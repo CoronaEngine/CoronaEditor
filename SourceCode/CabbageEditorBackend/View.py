@@ -300,6 +300,10 @@ class AddDock(QDockWidget):
         elif event_type == "resize":
             try:
                 data = json.loads(event_data)
+                # 如果有位置信息，先移动窗口
+                if "x" in data and "y" in data:
+                    self.move(int(data["x"]), int(data["y"]))
+                # 调整大小
                 self.resize(int(data["width"]), int(data["height"]))
                 self.update()
             except Exception as e:

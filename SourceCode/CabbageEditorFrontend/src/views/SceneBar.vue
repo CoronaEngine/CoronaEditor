@@ -95,127 +95,14 @@
 <script setup>
 import { ref, onMounted, onUnmounted } from 'vue';
 import { useRoute } from 'vue-router';
+import { useDragResize } from '@/composables/useDragResize';
 
+const { dragState,startDrag,startResize,stopDrag,onDrag,stopResize,onResize } = useDragResize();
 const sceneImages = ref([]);
-
-const isFloating = ref(false);
 const route = useRoute();
 const currentSceneName = ref('');
 const px=ref('1.0'), py=ref('1.0'), pz=ref('1.0');
 
-
-// 拖拽状态管理
-const dragState = ref({
-  isDragging: false,
-  isResizing: false,
-  resizeDirection: '',
-  offsetX: 0,
-  offsetY: 0,
-  startWidth: 0,
-  startHeight: 0,
-  startX: 0,
-  startY: 0,
-  windowX: 0,
-  windowY: 0
-});
-
-const startResize = (event, direction) => {
-  if (event.button !== 0) return;
-
-  dragState.value.isResizing = true;
-  dragState.value.resizeDirection = direction;
-  dragState.value.startWidth = event.currentTarget.parentElement.offsetWidth;
-  dragState.value.startHeight = event.currentTarget.parentElement.offsetHeight;
-  dragState.value.startX = event.clientX;
-  dragState.value.startY = event.clientY;
-  
-  // 记录窗口当前位置
-  const rect = event.currentTarget.parentElement.getBoundingClientRect();
-  dragState.value.windowX = rect.left;
-  dragState.value.windowY = rect.top;
-  
-  event.preventDefault();
-};
-
-const onResize = (event) => {
-  if (!dragState.value.isResizing) return;
-
-  const deltaX = event.clientX - dragState.value.startX;
-  const deltaY = event.clientY - dragState.value.startY;
-  
-  let newWidth = dragState.value.startWidth;
-  let newHeight = dragState.value.startHeight;
-  let newX = dragState.value.windowX;
-  let newY = dragState.value.windowY;
-
-  switch(dragState.value.resizeDirection) {
-    case 'n':
-      newY = dragState.value.windowY - deltaY;
-      newHeight = Math.max(200, dragState.value.startHeight + deltaY);
-      break;
-    case 's':
-      newY = dragState.value.windowY + deltaY;
-      newHeight = Math.max(200, dragState.value.startHeight + deltaY);
-      break;
-    case 'w':
-      newX = dragState.value.windowX - deltaX;
-      newWidth = Math.max(200, dragState.value.startWidth + deltaX);
-      break;
-    case 'e':
-      newX = dragState.value.windowX + deltaX;
-      newWidth = Math.max(200, dragState.value.startWidth + deltaX);
-      break;
-    case 'nw':
-      newWidth = Math.max(200, dragState.value.startWidth - deltaX);
-      newHeight = Math.max(200, dragState.value.startHeight - deltaY);
-      newX = dragState.value.windowX + deltaX;
-      newY = dragState.value.windowY + deltaY;
-      break;
-    case 'ne':
-      newWidth = Math.max(200, dragState.value.startWidth + deltaX);
-      newHeight = Math.max(200, dragState.value.startHeight - deltaY);
-      newY = dragState.value.windowY + deltaY;
-      break;
-    case 'sw':
-      newWidth = Math.max(200, dragState.value.startWidth - deltaX);
-      newHeight = Math.max(200, dragState.value.startHeight + deltaY);
-      newX = dragState.value.windowX + deltaX;
-      break;
-    case 'se':
-      newWidth = Math.max(200, dragState.value.startWidth + deltaX);
-      newHeight = Math.max(200, dragState.value.startHeight + deltaY);
-      break;
-  }
-
-  // 检测是否拖到边界自动浮动
-  const screenWidth = window.innerWidth;
-  const screenHeight = window.innerHeight;
-  const threshold = 50;
-  
-  if (newX < threshold || newX + newWidth > screenWidth - threshold ||
-      newY < threshold || newY + newHeight > screenHeight - threshold) {
-    if (!isFloating.value && window.pyBridge) {
-      isFloating.value = true;
-      window.pyBridge.forwardDockEvent('float', JSON.stringify({
-        isFloating: true
-      }));
-    }
-  }
-
-  if (window.pyBridge) {
-    window.pyBridge.forwardDockEvent('resize', JSON.stringify({
-      width: newWidth,
-      height: newHeight,
-      x: newX,
-      y: newY
-    }));
-  }
-  event.preventDefault();
-};
-
-const stopResize = () => {
-  dragState.value.isResizing = false;
-};
 
 const controlObject = (scene) => {
   if (window.pyBridge) {
@@ -335,51 +222,6 @@ const DayNightCycle = () => {
   return () => clearInterval(interval);
 };
 
-const startDrag = (event) => {
-  if (event.button !== 0) return;
-  dragState.value.isDragging = true;
-  dragState.value.startX = event.clientX;
-  dragState.value.startY = event.clientY;
-  
-  // 移除获取位置的代码
-  event.currentTarget.classList.add('bg-[#7BA590]/80');
-  event.preventDefault();
-};
-
-// 拖动中
-const onDrag = (event) => {
-  if (!dragState.value.isDragging) return;
-  
-  const deltaX = event.clientX - dragState.value.startX;
-  const deltaY = event.clientY - dragState.value.startY;
-  
-  if (window.pyBridge) {
-    window.pyBridge.forwardDockEvent('drag', JSON.stringify({
-      deltaX,
-      deltaY
-    }));
-  }
-  
-  dragState.value.startX = event.clientX;
-  dragState.value.startY = event.clientY;
-  event.preventDefault();
-};
-
-// 停止拖动
-const stopDrag = (event) => {
-  if (!dragState.value.isDragging) return;
-
-  dragState.value.isDragging = false;
-  dragState.value.startX = 0;
-  dragState.value.startY = 0;
-
-  event.currentTarget.classList.remove('bg-[#7BA590]/80');
-  event.preventDefault();
-};
-
-// 浮动和缩放相关
-
-
 //关闭浮动窗口
 const closeFloat = () => {
   if (window.pyBridge) {
@@ -387,25 +229,33 @@ const closeFloat = () => {
   }
 };
 
+const handleResizeMove = (e) => {
+  if (dragState.value.isResizing) onResize(e);
+};
+
+const handleResizeUp = () => {
+  if (dragState.value.isResizing) stopResize();
+};
+
 onMounted(() => {
   currentSceneName.value = route.query.sceneName || 'scene1';
+  document.addEventListener('mousemove', handleResizeMove);
+  document.addEventListener('mouseup', handleResizeUp);
   document.addEventListener('mousemove', onDrag);
   document.addEventListener('mouseup', stopDrag);
   window.pyBridge.send_message_to_dock("AITalkBar", JSON.stringify({"content": "Hello, World!"}));
   if (window.pyBridge) {
     window.pyBridge.dock_event.connect(handleDockEvent);
   }
-  document.addEventListener('mousemove', onResize);
-  document.addEventListener('mouseup', stopResize);
 });
 
 onUnmounted(() => {
+  document.removeEventListener('mousemove', handleResizeMove);
+  document.removeEventListener('mouseup', handleResizeUp);
   document.removeEventListener('mousemove', onDrag);
   document.removeEventListener('mouseup', stopDrag);
   if (window.pyBridge) {
     window.pyBridge.dockEvent.disconnect(handleDockEvent);
   }
-  document.removeEventListener('mousemove', onResize);
-  document.removeEventListener('mouseup', stopResize);
 });
 </script>

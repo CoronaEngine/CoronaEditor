@@ -2,6 +2,7 @@ import { defineConfig } from 'vite';
 import vue from '@vitejs/plugin-vue';
 import tailwindcss from 'tailwindcss';
 import autoprefixer from 'autoprefixer';
+import { fileURLToPath } from 'url';
 
 export default defineConfig({
   base: './',
@@ -19,4 +20,10 @@ export default defineConfig({
   build: {
     chunkSizeWarningLimit: 1000, // Increase the limit to 1000 kB (1MB)
   },
+  resolve: {
+    alias: {
+      '@': fileURLToPath(new URL('./src', import.meta.url)),
+      '@/composables': fileURLToPath(new URL('./src/composables', import.meta.url))
+    }
+  }
 });
