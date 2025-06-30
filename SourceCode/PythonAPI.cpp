@@ -12,7 +12,29 @@
 
 #include "PythonAPI.h"
 
-#include"CabbageFramework/CabbageCommon/CabbageCommon.h"
+//#include"CabbageFramework/CabbageCommon/CabbageCommon.h"
+
+const std::string PythonAPI::codePath =
+[] {
+    std::string resultPath = "";
+    std::string runtimePath = std::filesystem::current_path().string();
+    // std::replace(runtimePath.begin(), runtimePath.end(), '\\', '/');
+    std::regex pattern(R"((.*)CabbageEngine\b)");
+    std::smatch matches;
+    if (std::regex_search(runtimePath, matches, pattern))
+    {
+        if (matches.size() > 1)
+        {
+            resultPath = matches[1].str() + "CabbageEngine";
+        }
+        else
+        {
+            throw std::runtime_error("Failed to resolve source path.");
+        }
+    }
+    std::replace(resultPath.begin(), resultPath.end(), '\\', '/');
+    return resultPath + "/SourceCode";
+    }();
 
 
 PyObject *PyInit_CabbageEngineEmbedded()
@@ -63,7 +85,7 @@ PythonAPI::PythonAPI()
 {
     PyConfig_InitPythonConfig(&config);
 
-    hotreloadPath = CabbageFiles::codePath + "/CabbageEditor/CabbageEditorBackend";
+    hotreloadPath = PythonAPI::codePath + "/CabbageEditor/CabbageEditorBackend";
     std::replace(hotreloadPath.begin(), hotreloadPath.end(), '\\', '/');
 }
 
