@@ -24,9 +24,12 @@ if(NOT USED_PRESET_CONFIG)
 endif()
 
 # 判断当前目录是否为项目根目录
-set(IS_ROOT_DIR
-    ${CMAKE_CURRENT_SOURCE_DIR} STREQUAL ${CMAKE_SOURCE_DIR}
-)
+set(IS_ROOT_DIR TRUE)
+
+if(NOT ${CMAKE_SOURCE_DIR} STREQUAL ${CMAKE_CURRENT_SOURCE_DIR})
+    set(IS_ROOT_DIR FALSE)
+    message(STATUS "[CabbageEditor] 当前目录不是项目根目录，设置 IS_ROOT_DIR 为 FALSE。")
+endif()
 
 if(IS_ROOT_DIR)
     message(STATUS "[CabbageEditor] 正在配置项目根目录: ${CMAKE_CURRENT_SOURCE_DIR}")
@@ -189,5 +192,6 @@ if(IS_ROOT_DIR)
         )
         message(STATUS "[CabbageEditor] Windows 平台依赖与脚本配置完成。")
     endif()
+
     message(STATUS "[CabbageEditor] 构建配置流程结束。")
 endif()
