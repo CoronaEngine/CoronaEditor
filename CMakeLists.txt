@@ -20,6 +20,16 @@ if(NOT USED_PRESET_CONFIG)
     message(FATAL_ERROR "请使用CMake预设配置！！！")
 endif()
 
+set(IS_ROOT_DIR
+    ${CMAKE_CURRENT_SOURCE_DIR} STREQUAL ${CMAKE_SOURCE_DIR}
+) # 检查当前目录是否为项目根目录
+
+if(IS_ROOT_DIR)
+    message(STATUS "CabbageFramework: 正在配置项目根目录 ${CMAKE_CURRENT_SOURCE_DIR}")
+else()
+    message(STATUS "CabbageFramework: 正在配置子目录 ${CMAKE_CURRENT_SOURCE_DIR}")
+endif()
+
 # -------------------------------------------------------------------------------
 # CMake策略配置
 # -------------------------------------------------------------------------------
@@ -63,115 +73,125 @@ function(set_source_groups SOURCE_FILES SOURCE_DIR SOURCE_DIR_NAME)
     endforeach()
 endfunction()
 
-
 # 设置源代码目录
 set(SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/SourceCode)
 
 # 递归搜索源文件
-file(GLOB_RECURSE SOURCE_FILES CONFIGURE_DEPENDS "${SOURCE_DIR}/*.*" )
+file(GLOB_RECURSE SOURCE_FILES CONFIGURE_DEPENDS "${SOURCE_DIR}/*.*")
 
-# 定义要忽略的文件或文件夹
-set(IGNORE_FILES
-  "SourceCode/CabbageEditorBackend/*"
-  "SourceCode/CabbageEditorFrontend/*")
+if(IS_ROOT_DIR)
+    # 定义要忽略的文件或文件夹
+    set(IGNORE_FILES
+        "SourceCode/CabbageEditorBackend/*"
+        "SourceCode/CabbageEditorFrontend/*")
+else()
+    # 定义要忽略的文件或文件夹
+    set(IGNORE_FILES
+        "SourceCode/CabbageEditorBackend/*"
+        "SourceCode/CabbageEditorFrontend/*"
+        "SourceCode/main.cpp" # 忽略主函数文件
+    )
+endif()
 
 # 过滤掉要忽略的文件或文件夹
 foreach(file ${IGNORE_FILES})
-  list(FILTER SOURCE_FILES EXCLUDE REGEX ${file})
+    list(FILTER SOURCE_FILES EXCLUDE REGEX ${file})
 endforeach()
 
-add_executable(${PROJECT_NAME} ${SOURCE_FILES})# 创建可执行目标，使用项目名称作为目标名
-set_source_groups("${SOURCE_FILES}" ${SOURCE_DIR} "SourceCode")
+# 如果是根目录，添加主函数文件 & 编译可执行目标
+if(IS_ROOT_DIR)
+    add_executable(${PROJECT_NAME} ${SOURCE_FILES}) # 创建可执行目标，使用项目名称作为目标名
+    set_source_groups("${SOURCE_FILES}" ${SOURCE_DIR} "SourceCode")
 
+    # -------------------------------------------------------------------------------
+    # 编译器选项配置
+    # -------------------------------------------------------------------------------
+    target_compile_options(${PROJECT_NAME} PRIVATE
 
-# -------------------------------------------------------------------------------
-# 编译器选项配置
-# -------------------------------------------------------------------------------
-target_compile_options(${PROJECT_NAME} PRIVATE
+        # RelWithDebInfo 配置下保留调试信息:
+        $<$<AND:$<CONFIG:RelWithDebInfo>,$<NOT:$<CXX_COMPILER_ID:MSVC>>>:-fno-omit-frame-pointer> # 保留帧指针
+        $<$<AND:$<CONFIG:RelWithDebInfo>,$<NOT:$<CXX_COMPILER_ID:MSVC>>>:-g> # 生成调试符号
 
-    # RelWithDebInfo 配置下保留调试信息:
-    $<$<AND:$<CONFIG:RelWithDebInfo>,$<NOT:$<CXX_COMPILER_ID:MSVC>>>:-fno-omit-frame-pointer> # 保留帧指针
-    $<$<AND:$<CONFIG:RelWithDebInfo>,$<NOT:$<CXX_COMPILER_ID:MSVC>>>:-g> # 生成调试符号
+        # MinSizeRel 配置下的优化选项:
+        $<$<AND:$<CONFIG:MinSizeRel>,$<NOT:$<CXX_COMPILER_ID:MSVC>>>:-ffunction-sections> # 函数分段(便于链接优化)
+        $<$<AND:$<CONFIG:MinSizeRel>,$<NOT:$<CXX_COMPILER_ID:MSVC>>>:-fdata-sections> # 数据分段(便于链接优化)
+        $<$<AND:$<CONFIG:MinSizeRel>,$<CXX_COMPILER_ID:Clang>>:-Oz> # Clang 最佳体积优化
+        $<$<AND:$<CONFIG:MinSizeRel>,$<CXX_COMPILER_ID:MSVC>>:/GL> # MSVC 全程序优化
 
-    # MinSizeRel 配置下的优化选项:
-    $<$<AND:$<CONFIG:MinSizeRel>,$<NOT:$<CXX_COMPILER_ID:MSVC>>>:-ffunction-sections> # 函数分段(便于链接优化)
-    $<$<AND:$<CONFIG:MinSizeRel>,$<NOT:$<CXX_COMPILER_ID:MSVC>>>:-fdata-sections> # 数据分段(便于链接优化)
-    $<$<AND:$<CONFIG:MinSizeRel>,$<CXX_COMPILER_ID:Clang>>:-Oz> # Clang 最佳体积优化
-    $<$<AND:$<CONFIG:MinSizeRel>,$<CXX_COMPILER_ID:MSVC>>:/GL> # MSVC 全程序优化
-
-    # MSVC 通用选项:
-    $<$<CXX_COMPILER_ID:MSVC>:/W1> # 警告等级 1
-    $<$<CXX_COMPILER_ID:MSVC>:/source-charset:utf-8> # 源文件编码 UTF-8
-    $<$<CXX_COMPILER_ID:MSVC>:/execution-charset:utf-8> # 执行字符集 UTF-8
-)
-
-# -------------------------------------------------------------------------------
-# 链接器选项配置
-# -------------------------------------------------------------------------------
-target_link_options(${PROJECT_NAME} PRIVATE
-
-    # MinSizeRel 配置下的体积优化:
-    $<$<AND:$<CONFIG:MinSizeRel>,$<PLATFORM_ID:Linux>,$<NOT:$<CXX_COMPILER_ID:MSVC>>>:LINKER:--gc-sections> # 移除未使用段
-    $<$<AND:$<CONFIG:MinSizeRel>,$<PLATFORM_ID:Darwin>>:-dead_strip> # macOS 死代码消除
-    $<$<AND:$<CONFIG:MinSizeRel>,$<CXX_COMPILER_ID:MSVC>>:/LTCG> # 链接时代码生成
-    $<$<AND:$<CONFIG:MinSizeRel>,$<CXX_COMPILER_ID:MSVC>>:/OPT:REF> # 移除未引用数据
-    $<$<AND:$<CONFIG:MinSizeRel>,$<CXX_COMPILER_ID:MSVC>>:/OPT:ICF> # 相同 COMDAT 折叠
-)
-
-# -------------------------------------------------------------------------------
-# 预处理器定义
-# -------------------------------------------------------------------------------
-target_compile_definitions(${PROJECT_NAME} PRIVATE
-
-    # 根据配置设置不同的功能开关:
-    $<$<CONFIG:RelWithDebInfo>:ENABLE_DETAILED_LOGGING=1> # 启用详细日志
-    $<$<CONFIG:RelWithDebInfo>:CABBAGE_ENGINE_DEBUG> # 调试模式宏 CABBAGE_ENGINE_DEBUG
-    $<$<CONFIG:MinSizeRel>:DISABLE_EXTRA_FEATURES=1> # 禁用额外功能
-    $<$<CONFIG:MinSizeRel>:CABBAGE_ENGINE_RELEASE> # 发布模式宏 CABBAGE_ENGINE_RELEASE
-
-    # MSVC 特定定义:
-    $<$<CXX_COMPILER_ID:MSVC>:_CRT_SECURE_NO_WARNINGS> # 禁用安全警告
-    NOMINMAX # 禁用 MSVC 的 min/max 宏
-)
-
-# -------------------------------------------------------------------------------
-# 目标属性配置
-# -------------------------------------------------------------------------------
-set_target_properties(${PROJECT_NAME} PROPERTIES
-    RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin/$<CONFIG> # 可执行文件输出路径
-    LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib/$<CONFIG> # 库文件输出路径
-    ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib/$<CONFIG> # 静态库输出路径
-    PDB_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin/$<CONFIG> # PDB 文件输出路径
-    VS_DEBUGGER_WORKING_DIRECTORY $<TARGET_FILE_DIR:${PROJECT_NAME}> # VS 调试工作目录
-)
-
-# -------------------------------------------------------------------------------
-# 全局属性配置
-# -------------------------------------------------------------------------------
-set_property(GLOBAL PROPERTY USE_FOLDERS ON) # 启用 IDE 中的文件夹组织
-set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT ${PROJECT_NAME}) # 设置 VS 启动项目
-
-# -------------------------------------------------------------------------------
-# Windows 平台配置
-# -------------------------------------------------------------------------------
-if(WIN32)
-    target_include_directories(${PROJECT_NAME} PRIVATE
-        "${Python3_INCLUDE_DIRS}"
-        "${CMAKE_CURRENT_SOURCE_DIR}/SourceCode"
+        # MSVC 通用选项:
+        $<$<CXX_COMPILER_ID:MSVC>:/W1> # 警告等级 1
+        $<$<CXX_COMPILER_ID:MSVC>:/source-charset:utf-8> # 源文件编码 UTF-8
+        $<$<CXX_COMPILER_ID:MSVC>:/execution-charset:utf-8> # 执行字符集 UTF-8
     )
 
-    target_link_directories(${PROJECT_NAME} PRIVATE "${Python3_LIBRARY_DIRS}")
-    target_link_libraries(${PROJECT_NAME} PRIVATE "${Python3_LIBRARIES}")
+    # -------------------------------------------------------------------------------
+    # 链接器选项配置
+    # -------------------------------------------------------------------------------
+    target_link_options(${PROJECT_NAME} PRIVATE
 
-    add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
-        COMMAND ${Python3_EXECUTABLE} "${CMAKE_CURRENT_SOURCE_DIR}/ExternalEnvironment/scripts/npm_build.py"
-        VERBATIM
+        # MinSizeRel 配置下的体积优化:
+        $<$<AND:$<CONFIG:MinSizeRel>,$<PLATFORM_ID:Linux>,$<NOT:$<CXX_COMPILER_ID:MSVC>>>:LINKER:--gc-sections> # 移除未使用段
+        $<$<AND:$<CONFIG:MinSizeRel>,$<PLATFORM_ID:Darwin>>:-dead_strip> # macOS 死代码消除
+        $<$<AND:$<CONFIG:MinSizeRel>,$<CXX_COMPILER_ID:MSVC>>:/LTCG> # 链接时代码生成
+        $<$<AND:$<CONFIG:MinSizeRel>,$<CXX_COMPILER_ID:MSVC>>:/OPT:REF> # 移除未引用数据
+        $<$<AND:$<CONFIG:MinSizeRel>,$<CXX_COMPILER_ID:MSVC>>:/OPT:ICF> # 相同 COMDAT 折叠
     )
-    add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
-        COMMAND ${Python3_EXECUTABLE} "${CMAKE_CURRENT_SOURCE_DIR}/ExternalEnvironment/scripts/sync_res.py"
-        "--python-root-dir" "${Python3_ROOT_DIR}"
-        "--runtime-output_dir" "$<TARGET_FILE_DIR:${PROJECT_NAME}>"
-        "--cmake-root-dir" "${CMAKE_CURRENT_SOURCE_DIR}"
-        VERBATIM
+
+    # -------------------------------------------------------------------------------
+    # 预处理器定义
+    # -------------------------------------------------------------------------------
+    target_compile_definitions(${PROJECT_NAME} PRIVATE
+
+        # 根据配置设置不同的功能开关:
+        $<$<CONFIG:RelWithDebInfo>:ENABLE_DETAILED_LOGGING=1> # 启用详细日志
+        $<$<CONFIG:RelWithDebInfo>:CABBAGE_ENGINE_DEBUG> # 调试模式宏 CABBAGE_ENGINE_DEBUG
+        $<$<CONFIG:MinSizeRel>:DISABLE_EXTRA_FEATURES=1> # 禁用额外功能
+        $<$<CONFIG:MinSizeRel>:CABBAGE_ENGINE_RELEASE> # 发布模式宏 CABBAGE_ENGINE_RELEASE
+
+        # MSVC 特定定义:
+        $<$<CXX_COMPILER_ID:MSVC>:_CRT_SECURE_NO_WARNINGS> # 禁用安全警告
+        NOMINMAX # 禁用 MSVC 的 min/max 宏
     )
+
+    # -------------------------------------------------------------------------------
+    # 目标属性配置
+    # -------------------------------------------------------------------------------
+    set_target_properties(${PROJECT_NAME} PROPERTIES
+        RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin/$<CONFIG> # 可执行文件输出路径
+        LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib/$<CONFIG> # 库文件输出路径
+        ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib/$<CONFIG> # 静态库输出路径
+        PDB_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin/$<CONFIG> # PDB 文件输出路径
+        VS_DEBUGGER_WORKING_DIRECTORY $<TARGET_FILE_DIR:${PROJECT_NAME}> # VS 调试工作目录
+    )
+
+    # -------------------------------------------------------------------------------
+    # 全局属性配置
+    # -------------------------------------------------------------------------------
+    set_property(GLOBAL PROPERTY USE_FOLDERS ON) # 启用 IDE 中的文件夹组织
+    set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT ${PROJECT_NAME}) # 设置 VS 启动项目
+
+    # -------------------------------------------------------------------------------
+    # Windows 平台配置
+    # -------------------------------------------------------------------------------
+    if(WIN32)
+        target_include_directories(${PROJECT_NAME} PRIVATE
+            "${Python3_INCLUDE_DIRS}"
+            "${CMAKE_CURRENT_SOURCE_DIR}/SourceCode"
+        )
+
+        target_link_directories(${PROJECT_NAME} PRIVATE "${Python3_LIBRARY_DIRS}")
+        target_link_libraries(${PROJECT_NAME} PRIVATE "${Python3_LIBRARIES}")
+
+        add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
+            COMMAND ${Python3_EXECUTABLE} "${CMAKE_CURRENT_SOURCE_DIR}/ExternalEnvironment/scripts/npm_build.py"
+            VERBATIM
+        )
+        add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
+            COMMAND ${Python3_EXECUTABLE} "${CMAKE_CURRENT_SOURCE_DIR}/ExternalEnvironment/scripts/sync_res.py"
+            "--python-root-dir" "${Python3_ROOT_DIR}"
+            "--runtime-output_dir" "$<TARGET_FILE_DIR:${PROJECT_NAME}>"
+            "--cmake-root-dir" "${CMAKE_CURRENT_SOURCE_DIR}"
+            VERBATIM
+        )
+    endif()
 endif()
