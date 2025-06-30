@@ -7,7 +7,7 @@ import time
 from httpx._models import Response
 
 # from LargeLanguageModel.mcp_client import qa_one_sync
-
+from mcp_client import qa_one_sync
 from StaticComponents import root_dir, html_path, url, obj_dir, scene_dict
 
 
