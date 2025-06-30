@@ -923,11 +923,13 @@ const handleBlockCreate = (event) => {
 
 const updatePosition = () => {
   if (window.pyBridge) {
-    window.pyBridge.HandleActorMove(JSON.stringify({
-      px: parseFloat(px.value),
-      py: parseFloat(py.value),
-      pz: parseFloat(pz.value),
-      actorname: actorname.value
+    window.pyBridge.Actor_Operation(JSON.stringify({
+      Operation: "Move",
+      sceneName: scenename.value,
+      x: parseFloat(px.value),
+      y: parseFloat(py.value),
+      z: parseFloat(pz.value),
+      actorName: actorname.value
     }));
     console.error('updatePosition', actorname.value, px.value, py.value, pz.value); // 调试用，确保值正确传递到 Python 端
   } 
@@ -935,11 +937,13 @@ const updatePosition = () => {
 
 const updateRotation = () => {
   if (window.pyBridge) {
-    window.pyBridge.HandleActorRotate(JSON.stringify({
-      rx: parseFloat(rx.value),
-      ry: parseFloat(ry.value),
-      rz: parseFloat(rz.value),
-      actorname: actorname.value
+    window.pyBridge.Actor_Operation(JSON.stringify({
+      Operation: "Rotate",
+      sceneName: scenename.value,
+      x: parseFloat(rx.value),
+      y: parseFloat(ry.value),
+      z: parseFloat(rz.value),
+      actorName: actorname.value
     }));
     console.error('updateRotation', rx.value, ry.value, rz.value); // 调试用，确保值正确传递到 Python 端
   }
@@ -947,11 +951,13 @@ const updateRotation = () => {
 
 const updateScale = () => {
   if (window.pyBridge) {
-    window.pyBridge.HandleActorScale(JSON.stringify({
-      sx: parseFloat(sx.value),
-      sy: parseFloat(sy.value),
-      sz: parseFloat(sz.value),
-      actorname: actorname.value
+    window.pyBridge.Actor_Operation(JSON.stringify({
+      Operation: "Scale",
+      sceneName: scenename.value,
+      x: parseFloat(sx.value),
+      y: parseFloat(sy.value),
+      z: parseFloat(sz.value),
+      actorName: actorname.value
     }));
     console.error('updateScale', sx.value, sy.value, sz.value); // 调试用，确保值正确传递到 Python 端
   } 
@@ -964,31 +970,34 @@ const closeFloat = () => {
   }
 };
 
+const handleResizeMove = (e) => {
+  if (dragState.value.isResizing) onResize(e);
+};
+
+const handleResizeUp = () => {
+  if (dragState.value.isResizing) stopResize();
+};
+
 onMounted(() => {
-  actorname.value = parseInt(route.query.index);
+  scenename.value = route.query.sceneName;
+  actorname.value = route.query.objectName;
   character.value = decodeURIComponent(route.query.path);
   routename.value = route.query.routename;
-  console.error('Received actor index:', actorname.value);
-  console.error('Received character:', character.value);
-  console.error('Received routename:', routename.value);
-
   initBlockly();
+  document.addEventListener('mousemove', handleResizeMove);
+  document.addEventListener('mouseup', handleResizeUp);
   document.addEventListener('mousemove', onDrag);
   document.addEventListener('mouseup', stopDrag);
-  document.addEventListener('mousemove', onResize);
-  document.addEventListener('mouseup', stopResize);
-
 });
 
 // 组件卸载时清理
 onUnmounted(() => {
   // 这里假设 closeWorkspace 是一个自定义函数，需要根据实际情况实现
   // closeWorkspace();
+  document.removeEventListener('mousemove', handleResizeMove);
+  document.removeEventListener('mouseup', handleResizeUp);
   document.removeEventListener('mousemove', onDrag);
   document.removeEventListener('mouseup', stopDrag);
-  document.removeEventListener('mousemove', onResize);
-  document.removeEventListener('mouseup', stopResize);
-
 });
 </script>
 
