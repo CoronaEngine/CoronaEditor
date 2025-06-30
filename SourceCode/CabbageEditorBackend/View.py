@@ -1,6 +1,6 @@
 from PyQt6.QtCore import Qt, QPoint, QEvent, pyqtSignal, QRect, QTimer
 from PyQt6.QtWidgets import QMainWindow, QApplication, QWidget,QDockWidget,QVBoxLayout
-from PyQt6.QtGui import QColor
+from PyQt6.QtGui import QColor, QPixmap, QPainter
 from PyQt6.QtWebChannel import QWebChannel
 from PyQt6.QtWebEngineWidgets import QWebEngineView
 from PyQt6.QtWebEngineCore import QWebEngineProfile, QWebEngineSettings
@@ -132,6 +132,17 @@ class RenderWidget(QWidget):
             "scene":self.mainscene,
             "actor_dict":{}
         }
+
+        self.image_path = os.path.join(os.path.dirname(__file__), "background")
+        self.pixmap = None
+        if self.image_path:
+            self.pixmap = QPixmap(self.image_path)
+            self.update()
+
+    def paintEvent(self, event):
+        if self.pixmap:
+            painter = QPainter(self)
+            painter.drawPixmap(self.rect(), self.pixmap)
 
     def scene(self):
         return self.winId()
