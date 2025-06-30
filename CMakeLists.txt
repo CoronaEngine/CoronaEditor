@@ -152,61 +152,12 @@ set_property(GLOBAL PROPERTY USE_FOLDERS ON) # 启用 IDE 中的文件夹组织
 set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT ${PROJECT_NAME}) # 设置 VS 启动项目
 
 # -------------------------------------------------------------------------------
-# 子仓库配置
-# -------------------------------------------------------------------------------
-set(BUILD_SHARED_LIBS OFF)
-
-# --- GLFW ---
-add_subdirectory(ExternalEnvironment/glfw EXCLUDE_FROM_ALL)
-
-# --- Assimp ---
-add_subdirectory(ExternalEnvironment/assimp EXCLUDE_FROM_ALL)
-
-# --- glslang ---
-set(ENABLE_OPT OFF) # 通常用于关闭 glslang 的优化，可能用于调试或加速编译。
-add_subdirectory(ExternalEnvironment/vulkan/glslang EXCLUDE_FROM_ALL)
-
-# --- SPIRV-Cross ---
-set(SPIRV_CROSS_SHARED OFF) # 显式要求 SPIRV-Cross 不构建共享库（与全局 BUILD_SHARED_LIBS 一致）。
-set(SPIRV_CROSS_STATIC ON) # 显式要求 SPIRV-Cross 构建静态库。
-set(SPIRV_CROSS_ENABLE_TESTS OFF) # 禁用测试目标，可以减少配置和编译时间。
-set(SPIRV_CROSS_CLI OFF) # 禁用命令行接口工具的构建。
-add_subdirectory(ExternalEnvironment/vulkan/SPIRV-Cross EXCLUDE_FROM_ALL)
-
-# --- 链接库到主项目 ---
-target_link_libraries(${PROJECT_NAME} PRIVATE
-    glfw
-    assimp
-    glslang
-    glslang-default-resource-limits # glslang 的一个组件
-    spirv-cross-core
-    spirv-cross-c
-    spirv-cross-cpp
-    spirv-cross-util
-)
-
-# -------------------------------------------------------------------------------
 # Windows 平台配置
 # -------------------------------------------------------------------------------
 if(WIN32)
     target_include_directories(${PROJECT_NAME} PRIVATE
         "${Python3_INCLUDE_DIRS}"
         "${CMAKE_CURRENT_SOURCE_DIR}/SourceCode"
-
-        "${CMAKE_CURRENT_SOURCE_DIR}/ExternalEnvironment/ktm"
-        "${CMAKE_CURRENT_SOURCE_DIR}/ExternalEnvironment/stb"
-        "${CMAKE_CURRENT_SOURCE_DIR}/ExternalEnvironment/glfw/include"
-
-        "${CMAKE_CURRENT_SOURCE_DIR}/ExternalEnvironment/boost/pfr/include"
-        "${CMAKE_CURRENT_SOURCE_DIR}/ExternalEnvironment/boost/preprocessor/include"
-
-        "${CMAKE_CURRENT_SOURCE_DIR}/ExternalEnvironment/vulkan"
-        "${CMAKE_CURRENT_SOURCE_DIR}/ExternalEnvironment/vulkan/volk"
-        "${CMAKE_CURRENT_SOURCE_DIR}/ExternalEnvironment/vulkan/glslang"
-        "${CMAKE_CURRENT_SOURCE_DIR}/ExternalEnvironment/vulkan/SPIRV-Cross"
-        "${CMAKE_CURRENT_SOURCE_DIR}/ExternalEnvironment/vulkan/Vulkan-Headers/include"
-        "${CMAKE_CURRENT_SOURCE_DIR}/ExternalEnvironment/vulkan/VulkanMemoryAllocator/include"
-
     )
 
     target_link_directories(${PROJECT_NAME} PRIVATE "${Python3_LIBRARY_DIRS}")
