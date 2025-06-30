@@ -7,7 +7,7 @@
 	- 基于MCP接入大模型
 	- 使用PyQt6的QWebEngineView及QDockWidget搭建前端界面布局
 - 底层C艹
-	- 支持Python层的热重载
+	- 支持Python层的热重载，保存文件自动更新Python代码逻辑
   
 ### 配置方式
 - cmake
