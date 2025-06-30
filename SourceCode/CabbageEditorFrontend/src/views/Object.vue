@@ -103,6 +103,7 @@ const route = useRoute();
 const scenename = ref(null);
 const actorname = ref(null);
 const routename = ref(null);
+const flash = ref(null);
 
 Blockly.setLocale(CN);
 
@@ -497,6 +498,56 @@ pythonGenerator.forBlock['random'] = function(block) {
   return  `CabbageEngine.scaleActor(${value1},${value2})\n`;  // 返回基础数值
 };
 
+Blockly.Blocks['engine_movetoplass_actor'] = { 
+  init: function () {
+    this.appendDummyInput()
+      .appendField('移到')
+      .appendField(new Blockly.FieldDropdown([
+        ['角色1', 'actor1'],
+        ['角色2', 'actor2'],
+        ['角色3', 'actor3']
+      ]), 'ACTOR')
+    this.setInputsInline(true);
+    this.setPreviousStatement(true, null);
+    this.setNextStatement(true, null);
+    this.setColour('#FF5722');
+    this.setHelpUrl('');
+  }
+};
+
+// 修正生成器函数，确保名称和参数正确
+pythonGenerator.forBlock['engine_movetoplass_actor'] = function(block) {
+  const actor = block.getFieldValue('ACTOR');
+  return `CabbageEngine.moveToPlassActor(${actor})
+`;
+};
+
+Blockly.Blocks['engine_movetotimeplass_actor'] = { 
+  init: function () {
+    this.appendDummyInput()
+      .appendField('在')
+      .appendField(new Blockly.FieldTextInput('1'), 'T')
+      .appendField('秒内移到')
+      .appendField(new Blockly.FieldDropdown([
+        ['角色1', 'actor1'],
+        ['角色2', 'actor2'],
+        ['角色3', 'actor3']
+      ]), 'ACTOR')
+    this.setInputsInline(true);
+    this.setPreviousStatement(true, null);
+    this.setNextStatement(true, null);
+    this.setColour('#FF5722');
+    this.setHelpUrl('');
+  }
+};
+
+pythonGenerator.forBlock['engine_movetotimeplass_actor'] = function(block) {
+  const actor = block.getFieldValue('ACTOR');
+  const t = block.getFieldValue('T');
+  return `CabbageEngine.moveToTimePlassActor(${t}, ${actor})
+`;
+};
+
 Blockly.Blocks['wait'] = {
   init: function () {
     this.appendDummyInput()
@@ -546,7 +597,320 @@ pythonGenerator.forBlock['clone_del'] = function(block) {
   return `CabbageEngine.scaleaddActor()\n`;
 };
 
+Blockly.Blocks['engine_moveto_actor'] = {
+  init: function () {
+    this.appendDummyInput()
+      .appendField('删除此克隆体')
+    this.setInputsInline(true);
+    this.setPreviousStatement(true, null);
+    this.setNextStatement(flash, null);
+    this.setColour('#8A2BE2');
+    this.setHelpUrl('');
+  }
+};
+pythonGenerator.forBlock['engine_moveto_actor'] = function(block) {
+  return `CabbageEngine.scaleaddActor()\n`;
+};
 
+Blockly.Blocks['engine_movetotime_actor'] = {
+  init: function () {
+    this.appendDummyInput()
+      .appendField('删除此克隆体')
+    this.setInputsInline(true);
+    this.setPreviousStatement(true, null);
+    this.setNextStatement(flash, null);
+    this.setColour('#8A2BE2');
+    this.setHelpUrl('');
+  }
+};
+pythonGenerator.forBlock['engine_movetotime_actor'] = function(block) {
+  return `CabbageEngine.scaleaddActor()\n`;
+};
+
+Blockly.Blocks['engine_faceplass_actor'] = {
+  init: function () {
+    this.appendDummyInput()
+      .appendField('删除此克隆体')
+    this.setInputsInline(true);
+    this.setPreviousStatement(true, null);
+    this.setNextStatement(flash, null);
+    this.setColour('#8A2BE2');
+    this.setHelpUrl('');
+  }
+};
+pythonGenerator.forBlock['engine_faceplass_actor'] = function(block) {
+  return `CabbageEngine.scaleaddActor()\n`;
+};
+
+Blockly.Blocks['engine_face_actor'] = {
+  init: function () {
+    this.appendDummyInput()
+      .appendField('删除此克隆体')
+    this.setInputsInline(true);
+    this.setPreviousStatement(true, null);
+    this.setNextStatement(flash, null);
+    this.setColour('#8A2BE2');
+    this.setHelpUrl('');
+  }
+};
+pythonGenerator.forBlock['engine_face_actor'] = function(block) {
+  return `CabbageEngine.scaleaddActor()\n`;
+};
+
+Blockly.Blocks['engine_moveX_actor'] = {
+  init: function () {
+    this.appendDummyInput()
+      .appendField('删除此克隆体')
+    this.setInputsInline(true);
+    this.setPreviousStatement(true, null);
+    this.setNextStatement(flash, null);
+    this.setColour('#8A2BE2');
+    this.setHelpUrl('');
+  }
+};
+pythonGenerator.forBlock['engine_moveX_actor'] = function(block) {
+  return `CabbageEngine.scaleaddActor()\n`;
+};
+
+Blockly.Blocks['engine_movetoX_actor'] = {
+  init: function () {
+    this.appendDummyInput()
+      .appendField('删除此克隆体')
+    this.setInputsInline(true);
+    this.setPreviousStatement(true, null);
+    this.setNextStatement(flash, null);
+    this.setColour('#8A2BE2');
+    this.setHelpUrl('');
+  }
+};
+pythonGenerator.forBlock['engine_movetoX_actor'] = function(block) {
+  return `CabbageEngine.scaleaddActor()\n`;
+};
+
+Blockly.Blocks['engine_moveY_actor'] = {
+  init: function () {
+    this.appendDummyInput()
+      .appendField('删除此克隆体')
+    this.setInputsInline(true);
+    this.setPreviousStatement(true, null);
+    this.setNextStatement(flash, null);
+    this.setColour('#8A2BE2');
+    this.setHelpUrl('');
+  }
+};
+pythonGenerator.forBlock['engine_moveY_actor'] = function(block) {
+  return `CabbageEngine.scaleaddActor()\n`;
+};
+
+Blockly.Blocks['engine_movetoY_actor'] = {
+  init: function () {
+    this.appendDummyInput()
+      .appendField('删除此克隆体')
+    this.setInputsInline(true);
+    this.setPreviousStatement(true, null);
+    this.setNextStatement(flash, null);
+    this.setColour('#8A2BE2');
+    this.setHelpUrl('');
+  }
+};
+pythonGenerator.forBlock['engine_movetoY_actor'] = function(block) {
+  return `CabbageEngine.scaleaddActor()\n`;
+};
+
+Blockly.Blocks['engine_moveZ_actor'] = {
+  init: function () {
+    this.appendDummyInput()
+      .appendField('删除此克隆体')
+    this.setInputsInline(true);
+    this.setPreviousStatement(true, null);
+    this.setNextStatement(flash, null);
+    this.setColour('#8A2BE2');
+    this.setHelpUrl('');
+  }
+};
+pythonGenerator.forBlock['engine_moveZ_actor'] = function(block) {
+  return `CabbageEngine.scaleaddActor()\n`;
+};
+
+Blockly.Blocks['engine_movetoZ_actor'] = {
+  init: function () {
+    this.appendDummyInput()
+      .appendField('删除此克隆体')
+    this.setInputsInline(true);
+    this.setPreviousStatement(true, null);
+    this.setNextStatement(flash, null);
+    this.setColour('#8A2BE2');
+    this.setHelpUrl('');
+  }
+};
+pythonGenerator.forBlock['engine_movetoZ_actor'] = function(block) {
+  return `CabbageEngine.scaleaddActor()\n`;
+};
+
+Blockly.Blocks['appearance_scaleadd_actor'] = {
+  init: function () {
+    this.appendDummyInput()
+      .appendField('删除此克隆体')
+    this.setInputsInline(true);
+    this.setPreviousStatement(true, null);
+    this.setNextStatement(flash, null);
+    this.setColour('#8A2BE2');
+    this.setHelpUrl('');
+  }
+};
+pythonGenerator.forBlock['appearance_scaleadd_actor'] = function(block) {
+  return `CabbageEngine.scaleaddActor()\n`;
+};
+
+Blockly.Blocks['appearance_scale_actor'] = {
+  init: function () {
+    this.appendDummyInput()
+      .appendField('删除此克隆体')
+    this.setInputsInline(true);
+    this.setPreviousStatement(true, null);
+    this.setNextStatement(flash, null);
+    this.setColour('#8A2BE2');
+    this.setHelpUrl('');
+  }
+};
+pythonGenerator.forBlock['appearance_scale_actor'] = function(block) {
+  return `CabbageEngine.scaleaddActor()\n`;
+};
+
+Blockly.Blocks['appearance_hide_actor'] = {
+  init: function () {
+    this.appendDummyInput()
+      .appendField('删除此克隆体')
+    this.setInputsInline(true);
+    this.setPreviousStatement(true, null);
+    this.setNextStatement(flash, null);
+    this.setColour('#8A2BE2');
+    this.setHelpUrl('');
+  }
+};
+pythonGenerator.forBlock['appearance_hide_actor'] = function(block) {
+  return `CabbageEngine.scaleaddActor()\n`;
+};
+
+Blockly.Blocks['appearance_show_actor'] = {
+  init: function () {
+    this.appendDummyInput()
+      .appendField('删除此克隆体')
+    this.setInputsInline(true);
+    this.setPreviousStatement(true, null);
+    this.setNextStatement(flash, null);
+    this.setColour('#8A2BE2');
+    this.setHelpUrl('');
+  }
+};
+pythonGenerator.forBlock['appearance_show_actor'] = function(block) {
+  return `CabbageEngine.scaleaddActor()\n`;
+};
+
+Blockly.Blocks['appearance_scalespe_actor'] = {
+  init: function () {
+    this.appendDummyInput()
+      .appendField('删除此克隆体')
+    this.setInputsInline(true);
+    this.setPreviousStatement(true, null);
+    this.setNextStatement(flash, null);
+    this.setColour('#8A2BE2');
+    this.setHelpUrl('');
+  }
+};
+pythonGenerator.forBlock['appearance_scalespe_actor'] = function(block) {
+  return `CabbageEngine.scaleaddActor()\n`;
+};
+
+Blockly.Blocks['appearance_scalespeaddX_actor'] = {
+  init: function () {
+    this.appendDummyInput()
+      .appendField('删除此克隆体')
+    this.setInputsInline(true);
+    this.setPreviousStatement(true, null);
+    this.setNextStatement(flash, null);
+    this.setColour('#8A2BE2');
+    this.setHelpUrl('');
+  }
+};
+pythonGenerator.forBlock['appearance_scalespeaddX_actor'] = function(block) {
+  return `CabbageEngine.scaleaddActor()\n`;
+};
+
+Blockly.Blocks['appearance_scalespeaddY_actor'] = {
+  init: function () {
+    this.appendDummyInput()
+      .appendField('删除此克隆体')
+    this.setInputsInline(true);
+    this.setPreviousStatement(true, null);
+    this.setNextStatement(flash, null);
+    this.setColour('#8A2BE2');
+    this.setHelpUrl('');
+  }
+};
+pythonGenerator.forBlock['appearance_scalespeaddY_actor'] = function(block) {
+  return `CabbageEngine.scaleaddActor()\n`;
+};
+
+Blockly.Blocks['appearance_scalespeaddZ_actor'] = {
+  init: function () {
+    this.appendDummyInput()
+      .appendField('删除此克隆体')
+    this.setInputsInline(true);
+    this.setPreviousStatement(true, null);
+    this.setNextStatement(flash, null);
+    this.setColour('#8A2BE2');
+    this.setHelpUrl('');
+  }
+};
+pythonGenerator.forBlock['appearance_scalespeaddZ_actor'] = function(block) {
+  return `CabbageEngine.scaleaddActor()\n`;
+};
+
+Blockly.Blocks['appearance_scalespeX_actor'] = {
+  init: function () {
+    this.appendDummyInput()
+      .appendField('删除此克隆体')
+    this.setInputsInline(true);
+    this.setPreviousStatement(true, null);
+    this.setNextStatement(flash, null);
+    this.setColour('#8A2BE2');
+    this.setHelpUrl('');
+  }
+};
+pythonGenerator.forBlock['appearance_scalespeX_actor'] = function(block) {
+  return `CabbageEngine.scaleaddActor()\n`;
+};
+
+Blockly.Blocks['appearance_scalespeY_actor'] = {
+  init: function () {
+    this.appendDummyInput()
+      .appendField('删除此克隆体')
+    this.setInputsInline(true);
+    this.setPreviousStatement(true, null);
+    this.setNextStatement(flash, null);
+    this.setColour('#8A2BE2');
+    this.setHelpUrl('');
+  }
+};
+pythonGenerator.forBlock['appearance_scalespeY_actor'] = function(block) {
+  return `CabbageEngine.scaleaddActor()\n`;
+};
+
+Blockly.Blocks['appearance_scalespeZ_actor'] = {
+  init: function () {
+    this.appendDummyInput()
+      .appendField('删除此克隆体')
+    this.setInputsInline(true);
+    this.setPreviousStatement(true, null);
+    this.setNextStatement(flash, null);
+    this.setColour('#8A2BE2');
+    this.setHelpUrl('');
+  }
+};
+pythonGenerator.forBlock['appearance_scalespeZ_actor'] = function(block) {
+  return `CabbageEngine.scaleaddActor()\n`;
+};
 
 // 使用 JSON 格式的工具箱配置
 const TOOLBOX_CONFIG = {
