@@ -49,7 +49,7 @@ class Bridge(QObject):
     os.makedirs(saves_dir, exist_ok=True)
     obj_dir = ""
 
-    def __init__(self, central_manager):
+    def __init__(self, central_manager=None):
         super().__init__()
         self.camera_position = [0.0, 5.0, 10.0]
         self.camera_forward = [0.0, 1.5, 0.0]
