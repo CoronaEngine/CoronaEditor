@@ -27,10 +27,13 @@ PyTypeObject EngineScripts::ActorScripts::PyActorType = {
 
 void EngineScripts::ActorScripts::PyActor_dealloc(PyActorObject *self)
 {
+#ifdef ENABLE_CABBAGE_FRAMEWORK
     CabbageEngine::pythonOperateList.destoryActor(self->cpp_obj->actorID);
 
     delete self->cpp_obj;
     self->cpp_obj = nullptr;
+#endif
+
     Py_TYPE(self)->tp_free((PyObject *)self);
 }
 
@@ -40,8 +43,10 @@ PyObject *EngineScripts::ActorScripts::PyActor_new(PyTypeObject *type, PyObject 
     self = (PyActorObject *)type->tp_alloc(type, 0);
     if (self != nullptr)
     {
+#ifdef ENABLE_CABBAGE_FRAMEWORK
         // EngineScripts::pythonOperateList.destoryActor(self->cpp_obj->actorID);
         self->cpp_obj = nullptr;
+#endif
     }
     return (PyObject *)self;
 }
@@ -56,6 +61,7 @@ int EngineScripts::ActorScripts::PyActor_init(PyActorObject *self, PyObject *arg
         return -1;
     }
 
+#ifdef ENABLE_CABBAGE_FRAMEWORK
     if (self->cpp_obj)
     {
         delete self->cpp_obj;
@@ -76,6 +82,7 @@ int EngineScripts::ActorScripts::PyActor_init(PyActorObject *self, PyObject *arg
         PyErr_SetString(PyExc_RuntimeError, e.what());
         return -1;
     }
+#endif
 
     return 0; // Success
 }
@@ -83,13 +90,14 @@ int EngineScripts::ActorScripts::PyActor_init(PyActorObject *self, PyObject *arg
 PyObject *EngineScripts::ActorScripts::PyActor_move(PyActorObject *self, PyObject *args)
 {
     PyObject *vector_py;
-    ktm::fvec3 vector_cpp;
 
     if (!PyArg_ParseTuple(args, "O", &vector_py))
     {
         return nullptr;
     }
-    else
+
+#ifdef ENABLE_CABBAGE_FRAMEWORK
+    ktm::fvec3 vector_cpp;
     {
         PyObject *ItemX = PyList_GetItem(vector_py, 0);
         PyArg_Parse(ItemX, "f", &vector_cpp.x);
@@ -115,19 +123,21 @@ PyObject *EngineScripts::ActorScripts::PyActor_move(PyActorObject *self, PyObjec
         PyErr_SetString(PyExc_RuntimeError, e.what());
         return nullptr;
     }
+#endif
+
     Py_RETURN_NONE;
 }
 
 PyObject *EngineScripts::ActorScripts::PyActor_rotate(PyActorObject *self, PyObject *args)
 {
     PyObject *vector_py;
-    ktm::fvec3 vector_cpp;
-
     if (!PyArg_ParseTuple(args, "O", &vector_py))
     {
         return nullptr;
     }
-    else
+
+#ifdef ENABLE_CABBAGE_FRAMEWORK
+    ktm::fvec3 vector_cpp;
     {
         PyObject *ItemX = PyList_GetItem(vector_py, 0);
         PyArg_Parse(ItemX, "f", &vector_cpp.x);
@@ -153,19 +163,22 @@ PyObject *EngineScripts::ActorScripts::PyActor_rotate(PyActorObject *self, PyObj
         PyErr_SetString(PyExc_RuntimeError, e.what());
         return nullptr;
     }
+#endif
+
     Py_RETURN_NONE;
 }
 
 PyObject *EngineScripts::ActorScripts::PyActor_scale(PyActorObject *self, PyObject *args)
 {
     PyObject *vector_py;
-    ktm::fvec3 vector_cpp;
 
     if (!PyArg_ParseTuple(args, "O", &vector_py))
     {
         return nullptr;
     }
-    else
+
+#ifdef ENABLE_CABBAGE_FRAMEWORK
+    ktm::fvec3 vector_cpp;
     {
         PyObject *ItemX = PyList_GetItem(vector_py, 0);
         PyArg_Parse(ItemX, "f", &vector_cpp.x);
@@ -191,5 +204,7 @@ PyObject *EngineScripts::ActorScripts::PyActor_scale(PyActorObject *self, PyObje
         PyErr_SetString(PyExc_RuntimeError, e.what());
         return nullptr;
     }
+#endif
+
     Py_RETURN_NONE;
 }

@@ -26,6 +26,9 @@ struct PythonAPI
     std::wstring str2wstr(const std::string &str);
 
   private:
+    
+    static const std::string codePath;
+    
     PythonHotfix hotfixManger;
 
     std::shared_mutex queMtx;
