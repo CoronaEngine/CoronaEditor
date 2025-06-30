@@ -2,8 +2,8 @@
 - 此仓库为Corona Engine的编辑器
 - 前端Web
 	- 基于Node.js（Vue + Tailwind）
-	- 实现可视化编程（类似Scratch）（自动转为Python代码）
-	- 实现基于MCP的大模型接入
+	- 基于MCP接入大模型
+	- 实现基于积木可视化编程（类似Scratch），积木运行时转为Python
 - 后端/脚本层Python
 	- 使用PyQt6的QWebEngineView及QDockWidget搭建前端界面布局
 - 底层C艹
