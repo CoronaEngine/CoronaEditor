@@ -2,8 +2,9 @@
 
 #include <Python.h>
 
+#ifdef ENABLE_CABBAGE_FRAMEWORK
 #include "CabbageEngine.h"
-
+#endif
 
 struct EngineScripts
 {
@@ -12,7 +13,9 @@ struct EngineScripts
         struct PySceneObject
         {
             PyObject_HEAD;
+#ifdef ENABLE_CABBAGE_FRAMEWORK
             CabbageEngine::Scene *cpp_obj;
+#endif
         };
 
         static void PyScene_dealloc(PySceneObject *self);
@@ -32,7 +35,9 @@ struct EngineScripts
         struct PyActorObject
         {
             PyObject_HEAD;
+#ifdef ENABLE_CABBAGE_FRAMEWORK
             CabbageEngine::Actor *cpp_obj;
+#endif
         };
 
         static void PyActor_dealloc(PyActorObject *self);
