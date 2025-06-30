@@ -1,8 +1,8 @@
 # Corona Engine Editor
-- 此仓库为Corona引擎的前后端及热更新部分
-- 前端为Vue构建，包括前端界面及逻辑部分，内嵌了TailwindCss、Blockly等模块
-- 后端为Python构建，主要使用PyQt6的QWebEngineView及QDockWidget搭建前端界面布局，主要包括数据处理及脚本逻辑实现
-- 底层为C++构建，主要用于搭建前后端环境及热重载功能。
+- 此仓库为Corona Engine的编辑器，前端Web、后端Python、底层C艹
+- 前端基于Node.js（Vue + Tailwind），实现可视化编程（类似Scratch）（自动转为Python代码），实现基于MCP的大模型接入
+- 后端/脚本层为Python，并使用PyQt6的QWebEngineView及QDockWidget搭建前端界面布局
+- 底层基于C艹，主要用于搭建前后端环境，并支持Python层的热重载
   
 ### 配置方式
 - cmake
