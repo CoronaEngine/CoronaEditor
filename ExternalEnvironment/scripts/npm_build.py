@@ -20,7 +20,7 @@ NODE_JS_DIR: Path = ENV_DIR / f"node-{NODE_JS_VERSION}-win-x64"
 NODE_JS_ARCHIVE: Path = ENV_DIR / f"node-{NODE_JS_VERSION}-win-x64.zip"
 NODE_JS_URL: str = f"https://nodejs.org/dist/{NODE_JS_VERSION}/{NODE_JS_ARCHIVE.name}"
 
-FRONTEND_DIR: Path = ROOT_DIR / "SourceCode" / "CabbageEditor" / "CabbageEditorFrontend"
+FRONTEND_DIR: Path = ROOT_DIR / "SourceCode" / "CabbageEditorFrontend"
 NPM_CMD: Path = NODE_JS_DIR / "npm.cmd"
 
 

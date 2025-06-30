@@ -40,9 +40,9 @@ def main():
     DLLS_DST = args.runtime_output_dir / "Resource" / "Python" / "DLLs"
     LIB_SRC = args.python_root_dir / "Lib"
     LIB_DST = args.runtime_output_dir / "Resource" / "Python" / "Lib"
-    BACKEND_SRC = args.cmake_root_dir / "SourceCode" / "CabbageEditor" / "CabbageEditorBackend"
+    BACKEND_SRC = args.cmake_root_dir / "SourceCode" / "CabbageEditorBackend"
     BACKEND_DST = args.runtime_output_dir / "Resource" / "CabbageEditorBackend"
-    FRONTEND_SRC = args.cmake_root_dir / "SourceCode" / "CabbageEditor" / "CabbageEditorFrontend" / "dist"
+    FRONTEND_SRC = args.cmake_root_dir / "SourceCode" / "CabbageEditorFrontend" / "dist"
     FRONTEND_DST = args.runtime_output_dir / "Resource" / "CabbageEditorFrontend"
 
     # 确保所有目标目录存在
