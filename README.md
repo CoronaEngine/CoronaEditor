@@ -1,3 +1,8 @@
+# Corona Engine Editor
+- 前端Web（Html、CSS、JS）、后端Python、底层C艹
+### 配置方式
+- cmake
+
 ### 7.30竞赛需求（7.25项目结束，之后需要写文档）
 - MCP @刘运喜 @邹佳
 - 前后端 @吴学杰 @黄 @张润田 @篮球 @活性炭 @王艺洁
