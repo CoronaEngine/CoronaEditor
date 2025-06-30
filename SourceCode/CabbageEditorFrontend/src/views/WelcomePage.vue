@@ -152,9 +152,7 @@ const closeprocess = () => {
 
 const createActor = () => {
     if (window.pyBridge) {
-        // 确保armadillo.obj的ID存储在actorid.value[0]
-        const armadilloId = window.pyBridge.CreateActor(currentScene.value,`./Resource/Cabbage/armadillo.obj`);
-        actorid.value = [armadilloId]; // 只存储armadillo的ID
+        window.pyBridge.CreateActor(currentScene.value,`./Resource/Cabbage/armadillo.obj`);
         window.pyBridge.CreateActor(currentScene.value,`./Resource/Cabbage/Ball.obj`);
     } else {
         console.error("Python SendMessageToDock 未连接！");
