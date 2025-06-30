@@ -71,7 +71,7 @@
       <div id="blockdiv" class="blockly-container"></div>
     </div>
   </div>
-  <!-- 四周拖动边框 -->
+    <!-- 四周拖动边框 -->
     <div class="absolute top-0 left-0 w-full h-2 cursor-n-resize z-40" @mousedown="(e) => startResize(e, 'n')"></div>
     <div class="absolute bottom-0 left-0 w-full h-2 cursor-s-resize z-40" @mousedown="(e) => startResize(e, 's')"></div>
     <div class="absolute top-0 left-0 h-full w-2 cursor-w-resize z-40" @mousedown="(e) => startResize(e, 'w')"></div>
@@ -90,13 +90,15 @@ import * as Blockly from 'blockly/core';
 import * as CN from 'blockly/msg/zh-hans';
 import { pythonGenerator } from 'blockly/python';
 import 'blockly/blocks';
+import { useDragResize } from '@/composables/useDragResize';
 
+const { dragState,startDrag,startResize,stopDrag,onDrag,stopResize,onResize } = useDragResize();
 const workspace = ref(null);
 const character = ref('');
 const px=ref('0.0'), py=ref('0.0'), pz=ref('0.0');
 const rx=ref('0.0'), ry=ref('0.0'), rz=ref('0.0');
 const sx=ref('1.0'), sy=ref('1.0'), sz=ref('1.0');
-const isFloating = ref(false);
+
 const route = useRoute();
 const scenename = ref(null);
 const actorname = ref(null);
@@ -107,25 +109,65 @@ Blockly.setLocale(CN);
 Blockly.Blocks['detect_collision'] = {
   init: function () {
     this.appendDummyInput()
-      .appendField('碰到')
+     .appendField('如果碰到')
+     .appendField(new Blockly.FieldTextInput(actorname.value), 'TARGET');
+    this.setInputsInline(true);
+    this.setPreviousStatement(true, null); 
+    this.setNextStatement(true, null);
+    this.setColour('#00FFFF');
+    this.setHelpUrl('');
+    this.setTooltip('检测该角色是与指定角色否发生碰撞');//改为true or falsh
+  }
+};
+pythonGenerator.forBlock['detect_collision'] = function(block) {
+  const target = block.getFieldValue('TARGET');
+  return `CabbageEngine.collisionDetection(${target})\n`;
+};
+
+Blockly.Blocks['detect_press'] = {
+  init: function () {
+    this.appendDummyInput()
+      .appendField('按下')
       .appendField(new Blockly.FieldTextInput(actorname.value), 'TARGET');
     this.setOutput(true, 'Boolean');  // 设置输出为布尔值
     this.setInputsInline(true);
     this.setColour('#00FFFF');
     this.setHelpUrl('');
-    this.setTooltip('检测该角色是否与指定角色发生碰撞，返回true或false');
+    this.setTooltip('检测该按钮是否被按下，返回true或false');
   }
 };
-pythonGenerator.forBlock['detect_collision'] = function(block) {
+pythonGenerator.forBlock['detect_press'] = function(block) {
   const target = block.getFieldValue('TARGET');
   return `CabbageEngine.collisionDetection(${target})`;
+};
+
+Blockly.Blocks['detect_press_mouse'] = {
+  init: function () {
+    this.appendDummyInput()
+      .appendField('按下鼠标？');
+    this.setOutput(true, 'Boolean');  // 设置输出为布尔值
+    this.setInputsInline(true);
+    this.setColour('#00FFFF');
+    this.setHelpUrl('');
+    this.setTooltip('检测鼠标是否被按下，返回true或false');
+  }
+};
+pythonGenerator.forBlock['detect_press_mouse'] = function(block) {
+  return `CabbageEngine.collisionDetection()`;
 };
 
 Blockly.Blocks['engine_move_actor'] = {
   init: function () {
     this.appendDummyInput()
-     .appendField('移动')
-     .appendField(new Blockly.FieldTextInput(), 'NUMBER')
+     .appendField('移动角色')
+     .appendField(new Blockly.FieldTextInput(actorname.value), 'NAME')
+     .appendField('向量')
+     .appendField('x:')
+     .appendField(new Blockly.FieldTextInput('0.0'), 'X')
+     .appendField('y:')
+      .appendField(new Blockly.FieldTextInput('0.0'), 'Y')
+      .appendField('z:')
+      .appendField(new Blockly.FieldTextInput('0.0'), 'Z');
     this.setInputsInline(true);
     this.setPreviousStatement(true, null);
     this.setNextStatement(true, null);
@@ -134,118 +176,26 @@ Blockly.Blocks['engine_move_actor'] = {
   }
 };
 pythonGenerator.forBlock['engine_move_actor'] = function(block) {
-  const number = parseFloat(block.getFieldValue('NUMBER') || '0.0').toFixed(1);
-  return `CabbageEngine.moveActor(${number})\n`;
-};
-
-Blockly.Blocks['engine_moveto_actor'] = {
-  init: function () {
-    this.appendDummyInput()
-     .appendField('移到')
-     .appendField('x:')
-     .appendField(new Blockly.FieldTextInput(), 'X')
-     .appendField('y:')
-      .appendField(new Blockly.FieldTextInput(), 'Y')
-      .appendField('z:')
-      .appendField(new Blockly.FieldTextInput(), 'Z');
-    this.setInputsInline(true);
-    this.setPreviousStatement(true, null);
-    this.setNextStatement(true, null);
-    this.setColour('#FF5722');
-    this.setHelpUrl('');
-  }
-};
-pythonGenerator.forBlock['engine_moveto_actor'] = function(block) {
   const x = parseFloat(block.getFieldValue('X') || '0.0').toFixed(1);
   const y = parseFloat(block.getFieldValue('Y') || '0.0').toFixed(1);
   const z = parseFloat(block.getFieldValue('Z') || '0.0').toFixed(1);
-  return `CabbageEngine.moveToActor([${x}, ${y}, ${z}])\n`;
+  const name = block.getFieldValue('NAME');
+  return `CabbageEngine.moveActor(${name}, [${x}, ${y}, ${z}])\n`;
 };
-
-Blockly.Blocks['engine_movetoplass_actor'] = {
-  init: function () {
-    this.appendDummyInput()
-      .appendField('移到')
-      .appendField(new Blockly.FieldDropdown([
-        ['角色1', 'actor1'],
-        ['角色2', 'actor2'],
-        ['角色3', 'actor3']
-      ]), 'ACTOR')
-    this.setInputsInline(true);
-    this.setPreviousStatement(true, null);
-    this.setNextStatement(true, null);
-    this.setColour('#FF5722');
-    this.setHelpUrl('');
-  }
-};
-pythonGenerator.forBlock['engine_movetoplass_actor'] = function(block) {
-  const actor = block.getFieldValue('ACTOR');
-  return `CabbageEngine.moveToPlassActor(${actor})\n`;
-};
-
-Blockly.Blocks['engine_movetotimeplass_actor'] = {
-  init: function () {
-    this.appendDummyInput()
-      .appendField('在')
-      .appendField(new Blockly.FieldTextInput('1'), 'T')
-      .appendField('秒内移到')
-      .appendField(new Blockly.FieldDropdown([
-        ['角色1', 'actor1'],
-        ['角色2', 'actor2'],
-        ['角色3', 'actor3']
-      ]), 'ACTOR')
-    this.setInputsInline(true);
-    this.setPreviousStatement(true, null);
-    this.setNextStatement(true, null);
-    this.setColour('#FF5722');
-    this.setHelpUrl('');
-  }
-};
-pythonGenerator.forBlock['engine_movetoplass_actor'] = function(block) {
-  const actor = block.getFieldValue('ACTOR');
-  const t = block.getFieldValue('T');
-  return `CabbageEngine.moveToTimePlassActor(${t},${actor})\n`;
-};
-
-Blockly.Blocks['engine_movetotime_actor'] = {
-  init: function () {
-    this.appendDummyInput()
-     .appendField('在')
-     .appendField(new Blockly.FieldTextInput("1"), 'T')
-     .appendField('秒内移到')
-     .appendField('x:')
-     .appendField(new Blockly.FieldTextInput(), 'X')
-     .appendField('y:')
-      .appendField(new Blockly.FieldTextInput(), 'Y')
-      .appendField('z:')
-      .appendField(new Blockly.FieldTextInput(), 'Z');
-    this.setInputsInline(true);
-    this.setPreviousStatement(true, null);
-    this.setNextStatement(true, null);
-    this.setColour('#FF5722');
-    this.setHelpUrl('');
-  }
-};
-pythonGenerator.forBlock['engine_movetotime_actor'] = function(block) {
-  const t = parseFloat(block.getFieldValue('T') || '0.0').toFixed(1);
-  const x = parseFloat(block.getFieldValue('X') || '0.0').toFixed(1);
-  const y = parseFloat(block.getFieldValue('Y') || '0.0').toFixed(1);
-  const z = parseFloat(block.getFieldValue('Z') || '0.0').toFixed(1);
-  return `CabbageEngine.moveToTimeActor(${t},[${x}, ${y}, ${z}])\n`;
-};
-
 Blockly.Blocks['engine_rotate_actor'] = {
   init: function () {
     this.appendDummyInput()
-      .appendField('旋转')
+      .appendField('旋转角色')
+      .appendField(new Blockly.FieldTextInput(actorname.value), 'NAME')
+      .appendField('到角度')
       .appendField('x:')
-      .appendField(new Blockly.FieldTextInput(), 'X')
+      .appendField(new Blockly.FieldTextInput('0.0'), 'X')
       .appendField('°')
       .appendField('y:')
-      .appendField(new Blockly.FieldTextInput(), 'Y')
+      .appendField(new Blockly.FieldTextInput('0.0'), 'Y')
       .appendField('°')
       .appendField('z:')
-      .appendField(new Blockly.FieldTextInput(), 'Z')
+      .appendField(new Blockly.FieldTextInput('0.0'), 'Z')
       .appendField('°');
     this.setInputsInline(true);
     this.setPreviousStatement(true, null);
@@ -258,348 +208,34 @@ pythonGenerator.forBlock['engine_rotate_actor'] = function(block) {
   const x = parseFloat(block.getFieldValue('X') || '0.0').toFixed(1);
   const y = parseFloat(block.getFieldValue('Y') || '0.0').toFixed(1);
   const z = parseFloat(block.getFieldValue('Z') || '0.0').toFixed(1);
-  return `CabbageEngine.rotateActor([${x}, ${y}, ${z}])\n`;
+  const name = block.getFieldValue('NAME');
+  return `CabbageEngine.rotateActor(${name}, [${x}, ${y}, ${z}])\n`;
 };
-
-Blockly.Blocks['engine_faceplass_actor'] = {
+Blockly.Blocks['engine_scale_actor'] = {
   init: function () {
     this.appendDummyInput()
-      .appendField('面向')
-      .appendField(new Blockly.FieldDropdown([
-        ['角色1', 'actor1'],
-        ['角色2', 'actor2'],
-        ['角色3', 'actor3']
-      ]), 'ACTOR')
-    this.setInputsInline(true);
-    this.setPreviousStatement(true, null);
-    this.setNextStatement(true, null);
-    this.setColour('#FF5722');
-    this.setHelpUrl('');
-  }
-};
-pythonGenerator.forBlock['engine_faceplass_actor'] = function(block) {
-  const actor = block.getFieldValue('ACTOR');
-  return `CabbageEngine.moveToPlassActor(${actor})\n`;
-};
-
-Blockly.Blocks['engine_face_actor'] = {
-  init: function () {
-    this.appendDummyInput()
-      .appendField('面向')
+      .appendField('缩放角色')
+      .appendField(new Blockly.FieldTextInput(actorname.value), 'NAME')
+      .appendField('到比例')
       .appendField('x:')
-      .appendField(new Blockly.FieldTextInput(), 'X')
-      .appendField('°')
+      .appendField(new Blockly.FieldTextInput('1.0'), 'X')
       .appendField('y:')
-      .appendField(new Blockly.FieldTextInput(), 'Y')
-      .appendField('°')
-      .appendField('z:')
-      .appendField(new Blockly.FieldTextInput(), 'Z')
-      .appendField('°');
-    this.setInputsInline(true);
-    this.setPreviousStatement(true, null);
-    this.setNextStatement(true, null);
-    this.setColour('#FF5722');
-    this.setHelpUrl('');
-  }
-};
-pythonGenerator.forBlock['engine_face_actor'] = function(block) {
-  const x = parseFloat(block.getFieldValue('X') || '0.0').toFixed(1);
-  const y = parseFloat(block.getFieldValue('Y') || '0.0').toFixed(1);
-  const z = parseFloat(block.getFieldValue('Z') || '0.0').toFixed(1);
-  return `CabbageEngine.faceActor([${x}, ${y}, ${z}])\n`;
-};
-
-Blockly.Blocks['engine_moveX_actor'] = {
-  init: function () {
-    this.appendDummyInput()
-     .appendField('将x轴增加')
-     .appendField(new Blockly.FieldTextInput(), 'NUMBER')
-    this.setInputsInline(true);
-    this.setPreviousStatement(true, null);
-    this.setNextStatement(true, null);
-    this.setColour('#FF5722');
-    this.setHelpUrl('');
-  }
-};
-pythonGenerator.forBlock['engine_moveX_actor'] = function(block) {
-  const number = parseFloat(block.getFieldValue('NUMBER') || '0.0').toFixed(1);
-  return `CabbageEngine.moveXActor(${number})\n`;
-};
-
-Blockly.Blocks['engine_movetoX_actor'] = {
-  init: function () {
-    this.appendDummyInput()
-     .appendField('将x轴设为')
-     .appendField(new Blockly.FieldTextInput(), 'NUMBER')
-    this.setInputsInline(true);
-    this.setPreviousStatement(true, null);
-    this.setNextStatement(true, null);
-    this.setColour('#FF5722');
-    this.setHelpUrl('');
-  }
-};
-pythonGenerator.forBlock['engine_moveX_actor'] = function(block) {
-  const number = parseFloat(block.getFieldValue('NUMBER') || '0.0').toFixed(1);
-  return `CabbageEngine.movetoXActor(${number})\n`;
-};
-
-Blockly.Blocks['engine_moveY_actor'] = {
-  init: function () {
-    this.appendDummyInput()
-     .appendField('将y轴增加')
-     .appendField(new Blockly.FieldTextInput(), 'NUMBER')
-    this.setInputsInline(true);
-    this.setPreviousStatement(true, null);
-    this.setNextStatement(true, null);
-    this.setColour('#FF5722');
-    this.setHelpUrl('');
-  }
-};
-pythonGenerator.forBlock['engine_moveY_actor'] = function(block) {
-  const number = parseFloat(block.getFieldValue('NUMBER') || '0.0').toFixed(1);
-  return `CabbageEngine.moveYActor(${number})\n`;
-};
-
-Blockly.Blocks['engine_movetoY_actor'] = {
-  init: function () {
-    this.appendDummyInput()
-     .appendField('将y轴设为')
-     .appendField(new Blockly.FieldTextInput(), 'NUMBER')
-    this.setInputsInline(true);
-    this.setPreviousStatement(true, null);
-    this.setNextStatement(true, null);
-    this.setColour('#FF5722');
-    this.setHelpUrl('');
-  }
-};
-pythonGenerator.forBlock['engine_movetoY_actor'] = function(block) {
-  const number = parseFloat(block.getFieldValue('NUMBER') || '0.0').toFixed(1);
-  return `CabbageEngine.movetoYActor(${number})\n`;
-};
-
-Blockly.Blocks['engine_moveZ_actor'] = {
-  init: function () {
-    this.appendDummyInput()
-     .appendField('将z轴增加')
-     .appendField(new Blockly.FieldTextInput(), 'NUMBER')
-    this.setInputsInline(true);
-    this.setPreviousStatement(true, null);
-    this.setNextStatement(true, null);
-    this.setColour('#FF5722');
-    this.setHelpUrl('');
-  }
-};
-pythonGenerator.forBlock['engine_moveZ_actor'] = function(block) {
-  const number = parseFloat(block.getFieldValue('NUMBER') || '0.0').toFixed(1);
-  return `CabbageEngine.moveZActor(${number})\n`;
-};
-
-Blockly.Blocks['engine_movetoZ_actor'] = {
-  init: function () {
-    this.appendDummyInput()
-     .appendField('将z轴设为')
-     .appendField(new Blockly.FieldTextInput(), 'NUMBER')
-    this.setInputsInline(true);
-    this.setPreviousStatement(true, null);
-    this.setNextStatement(true, null);
-    this.setColour('#FF5722');
-    this.setHelpUrl('');
-  }
-};
-pythonGenerator.forBlock['engine_movetoZ_actor'] = function(block) {
-  const number = parseFloat(block.getFieldValue('NUMBER') || '0.0').toFixed(1);
-  return `CabbageEngine.movetoZActor(${number})\n`;
-};
-
-Blockly.Blocks['appearance_scale_actor'] = {
-  init: function () {
-    this.appendDummyInput()
-      .appendField('将大小设为')
-      .appendField(new Blockly.FieldTextInput('100'), 'NUMBER')
-    this.setInputsInline(true);
-    this.setPreviousStatement(true, null);
-    this.setNextStatement(true, null);
-    this.setColour('#8A2BE2');
-    this.setHelpUrl('');
-  }
-};
-pythonGenerator.forBlock['appearance_scale_actor'] = function(block) {
-  const number = parseFloat(block.getFieldValue('NUMBER') || '0.0').toFixed(1);
-  return `CabbageEngine.scaleActor([${number}])\n`;
-};
-
-Blockly.Blocks['appearance_scaleadd_actor'] = {
-  init: function () {
-    this.appendDummyInput()
-      .appendField('将大小增加')
-      .appendField(new Blockly.FieldTextInput(), 'NUMBER')
-    this.setInputsInline(true);
-    this.setPreviousStatement(true, null);
-    this.setNextStatement(true, null);
-    this.setColour('#8A2BE2');
-    this.setHelpUrl('');
-  }
-};
-pythonGenerator.forBlock['appearance_scaleadd_actor'] = function(block) {
-  const number = parseFloat(block.getFieldValue('NUMBER') || '0.0').toFixed(1);
-  return `CabbageEngine.scaleaddActor([${number}])\n`;
-};
-
-Blockly.Blocks['appearance_hide_actor'] = {
-  init: function () {
-    this.appendDummyInput()
-      .appendField('隐藏')
-    this.setInputsInline(true);
-    this.setPreviousStatement(true, null);
-    this.setNextStatement(true, null);
-    this.setColour('#8A2BE2');
-    this.setHelpUrl('');
-  }
-};
-pythonGenerator.forBlock['appearance_hide_actor'] = function(block) {
-  return `CabbageEngine.scaleaddActor()\n`;
-};
-
-Blockly.Blocks['appearance_show_actor'] = {
-  init: function () {
-    this.appendDummyInput()
-      .appendField('显示')
-    this.setInputsInline(true);
-    this.setPreviousStatement(true, null);
-    this.setNextStatement(true, null);
-    this.setColour('#8A2BE2');
-    this.setHelpUrl('');
-  }
-};
-pythonGenerator.forBlock['appearance_show_actor'] = function(block) {
-  return `CabbageEngine.scaleaddActor()\n`;
-};
-
-
-Blockly.Blocks['appearance_scalespe_actor'] = {
-  init: function () {
-    this.appendDummyInput()
-      .appendField('将缩放设为')
-      .appendField('x:')
-      .appendField(new Blockly.FieldTextInput('100'), 'X')
-      .appendField('y:')
-     .appendField(new Blockly.FieldTextInput('100'), 'Y')
+     .appendField(new Blockly.FieldTextInput('1.0'), 'Y')
      .appendField('z:')
-     .appendField(new Blockly.FieldTextInput('100'), 'Z');
+     .appendField(new Blockly.FieldTextInput('1.0'), 'Z');
     this.setInputsInline(true);
     this.setPreviousStatement(true, null);
     this.setNextStatement(true, null);
-    this.setColour('#8A2BE2');
+    this.setColour('#FF5722');
     this.setHelpUrl('');
   }
 };
-pythonGenerator.forBlock['appearance_scalespe_actor'] = function(block) {
+pythonGenerator.forBlock['engine_scale_actor'] = function(block) {
   const x = parseFloat(block.getFieldValue('X') || '0.0').toFixed(1);
   const y = parseFloat(block.getFieldValue('Y') || '0.0').toFixed(1);
   const z = parseFloat(block.getFieldValue('Z') || '0.0').toFixed(1);
-  return `CabbageEngine.scalespeActor([${x}, ${y}, ${z}])\n`;
-};
-
-Blockly.Blocks['appearance_scalespeaddX_actor'] = {
-  init: function () {
-    this.appendDummyInput()
-      .appendField('将X缩放增加')
-      .appendField(new Blockly.FieldTextInput(), 'NUMBER')
-    this.setInputsInline(true);
-    this.setPreviousStatement(true, null);
-    this.setNextStatement(true, null);
-    this.setColour('#8A2BE2');
-    this.setHelpUrl('');
-  }
-};
-pythonGenerator.forBlock['appearance_scalespeaddX_actor'] = function(block) {
-  const number = parseFloat(block.getFieldValue('NUMBER') || '0.0').toFixed(1);
-  return `CabbageEngine.scalespeaddXActor(${number})\n`;
-};
-
-Blockly.Blocks['appearance_scalespeaddY_actor'] = {
-  init: function () {
-    this.appendDummyInput()
-      .appendField('将y缩放增加')
-      .appendField(new Blockly.FieldTextInput(), 'NUMBER')
-    this.setInputsInline(true);
-    this.setPreviousStatement(true, null);
-    this.setNextStatement(true, null);
-    this.setColour('#8A2BE2');
-    this.setHelpUrl('');
-  }
-};
-pythonGenerator.forBlock['appearance_scalespeaddY_actor'] = function(block) {
-  const number = parseFloat(block.getFieldValue('NUMBER') || '0.0').toFixed(1);
-  return `CabbageEngine.scalespeaddYActor(${number})\n`;
-};
-
-Blockly.Blocks['appearance_scalespeaddZ_actor'] = {
-  init: function () {
-    this.appendDummyInput()
-      .appendField('将z缩放增加')
-      .appendField(new Blockly.FieldTextInput(), 'NUMBER')
-    this.setInputsInline(true);
-    this.setPreviousStatement(true, null);
-    this.setNextStatement(true, null);
-    this.setColour('#8A2BE2');
-    this.setHelpUrl('');
-  }
-};
-pythonGenerator.forBlock['appearance_scalespeaddZ_actor'] = function(block) {
-  const number = parseFloat(block.getFieldValue('NUMBER') || '0.0').toFixed(1);
-  return `CabbageEngine.scalespeaddZActor(${number})\n`;
-};
-
-Blockly.Blocks['appearance_scalespeX_actor'] = {
-  init: function () {
-    this.appendDummyInput()
-      .appendField('将X缩放设为')
-      .appendField(new Blockly.FieldTextInput(), 'NUMBER')
-    this.setInputsInline(true);
-    this.setPreviousStatement(true, null);
-    this.setNextStatement(true, null);
-    this.setColour('#8A2BE2');
-    this.setHelpUrl('');
-  }
-};
-pythonGenerator.forBlock['appearance_scalespeX_actor'] = function(block) {
-  const number = parseFloat(block.getFieldValue('NUMBER') || '0.0').toFixed(1);
-  return `CabbageEngine.scalespeXActor(${number})\n`;
-};
-
-Blockly.Blocks['appearance_scalespeY_actor'] = {
-  init: function () {
-    this.appendDummyInput()
-      .appendField('将y缩放设为')
-      .appendField(new Blockly.FieldTextInput(), 'NUMBER')
-    this.setInputsInline(true);
-    this.setPreviousStatement(true, null);
-    this.setNextStatement(true, null);
-    this.setColour('#8A2BE2');
-    this.setHelpUrl('');
-  }
-};
-pythonGenerator.forBlock['appearance_scalespeY_actor'] = function(block) {
-  const number = parseFloat(block.getFieldValue('NUMBER') || '0.0').toFixed(1);
-  return `CabbageEngine.scalespeYActor(${number})\n`;
-};
-
-Blockly.Blocks['appearance_scalespeZ_actor'] = {
-  init: function () {
-    this.appendDummyInput()
-      .appendField('将z缩放设为')
-      .appendField(new Blockly.FieldTextInput(), 'NUMBER')
-    this.setInputsInline(true);
-    this.setPreviousStatement(true, null);
-    this.setNextStatement(true, null);
-    this.setColour('#8A2BE2');
-    this.setHelpUrl('');
-  }
-};
-pythonGenerator.forBlock['appearance_scalespeZ_actor'] = function(block) {
-  const number = parseFloat(block.getFieldValue('NUMBER') || '0.0').toFixed(1);
-  return `CabbageEngine.scalespeZActor(${number})\n`;
+  const name = block.getFieldValue('NAME');
+  return `CabbageEngine.scaleActor(${name}, [${x}, ${y}, ${z}])\n`;
 };
 
 
@@ -620,21 +256,296 @@ pythonGenerator.forBlock['event_keyboardEventHandling'] = function(block) {
   return  `CabbageEngine.scaleActor(${key})\n`;
 };
 
+Blockly.Blocks['event_gameStart'] = {
+  init: function () {
+    this.appendDummyInput()
+      .appendField('当游戏开始时')
+    this.setInputsInline(true);
+    this.setPreviousStatement(false, null);
+    this.setNextStatement(true, null);
+    this.setColour('#5C97FF');
+    this.setHelpUrl('');
+  }
+};
+pythonGenerator.forBlock['event_gameStart'] = function(block) {
+  return `CabbageEngine.scaleaddActor()\n`;
+};
+
+Blockly.Blocks['event_cloneStart'] = {
+  init: function () {
+    this.appendDummyInput()
+      .appendField('当作为克隆体启动时')
+    this.setInputsInline(true);
+    this.setPreviousStatement(false, null);
+    this.setNextStatement(true, null);
+    this.setColour('#5C97FF');
+    this.setHelpUrl('');
+  }
+};
+pythonGenerator.forBlock['event_cloneStart'] = function(block) {
+  return `CabbageEngine.scaleaddActor()\n`;
+};
+
+Blockly.Blocks['ask'] = {
+  init: function () {
+    this.appendDummyInput()
+      .appendField('询问')
+      .appendField(new Blockly.FieldTextInput(actorname.value),'TEXT');
+    this.setInputsInline(true);
+    this.setPreviousStatement(true, null);
+    this.setNextStatement(true, null);
+    this.setColour('#5C97FF');
+    this.setHelpUrl('');
+  }
+};
+pythonGenerator.forBlock['ask'] = function(block) {
+  const text = block.getFieldValue('TEXT') || '';
+  return `CabbageEngine.scaleaddActor(${text})\n`;
+};
+
+
+Blockly.Blocks['event_scenairChange'] = {
+  init: function(){
+    this.appendDummyInput()
+      .appendField('当场景切换为')
+      .appendField(new Blockly.FieldTextInput(actorname.value),'Scenario_ID')
+      .appendField('时');
+    this.setInputsInline(true);
+    this.setPreviousStatement(false, null);
+    this.setNextStatement(true, null);
+    this.setColour('#5C97FF');
+    this.setHelpUrl('');
+  }
+};
+pythonGenerator.forBlock['event_scenairChange'] = function(block) {
+  const scid = block.getFieldValue('Scenario_ID');
+  return  `CabbageEngine.scaleActor(${scid})\n`;
+};
+
+Blockly.Blocks['variable_assignTo'] = {
+  init: function () {
+    this.appendDummyInput()
+     .appendField('将')
+     .appendField(new Blockly.FieldTextInput(), 'VARIABLENAME')
+     .appendField('设为')
+     .appendField(new Blockly.FieldTextInput(), 'VALUE')
+    this.setInputsInline(true);
+    this.setPreviousStatement(true, null);
+    this.setNextStatement(true, null);
+    this.setColour('#FF5722');
+    this.setHelpUrl('');
+  }
+};
+pythonGenerator.forBlock['variable_assignTo'] = function(block) {
+  const name = block.getFieldValue('VARIABLENAME');
+  const value = parseFloat(block.getFieldValue('VALUE') || '0.0').toFixed(1);
+  return `CabbageEngine.moveActor(${name},${value})\n`;
+};
+
+Blockly.Blocks['variable_add'] = {
+  init: function () {
+    this.appendDummyInput()
+     .appendField('将')
+     .appendField(new Blockly.FieldTextInput(), 'VARIABLENAME')
+     .appendField('加上')
+     .appendField(new Blockly.FieldTextInput(), 'VALUE')
+    this.setInputsInline(true);
+    this.setPreviousStatement(true, null);
+    this.setNextStatement(true, null);
+    this.setColour('#FF5722');
+    this.setHelpUrl('');
+  }
+};
+pythonGenerator.forBlock['variable_add'] = function(block) {
+  const name = block.getFieldValue('VARIABLENAME');
+  const value = parseFloat(block.getFieldValue('VALUE') || '0.0').toFixed(1);
+  return `CabbageEngine.moveActor(${name},${value})\n`;
+};
+
+
+Blockly.Blocks['variable_show'] = {
+  init: function () {
+    this.appendDummyInput()
+     .appendField('显示变量')
+     .appendField(new Blockly.FieldTextInput(), 'VARIABLENAME')
+    this.setInputsInline(true);
+    this.setPreviousStatement(true, null);
+    this.setNextStatement(true, null);
+    this.setColour('#FF5722');
+    this.setHelpUrl('');
+  }
+};
+pythonGenerator.forBlock['variable_show'] = function(block) {
+  const name = block.getFieldValue('VARIABLENAME');
+  return `CabbageEngine.moveActor(${name})\n`;
+};
+
+Blockly.Blocks['variable_hide'] = {
+  init: function () {
+    this.appendDummyInput()
+     .appendField('隐藏变量')
+     .appendField(new Blockly.FieldTextInput(), 'VARIABLENAME')
+    this.setInputsInline(true);
+    this.setPreviousStatement(true, null);
+    this.setNextStatement(true, null);
+    this.setColour('#FF5722');
+    this.setHelpUrl('');
+  }
+};
+pythonGenerator.forBlock['variable_hide'] = function(block) {
+  const name = block.getFieldValue('VARIABLENAME');
+  return `CabbageEngine.moveActor(${name})\n`;
+};
+
+
+
 Blockly.Blocks['math_add'] = {
   init: function() {
     // 设置圆形外观（需搭配CSS或主题）
     this.setStyle('math_blocks');  // 使用数学类样式（通常自带圆形）
     this.appendDummyInput()
-        .appendField(new Blockly.FieldTextInput(0), "VALUE");  // 数字输入框
+        .appendField(new Blockly.FieldTextInput(0), "VALUE1")
+        .appendField('+')
+        .appendField(new Blockly.FieldTextInput(0), "VALUE2");  // 数字输入框
     this.setOutput(true, 'Number');  // 关键：输出数值类型
     this.setColour(230);  // 数学积木常用橙色
     this.setTooltip("可在数学运算中使用的圆形操作数");
   }
 };
 pythonGenerator.forBlock['math_add'] = function(block) {
-  const value = block.getFieldValue('VALUE');
-  return  `CabbageEngine.scaleActor(${value})\n`;  // 返回基础数值
+  const value1 = block.getFieldValue('VALUE1');
+  const value2 = block.getFieldValue('VALUE2');
+  return  `CabbageEngine.scaleActor(${value1},${value2})\n`;  // 返回基础数值
 };
+
+Blockly.Blocks['math_sub'] = {
+  init: function() {
+    // 设置圆形外观
+    this.setStyle('math_blocks');  // 使用数学类样式（通常自带圆形）
+    this.appendDummyInput()
+        .appendField(new Blockly.FieldTextInput(0), "VALUE1")
+        .appendField('-')
+        .appendField(new Blockly.FieldTextInput(0), "VALUE2");  // 数字输入框
+    this.setOutput(true, 'Number');  // 关键：输出数值类型
+    this.setColour(230);  // 数学积木常用橙色
+    this.setTooltip("可在数学运算中使用的圆形操作数");
+  }
+};
+pythonGenerator.forBlock['math_sub'] = function(block) {
+  const value1 = block.getFieldValue('VALUE1');
+  const value2 = block.getFieldValue('VALUE2');
+  return  `CabbageEngine.scaleActor(${value1},${value2})\n`;  // 返回基础数值
+};
+
+Blockly.Blocks['math_mul'] = {
+  init: function() {
+    // 设置圆形外观
+    this.setStyle('math_blocks');  // 使用数学类样式（通常自带圆形）
+    this.appendDummyInput()
+        .appendField(new Blockly.FieldTextInput(0), "VALUE1")
+        .appendField('*')
+        .appendField(new Blockly.FieldTextInput(0), "VALUE2");  // 数字输入框
+    this.setOutput(true, 'Number');  // 关键：输出数值类型
+    this.setColour(230);  // 数学积木常用橙色
+    this.setTooltip("可在数学运算中使用的圆形操作数");
+  }
+};
+pythonGenerator.forBlock['math_mul'] = function(block) {
+  const value1 = block.getFieldValue('VALUE1');
+  const value2 = block.getFieldValue('VALUE2');
+  return  `CabbageEngine.scaleActor(${value1},${value2})\n`;  // 返回基础数值
+};
+
+Blockly.Blocks['math_div'] = {
+  init: function() {
+    // 设置圆形外观（需搭配CSS或主题）
+    this.setStyle('math_blocks');  // 使用数学类样式（通常自带圆形）
+    this.appendDummyInput()
+        .appendField(new Blockly.FieldTextInput(0), "VALUE1")
+        .appendField('/')
+        .appendField(new Blockly.FieldTextInput(0), "VALUE2");  // 数字输入框
+    this.setOutput(true, 'Number');  // 关键：输出数值类型
+    this.setColour(230);  // 数学积木常用橙色
+    this.setTooltip("可在数学运算中使用的圆形操作数");
+  }
+};
+pythonGenerator.forBlock['math_div'] = function(block) {
+  const value1 = block.getFieldValue('VALUE1');
+  const value2 = block.getFieldValue('VALUE2');
+  return  `CabbageEngine.scaleActor(${value1},${value2})\n`;  // 返回基础数值
+};
+
+Blockly.Blocks['random'] = {
+  init: function () {
+    this.setStyle('math_blocks');
+    this.appendDummyInput()
+      .appendField('在')
+      .appendField(new Blockly.FieldTextInput(0), "VALUE1")
+      .appendField('到')
+      .appendField(new Blockly.FieldTextInput(0), "VALUE2")
+      .appendField('之间的一个随机数');
+    this.setInputsInline(true);
+    this.setPreviousStatement(true, null);
+    this.setNextStatement(true, null);
+    this.setColour('#8A2BE2');
+    this.setHelpUrl('');
+  }
+};
+pythonGenerator.forBlock['random'] = function(block) {
+  const value1 = block.getFieldValue('VALUE1');
+  const value2 = block.getFieldValue('VALUE2');
+  return  `CabbageEngine.scaleActor(${value1},${value2})\n`;  // 返回基础数值
+};
+
+Blockly.Blocks['wait'] = {
+  init: function () {
+    this.appendDummyInput()
+      .appendField('等待')
+      .appendField(new Blockly.FieldTextInput(), 'NUMBER')
+    this.setInputsInline(true);
+    this.setPreviousStatement(true, null);
+    this.setNextStatement(true, null);
+    this.setColour('#8A2BE2');
+    this.setHelpUrl('');
+  }
+};
+pythonGenerator.forBlock['wait'] = function(block) {
+  const number = parseFloat(block.getFieldValue('NUMBER') || '0.0').toFixed(1);
+  return `CabbageEngine.scalespeaddZActor(${number})\n`;
+};
+
+Blockly.Blocks['clone'] = {
+  init: function () {
+    this.appendDummyInput()
+      .appendField('克隆')
+      .appendField(new Blockly.FieldTextInput(), 'NUMBER')
+    this.setInputsInline(true);
+    this.setPreviousStatement(true, null);
+    this.setNextStatement(true, null);
+    this.setColour('#8A2BE2');
+    this.setHelpUrl('');
+  }
+};
+pythonGenerator.forBlock['clone'] = function(block) {
+  const number = parseFloat(block.getFieldValue('NUMBER') || '0.0').toFixed(1);
+  return `CabbageEngine.scalespeaddZActor(${number})\n`;
+};
+
+Blockly.Blocks['clone_del'] = {
+  init: function () {
+    this.appendDummyInput()
+      .appendField('删除此克隆体')
+    this.setInputsInline(true);
+    this.setPreviousStatement(true, null);
+    this.setNextStatement(flash, null);
+    this.setColour('#8A2BE2');
+    this.setHelpUrl('');
+  }
+};
+pythonGenerator.forBlock['clone_del'] = function(block) {
+  return `CabbageEngine.scaleaddActor()\n`;
+};
+
 
 
 // 使用 JSON 格式的工具箱配置
@@ -683,21 +594,25 @@ const TOOLBOX_CONFIG = {
     },
     {
       kind: 'category',
-      name: '逻辑',
-      colour: '#5C97FF',
+      name: '事件',
+      colour: '#855E42',
       contents: [
-        { kind: 'block', type: 'controls_if' },
-        { kind: 'block', type: 'logic_compare' },
-        { kind: 'block', type: 'logic_boolean' }
+        { kind: 'block', type: 'event_keyboardEventHandling'},
+        { kind: 'bkock', type: 'event_gameStart'},
+        { kind: 'bkock', type: 'event_scenairChange'},
+        { kind: 'bkock', type: 'event_cloneStart'},
       ]
     },
     {
       kind: 'category',
-      name: '循环',
+      name: '变量',
       colour: '#FF6680',
       contents: [
-        { kind: 'block', type: 'controls_repeat_ext' },
-        { kind: 'block', type: 'controls_whileUntil' }
+        { kind: 'block', type: 'variable_assignTo' },
+        { kind: 'block', type: 'variable_add' },
+        { kind: 'block', type: 'variable_show' },
+        { kind: 'block', type: 'variable_hide' },
+        { kind: 'block', type: 'math_change' }
       ]
     },
     {
@@ -705,10 +620,23 @@ const TOOLBOX_CONFIG = {
       name: '数学',
       colour: '#FFAB19',
       contents: [
-        { kind: 'block', type: 'math_number' },
-        { kind: 'block', type: 'math_arithmetic' },
-        { kind: 'block', type: 'math_change' },
-        { kind: 'block', type: 'math_add' }
+        { kind: 'block', type: 'math_add' },
+        { kind: 'block', type: 'math_mul' },
+        { kind: 'block', type: 'math_div' },
+        { kind: 'block', type: 'math_sub' },
+        { kind: 'block', type: 'random' },
+        { kind: 'block', type: 'logic_compare' }
+      ]
+    },
+    {
+      kind: 'category',
+      name: '控制',
+      colour: '#FFAB19',
+      contents: [
+        { kind: 'block', type: 'wait' },
+        { kind: 'block', type: 'ask' },
+        { kind: 'block', type: 'clone'},
+        { kind: 'block', type: 'clone_del'}
       ]
     },
     {
@@ -716,16 +644,10 @@ const TOOLBOX_CONFIG = {
       name: '侦测',
       colour: '#00FFFF',
       contents: [
-        { kind: 'block', type: 'detect_collision'}   
-      ]
-    },
-    {
-      kind: 'category',
-      name: '事件',
-      colour: '#855E42',
-      contents: [
-        { kind: 'block', type: 'event_keyboardEventHandling'},
-        { kind: 'bkock', type: 'event_gameStart'}
+        { kind: 'block', type: 'detect_collision'},
+        { kind: 'block', type: 'detect_press_mouse'},
+        { kind: 'block', type: 'detect_press'},
+
       ]
     }
   ]
@@ -757,14 +679,33 @@ const BLOCK_CATEGORY_MAP = {
   'appearance_scalespeX_actor': '外观',
   'appearance_scalespeY_actor': '外观',
   'appearance_scalespeZ_actor': '外观',
-  'controls_if': '逻辑',
-  'logic_compare': '逻辑',
+  'logic_compare': '数学',
   'logic_boolean': '逻辑',
-  'controls_repeat_ext': '循环',
-  'controls_whileUntil': '循环',
-  'math_number': '数学',
-  'math_arithmetic': '数学',
-  'math_change': '数学',
+  'math_change': '变量',
+  'event_keyboardEventHandling':'事件',
+  'event_gameStart':'事件',
+  'event_scenairChange':'事件',
+  'event_cloneStart':'事件',
+  'variable_assignTo':'变量',
+  'variable_add':'变量',
+  'variable_show':'变量',
+  'variable_hide':'变量',
+  'detect_collision':'侦测',
+  'detect_press_mouse':'侦测',
+  'detect_press':'侦测',
+  'math_add':'数学',
+  'math_mul':'数学',
+  'math_div':'数学',
+  'math_sub':'数学',
+  'random':'数学',
+  'wait':'控制',
+  'ask':'控制',
+  'clone':'控制',
+  'clone_del':'控制',
+  
+
+
+
 };
 
 const WORKSPACE_CONFIG = {
@@ -1022,155 +963,6 @@ const updateScale = () => {
   } 
 }
 
-// 拖拽状态管理
-const dragState = ref({
-  isDragging: false,
-  isResizing: false,
-  offsetX: 0,
-  offsetY: 0,
-  startWidth: 0,
-  startHeight: 0,
-  startX: 0,
-  startY: 0,
-  windowX: 0,
-  windowY: 0
-});
-
-
-const startResize = (event,direction) => {
-  if (event.button !== 0) return;
-  dragState.value.isResizing = true;
-  dragState.value.startWidth = event.currentTarget.parentElement.offsetWidth;
-  dragState.value.startHeight = event.currentTarget.parentElement.offsetHeight;
-  dragState.value.startX = event.clientX;
-  dragState.value.startY = event.clientY;
-
- // 记录窗口当前位置
-  const rect = event.currentTarget.parentElement.getBoundingClientRect();
-  dragState.value.windowX = rect.left;
-  dragState.value.windowY = rect.top;
-
-  event.preventDefault();
-};
-
-const onResize = (event) => {
-  if (!dragState.value.isResizing) return;
-  
-  const deltaX = event.clientX - dragState.value.startX;
-  const deltaY = event.clientY - dragState.value.startY;
-  
-  let newWidth = dragState.value.startWidth;
-  let newHeight = dragState.value.startHeight;
-  let newX = dragState.value.windowX;
-  let newY = dragState.value.windowY;
-
-  switch(dragState.value.resizeDirection) {
-    case 'n':
-      newHeight = Math.max(200, dragState.value.startHeight + deltaY);
-      newY = dragState.value.windowY - deltaY;
-      break;
-    case 's':
-      newHeight = Math.max(200, dragState.value.startHeight + deltaY);
-      break;
-    case 'w':
-      newWidth = Math.max(200, dragState.value.startWidth + deltaX);
-      newX = dragState.value.windowX - deltaX;
-      break;
-    case 'e':
-      newWidth = Math.max(200, dragState.value.startWidth + deltaX);
-      break;
-    case 'nw':
-      newWidth = Math.max(200, dragState.value.startWidth - deltaX);
-      newHeight = Math.max(200, dragState.value.startHeight - deltaY);
-      newX = dragState.value.windowX + deltaX;
-      newY = dragState.value.windowY + deltaY;
-      break;
-    case 'ne':
-      newWidth = Math.max(200, dragState.value.startWidth + deltaX);
-      newHeight = Math.max(200, dragState.value.startHeight - deltaY);
-      newY = dragState.value.windowY + deltaY;
-      break;
-    case 'sw':
-      newWidth = Math.max(200, dragState.value.startWidth - deltaX);
-      newHeight = Math.max(200, dragState.value.startHeight + deltaY);
-      newX = dragState.value.windowX + deltaX;
-      break;
-    case 'se':
-      newWidth = Math.max(200, dragState.value.startWidth + deltaX);
-      newHeight = Math.max(200, dragState.value.startHeight + deltaY);
-      break;
-  }
-
-  // 检测是否拖到边界自动浮动
-  const screenWidth = window.innerWidth;
-  const screenHeight = window.innerHeight;
-  const threshold = 50;
-  
-  if (newX < threshold || newX + newWidth > screenWidth - threshold ||
-      newY < threshold || newY + newHeight > screenHeight - threshold) {
-    if (!isFloating.value && window.pyBridge) {
-      isFloating.value = true;
-      window.pyBridge.forwardDockEvent('float', JSON.stringify({
-        isFloating: true
-      }));
-    }
-  }
-  
-  if (window.pyBridge) {
-    window.pyBridge.forwardDockEvent('resize', JSON.stringify({
-      width: newWidth,
-      height: newHeight,
-      x: newX,
-      y: newY
-    }));
-  }
-  event.preventDefault();
-};
-
-const stopResize = () => {
-  dragState.value.isResizing = false;
-};
-// 拖拽相关
-const startDrag = (event) => {
-  if (event.button !== 0) return;
-  dragState.value.isDragging = true;
-  dragState.value.startX = event.clientX;
-  dragState.value.startY = event.clientY;
-  
-  // 移除获取位置的代码
-  event.currentTarget.classList.add('bg-[#7BA590]/80');
-  event.preventDefault();
-};
-
-const onDrag = (event) => {
-  if (!dragState.value.isDragging) return;
-  
-  const deltaX = event.clientX - dragState.value.startX;
-  const deltaY = event.clientY - dragState.value.startY;
-  
-  if (window.pyBridge) {
-    window.pyBridge.forwardDockEvent('drag', JSON.stringify({
-      deltaX,
-      deltaY
-    }));
-  }
-  
-  dragState.value.startX = event.clientX;
-  dragState.value.startY = event.clientY;
-  event.preventDefault();
-};
-
-const stopDrag = (event) => {
-  if (!dragState.value.isDragging) return;
-
-  dragState.value.isDragging = false;
-  dragState.value.startX = 0;
-  dragState.value.startY = 0;
-
-  event.currentTarget.classList.remove('bg-[#7BA590]/80');
-  event.preventDefault();
-};
-
 //关闭浮动窗口
 const closeFloat = () => {
   if (window.pyBridge) {
@@ -1178,6 +970,13 @@ const closeFloat = () => {
   }
 };
 
+const handleResizeMove = (e) => {
+  if (dragState.value.isResizing) onResize(e);
+};
+
+const handleResizeUp = () => {
+  if (dragState.value.isResizing) stopResize();
+};
 
 onMounted(() => {
   scenename.value = route.query.sceneName;
@@ -1185,22 +984,20 @@ onMounted(() => {
   character.value = decodeURIComponent(route.query.path);
   routename.value = route.query.routename;
   initBlockly();
+  document.addEventListener('mousemove', handleResizeMove);
+  document.addEventListener('mouseup', handleResizeUp);
   document.addEventListener('mousemove', onDrag);
   document.addEventListener('mouseup', stopDrag);
-  document.addEventListener('mousemove', onResize);
-  document.addEventListener('mouseup', stopResize);
-
 });
 
 // 组件卸载时清理
 onUnmounted(() => {
   // 这里假设 closeWorkspace 是一个自定义函数，需要根据实际情况实现
   // closeWorkspace();
+  document.removeEventListener('mousemove', handleResizeMove);
+  document.removeEventListener('mouseup', handleResizeUp);
   document.removeEventListener('mousemove', onDrag);
   document.removeEventListener('mouseup', stopDrag);
-  document.removeEventListener('mousemove', onResize);
-  document.removeEventListener('mouseup', stopResize);
-
 });
 </script>
 

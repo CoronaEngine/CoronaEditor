@@ -23,12 +23,13 @@ except ImportError:
     )[0]
     html_path = os.path.join(
         root_dir,
-        "SourceCode",
         "CabbageEditor",
+        "SourceCode",
         "CabbageEditorFrontend",
         "dist",
         "index.html",
     )
+    print(html_path)
     url = QUrl.fromLocalFile(html_path)
     obj_dir = os.path.join(root_dir, "TestCase", "AddModelTest")
     print("import CabbageEngine Fallback")
