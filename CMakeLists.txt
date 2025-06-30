@@ -72,8 +72,8 @@ file(GLOB_RECURSE SOURCE_FILES CONFIGURE_DEPENDS "${SOURCE_DIR}/*.*" )
 
 # 定义要忽略的文件或文件夹
 set(IGNORE_FILES
-  "SourceCode/CabbageEditor/CabbageEditorBackend/*"
-  "SourceCode/CabbageEditor/CabbageEditorFrontend/*")
+  "SourceCode/CabbageEditorBackend/*"
+  "SourceCode/CabbageEditorFrontend/*")
 
 # 过滤掉要忽略的文件或文件夹
 foreach(file ${IGNORE_FILES})
