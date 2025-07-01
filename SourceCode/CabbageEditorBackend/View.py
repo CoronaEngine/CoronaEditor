@@ -153,7 +153,6 @@ class BrowserWidget(QWebEngineView):
         self.Main_Window = Main_Window
         self.CentralManager = QtWindow.CentralManager()
 
-
         self.setMinimumSize(1, 1)
         self.setStyleSheet("background: transparent;")
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
@@ -175,12 +174,12 @@ class BrowserWidget(QWebEngineView):
         self.bridge.create_route.connect(self.AddDockWidget)
         self.bridge.remove_route.connect(self.RemoveDockWidget)
 
-    def AddDockWidget(self, routename, routepath, position):
+    def AddDockWidget(self, routename, routepath, position, floatposition):
         if not routename or not routepath:
             print("错误：routename 和 routepath 不能为空")
             return
         browser = QWebEngineView()
-        dock_area, isFloat = self._get_dock_area(position)
+        dock_area, isFloat, pos = self._get_dock_area(position, floatposition)
 
         if self.CentralManager.docks.get(routename):
             self.RemoveDockWidget(routename)
@@ -192,6 +191,8 @@ class BrowserWidget(QWebEngineView):
             if isFloat:
                 self.dock.bridge.create_route.connect(lambda *args: self.AddDockWidget(*args))
                 self.dock.bridge.remove_route.connect(self.RemoveDockWidget)
+                self.dock.move(pos)
+                print(self.dock.pos().x(),self.dock.pos().y())
             else:
                 self.Main_Window.addDockWidget(dock_area,self.dock)
                 self.dock.bridge.create_route.connect(lambda *args: self.AddDockWidget(*args))
@@ -209,17 +210,27 @@ class BrowserWidget(QWebEngineView):
 
             if hasattr(dock, "bridge"):
                 dock.bridge.create_route.disconnect()
+                dock.bridge.remove_route.disconnect()
 
-    def _get_dock_area(self, position):
+    def _get_dock_area(self, position, floatposition):
         position_map = {
-            "float": (Qt.DockWidgetArea.AllDockWidgetAreas, True),
-            "left": (Qt.DockWidgetArea.LeftDockWidgetArea, False),
-            "right": (Qt.DockWidgetArea.RightDockWidgetArea, False),
-            "top": (Qt.DockWidgetArea.TopDockWidgetArea, False),
-            "bottom": (Qt.DockWidgetArea.BottomDockWidgetArea, False),
+            "left": (Qt.DockWidgetArea.LeftDockWidgetArea, False, None),
+            "right": (Qt.DockWidgetArea.RightDockWidgetArea, False, None),
+            "top": (Qt.DockWidgetArea.TopDockWidgetArea, False, None),
+            "bottom": (Qt.DockWidgetArea.BottomDockWidgetArea, False, None),
         }
+
+        if position.lower() == "float":
+            float_position_map = {
+                "top_left": (Qt.DockWidgetArea.AllDockWidgetAreas, True, self.Main_Window.rect().topLeft()),
+                "bottom_left": (Qt.DockWidgetArea.AllDockWidgetAreas, True, self.Main_Window.rect().bottomLeft()),
+                "top_right": (Qt.DockWidgetArea.AllDockWidgetAreas, True, self.Main_Window.rect().topRight()),
+                "bottom_right": (Qt.DockWidgetArea.AllDockWidgetAreas, True, self.Main_Window.rect().bottomRight()),
+            }
+            return float_position_map.get(floatposition.lower(), (Qt.DockWidgetArea.AllDockWidgetAreas, True, "top_left"))
+
         return position_map.get(
-            position.lower(), (Qt.DockWidgetArea.LeftDockWidgetArea, False)
+            position.lower(), (Qt.DockWidgetArea.LeftDockWidgetArea, False, None)
         )
 
 
