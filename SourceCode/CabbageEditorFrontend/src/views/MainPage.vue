@@ -148,7 +148,8 @@ const switchTab = (index) => {
 // 控制包菜精显示
 const cabbagetalk = () => {
   if (window.pyBridge) {
-    window.pyBridge.addDockWidget("Pet", "/Pet", "float");
+    window.pyBridge.addDockWidget("Pet", "/Pet", "float","top_left");
+
   } else {
     console.error("Python SendMessageToDock 未连接！");
   }
