@@ -21,7 +21,7 @@
 
 ### 前端Todo
 - ESC弹出设置页面
-- 多配色方案
+- 多配色、多主题（cabbage、corona）方案
 - dock，关闭、缩放、拖拽、停靠事件重构，使用JS控制
 	- BUG:dock拖动边框改变窗口大小
  	- BUG:dock浮动偶尔失效
