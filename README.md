@@ -35,7 +35,7 @@
 - dock浮动的时候，指定位置、size的接口
 - 读写文件开放接口（非Dialog，读写txt、json等）
 - BUG:积木hotfix会导致多次运行
-- BUG:关闭报错
+- BUG:c艹运行，关闭报错
 - BUG：包菜的dock在主副屏幕的问题
   
 ### 美术Todo
