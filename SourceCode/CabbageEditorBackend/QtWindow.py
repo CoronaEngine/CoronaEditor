@@ -38,7 +38,7 @@ class WorkerThread(QThread):
 
 
 class Bridge(QObject):
-    create_route = pyqtSignal(str, str, str, str)
+    create_route = pyqtSignal(str, str, str, str, object)
     ai_message = pyqtSignal(str)
     remove_route = pyqtSignal(str)
     ai_response = pyqtSignal(str)
@@ -55,9 +55,14 @@ class Bridge(QObject):
         self.camera_forward = [0.0, 1.5, 0.0]
         self.central_manager = central_manager
 
-    @pyqtSlot(str, str, str, str)
-    def addDockWidget(self, routename, routepath, position="left", floatposition="None"):
-        self.create_route.emit(routename, routepath, position, floatposition)
+    @pyqtSlot(str, str, str, str, str)
+    def addDockWidget(self, routename, routepath, position="left", floatposition="None",size=None):
+        try:
+            if isinstance(size, str):
+                size = json.loads(size)
+        except json.JSONDecodeError:
+            size = None
+        self.create_route.emit(routename, routepath, position, floatposition, size)
 
     @pyqtSlot(str)
     def removeDockWidget(self, routename):

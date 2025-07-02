@@ -174,7 +174,7 @@ class BrowserWidget(QWebEngineView):
         self.bridge.create_route.connect(self.AddDockWidget)
         self.bridge.remove_route.connect(self.RemoveDockWidget)
 
-    def AddDockWidget(self, routename, routepath, position, floatposition):
+    def AddDockWidget(self, routename, routepath, position, floatposition, size):
         if not routename or not routepath:
             print("错误：routename 和 routepath 不能为空")
             return
@@ -191,8 +191,12 @@ class BrowserWidget(QWebEngineView):
             if isFloat:
                 self.dock.bridge.create_route.connect(lambda *args: self.AddDockWidget(*args))
                 self.dock.bridge.remove_route.connect(self.RemoveDockWidget)
+                if size:
+                    self.dock.resize(size.get("width"),size.get("height"))
+                    self.dock.browser.resize(size.get("width"),size.get("height"))
                 self.dock.move(pos)
                 print(self.dock.pos().x(),self.dock.pos().y())
+                print(self.dock.size())
             else:
                 self.Main_Window.addDockWidget(dock_area,self.dock)
                 self.dock.bridge.create_route.connect(lambda *args: self.AddDockWidget(*args))
@@ -223,9 +227,10 @@ class BrowserWidget(QWebEngineView):
         if position.lower() == "float":
             float_position_map = {
                 "top_left": (Qt.DockWidgetArea.AllDockWidgetAreas, True, self.Main_Window.rect().topLeft()),
-                "bottom_left": (Qt.DockWidgetArea.AllDockWidgetAreas, True, self.Main_Window.rect().bottomLeft()),
+                "bottom_left": (Qt.DockWidgetArea.AllDockWidgetAreas, True, self.Main_Window.rect().bottomLeft()-QPoint(150,150)),
                 "top_right": (Qt.DockWidgetArea.AllDockWidgetAreas, True, self.Main_Window.rect().topRight()),
-                "bottom_right": (Qt.DockWidgetArea.AllDockWidgetAreas, True, self.Main_Window.rect().bottomRight()),
+                "bottom_right": (Qt.DockWidgetArea.AllDockWidgetAreas, True, self.Main_Window.rect().bottomRight()-QPoint(150,150)),
+                "center": (Qt.DockWidgetArea.AllDockWidgetAreas, True, self.Main_Window.rect().center()),
             }
             return float_position_map.get(floatposition.lower(), (Qt.DockWidgetArea.AllDockWidgetAreas, True, "top_left"))
 
