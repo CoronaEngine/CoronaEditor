@@ -227,7 +227,7 @@ class BrowserWidget(QWebEngineView):
         if position.lower() == "float":
             float_position_map = {
                 "top_left": (Qt.DockWidgetArea.AllDockWidgetAreas, True, self.Main_Window.rect().topLeft()),
-                "bottom_left": (Qt.DockWidgetArea.AllDockWidgetAreas, True, self.Main_Window.rect().bottomLeft()-QPoint(150,150)),
+                "bottom_left": (Qt.DockWidgetArea.AllDockWidgetAreas, True, self.Main_Window.rect().bottomLeft()-QPoint(0,150)),
                 "top_right": (Qt.DockWidgetArea.AllDockWidgetAreas, True, self.Main_Window.rect().topRight()),
                 "bottom_right": (Qt.DockWidgetArea.AllDockWidgetAreas, True, self.Main_Window.rect().bottomRight()-QPoint(150,150)),
                 "center": (Qt.DockWidgetArea.AllDockWidgetAreas, True, self.Main_Window.rect().center()),
