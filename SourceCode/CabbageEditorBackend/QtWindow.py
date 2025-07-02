@@ -161,9 +161,8 @@ class Bridge(QObject):
 
     @pyqtSlot(str)
     def openFileDialog(self,sceneName):
-        file_path, _ = QFileDialog.getOpenFileName(
-            None, "选择模型文件", self.obj_dir, "3D模型文件 (*.obj *.fbx *.dae)"
-        )
+        file_handler = FileHandler()
+        _, file_path = file_handler.open_file("选择模型文件","3D模型文件 (*.obj *.fbx *.dae)")
         if file_path:
             try:
                 print(f"选择的模型文件路径: {file_path}")
@@ -293,53 +292,49 @@ def run():
     def HandleSceneSave(self, data):
         try:
             scene_data = json.loads(data)
-            scene_dir = os.path.join(self.saves_dir, "scenes")
-            os.makedirs(scene_dir, exist_ok=True)
+            file_handler = FileHandler()
 
-            timestamp = time.strftime("%Y%m%d_%H%M%S")
-            filename = f"scene_{timestamp}.json"
-            filepath = os.path.join(scene_dir, filename)
-
-            with open(filepath, "w", encoding="utf-8") as f:
-                json.dump(scene_data, f, indent=4)
-
-            print(f"[DEBUG] 场景保存成功: {filepath}")
-            self.dock_event.emit(
-                "sceneSaved", json.dumps({"status": "success", "filepath": filepath})
-            )
+            content = json.dumps(scene_data,indent=4)
+            save_path = file_handler.save_file(content,"保存场景文件","场景文件 (*.json)")
+            if save_path:
+                print(f"[DEBUG] 场景保存成功: {save_path}")
+                self.dock_event.emit(
+                    "sceneSaved", json.dumps({"status": "success", "filepath": save_path})
+                )
+            else:
+                print("[DEBUG] 场景保存失败")
+                self.dock_event.emit(
+                    "sceneSaved", json.dumps({"status": "error", "filepath": save_path})
+                )
         except Exception as e:
             print(f"[ERROR] 保存场景失败: {str(e)}")
             error_response = {
                 "status": "error",
-                "message": str(e),
-                "stacktrace": traceback.format_exc(),
+                "message": str(e)
             }
             self.dock_event.emit("sceneError", json.dumps(error_response))
 
     @pyqtSlot(str)
     def openSceneDialog(self,sceneName):
-        from PyQt6.QtWidgets import QFileDialog
-
-        file_path, _ = QFileDialog.getOpenFileName(
-            None, "选择场景文件", self.saves_dir, "场景文件 (*.json)"
-        )
+        file_handler = FileHandler()
+        content, file_path = file_handler.open_file("选择场景文件","场景文件 (*.json)")
         if file_path:
             try:
-                with open(file_path, "r", encoding="utf-8") as f:
-                    scene_data = json.load(f)
-                scene_dict[sceneName]["actor_dict"] = []
+                scene_dict[sceneName]["actor_dict"] = {}
+                scene_data = json.loads(content)
                 actors = []
                 for actor in scene_data.get("actors", []):
                     path = actor.get("path")
                     if path:
                         actor_obj = CabbageEngine.Actor(scene_dict[sceneName]["scene"], path)
-                        scene_dict[sceneName]["actor_dict"].append({
-                            "name": os.path.basename(path),
+                        name = os.path.basename(path)
+                        scene_dict[sceneName]["actor_dict"][name]= {
+                            "name": name,
                             "actor": actor_obj,
                             "path": path
-                        })
+                        }
                         actors.append({
-                            "name": os.path.basename(path),
+                            "name": name,
                             "path": path
                         })
                 self.dock_event.emit("sceneLoaded", json.dumps({"actors": actors}))
@@ -358,9 +353,8 @@ def run():
         self.dock_event.emit(event_type, event_data)
 
 
-class CentralManager(QObject):
+class CentralManager:
     def __init__(self):
-        super().__init__()
         self.docks = {}
 
     def register_dock(self, routename, dock):
@@ -375,3 +369,41 @@ class CentralManager(QObject):
         else:
             print(f"[ERROR] 未找到路由 {routename} 对应的 DockWidget")
 
+class FileHandler:
+    def __init__(self):
+        super().__init__()
+
+    def open_file(self, caption="打开文件", filter="所有文件 (*.*)", default_dir=None):
+        if default_dir is None:
+            default_dir = os.getcwd()
+        file_path, _ = QFileDialog.getOpenFileName(None, caption, default_dir, filter)
+        if file_path:
+            try:
+                with open(file_path, 'r', encoding='utf-8') as file:
+                    content = file.read()
+                return content, file_path
+            except UnicodeDecodeError:
+                try:
+                    with open(file_path, 'r', encoding='gbk') as file:
+                        content = file.read()
+                    return content, file_path
+                except Exception as e:
+                    print(f"读取文件失败: {str(e)}")
+            except Exception as e:
+                print(f"读取文件失败: {str(e)}")
+        return None, None
+
+    def save_file(self, content, caption="保存文件", filter="所有文件 (*.*)", default_dir=None, default_filename=""):
+        if default_dir is None:
+            default_dir = os.getcwd()
+        file_path, _ = QFileDialog.getSaveFileName(
+            None, caption, os.path.join(default_dir, default_filename), filter
+        )
+        if file_path:
+            try:
+                with open(file_path, 'w', encoding='utf-8') as file:
+                    file.write(content)
+                return file_path
+            except Exception as e:
+                print(f"保存文件失败: {str(e)}")
+        return None

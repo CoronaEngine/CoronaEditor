@@ -1,12 +1,12 @@
 # Corona Engine Editor
 - 此仓库为Corona Engine的编辑器
-- 前端Web
+- 前端Web：
 	- 基于Node.js（Vue + Tailwind）
 	- 实现基于积木可视化编程（类似Scratch），积木运行时转为Python
-- 后端/脚本层Python
+- 后端/脚本层Python：
 	- 基于MCP接入大模型
 	- 使用PyQt6的QWebEngineView及QDockWidget搭建前端界面布局
-- 底层C艹
+- 底层C艹：
 	- 支持Python层的热重载，保存文件自动更新Python代码逻辑
   
 ### 环境配置
@@ -20,6 +20,8 @@
  	- 代码位于SourceCode\CabbageEditorFrontend
 
 ### 前端Todo
+- ESC弹出设置页面
+- 多配色、多主题（cabbage、corona）方案
 - dock，关闭、缩放、拖拽、停靠事件重构，使用JS控制
 	- BUG:dock拖动边框改变窗口大小
  	- BUG:dock浮动偶尔失效
@@ -32,10 +34,9 @@
 - BUG：camera的问题
   
 ### 后端Todo
-- dock浮动的时候，指定位置的接口
-- 读写文件开放接口
+- dock浮动的时候，指定位置、size的接口
+- 读写文件开放接口（非Dialog，读写txt、json等）
 - BUG:积木hotfix会导致多次运行
-- BUG:关闭报错
 - BUG：包菜的dock在主副屏幕的问题
   
 ### 美术Todo
