@@ -137,14 +137,14 @@ const saveScene = () => {
 };
 
 const handleFileImport = () => {
-  if (window.pyBridge && window.pyBridge.openFileDialog) {
-    window.pyBridge.openFileDialog(currentSceneName.value);
+  if (window.pyBridge && window.pyBridge.open_file_dialog) {
+    window.pyBridge.open_file_dialog(currentSceneName.value, 'model');
   }
 };
 
 const handleSceneImport = () => {
-  if (window.pyBridge && window.pyBridge.openSceneDialog) {
-    window.pyBridge.openSceneDialog(currentSceneName.value);
+  if (window.pyBridge && window.pyBridge.open_file_dialog) {
+    window.pyBridge.open_file_dialog(currentSceneName.value, 'scene');
   }
 };
 

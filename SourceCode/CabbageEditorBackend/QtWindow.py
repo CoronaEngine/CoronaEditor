@@ -159,26 +159,53 @@ class Bridge(QObject):
         self.worker_thread.result_ready.connect(self.ai_response.emit)
         self.worker_thread.start()
 
-    @pyqtSlot(str)
-    def openFileDialog(self,sceneName):
+    @pyqtSlot(str, str)
+    def open_file_dialog(self, sceneName, file_type="model"):
         file_handler = FileHandler()
-        _, file_path = file_handler.open_file("选择模型文件","3D模型文件 (*.obj *.fbx *.dae)")
-        if file_path:
-            try:
-                print(f"选择的模型文件路径: {file_path}")
-                name = os.path.basename(file_path)
-                object = CabbageEngine.Actor(scene_dict[sceneName]["scene"],file_path)
-                scene_dict[sceneName]["actor_dict"][name]={
-                    "actor":object,
-                    "path":file_path
-                }
-                response = {
-                    "name": name,
-                    "path": file_path,
-                }
-                self.dock_event.emit("actorCreated", json.dumps(response))
-            except Exception as e:
-                print(f"创建角色失败: {str(e)}")
+        if file_type == "model":
+            _, file_path = file_handler.open_file("选择模型文件", "3D模型文件 (*.obj *.fbx *.dae)")
+            if file_path:
+                try:
+                    print(f"选择的模型文件路径: {file_path}")
+                    name = os.path.basename(file_path)
+                    object = CabbageEngine.Actor(scene_dict[sceneName]["scene"], file_path)
+                    scene_dict[sceneName]["actor_dict"][name] = {
+                        "actor": object,
+                        "path": file_path
+                    }
+                    response = {
+                        "name": name,
+                        "path": file_path,
+                    }
+                    self.dock_event.emit("actorCreated", json.dumps(response))
+                except Exception as e:
+                    print(f"创建角色失败: {str(e)}")
+        elif file_type == "scene":
+            content, file_path = file_handler.open_file("选择场景文件", "场景文件 (*.json)")
+            if file_path:
+                try:
+                    scene_dict[sceneName]["actor_dict"] = {}
+                    scene_data = json.loads(content)
+                    actors = []
+                    for actor in scene_data.get("actors", []):
+                        path = actor.get("path")
+                        if path:
+                            actor_obj = CabbageEngine.Actor(scene_dict[sceneName]["scene"], path)
+                            name = os.path.basename(path)
+                            scene_dict[sceneName]["actor_dict"][name] = {
+                                "name": name,
+                                "actor": actor_obj,
+                                "path": path
+                            }
+                            actors.append({
+                                "name": name,
+                                "path": path
+                            })
+                    self.dock_event.emit("sceneLoaded", json.dumps({"actors": actors}))
+                except Exception as e:
+                    print(f"加载场景失败: {str(e)}")
+                    error_response = {"type": "error", "message": str(e)}
+                    self.dock_event.emit("sceneError", json.dumps(error_response))
 
     @pyqtSlot(str,str)
     def HandleActorDelete(self, sceneName, actorName):
@@ -314,35 +341,6 @@ def run():
             }
             self.dock_event.emit("sceneError", json.dumps(error_response))
 
-    @pyqtSlot(str)
-    def openSceneDialog(self,sceneName):
-        file_handler = FileHandler()
-        content, file_path = file_handler.open_file("选择场景文件","场景文件 (*.json)")
-        if file_path:
-            try:
-                scene_dict[sceneName]["actor_dict"] = {}
-                scene_data = json.loads(content)
-                actors = []
-                for actor in scene_data.get("actors", []):
-                    path = actor.get("path")
-                    if path:
-                        actor_obj = CabbageEngine.Actor(scene_dict[sceneName]["scene"], path)
-                        name = os.path.basename(path)
-                        scene_dict[sceneName]["actor_dict"][name]= {
-                            "name": name,
-                            "actor": actor_obj,
-                            "path": path
-                        }
-                        actors.append({
-                            "name": name,
-                            "path": path
-                        })
-                self.dock_event.emit("sceneLoaded", json.dumps({"actors": actors}))
-            except Exception as e:
-                print(f"加载场景失败: {str(e)}")
-                error_response = {"type": "error", "message": str(e)}
-                self.dock_event.emit("sceneError", json.dumps(error_response))
-
     @pyqtSlot()
     def closeprocess(self):
         QApplication.quit()
@@ -406,4 +404,22 @@ class FileHandler:
                 return file_path
             except Exception as e:
                 print(f"保存文件失败: {str(e)}")
+        return None
+
+    def read_file_by_path(self, file_path):
+        if not file_path:
+            return None
+        try:
+            with open(file_path, 'r', encoding='utf-8') as file:
+                content = file.read()
+            return content
+        except UnicodeDecodeError:
+            try:
+                with open(file_path, 'r', encoding='gbk') as file:
+                    content = file.read()
+                return content
+            except Exception as e:
+                print(f"读取文件失败: {str(e)}")
+        except Exception as e:
+            print(f"读取文件失败: {str(e)}")
         return None
