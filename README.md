@@ -32,7 +32,7 @@
 - BUG：camera的问题
   
 ### 后端Todo
-- dock浮动的时候，指定位置的接口
+- dock浮动的时候，指定位置、size的接口
 - 读写文件开放接口
 - BUG:积木hotfix会导致多次运行
 - BUG:关闭报错
