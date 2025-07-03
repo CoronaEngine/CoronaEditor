@@ -30,6 +30,7 @@ class MainWindow(QMainWindow):
         super(MainWindow, self).__init__()
         screen = QApplication.primaryScreen().availableGeometry()
         self.setGeometry(0, 0, screen.width(), screen.height())
+        self.setWindowTitle("CabbageEngine")
         self.configure_web_engine()
 
         self.RenderWidget = RenderWidget(self)
