@@ -35,7 +35,7 @@
   
 ### 后端Todo
 - BUG:积木hotfix会导致多次运行
-- BUG：包菜的dock在主副屏幕的问题
+- BUG：dock在主副屏幕的问题
   
 ### 美术Todo
 -  主页场景再设计(3D场景) 
