@@ -79,6 +79,9 @@ const handleKeyDown = (event) => {
     case 'e':
       handleCameraMove('rotateRight');
       forward[1];
+    case 'escape':
+      openSetup();
+      break;
   }
 };
 
@@ -129,6 +132,13 @@ const handleCameraMove = (direction) => {
     }));
   }
 };
+
+// 调用Esc
+const openSetup = () => {
+  if (window.pyBridge) {
+    window.pyBridge.addDockWidget("SetUp", "/SetUp", "float", "center");
+  }
+}
 
 // 关闭标签页
 const closeTab = (index) => {
