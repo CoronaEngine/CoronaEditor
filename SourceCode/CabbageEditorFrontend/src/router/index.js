@@ -1,4 +1,5 @@
 // 路由文件
+import { comments } from 'blockly/core';
 import { createRouter, createWebHashHistory } from 'vue-router'
 
 const routes = [
@@ -36,6 +37,11 @@ const routes = [
       path: '/Test',
       name: 'Test',
       component: () => import('../views/Test.vue')
+    },
+    {
+      path: '/SetUp',
+      name: 'SetUp',
+      component: () => import('../views/SetUp.vue')
     }
 ]
 

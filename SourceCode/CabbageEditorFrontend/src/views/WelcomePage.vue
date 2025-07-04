@@ -67,7 +67,7 @@
                 </button>
             </router-link>
             <!--游戏设置-->
-            <router-link to=" " class="w-full max-w-xs">
+            <router-link to="/SetUp" class="w-full max-w-xs">
                 <button 
                 @click="removeActors"    
                 class="w-full rounded-none bg-[#9E9E9E]/50 hover:bg-white/50 font-bold py-2 px-4 sm:py-3 sm:px-6 md:py-4 md:px-8 
