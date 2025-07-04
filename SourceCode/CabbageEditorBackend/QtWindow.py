@@ -411,13 +411,18 @@ class FileHandler:
                 print(f"保存文件失败: {str(e)}")
         return None
 
-    def read_file_by_path(self, file_path):
+    def open_file_by_path(self, file_path, content=None, ):
         if not file_path:
             return None
         try:
-            with open(file_path, 'r', encoding='utf-8') as file:
-                content = file.read()
-            return content
+            if content is None:
+                with open(file_path, 'r', encoding='utf-8') as file:
+                    content = file.read()
+                return content
+            else:
+                with open(file_path, 'w', encoding='utf-8') as file:
+                    file.write(content)
+                return None
         except UnicodeDecodeError:
             try:
                 with open(file_path, 'r', encoding='gbk') as file:
