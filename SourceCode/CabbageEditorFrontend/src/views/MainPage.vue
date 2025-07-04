@@ -63,22 +63,22 @@ const handleKeyDown = (event) => {
   switch(event.key.toLowerCase()) {
     case 'w':
       handleCameraMove('up');
-      forward[1];
+      break;
     case 's':
       handleCameraMove('down');
-      forward[1];
+      break;
     case 'a':
       handleCameraMove('left');
-      forward[1];
+      break;
     case 'd':
       handleCameraMove('right');
-      forward[1];
+      break;
     case 'q':
       handleCameraMove('rotateLeft');
-      forward[1];
+      break;
     case 'e':
       handleCameraMove('rotateRight');
-      forward[1];
+      break;
   }
 };
 
