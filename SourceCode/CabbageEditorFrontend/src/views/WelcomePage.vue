@@ -48,8 +48,8 @@
             <router-link to="/MainPage" class="w-full max-w-xs">
                 <button
                     @click="removeActors" 
-                    class="w-full rounded-none bg-[#9E9E9E]/50 hover:bg-white/50 font-bold py-2 px-4 sm:py-3 sm:px-6 md:py-4 md:px-8 
-           transform hover:scale-110 hover:px-9 hover:py-6 hover:w-[110%] origin-center 
+                    class="w-full rounded-lg bg-[#5F9DC6]/50 hover:bg-white/50 font-bold py-2 px-4 sm:py-3 sm:px-6 md:py-4 md:px-8 
+           transform hover:scale-105 hover:px-9 hover:py-6 hover:w-[105%] origin-center 
            transition-all duration-300 transition-[transform,padding]">
                     <p class="font-bold text-black/80 tracking-widest text-sm sm:text-base md:text-lg">开始游戏<br />Start Game
                     </p>
@@ -59,8 +59,8 @@
             <router-link to="/MainPage" class="w-full max-w-xs">
                 <button
                     @click="removeActors" 
-                    class="w-full rounded-none bg-[#9E9E9E]/50 hover:bg-white/50 font-bold py-2 px-4 sm:py-3 sm:px-6 md:py-4 md:px-8 
-           transform hover:scale-110 hover:px-9 hover:py-6 hover:w-[110%] origin-center 
+                    class="w-full rounded-lg bg-[#5F9DC6]/50 hover:bg-white/50 font-bold py-2 px-4 sm:py-3 sm:px-6 md:py-4 md:px-8 
+           transform hover:scale-105 hover:px-9 hover:py-6 hover:w-[105%] origin-center 
            transition-all duration-300 transition-[transform,padding]">
                     <p class="font-bold text-black/80 tracking-widest text-sm sm:text-base md:text-lg">继续游戏<br />Continue
                     </p>
@@ -70,8 +70,8 @@
             <router-link to="/SetUp" class="w-full max-w-xs">
                 <button 
                 @click="removeActors"    
-                class="w-full rounded-none bg-[#9E9E9E]/50 hover:bg-white/50 font-bold py-2 px-4 sm:py-3 sm:px-6 md:py-4 md:px-8 
-           transform hover:scale-110 hover:px-9 hover:py-6 hover:w-[110%] origin-center 
+                class="w-full rounded-lg bg-[#5F9DC6]/50 hover:bg-white/50 font-bold py-2 px-4 sm:py-3 sm:px-6 md:py-4 md:px-8 
+           transform hover:scale-105 hover:px-9 hover:py-6 hover:w-[105%] origin-center 
            transition-all duration-300 transition-[transform,padding]">
                     <p class="font-bold text-black/80 tracking-widest text-sm sm:text-base md:text-lg">游戏设置<br />Setting</p>
                 </button>
@@ -79,8 +79,8 @@
             <!--退出游戏-->
             <router-link to=" " class="w-full max-w-xs">
                 <button @click="Out"
-                    class="w-full rounded-none bg-[#9E9E9E]/50 hover:bg-white/50 font-bold py-2 px-4 sm:py-3 sm:px-6 md:py-4 md:px-8 
-           transform hover:scale-110 hover:px-9 hover:py-6 hover:w-[110%] origin-center 
+                    class="w-full rounded-lg bg-[#5F9DC6]/50 hover:bg-white/50 font-bold py-2 px-4 sm:py-3 sm:px-6 md:py-4 md:px-8 
+           transform hover:scale-105 hover:px-9 hover:py-6 hover:w-[105%] origin-center 
            transition-all duration-300 transition-[transform,padding]">
                     <p class="font-bold text-black/80 tracking-widest text-sm sm:text-base md:text-lg">结束游戏<br />Exit</p>
                 </button>
