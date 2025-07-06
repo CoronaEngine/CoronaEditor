@@ -1,6 +1,7 @@
+from turtle import Screen
 from PyQt6.QtCore import Qt, QPoint, QEvent, pyqtSignal, QRect, QTimer
 from PyQt6.QtWidgets import QMainWindow, QApplication, QWidget,QDockWidget,QVBoxLayout
-from PyQt6.QtGui import QColor, QPixmap, QPainter
+from PyQt6.QtGui import QColor, QGuiApplication, QPixmap, QPainter
 from PyQt6.QtWebChannel import QWebChannel
 from PyQt6.QtWebEngineWidgets import QWebEngineView
 from PyQt6.QtWebEngineCore import QWebEngineProfile, QWebEngineSettings
@@ -195,9 +196,9 @@ class BrowserWidget(QWebEngineView):
                 if size:
                     self.dock.resize(size.get("width"),size.get("height"))
                     self.dock.browser.resize(size.get("width"),size.get("height"))
+                self.dock.setWindowFlags(self.dock.windowFlags() | Qt.WindowType.WindowStaysOnTopHint)
                 self.dock.move(pos)
-                print(self.dock.pos().x(),self.dock.pos().y())
-                print(self.dock.size())
+                self.dock.show()
             else:
                 self.Main_Window.addDockWidget(dock_area,self.dock)
                 self.dock.bridge.create_route.connect(lambda *args: self.AddDockWidget(*args))
@@ -226,12 +227,13 @@ class BrowserWidget(QWebEngineView):
         }
 
         if position.lower() == "float":
+            screen = QGuiApplication.primaryScreen()
             float_position_map = {
-                "top_left": (Qt.DockWidgetArea.AllDockWidgetAreas, True, self.Main_Window.rect().topLeft()),
-                "bottom_left": (Qt.DockWidgetArea.AllDockWidgetAreas, True, self.Main_Window.rect().bottomLeft()-QPoint(0,150)),
-                "top_right": (Qt.DockWidgetArea.AllDockWidgetAreas, True, self.Main_Window.rect().topRight()),
-                "bottom_right": (Qt.DockWidgetArea.AllDockWidgetAreas, True, self.Main_Window.rect().bottomRight()-QPoint(150,150)),
-                "center": (Qt.DockWidgetArea.AllDockWidgetAreas, True, self.Main_Window.rect().center()),
+                "top_left": (Qt.DockWidgetArea.AllDockWidgetAreas, True, screen.geometry().topLeft()),
+                "bottom_left": (Qt.DockWidgetArea.AllDockWidgetAreas, True, screen.geometry().bottomLeft()-QPoint(0,200)),
+                "top_right": (Qt.DockWidgetArea.AllDockWidgetAreas, True, screen.geometry().topRight()-QPoint(150,0)),
+                "bottom_right": (Qt.DockWidgetArea.AllDockWidgetAreas, True, screen.geometry().bottomRight()-QPoint(150,200)),
+                "center": (Qt.DockWidgetArea.AllDockWidgetAreas, True, screen.geometry().center()),
             }
             return float_position_map.get(floatposition.lower(), (Qt.DockWidgetArea.AllDockWidgetAreas, True, "top_left"))
 
