@@ -8,14 +8,10 @@ const dragState = ref({
   isDragging: false,
   isResizing: false,
   resizeDirection: '',
-  offsetX: 0,
-  offsetY: 0,
-  startWidth: 0,
-  startHeight: 0,
-  startX: 0,
-  startY: 0,
-  windowX: 0,
-  windowY: 0
+  offset: { x: 0, y: 0 },
+  startPos: { x: 0, y: 0 },
+  startSize: { width: 0, height: 0 },
+  windowPos: { x: 0, y: 0 }
 });
 
 const startDrag = (event) => {
@@ -44,10 +40,6 @@ const startResize = (event, direction) => {
   dragState.value.startHeight = event.currentTarget.parentElement.offsetHeight;
   dragState.value.startX = event.clientX;
   dragState.value.startY = event.clientY;
-  // 记录窗口当前位置
-  const rect = event.currentTarget.parentElement.getBoundingClientRect();
-  dragState.value.windowX = rect.left;
-  dragState.value.windowY = rect.top;
   
   event.preventDefault();
 };
@@ -68,25 +60,6 @@ const onDrag = (event) => {
 
   const deltaX = event.clientX - dragState.value.startX;
   const deltaY = event.clientY - dragState.value.startY;
-  
-  // 检测是否拖拽到边界触发浮动或吸附
-  const rect = event.currentTarget.parentElement.getBoundingClientRect();
-  const newX = rect.left + deltaX;
-  const newY = rect.top + deltaY;
-  
-  const screenWidth = window.innerWidth;
-  const screenHeight = window.innerHeight;
-  const threshold = 30;
-  
-  const isNearEdge = newX < threshold || newX + newWidth > screenWidth - threshold || newY < threshold || newY + newHeight > screenHeight - threshold;
-  
-  if (isNearEdge && !isFloating.value && window.pyBridge) {
-    // 靠近边界时浮动
-    isFloating.value = true;
-    window.pyBridge.forwardDockEvent('float', JSON.stringify({
-      isFloating: true
-    }));
-  }
 
   if (window.pyBridge) {
     window.pyBridge.forwardDockEvent('drag', JSON.stringify({
@@ -111,43 +84,32 @@ const onResize = (event) => {
   
   let newWidth = dragState.value.startWidth;
   let newHeight = dragState.value.startHeight;
-  let newX = dragState.value.windowX;
-  let newY = dragState.value.windowY;
 
   switch(dragState.value.resizeDirection) {
     case 'n':
       newHeight = Math.max(200, dragState.value.startHeight - deltaY);
-      newY = dragState.value.windowY + deltaY;
       break;
     case 's':
       newHeight = Math.max(200, dragState.value.startHeight + deltaY);
       break;
     case 'w': {
-      const rightEdge = dragState.value.windowX + dragState.value.startWidth;
       newWidth = Math.max(200, dragState.value.startWidth - deltaX);
-      newX = dragState.value.windowX + deltaX;
       break;
     }
     case 'e':
       newWidth = Math.max(200, dragState.value.startWidth + deltaX);
       break;
     case 'nw': {
-      const rightEdge = dragState.value.windowX + dragState.value.startWidth;
       newWidth = Math.max(200, dragState.value.startWidth - deltaX);
-      newX = rightEdge - newWidth;
       newHeight = Math.max(200, dragState.value.startHeight - deltaY);
-      newY = dragState.value.windowY + deltaY;
       break;
     }
     case 'ne':
       newWidth = Math.max(200, dragState.value.startWidth + deltaX);
       newHeight = Math.max(200, dragState.value.startHeight - deltaY);
-      newY = dragState.value.windowY + deltaY;
       break;
     case 'sw': {
-      const rightEdge = dragState.value.windowX + dragState.value.startWidth;
       newWidth = Math.max(200, dragState.value.startWidth - deltaX);
-      newX = rightEdge - newWidth;
       newHeight = Math.max(200, dragState.value.startHeight + deltaY);
       break;
     }
@@ -162,12 +124,6 @@ const onResize = (event) => {
       width: newWidth,
       height: newHeight
     };
-    if (dragState.value.resizeDirection.includes('w')) {
-      payload.x = newX;
-    }
-    if (dragState.value.resizeDirection.includes('n')) {
-      payload.y = newY;
-    }
     window.pyBridge.forwardDockEvent('resize', JSON.stringify(payload));
   }
   event.preventDefault();
