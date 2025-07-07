@@ -14,9 +14,6 @@
 
 <script setup>
 import { ref, onMounted, onUnmounted } from 'vue';
-import { useDragResize } from '@/composables/useDragResize';
-
-const { dragState,startDrag,stopDrag,onDrag} = useDragResize();
 
 // 定义响应式状态变量
 const showContextMenu = ref(false);
@@ -24,6 +21,58 @@ const contextMenuX = ref(0);
 const contextMenuY = ref(0);
 let isClosingMenu = false;
 
+// 拖拽状态管理
+const dragState = ref({
+  isDragging: false,
+  isResizing: false,
+  offsetX: 0,
+  offsetY: 0,
+  startWidth: 0,
+  startHeight: 0,
+  startX: 0,
+  startY: 0
+});
+
+// 拖拽相关
+const startDrag = (event) => {
+  if (event.button !== 0) return;
+  dragState.value.isDragging = true;
+  dragState.value.startX = event.clientX;
+  dragState.value.startY = event.clientY;
+  
+  // 移除获取位置的代码
+  event.currentTarget.classList.add('bg-[#7BA590]/80');
+  event.preventDefault();
+};
+
+const onDrag = (event) => {
+  if (!dragState.value.isDragging) return;
+  
+  const deltaX = event.clientX - dragState.value.startX;
+  const deltaY = event.clientY - dragState.value.startY;
+  
+  if (window.pyBridge) {
+    window.pyBridge.forwardDockEvent('drag', JSON.stringify({
+      deltaX,
+      deltaY
+    }));
+  }
+  
+  dragState.value.startX = event.clientX;
+  dragState.value.startY = event.clientY;
+  event.preventDefault();
+};
+
+const stopDrag = (event) => {
+  if (!dragState.value.isDragging) return;
+
+  dragState.value.isDragging = false;
+  dragState.value.startX = 0;
+  dragState.value.startY = 0;
+
+  event.currentTarget.classList.remove('bg-[#7BA590]/80');
+  event.preventDefault();
+};
 
 // 打开快捷栏
 const openContextMenu = (e) => {
