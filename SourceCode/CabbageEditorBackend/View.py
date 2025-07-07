@@ -1,4 +1,3 @@
-from turtle import Screen
 from PyQt6.QtCore import Qt, QPoint, QEvent, pyqtSignal, QRect, QTimer
 from PyQt6.QtWidgets import QMainWindow, QApplication, QWidget,QDockWidget,QVBoxLayout
 from PyQt6.QtGui import QColor, QGuiApplication, QPixmap, QPainter
@@ -305,39 +304,41 @@ class AddDock(QDockWidget):
 
     def _connect_signals(self):
         self.bridge.ai_response.connect(self.send_ai_message_to_js)
-        self.bridge.dock_event.connect(self.handle_dock_event)
+        self.bridge.dock_event.connect(self.dock_event)
         self.topLevelChanged.connect(self.handle_top_level_change)
         self.destroyed.connect(self.cleanup_resources)
 
-    def handle_dock_event(self, event_type, event_data):
-        if event_type == "drag" and self.isFloating(): 
-            try:
+    def dock_event(self, event_type, event_data):
+        match event_type:
+            case "drag" if self.isFloating():
+                try:
+                    data = json.loads(event_data)
+                    current_pos = self.pos()
+                    new_x = current_pos.x() + data["deltaX"]
+                    new_y = current_pos.y() + data["deltaY"]
+                    self.move(new_x, new_y)
+                except Exception as e:
+                    print(f"处理拖拽事件失败: {str(e)}")
+            case "close":
+                self.close()
+            case "float":
                 data = json.loads(event_data)
-                # 问题修复：只获取一次当前位置
-                current_pos = self.pos()
-                new_x = current_pos.x() + data["deltaX"]
-                new_y = current_pos.y() + data["deltaY"]
-                self.move(new_x, new_y)
-            except Exception as e:
-                print(f"处理拖拽事件失败: {str(e)}")
-        elif event_type == "close":
-            self.close()
-        elif event_type == "float":
-            data = json.loads(event_data)
-            self.setFloating(data["isFloating"])
-            self.raise_()
-            print(f"float event: {data['isFloating']}")
-        elif event_type == "resize":
-            try:
-                data = json.loads(event_data)
-                # 如果有位置信息，先移动窗口
-                if "x" in data and "y" in data:
-                    self.move(int(data["x"]), int(data["y"]))
-                # 调整大小
-                self.resize(int(data["width"]), int(data["height"]))
-                self.update()
-            except Exception as e:
-                print(f"处理resize事件失败: {str(e)}")
+                self.setFloating(data["isFloating"])
+                self.raise_()
+            case "resize":
+                try:
+                    data = json.loads(event_data)
+                    x = int(data.get("x", self.pos().x()))
+                    y = int(data.get("y", self.pos().y()))
+                    width = int(data["width"])
+                    height = int(data["height"])
+                    self.move(x, y)
+                    self.resize(width, height)
+                    self.update()
+                except Exception as e:
+                    print(f"处理resize事件失败: {str(e)}")
+            case _:
+                pass
 
     def handle_top_level_change(self):
         if self.isFloating():

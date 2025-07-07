@@ -234,12 +234,13 @@ class Bridge(QObject):
             x = float(Actor_data.get("x",0.0))
             y = float(Actor_data.get("y",0.0))
             z = float(Actor_data.get("z",0.0))
-            if Operation == "Scale":
-                CabbageEngine.Actor.scale(scene_dict[sceneName]["actor_dict"][actorName]["actor"],[x,y,z])
-            elif Operation == "Move":
-                CabbageEngine.Actor.move(scene_dict[sceneName]["actor_dict"][actorName]["actor"],[x,y,z])
-            elif Operation == "Rotate":
-                CabbageEngine.Actor.rotate(scene_dict[sceneName]["actor_dict"][actorName]["actor"],[x,y,z])
+            match Operation:
+                case "Scale":
+                    CabbageEngine.Actor.scale(scene_dict[sceneName]["actor_dict"][actorName]["actor"],[x,y,z])
+                case "Move":
+                    CabbageEngine.Actor.move(scene_dict[sceneName]["actor_dict"][actorName]["actor"],[x,y,z])
+                case "Rotate":
+                    CabbageEngine.Actor.rotate(scene_dict[sceneName]["actor_dict"][actorName]["actor"],[x,y,z])
         except Exception as e:
             print(f"Actor transform error: {str(e)}")
             return
