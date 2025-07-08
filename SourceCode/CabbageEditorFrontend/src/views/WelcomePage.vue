@@ -72,11 +72,22 @@
             </router-link>
         </div>
     </div>
+    <!-- 返回首页按钮 -->
+    <button 
+      v-show="true"
+      @click="goToHome"
+      class="home-button">
+      <img 
+        src="@/assets/首页的小房子按钮.png" 
+        class="home-button-img"
+      />
+    </button>
   </div>
 </template>
 
 <script setup>
 import { ref, onMounted, onBeforeUnmount } from 'vue';
+import { useRouter } from 'vue-router';
 import "@/assets/welcome-page.css";
 import "@/assets/welcome-pagePE.css";
 import eventBus from '@/utils/eventBus';
@@ -97,6 +108,11 @@ const isJumping = ref(false);
 const jumpSpeed = ref(0);
 const gravity = 0.01;
 
+const router = useRouter();
+
+const goToHome = () => {
+  router.push('/');
+};
 
 const toggleAnnouncements = () => {
   showAnnouncements.value = !showAnnouncements.value;
