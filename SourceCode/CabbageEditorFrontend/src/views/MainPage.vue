@@ -23,11 +23,31 @@
       </button>
       </div>
     </div>
+    <!-- 返回首页按钮 -->
+    <button 
+      @click="goToHome"
+      class="home-button">
+      <img 
+        src="@/assets/首页的小房子按钮.png" 
+        class="home-button-img"
+      />
+    </button>
   </div>
 </template>
 
 <script setup>
 import { ref, onMounted, onUnmounted } from 'vue';
+import { useRouter } from 'vue-router';
+import "@/assets/welcome-page.css";
+
+const router = useRouter();
+
+const goToHome = () => {
+  if (window.pyBridge) {
+    window.pyBridge.removeDockWidget("Pet");
+  }
+  router.push('/');
+};
 
 const activeTab = ref(0);  // 当前激活的标签页
 
