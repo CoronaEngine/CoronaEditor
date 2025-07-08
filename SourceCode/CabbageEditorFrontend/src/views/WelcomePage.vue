@@ -1,35 +1,30 @@
 <template>
   <div tabindex="0" @keydown="handleKeyDown">
-    <div class="min-h-screen w-full bg-transparent">
+    <div class="welcome-container">
       <!-- LOGO -->
-      <div class="fixed top-0 left-0 inset-x-0 z-[50] text-center transform -translate-y-6">
+      <div class="welcome-logo">
         <img 
           src="@/assets/Cabbage Engine花字.png" 
           alt="Cabbage Engine Logo"
-          class="h-auto transform transform-gpu perspective-1000 animate-float"
+          class="welcome-logo-img"
         />
       </div>
         <!-- 公告按钮与面板 -->
-        <div class="flex flex-row justify-end items-start w-full p-8 z-[51]">
+        <div class="announcement-container">
             <div class="items-center w-2/3"></div>
             <!-- 公告按钮 -->
             <button 
               @click="toggleAnnouncements" 
-              class="absolute right-8 top-5 text-black/50 hover:text-black/80 
-                    transition-colors p-1 hover:bg-black/5 rounded-full z-[51]">
+              class="announcement-button">
               <img 
               src="@/assets/announcement.png" 
-              class="w-12 h-12 object-contain"
+              class="announcement-button-img"
               :class="{ 'animate-soft-shake': !showAnnouncements }"
               />
             </button>
             <!-- 公告面板 -->
             <div v-show="showAnnouncements" 
-                 class="fixed top-20 right-20 w-96 bg-white/10 backdrop-blur-lg rounded-xl shadow-2xl 
-                        transition-all duration-300 ease-out z-[998] 
-                        transform-gpu origin-top-right
-                        opacity-0 translate-y-4 scale-95
-                        [&.active]:opacity-100 [&.active]:translate-y-0 [&.active]:scale-100"
+                 class="announcement-panel"
                  :class="{ 'active': showAnnouncements }">
                 <div class="relative p-6">
                     <p class="text-center text-2xl font-bold text-black mb-4">公告</p>
@@ -43,46 +38,36 @@
         </div>
 
         <!--按钮部分-->
-        <div class="flex flex-col items-center space-y-4 absolute top-1/3 right-30 mx-auto w-full sm:w-3/4 md:w-1/2 lg:w-1/3 z-[50]">
+        <div class="button-container">
             <!--开始游戏-->
             <router-link to="/MainPage" class="w-full max-w-xs">
                 <button
                     @click="removeActors" 
-                    class="w-full rounded-lg bg-[#5F9DC6]/50 hover:bg-white/50 font-bold py-2 px-4 sm:py-3 sm:px-6 md:py-4 md:px-8 
-           transform hover:scale-105 hover:px-9 hover:py-6 hover:w-[105%] origin-center 
-           transition-all duration-300 transition-[transform,padding]">
-                    <p class="font-bold text-black/80 tracking-widest text-sm sm:text-base md:text-lg">开始游戏<br />Start Game
-                    </p>
+                    class="welcome-button">
+                    <p class="button-text">开始游戏<br />Start Game</p>
                 </button>
             </router-link>
             <!--继续游戏-->
             <router-link to="/MainPage" class="w-full max-w-xs">
                 <button
                     @click="removeActors" 
-                    class="w-full rounded-lg bg-[#5F9DC6]/50 hover:bg-white/50 font-bold py-2 px-4 sm:py-3 sm:px-6 md:py-4 md:px-8 
-           transform hover:scale-105 hover:px-9 hover:py-6 hover:w-[105%] origin-center 
-           transition-all duration-300 transition-[transform,padding]">
-                    <p class="font-bold text-black/80 tracking-widest text-sm sm:text-base md:text-lg">继续游戏<br />Continue
-                    </p>
+                    class="welcome-button">
+                    <p class="button-text">继续游戏<br />Continue</p>
                 </button>
             </router-link>
             <!--游戏设置-->
             <router-link to="/SetUp" class="w-full max-w-xs">
                 <button 
                 @click="removeActors"    
-                class="w-full rounded-lg bg-[#5F9DC6]/50 hover:bg-white/50 font-bold py-2 px-4 sm:py-3 sm:px-6 md:py-4 md:px-8 
-           transform hover:scale-105 hover:px-9 hover:py-6 hover:w-[105%] origin-center 
-           transition-all duration-300 transition-[transform,padding]">
-                    <p class="font-bold text-black/80 tracking-widest text-sm sm:text-base md:text-lg">游戏设置<br />Setting</p>
+                class="welcome-button">
+                    <p class="button-text">游戏设置<br />Setting</p>
                 </button>
             </router-link>
             <!--退出游戏-->
             <router-link to=" " class="w-full max-w-xs">
                 <button @click="Out"
-                    class="w-full rounded-lg bg-[#5F9DC6]/50 hover:bg-white/50 font-bold py-2 px-4 sm:py-3 sm:px-6 md:py-4 md:px-8 
-           transform hover:scale-105 hover:px-9 hover:py-6 hover:w-[105%] origin-center 
-           transition-all duration-300 transition-[transform,padding]">
-                    <p class="font-bold text-black/80 tracking-widest text-sm sm:text-base md:text-lg">结束游戏<br />Exit</p>
+                    class="welcome-button">
+                    <p class="button-text">结束游戏<br />Exit</p>
                 </button>
             </router-link>
         </div>
@@ -92,6 +77,7 @@
 
 <script setup>
 import { ref, onMounted, onBeforeUnmount } from 'vue';
+import "@/assets/welcome-page.css";
 // 控制公告显示的状态
 const currentScene = ref("mainscene");
 const showAnnouncements = ref(false);
