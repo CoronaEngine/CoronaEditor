@@ -4,7 +4,7 @@
       <!-- LOGO -->
       <div class="welcome-logo">
         <img 
-          src="@/assets/Cabbage Engine花字.png" 
+          src="@/assets/CabbageEngine-LOGO.png" 
           alt="Cabbage Engine Logo"
           class="welcome-logo-img"
         />
@@ -83,8 +83,8 @@ import eventBus from '@/utils/eventBus';
 
 const handleVersionSelected = (version) => {
     console.log(`Selected version: ${version}`);
-    if (version === 'pro') {
-    } else if (version === 'fun') {
+    if (version === 'fun') {
+    } else if (version === 'pro') {
     }
 };
 
