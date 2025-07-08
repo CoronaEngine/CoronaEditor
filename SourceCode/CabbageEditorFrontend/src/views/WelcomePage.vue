@@ -78,6 +78,16 @@
 <script setup>
 import { ref, onMounted, onBeforeUnmount } from 'vue';
 import "@/assets/welcome-page.css";
+import "@/assets/welcome-pagePE.css";
+import eventBus from '@/utils/eventBus';
+
+const handleVersionSelected = (version) => {
+    console.log(`Selected version: ${version}`);
+    if (version === 'pro') {
+    } else if (version === 'fun') {
+    }
+};
+
 // 控制公告显示的状态
 const currentScene = ref("mainscene");
 const showAnnouncements = ref(false);
@@ -245,8 +255,13 @@ const removeActors = () => {
     }
 }
 
-  onMounted(() => {
+onMounted(() => {
     createActor();
     document.addEventListener('keydown', handleKeyDown);
-  });
+    eventBus.on('version-selected', handleVersionSelected);
+});
+
+onBeforeUnmount(() => {
+    eventBus.off('version-selected', handleVersionSelected);
+});
 </script>
