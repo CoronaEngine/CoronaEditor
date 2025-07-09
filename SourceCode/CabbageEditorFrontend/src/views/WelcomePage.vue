@@ -1,4 +1,5 @@
 <template>
+<div :class="themeClass">
   <div tabindex="0" @keydown="handleKeyDown">
     <div class="welcome-container">
       <!-- LOGO -->
@@ -83,21 +84,15 @@
       />
     </button>
   </div>
+</div>
 </template>
 
 <script setup>
-import { ref, onMounted, onBeforeUnmount } from 'vue';
+import { ref, onMounted, onBeforeUnmount, onUnmounted, computed } from 'vue';
+import '@/assets/welcome-page.css'
+import '@/assets/welcome-pagePE.css'
 import { useRouter } from 'vue-router';
-import "@/assets/welcome-page.css";
-import "@/assets/welcome-pagePE.css";
 import eventBus from '@/utils/eventBus';
-
-const handleVersionSelected = (version) => {
-    console.log(`Selected version: ${version}`);
-    if (version === 'fun') {
-    } else if (version === 'pro') {
-    }
-};
 
 // 控制公告显示的状态
 const currentScene = ref("mainscene");
@@ -107,8 +102,14 @@ const actorid = ref([]);
 const isJumping = ref(false);
 const jumpSpeed = ref(0);
 const gravity = 0.01;
-
 const router = useRouter();
+const selectedVersion = ref('fun');
+
+const themeClass = computed(() => {
+  const cls = selectedVersion.value === 'pro' ? 'theme-pro' : 'theme-fun'
+  console.log('Current theme class:', cls)
+  return cls
+})
 
 const goToHome = () => {
   router.push('/');
@@ -255,6 +256,12 @@ const handleKeyDown = (event) => {
   }
 };
 
+// 版本切换处理
+const handleVersionSelect = (version) => {
+  selectedVersion.value = version
+  localStorage.setItem('selectedVersion', version)
+}
+
 const Out = () => {
     if (window.pyBridge) {
         window.pyBridge.closeprocess();
@@ -272,12 +279,25 @@ const removeActors = () => {
 }
 
 onMounted(() => {
-    createActor();
-    document.addEventListener('keydown', handleKeyDown);
-    eventBus.on('version-selected', handleVersionSelected);
+  try {
+    const savedVersion = localStorage?.getItem('selectedVersion')
+    if (savedVersion) {
+      selectedVersion.value = savedVersion
+    } else {
+      selectedVersion.value = 'fun'
+    }
+  } catch (e) {
+    console.warn('localStorage access error:', e)
+    selectedVersion.value = 'fun'
+  }
+
+  createActor();
+  document.addEventListener('keydown', handleKeyDown);
+  eventBus.on('version-selected', handleVersionSelect);
 });
 
-onBeforeUnmount(() => {
-    eventBus.off('version-selected', handleVersionSelected);
-});
+onUnmounted(() => {
+  eventBus.off('version-selected', handleVersionSelect)
+  document.removeEventListener('keydown', handleKeyDown)
+})
 </script>

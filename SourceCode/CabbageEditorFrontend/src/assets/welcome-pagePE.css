@@ -1,4 +1,4 @@
-.welcome-container {
+.theme-pro .welcome-container {
   min-height: 100vh;
   width: 100%;
   /* 背景图片URL */
@@ -7,7 +7,7 @@
   background-position: center;
 }
 
-.welcome-logo {
+.theme-pro .welcome-logo {
   position: fixed;
   top: 0;
   left: 0;
@@ -17,7 +17,7 @@
   transform: translateY(-1.5rem);
 }
 
-.welcome-logo img {
+.theme-pro .welcome-logo img {
   /* LOGO图片URL */
   content: url('');
   height: auto;
@@ -25,7 +25,7 @@
   animation: float 3s ease-in-out infinite;
 }
 
-.announcement-container {
+.theme-pro .announcement-container {
   display: flex;
   flex-direction: row;
   justify-content: flex-end;
@@ -35,7 +35,7 @@
   z-index: 51;
 }
 
-.announcement-button {
+.theme-pro .announcement-button {  
   position: absolute;
   right: 2rem;
   top: 1.25rem;
@@ -46,18 +46,18 @@
   z-index: 51;
 }
 
-.announcement-button:hover {
+.theme-pro .announcement-button:hover {
   color: rgba(51, 51, 51, 0.8);
   background-color: rgba(51, 51, 51, 0.05);
 }
 
-.announcement-button img {
+.theme-pro .announcement-button img {
   width: 3rem;
   height: 3rem;
   object-fit: contain;
 }
 
-.announcement-panel {
+.theme-pro .announcement-panel {
   position: fixed;
   top: 5rem;
   right: 5rem;
@@ -72,12 +72,12 @@
   transform: translateY(1rem) scale(0.95);
 }
 
-.announcement-panel.active {
+.theme-pro .announcement-panel.active {
   opacity: 1;
   transform: translateY(0) scale(1);
 }
 
-.button-container {
+.theme-pro .button-container {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
@@ -92,24 +92,24 @@
 }
 
 @media (min-width: 640px) {
-  .button-container {
+  .theme-pro .button-container {
     width: 75%;
   }
 }
 
 @media (min-width: 768px) {
-  .button-container {
+  .theme-pro .button-container {
     width: 50%;
   }
 }
 
 @media (min-width: 1024px) {
-  .button-container {
+  .theme-pro .button-container {
     width: 33.333333%;
   }
 }
 
-.welcome-button {
+.theme-pro .welcome-button {
   width: 100%;
   border-radius: 0.5rem;
   background-color: rgba(200, 200, 200, 0.7);
@@ -119,14 +119,14 @@
   transform-origin: center;
 }
 
-.welcome-button:hover {
+.theme-pro .welcome-button:hover {
   background-color: rgba(230, 230, 230, 0.8);
   transform: scale(1.05);
   padding: 1.8rem 2.5rem;
   width: 105%;
 }
 
-.button-text {
+.theme-pro .button-text {
   font-weight: 700;
   color: rgba(51, 51, 51, 0.8);
   letter-spacing: 0.05em;
@@ -136,14 +136,14 @@
 }
 
 @media (min-width: 640px) {
-  .button-text {
+  .theme-pro .button-text {
     font-size: 1rem;
     line-height: 1.5rem;
   }
 }
 
 @media (min-width: 768px) {
-  .button-text {
+  .theme-pro .button-text {
     font-size: 1.125rem;
     line-height: 1.75rem;
   }
