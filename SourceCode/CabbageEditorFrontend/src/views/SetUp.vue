@@ -4,9 +4,9 @@
     @contextmenu="openContextMenu($event)"
     @mousedown="startDrag" @mousemove="onDrag" @mouseup="stopDrag" @mouseleave="stopDrag"
     >
-        <router-link to="/WelcomePagePE" class="w-full max-w-xs">
+        <router-link to="/" class="w-full max-w-xs">
             <button 
-            @click="removeActors"
+            @click="emitProVersion"
             class="w-full rounded-none bg-[#9E9E9E]/50 hover:bg-white/50 font-bold py-2 px-4 sm:py-3 sm:px-6 md:py-4 md:px-8 
             transform hover:scale-110 hover:px-9 hover:py-6 hover:w-[110%] origin-center 
             transition-all duration-300 transition-[transform,padding]"
@@ -14,7 +14,7 @@
         </router-link>
         <router-link to="/" class="w-full max-w-xs">
             <button
-            @click="removeActors"
+            @click="emitFunVersion"
             class="w-full rounded-none bg-[#9E9E9E]/50 hover:bg-white/50 font-bold py-2 px-4 sm:py-3 sm:px-6 md:py-4 md:px-8 
             transform hover:scale-110 hover:px-9 hover:py-6 hover:w-[110%] origin-center 
             transition-all duration-300 transition-[transform,padding]"
@@ -35,6 +35,17 @@
 <script setup>
     import { ref, onMounted, onUnmounted } from 'vue';
     import { useDragResize } from '@/composables/useDragResize';
+    import eventBus from '@/utils/eventBus';
+
+    const emitProVersion = () => {
+        removeActors();
+        eventBus.emit('version-selected', 'pro');
+    }
+
+    const emitFunVersion = () => {
+        removeActors();
+        eventBus.emit('version-selected', 'fun');
+    }
 
     const {startDrag,stopDrag,onDrag} = useDragResize();
     const showContextMenu = ref(false);
