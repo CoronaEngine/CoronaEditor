@@ -107,29 +107,837 @@ const flash = ref(null);
 
 Blockly.setLocale(CN);
 
-Blockly.Blocks['detect_collision'] = {
+Blockly.Blocks['engine_move'] = {
   init: function () {
     this.appendDummyInput()
-     .appendField('如果碰到')
-     .appendField(new Blockly.FieldTextInput(actorname.value), 'TARGET');
+     .appendField('移动')
+     .appendField(new Blockly.FieldTextInput(actorname.value), 'x');
     this.setInputsInline(true);
     this.setPreviousStatement(true, null); 
     this.setNextStatement(true, null);
-    this.setColour('#00FFFF');
+    this.setColour('#5631E4');
     this.setHelpUrl('');
-    this.setTooltip('检测该角色是与指定角色否发生碰撞');//改为true or falsh
   }
 };
-pythonGenerator.forBlock['detect_collision'] = function(block) {
-  const target = block.getFieldValue('TARGET');
-  return `CabbageEngine.collisionDetection(${target})\n`;
+pythonGenerator.forBlock['engine_move'] = function(block) {
+  const x = block.getFieldValue('x');
+  return `CabbageEngine.move(${x})\n`;
 };
-
-Blockly.Blocks['detect_press'] = {
+Blockly.Blocks['engine_rotateX'] = {
   init: function () {
     this.appendDummyInput()
-      .appendField('按下')
-      .appendField(new Blockly.FieldTextInput(actorname.value), 'TARGET');
+     .appendField('水平旋转')
+     .appendField(new Blockly.FieldTextInput(actorname.value), 'x')
+     .appendField('度');
+    this.setInputsInline(true);
+    this.setPreviousStatement(true, null); 
+    this.setNextStatement(true, null);
+    this.setColour('#5631E4');
+    this.setHelpUrl('');
+  }
+};
+pythonGenerator.forBlock['engine_move'] = function(block) {
+  const x = block.getFieldValue('x');
+  return `CabbageEngine.rotateX(${x})\n`;
+};
+Blockly.Blocks['engine_rotateY'] = {
+  init: function () {
+    this.appendDummyInput()
+     .appendField('竖直旋转')
+     .appendField(new Blockly.FieldTextInput(actorname.value), 'x')
+     .appendField('度');
+    this.setInputsInline(true);
+    this.setPreviousStatement(true, null); 
+    this.setNextStatement(true, null);
+    this.setColour('#5631E4');
+    this.setHelpUrl('');
+  }
+};
+pythonGenerator.forBlock['engine_move'] = function(block) {
+  const x = block.getFieldValue('x');
+  return `CabbageEngine.rotateY(${x})\n`;
+};
+Blockly.Blocks['engine_face'] = {
+  init: function () {
+    this.appendDummyInput()
+     .appendField('面向')
+     .appendField(new Blockly.FieldTextInput(actorname.value), 'x')
+     .appendField('度方向');
+    this.setInputsInline(true);
+    this.setPreviousStatement(true, null); 
+    this.setNextStatement(true, null);
+    this.setColour('#5631E4');
+    this.setHelpUrl('');
+  }
+};
+pythonGenerator.forBlock['engine_move'] = function(block) {
+  const x = block.getFieldValue('x');
+  return `CabbageEngine.face(${x})\n`;
+};
+Blockly.Blocks['engine_moveto'] = {
+  init: function () {
+    this.appendDummyInput()
+      .appendField('移动到')
+      .appendField(new Blockly.FieldDropdown([
+        ['随机位置', 'random_position'],
+        ['准星位置', 'sight_position']
+      ]), 'POSITION');
+    this.setInputsInline(true);
+    this.setPreviousStatement(true, null); 
+    this.setNextStatement(true, null);
+    this.setColour('#5631E4');
+    this.setHelpUrl('');
+  }
+};
+pythonGenerator.forBlock['engine_moveto'] = function(block) {
+  const position = block.getFieldValue('POSITION');
+  return `CabbageEngine.moveto(${position})\n`;
+};
+Blockly.Blocks['engine_movetoXYZ'] = {
+  init: function () {
+    this.appendDummyInput()
+     .appendField('移到')
+     .appendField(new Blockly.FieldTextInput(actorname.value), 'x1')
+     .appendField(new Blockly.FieldTextInput(actorname.value), 'x2')
+     .appendField(new Blockly.FieldTextInput(actorname.value), 'x3');
+    this.setInputsInline(true);
+    this.setPreviousStatement(true, null); 
+    this.setNextStatement(true, null);
+    this.setColour('#5631E4');
+    this.setHelpUrl('');
+  }
+};
+pythonGenerator.forBlock['engine_movetoXYZ'] = function(block) {
+  const x1 = block.getFieldValue('x1');
+  const x2 = block.getFieldValue('x2');
+  const x3 = block.getFieldValue('x3');
+  return `CabbageEngine.movetoXYZ(${x1}, ${x2}, ${x3})\n`;
+};
+Blockly.Blocks['engine_movetoXYZtime'] = {
+  init: function () {
+    this.appendDummyInput()
+     .appendField('在')
+     .appendField(new Blockly.FieldTextInput(actorname.value), 't')
+     .appendField('秒内移到')
+     .appendField(new Blockly.FieldTextInput(actorname.value), 'x1')
+     .appendField(new Blockly.FieldTextInput(actorname.value), 'x2')
+     .appendField(new Blockly.FieldTextInput(actorname.value), 'x3');
+    this.setInputsInline(true);
+    this.setPreviousStatement(true, null); 
+    this.setNextStatement(true, null);
+    this.setColour('#5631E4');
+    this.setHelpUrl('');
+  }
+};
+pythonGenerator.forBlock['engine_movetoXYZtime'] = function(block) {
+  const t = block.getFieldValue('t');
+  const x1 = block.getFieldValue('x1');
+  const x2 = block.getFieldValue('x2');
+  const x3 = block.getFieldValue('x3');
+  return `CabbageEngine.movetoXYZtime(${t},${x1}, ${x2}, ${x3})\n`;
+};
+Blockly.Blocks['engine_Xset'] = {
+  init: function () {
+    this.appendDummyInput()
+     .appendField('将x坐标设为')
+     .appendField(new Blockly.FieldTextInput(actorname.value), 'x')
+    this.setInputsInline(true);
+    this.setPreviousStatement(true, null); 
+    this.setNextStatement(true, null);
+    this.setColour('#5631E4');
+    this.setHelpUrl('');
+  }
+};
+pythonGenerator.forBlock['engine_Xset'] = function(block) {
+  const x = block.getFieldValue('x');
+  return `CabbageEngine.Xset(${x})\n`;
+};
+Blockly.Blocks['engine_Yset'] = {
+  init: function () {
+    this.appendDummyInput()
+     .appendField('将y坐标设为')
+     .appendField(new Blockly.FieldTextInput(actorname.value), 'x')
+    this.setInputsInline(true);
+    this.setPreviousStatement(true, null); 
+    this.setNextStatement(true, null);
+    this.setColour('#5631E4');
+    this.setHelpUrl('');
+  }
+};
+pythonGenerator.forBlock['engine_Yset'] = function(block) {
+  const x = block.getFieldValue('x');
+  return `CabbageEngine.Yset(${x})\n`;
+};
+Blockly.Blocks['engine_Zset'] = {
+  init: function () {
+    this.appendDummyInput()
+     .appendField('将z坐标设为')
+     .appendField(new Blockly.FieldTextInput(actorname.value), 'x')
+    this.setInputsInline(true);
+    this.setPreviousStatement(true, null); 
+    this.setNextStatement(true, null);
+    this.setColour('#5631E4');
+    this.setHelpUrl('');
+  }
+};
+pythonGenerator.forBlock['engine_Zset'] = function(block) {
+  const x = block.getFieldValue('x');
+  return `CabbageEngine.Zset(${x})\n`;
+};
+Blockly.Blocks['engine_Xadd'] = {
+  init: function () {
+    this.appendDummyInput()
+     .appendField('将x坐标增加')
+     .appendField(new Blockly.FieldTextInput(actorname.value), 'x')
+    this.setInputsInline(true);
+    this.setPreviousStatement(true, null); 
+    this.setNextStatement(true, null);
+    this.setColour('#5631E4');
+    this.setHelpUrl('');
+  }
+};
+pythonGenerator.forBlock['engine_Xadd'] = function(block) {
+  const x = block.getFieldValue('x');
+  return `CabbageEngine.Xadd(${x})\n`;
+};
+Blockly.Blocks['engine_Yadd'] = {
+  init: function () {
+    this.appendDummyInput()
+     .appendField('将y坐标增加')
+     .appendField(new Blockly.FieldTextInput(actorname.value), 'x')
+    this.setInputsInline(true);
+    this.setPreviousStatement(true, null); 
+    this.setNextStatement(true, null);
+    this.setColour('#5631E4');
+    this.setHelpUrl('');
+  }
+};
+pythonGenerator.forBlock['engine_Yadd'] = function(block) {
+  const x = block.getFieldValue('x');
+  return `CabbageEngine.Yadd(${x})\n`;
+};
+Blockly.Blocks['engine_Zadd'] = {
+  init: function () {
+    this.appendDummyInput()
+     .appendField('将z坐标增加')
+     .appendField(new Blockly.FieldTextInput(actorname.value), 'x')
+    this.setInputsInline(true);
+    this.setPreviousStatement(true, null); 
+    this.setNextStatement(true, null);
+    this.setColour('#5631E4');
+    this.setHelpUrl('');
+  }
+};
+pythonGenerator.forBlock['engine_Zadd'] = function(block) {
+  const x = block.getFieldValue('x');
+  return `CabbageEngine.Zadd(${x})\n`;
+};
+Blockly.Blocks['engine_X'] = {
+  init: function() {
+    this.setStyle('math_blocks');  // 使用数学类样式（通常自带圆形）
+    this.appendDummyInput()
+         .appendField('X');
+    this.setOutput(true, 'Number');  // 关键：输出数值类型
+    this.setColour('#5631E4'); 
+    this.setTooltip("该角色的x坐标");
+  }
+};
+pythonGenerator.forBlock['engine_X'] = function(block) {
+  const x = block.getFieldValue('x');
+  return  `CabbageEngine.X(${x})\n`;
+};
+Blockly.Blocks['engine_Y'] = {
+  init: function() {
+    this.setStyle('math_blocks');  // 使用数学类样式（通常自带圆形）
+    this.appendDummyInput()
+         .appendField('Y');
+    this.setOutput(true, 'Number');  // 关键：输出数值类型
+    this.setColour('#5631E4'); 
+    this.setTooltip("该角色的y坐标");
+  }
+};
+pythonGenerator.forBlock['engine_Y'] = function(block) {
+  const X = block.getFieldValue('X');
+  return  `CabbageEngine.Y(${X})\n`;
+};
+Blockly.Blocks['engine_Z'] = {
+  init: function() {
+    this.setStyle('math_blocks');  // 使用数学类样式（通常自带圆形）
+    this.appendDummyInput()
+         .appendField('Z');
+    this.setOutput(true, 'Number');  // 关键：输出数值类型
+    this.setColour('#5631E4'); 
+    this.setTooltip("该角色的z坐标");
+  }
+};
+pythonGenerator.forBlock['engine_Z'] = function(block) {
+  const x = block.getFieldValue('x');
+  return  `CabbageEngine.X(${x})\n`;
+};
+
+Blockly.Blocks['appearance_cartoonSet'] = {
+  init: function () {
+    this.appendDummyInput()
+     .appendField('换成')
+     .appendField(new Blockly.FieldTextInput(actorname.value), 'x')
+     .appendField('动画')
+    this.setInputsInline(true);
+    this.setPreviousStatement(true, null); 
+    this.setNextStatement(true, null);
+    this.setColour('#C501F6');
+    this.setTooltip("输入动画序号");
+    this.setHelpUrl('');
+  }
+};
+pythonGenerator.forBlock['appearance_cartoonSet'] = function(block) {
+  const x = block.getFieldValue('x');
+  return `CabbageEngine.cartoonSet(${x})\n`;
+};
+Blockly.Blocks['appearance_nextCartoon'] = {
+  init: function () {
+    this.appendDummyInput()
+     .appendField('下一个动画')
+    this.setInputsInline(true);
+    this.setPreviousStatement(true, null); 
+    this.setNextStatement(true, null);
+    this.setColour('#C501F6');
+    this.setHelpUrl('');
+  }
+};
+pythonGenerator.forBlock['appearance_nextCartoon'] = function(block) {
+  return `CabbageEngine.nextCartoon()\n`;
+};
+Blockly.Blocks['appearance_playCartoon'] = {
+  init: function () {
+    this.appendDummyInput()
+     .appendField('播放动画')
+    this.setInputsInline(true);
+    this.setPreviousStatement(true, null); 
+    this.setNextStatement(true, null);
+    this.setColour('#C501F6');
+    this.setHelpUrl('');
+  }
+};
+pythonGenerator.forBlock['appearance_playCartoon'] = function(block) {
+  return `CabbageEngine.playCartoon()\n`;
+};
+Blockly.Blocks['appearance_stopCartoon'] = {
+  init: function () {
+    this.appendDummyInput()
+     .appendField('停止动画')
+    this.setInputsInline(true);
+    this.setPreviousStatement(true, null); 
+    this.setNextStatement(true, null);
+    this.setColour('#C501F6');
+    this.setHelpUrl('');
+  }
+};
+pythonGenerator.forBlock['appearance_stopCartoon'] = function(block) {
+  return `CabbageEngine.stopCartoon()\n`;
+};
+Blockly.Blocks['appearance_resetCartoon'] = {
+  init: function () {
+    this.appendDummyInput()
+     .appendField('重置动画')
+    this.setInputsInline(true);
+    this.setPreviousStatement(true, null); 
+    this.setNextStatement(true, null);
+    this.setColour('#C501F6');
+    this.setHelpUrl('');
+  }
+};
+pythonGenerator.forBlock['appearance_resetCartoon'] = function(block) {
+  return `CabbageEngine.resetCartoon()\n`;
+};
+Blockly.Blocks['appearance_sizeAdd'] = {
+  init: function () {
+    this.appendDummyInput()
+     .appendField('大小增加')
+     .appendField(new Blockly.FieldTextInput(actorname.value), 'x');
+    this.setInputsInline(true);
+    this.setPreviousStatement(true, null); 
+    this.setNextStatement(true, null);
+    this.setColour('#C501F6');
+    this.setHelpUrl('');
+  }
+};
+pythonGenerator.forBlock['appearance_sizeAdd'] = function(block) {
+  const x = block.getFieldValue('x');
+  return `CabbageEngine.sizeAdd(${x})\n`;
+};
+Blockly.Blocks['appearance_sizeSet'] = {
+  init: function () {
+    this.appendDummyInput()
+     .appendField('大小设为')
+     .appendField(new Blockly.FieldTextInput(actorname.value), 'x');
+    this.setInputsInline(true);
+    this.setPreviousStatement(true, null); 
+    this.setNextStatement(true, null);
+    this.setColour('#C501F6');
+    this.setHelpUrl('');
+  }
+};
+pythonGenerator.forBlock['appearance_sizeSet'] = function(block) {
+  const x = block.getFieldValue('x');
+  return `CabbageEngine.sizeSet(${x})\n`;
+};
+Blockly.Blocks['appearance_show'] = {
+  init: function () {
+    this.appendDummyInput()
+     .appendField('显示')
+    this.setInputsInline(true);
+    this.setPreviousStatement(true, null); 
+    this.setNextStatement(true, null);
+    this.setColour('#C501F6');
+    this.setHelpUrl('');
+  }
+};
+pythonGenerator.forBlock['appearance_show'] = function(block) {
+  return `CabbageEngine.show()\n`;
+};
+Blockly.Blocks['appearance_hide'] = {
+  init: function () {
+    this.appendDummyInput()
+     .appendField('隐藏') 
+    this.setInputsInline(true);
+    this.setPreviousStatement(true, null); 
+    this.setNextStatement(true, null);
+    this.setColour('#C501F6');
+    this.setHelpUrl('');
+  }
+};
+pythonGenerator.forBlock['appearance_hide'] = function(block) {
+  return `CabbageEngine.hide()\n`;
+};
+Blockly.Blocks['appearance_cartoon'] = {
+  init: function() {
+    this.setStyle('math_blocks');  // 使用数学类样式（通常自带圆形）
+    this.appendDummyInput()
+         .appendField('动画');
+    this.setOutput(true, 'Number');  // 关键：输出数值类型
+    this.setColour('#5631E4'); 
+    this.setTooltip("该角色的动画序号");
+  }
+};
+pythonGenerator.forBlock['appearance_cartoon'] = function(block) {
+  const x = block.getFieldValue('x');
+  return  `CabbageEngine.cartoon(${x})\n`;
+};
+Blockly.Blocks['appearance_size'] = {
+  init: function() {
+    this.setStyle('math_blocks');  // 使用数学类样式（通常自带圆形）
+    this.appendDummyInput()
+         .appendField('大小');
+    this.setOutput(true, 'Number');  // 关键：输出数值类型
+    this.setColour('#5631E4'); 
+    this.setTooltip("该角色的大小");
+  }
+};
+pythonGenerator.forBlock['appearance_size'] = function(block) {
+  const x = block.getFieldValue('x');
+  return  `CabbageEngine.size(${x})\n`;
+};
+Blockly.Blocks['event_gameStart'] = {
+  init: function () {
+    this.appendDummyInput()
+     .appendField('当游戏开始时')
+    this.setInputsInline(true);
+    this.setPreviousStatement(flash, null); 
+    this.setNextStatement(true, null);
+    this.setColour('#FFDE59');
+    this.setHelpUrl('');
+  }
+};
+pythonGenerator.forBlock['event_gameStart'] = function(block) {
+  return `CabbageEngine.gameStart()\n`;
+};
+Blockly.Blocks['event_keyboard'] = {
+  init: function () {
+    this.appendDummyInput()
+     .appendField('当按下')
+     .appendField(new Blockly.FieldTextInput(actorname.value), 'x')
+     .appendField('时');
+    this.setInputsInline(true);
+    this.setPreviousStatement(flash, null); 
+    this.setNextStatement(true, null);
+    this.setColour('#FFDE59');
+    this.setHelpUrl('');
+  }
+};
+pythonGenerator.forBlock['event_keyboard'] = function(block) {
+  const x = block.getFieldValue('x');
+  return `CabbageEngine.keyboard(${x})\n`;
+};
+import { ref } from 'vue';
+
+// 定义响应式的广播列表，初始为空
+const broadcastList = ref([]);
+// 新建广播的函数
+const createNewBroadcast = () => {
+  const newBroadcastName = prompt('请输入新广播的名称：');
+  if (newBroadcastName && newBroadcastName.trim() !== '') {
+    broadcastList.value.push(newBroadcastName.trim());
+  }
+};
+Blockly.Blocks['event_RB'] = {
+  init: function () {
+    this.appendDummyInput()
+      .appendField('当接收到广播')
+      .appendField(new Blockly.FieldDropdown(() => {
+        // 构造下拉选项，包含现有广播和新建广播按钮
+        const options = broadcastList.value.map(item => [item, item]);
+        options.push(['新建广播...', 'CREATE_NEW']);
+        return options;
+      }, (value) => {
+        if (value === 'CREATE_NEW') {
+          createNewBroadcast();
+          // 取消选择新建广播选项
+          return null;
+        }
+        return value;
+      }), 'x')
+    this.setInputsInline(true);
+    this.setPreviousStatement(flash, null); 
+    this.setNextStatement(true, null);
+    this.setColour('#FFDE59');
+    this.setHelpUrl('');
+  }
+};
+pythonGenerator.forBlock['event_RB'] = function(block) {
+  const x = block.getFieldValue('x');
+  return `CabbageEngine.RB("${x}")\n`;
+};
+Blockly.Blocks['event_broadcast'] = {
+  init: function () {
+    this.appendDummyInput()
+      .appendField('当接收到广播')
+      .appendField(new Blockly.FieldDropdown(() => {
+        // 构造下拉选项，包含现有广播和新建广播按钮
+        const options = broadcastList.value.map(item => [item, item]);
+        options.push(['新建广播...', 'CREATE_NEW']);
+        return options;
+      }, (value) => {
+        if (value === 'CREATE_NEW') {
+          createNewBroadcast();
+          // 取消选择新建广播选项
+          return null;
+        }
+        return value;
+      }), 'x')
+    this.setInputsInline(true);
+    this.setPreviousStatement(flash, null); 
+    this.setNextStatement(true, null);
+    this.setColour('#FFDE59');
+    this.setHelpUrl('');
+  }
+};
+pythonGenerator.forBlock['event_broadcast'] = function(block) {
+  const x = block.getFieldValue('x');
+  return `CabbageEngine.broadcast("${x}")\n`;
+};
+Blockly.Blocks['event_broadcastWait'] = {
+  init: function () {
+    this.appendDummyInput()
+      .appendField('当接收到广播')
+      .appendField(new Blockly.FieldDropdown(() => {
+        // 构造下拉选项，包含现有广播和新建广播按钮
+        const options = broadcastList.value.map(item => [item, item]);
+        options.push(['新建广播...', 'CREATE_NEW']);
+        return options;
+      }, (value) => {
+        if (value === 'CREATE_NEW') {
+          createNewBroadcast();
+          // 取消选择新建广播选项
+          return null;
+        }
+        return value;
+      }), 'x')
+      .appendField('并等待')
+    this.setInputsInline(true);
+    this.setPreviousStatement(flash, null); 
+    this.setNextStatement(true, null);
+    this.setColour('#FFDE59');
+    this.setHelpUrl('');
+  }
+};
+pythonGenerator.forBlock['event_broadcastWait'] = function(block) {
+  const x = block.getFieldValue('x');
+  return `CabbageEngine.broadcastWait("${x}")\n`;
+
+};
+Blockly.Blocks['control_wait'] = {
+  init: function () {
+    this.appendDummyInput()
+     .appendField('等待')
+     .appendField(new Blockly.FieldTextInput(actorname.value), 'x')
+     .appendField('秒')
+    this.setInputsInline(true);
+    this.setPreviousStatement(true, null); 
+    this.setNextStatement(true, null);
+    this.setColour('#FE9900');
+    this.setHelpUrl('');
+  }
+};
+pythonGenerator.forBlock['control_wait'] = function(block) {
+  const x = block.getFieldValue('x');
+  return `CabbageEngine.wait(${x})\n`;
+};
+Blockly.Blocks['control_for'] = {
+  init: function () {
+    this.appendStatementInput('DO')
+      .setCheck(null)
+      .appendField('重复执行（永久）');
+    this.setInputsInline(true);
+    this.setPreviousStatement(true, null);
+    this.setNextStatement(true, null);
+    this.setColour('#FE9900');
+    this.setTooltip('无限循环执行内部代码块');
+    this.setHelpUrl('');
+  }
+};
+pythonGenerator.forBlock['control_for'] = function (block) {
+  const branch = pythonGenerator.statementToCode(block, 'DO');
+  if (pythonGenerator.STATEMENT_PREFIX) {
+    branch = pythonGenerator.prefixLines(
+      pythonGenerator.STATEMENT_PREFIX.replace(/%1/g, '\'' + block.id + '\''),
+      pythonGenerator.INDENT) + branch;
+  }
+  const code = `while True:\n` + pythonGenerator.prefixLines(branch, pythonGenerator.INDENT);
+  return code;
+};
+Blockly.Blocks['control_forX'] = {
+  init: function () {
+    this.appendValueInput('TIMES')
+      .setCheck('Number')
+      .appendField('重复执行')
+      .appendField(new Blockly.FieldNumber(1, 1), 'DEFAULT_TIMES')
+      .appendField('次');
+    this.appendStatementInput('DO')
+      .setCheck(null)
+      .appendField('执行');
+    this.setInputsInline(true);
+    this.setPreviousStatement(true, null);
+    this.setNextStatement(true, null);
+    this.setColour('#FE9900'); // 控制类积木常用颜色
+    this.setTooltip('重复执行指定次数的代码块');
+    this.setHelpUrl('');
+  }
+};
+// 定义重复执行 x 次积木块的 Python 代码生成器
+pythonGenerator.forBlock['control_forX'] = function (block) {
+  const times = pythonGenerator.valueToCode(block, 'TIMES', pythonGenerator.ORDER_NONE) || block.getFieldValue('DEFAULT_TIMES');
+  const branch = pythonGenerator.statementToCode(block, 'DO');
+  const code = `for _ in range(${times}):\n` + pythonGenerator.prefixLines(branch, pythonGenerator.INDENT);
+  return code;
+};
+Blockly.Blocks['control_if'] = {
+  init: function () {
+    this.appendValueInput('CONDITION')
+      .setCheck('Boolean')
+      .appendField('如果');
+    this.appendStatementInput('DO')
+      .setCheck(null)
+      .appendField('那么');
+    this.setInputsInline(true);
+    this.setPreviousStatement(true, null);
+    this.setNextStatement(true, null);
+    this.setColour('#FE9900'); 
+    this.setTooltip('如果条件满足，则执行对应的代码块');
+    this.setHelpUrl('');
+  }
+};
+pythonGenerator.forBlock['control_if'] = function (block) {
+  const condition = pythonGenerator.valueToCode(block, 'CONDITION', pythonGenerator.ORDER_NONE) || 'False';
+  const branch = pythonGenerator.statementToCode(block, 'DO');
+  const code = `if ${condition}:\n` + pythonGenerator.prefixLines(branch, pythonGenerator.INDENT);
+  return code;
+};
+// 定义如果那么否则积木块
+Blockly.Blocks['control_else'] = {
+  init: function () {
+    this.appendValueInput('CONDITION')
+      .setCheck('Boolean')
+      .appendField('如果');
+    this.appendStatementInput('DO')
+      .setCheck(null)
+      .appendField('那么');
+    this.appendStatementInput('ELSE')
+      .setCheck(null)
+      .appendField('否则');
+    this.setInputsInline(true);
+    this.setPreviousStatement(true, null);
+    this.setNextStatement(true, null);
+    this.setColour('#FE9900'); // 控制类积木常用颜色
+    this.setTooltip('如果条件满足，执行对应的代码块；否则，执行另一个代码块');
+    this.setHelpUrl('');
+  }
+};
+
+// 定义如果那么否则积木块的 Python 代码生成器
+pythonGenerator.forBlock['control_else'] = function (block) {
+  const condition = pythonGenerator.valueToCode(block, 'CONDITION', pythonGenerator.ORDER_NONE) || 'False';
+  const branch = pythonGenerator.statementToCode(block, 'DO');
+  const elseBranch = pythonGenerator.statementToCode(block, 'ELSE');
+  let code = `if ${condition}:\n` + pythonGenerator.prefixLines(branch, pythonGenerator.INDENT);
+  if (elseBranch) {
+    code += `else:\n` + pythonGenerator.prefixLines(elseBranch, pythonGenerator.INDENT);
+  }
+  return code;
+};
+
+
+Blockly.Blocks['control_wait2'] = {
+  init: function() {
+    this.appendValueInput('CONDITION')
+      .setCheck('Boolean') // 确保输入为布尔类型
+      .appendField('等待直到');
+    this.setInputsInline(true);
+    this.setPreviousStatement(true, null);
+    this.setNextStatement(true, null);
+    this.setColour('#FE9900'); 
+    this.setTooltip('等待直到条件满足后继续执行');
+    this.setHelpUrl('');
+  }
+};
+
+// 定义等待直到条件满足积木块的 Python 代码生成器
+pythonGenerator.forBlock['control_wait2'] = function(block) {
+  const condition = pythonGenerator.valueToCode(block, 'CONDITION', pythonGenerator.ORDER_NONE) || 'False';
+  const code = `while not (${condition}):\n` +
+               pythonGenerator.prefixLines('    pass\n', pythonGenerator.INDENT);
+  return code;
+};
+// 定义重复执行直到的积木块
+Blockly.Blocks['control_until'] = {
+  init: function() {
+    this.appendValueInput('CONDITION')
+      .setCheck('Boolean') // 确保输入为布尔类型
+      .appendField('重复执行直到');
+    this.appendStatementInput('DO')
+      .setCheck(null)
+      .appendField('执行');
+    this.setInputsInline(true);
+    this.setPreviousStatement(true, null);
+    this.setNextStatement(true, null);
+    this.setColour('#FE9900'); 
+    this.setTooltip('重复执行代码块，直到条件满足');
+    this.setHelpUrl('');
+  }
+};
+
+// 定义重复执行直到积木块的 Python 代码生成器
+pythonGenerator.forBlock['control_until'] = function(block) {
+  const condition = pythonGenerator.valueToCode(block, 'CONDITION', pythonGenerator.ORDER_NONE) || 'False';
+  const branch = pythonGenerator.statementToCode(block, 'DO');
+  const code = `while not (${condition}):\n` +
+               pythonGenerator.prefixLines(branch, pythonGenerator.INDENT);
+  return code;
+};
+const stopOptions = [
+  ['当前脚本', 'CURRENT_SCRIPT'],
+  ['全部脚本', 'ALL_SCRIPTS'],
+  ['该角色的其他脚本', 'OTHER_SCRIPTS_OF_ACTOR']
+];
+Blockly.Blocks['control_stop'] = {
+  init: function () {
+    this.appendDummyInput()
+      .appendField('停止')
+      .appendField(new Blockly.FieldDropdown(stopOptions), 'STOP_OPTION');
+    this.setInputsInline(true);
+    this.setPreviousStatement(true, null); 
+    this.setNextStatement(true, null);
+    this.setColour('#FE9900');
+    this.setTooltip('停止指定的脚本执行');
+  }
+};
+
+// 定义停止积木块的 Python 代码生成器
+pythonGenerator.forBlock['control_stop'] = function(block) {
+  const stopOption = block.getFieldValue('STOP_OPTION');
+  return `CabbageEngine.stop("${stopOption}")\n`;
+};
+Blockly.Blocks['control_cloneStart'] = {
+  init: function () {
+    this.appendDummyInput()
+     .appendField('当作为克隆体启动时')
+    this.setInputsInline(true);
+    this.setPreviousStatement(flash, null); 
+    this.setNextStatement(true, null);
+    this.setColour('#FFDE59');
+    this.setHelpUrl('');
+  }
+};
+pythonGenerator.forBlock['control_cloneStart'] = function(block) {
+  return `CabbageEngine.cloneStart()\n`;
+};
+Blockly.Blocks['control_clone'] = {
+  init: function () {
+    this.appendDummyInput()
+     .appendField('克隆')
+     .appendField(new Blockly.FieldTextInput(actorname.value), 'x')
+    this.setInputsInline(true);
+    this.setPreviousStatement(true, null); 
+    this.setNextStatement(true, null);
+    this.setColour('#FE9900');
+    this.setHelpUrl('');
+  }
+};
+pythonGenerator.forBlock['control_clone'] = function(block) {
+  const x = block.getFieldValue('x');
+  return `CabbageEngine.clone(${x})\n`;
+};
+Blockly.Blocks['control_cloneDEL'] = {
+  init: function () {
+    this.appendDummyInput()
+     .appendField('删除此克隆体') 
+    this.setInputsInline(true);
+    this.setPreviousStatement(true, null); 
+    this.setNextStatement(flash, null);
+    this.setColour('#FE9900');
+    this.setHelpUrl('');
+  }
+};
+pythonGenerator.forBlock['control_cloneDEL'] = function(block) {
+  return `CabbageEngine.deleteClone()\n`;
+};
+Blockly.Blocks['control_senceSet'] = {
+  init: function () {
+    this.appendDummyInput()
+     .appendField('换成')
+     .appendField(new Blockly.FieldTextInput(actorname.value), 'x')
+     .appendField('场景')
+    this.setInputsInline(true);
+    this.setPreviousStatement(true, null); 
+    this.setNextStatement(true, null);
+    this.setColour('#FE9900');
+    this.setHelpUrl('');
+  }
+};
+pythonGenerator.forBlock['control_senceSet'] = function(block) {
+  const x = block.getFieldValue('x');
+  return `CabbageEngine.setScene(${x})\n`;
+};
+Blockly.Blocks['control_nextSence'] = {
+  init: function () {
+    this.appendDummyInput()
+     .appendField('下一个场景') 
+    this.setInputsInline(true);
+    this.setPreviousStatement(true, null); 
+    this.setNextStatement(true, null);
+    this.setColour('#FE9900');
+    this.setHelpUrl('');
+  }
+};
+pythonGenerator.forBlock['control_nextSence'] = function(block) {
+  return `CabbageEngine.nextScene()\n`;
+};
+
+Blockly.Blocks['detect_touch'] = {
+  init: function () {
+    this.setStyle('logic_compare_blocks');
+    this.appendDummyInput()
+      .appendField('碰到')
+      .appendField(new Blockly.FieldTextInput(actorname.value), 'x')
     this.setOutput(true, 'Boolean');  // 设置输出为布尔值
     this.setInputsInline(true);
     this.setColour('#00FFFF');
@@ -137,353 +945,204 @@ Blockly.Blocks['detect_press'] = {
     this.setTooltip('检测该按钮是否被按下，返回true或false');
   }
 };
-pythonGenerator.forBlock['detect_press'] = function(block) {
-  const target = block.getFieldValue('TARGET');
-  return `CabbageEngine.collisionDetection(${target})`;
+pythonGenerator.forBlock['detect_touch'] = function(block) {
+  const x = block.getFieldValue('x');
+  return `CabbageEngine.touch(${x})`;
 };
-
-Blockly.Blocks['detect_press_mouse'] = {
+Blockly.Blocks['detect_distance'] = {
+  init: function() {
+    this.setStyle('math_blocks'); 
+    this.appendDummyInput()
+         .appendField('到')
+         .appendField(new Blockly.FieldTextInput(actorname.value), 'x')
+         .appendField('的距离');
+    this.setOutput(true, 'Number'); 
+    this.setColour('#42EEF4'); 
+  }
+};
+pythonGenerator.forBlock['detect_distance'] = function(block) {
+  const x = block.getFieldValue('x');
+  return  `CabbageEngine.distance(${x})\n`;
+};
+Blockly.Blocks['detect_ask'] = {
   init: function () {
     this.appendDummyInput()
-      .appendField('按下鼠标？');
+     .appendField('询问')
+     .appendField(new Blockly.FieldTextInput(actorname.value), 'x')
+     .appendField('并等待')
+    this.setInputsInline(true);
+    this.setPreviousStatement(true, null); 
+    this.setNextStatement(true, null);
+    this.setColour('#42EEF4');
+    this.setHelpUrl('');
+  }
+};
+pythonGenerator.forBlock['detect_ask'] = function(block) {
+  const x = block.getFieldValue('x');
+  return `CabbageEngine.ask(${x})\n`;
+};
+Blockly.Blocks['detect_keyboard1'] = {
+  init: function () {
+    this.setStyle('logic_compare_blocks');
+    this.appendDummyInput()
+      .appendField('按下')
+      .appendField(new Blockly.FieldTextInput(actorname.value), 'x')
+      .appendField('？')
     this.setOutput(true, 'Boolean');  // 设置输出为布尔值
     this.setInputsInline(true);
-    this.setColour('#00FFFF');
+    this.setColour('#42EEF4');
+    this.setHelpUrl('');
+    this.setTooltip('检测该按键是否被按下，返回true或false');
+  }
+};
+pythonGenerator.forBlock['detect_keyboard1'] = function(block) {
+  const x = block.getFieldValue('x');
+  return `CabbageEngine.keyboard(${x})`;
+};
+Blockly.Blocks['detect_keyboard0'] = {
+  init: function () {
+    this.setStyle('logic_compare_blocks');
+    this.appendDummyInput()
+      .appendField('松开')
+      .appendField(new Blockly.FieldTextInput(actorname.value), 'x')
+      .appendField('？')
+    this.setOutput(true, 'Boolean');  // 设置输出为布尔值
+    this.setInputsInline(true);
+    this.setColour('#42EEF4');
+    this.setHelpUrl('');
+    this.setTooltip('检测该按键是否被松开，返回true或false');
+  }
+};
+pythonGenerator.forBlock['detect_keyboard0'] = function(block) {
+  const x = block.getFieldValue('x');
+  return `CabbageEngine.keyboard0(${x})`;
+};
+Blockly.Blocks['detect_mouse1'] = {
+  init: function () {
+    this.setStyle('logic_compare_blocks');
+    this.appendDummyInput()
+      .appendField('按下鼠标？')
+    this.setOutput(true, 'Boolean');  // 设置输出为布尔值
+    this.setInputsInline(true);
+    this.setColour('#42EEF4');
     this.setHelpUrl('');
     this.setTooltip('检测鼠标是否被按下，返回true或false');
   }
 };
-pythonGenerator.forBlock['detect_press_mouse'] = function(block) {
-  return `CabbageEngine.collisionDetection()`;
+pythonGenerator.forBlock['detect_mouse1'] = function(block) {
+  return `CabbageEngine.mouse1()`;
 };
-
-Blockly.Blocks['engine_move_actor'] = {
+Blockly.Blocks['detect_mouse0'] = {
+  init: function () {
+    this.setStyle('logic_compare_blocks');
+    this.appendDummyInput()
+      .appendField('松开鼠标？')
+    this.setOutput(true, 'Boolean');  // 设置输出为布尔值
+    this.setInputsInline(true);
+    this.setColour('#42EEF4');
+    this.setHelpUrl('');
+    this.setTooltip('检测鼠标是否被松开，返回true或false');
+  }
+};
+pythonGenerator.forBlock['detect_mouse0'] = function(block) {
+  return `CabbageEngine.mouse0()`;
+};
+const detectAttribute = [
+  ['动画名称', 'NAME'],
+  ['动画编号', 'ID'],
+  ['X坐标', 'X'],
+  ['Y坐标', 'Y'],
+  ['Z坐标', 'Z'],
+  ['方向', 'DIRECTION'],
+  ['大小', 'SIZE'],
+];
+Blockly.Blocks['detect_attribute'] = {
   init: function () {
     this.appendDummyInput()
-     .appendField('移动角色')
-     .appendField(new Blockly.FieldTextInput(actorname.value), 'NAME')
-     .appendField('向量')
-     .appendField('x:')
-     .appendField(new Blockly.FieldTextInput('0.0'), 'X')
-     .appendField('y:')
-      .appendField(new Blockly.FieldTextInput('0.0'), 'Y')
-      .appendField('z:')
-      .appendField(new Blockly.FieldTextInput('0.0'), 'Z');
+      .appendField(new Blockly.FieldDropdown(detectAttribute), 'x');
     this.setInputsInline(true);
-    this.setPreviousStatement(true, null);
+    this.setPreviousStatement(true, null); 
     this.setNextStatement(true, null);
-    this.setColour('#FF5722');
-    this.setHelpUrl('');
+    this.setColour('#FE9900');
+    this.setTooltip('检测指定的属性');
   }
 };
-pythonGenerator.forBlock['engine_move_actor'] = function(block) {
-  const x = parseFloat(block.getFieldValue('X') || '0.0').toFixed(1);
-  const y = parseFloat(block.getFieldValue('Y') || '0.0').toFixed(1);
-  const z = parseFloat(block.getFieldValue('Z') || '0.0').toFixed(1);
-  const name = block.getFieldValue('NAME');
-  return `CabbageEngine.moveActor(${name}, [${x}, ${y}, ${z}])\n`;
+pythonGenerator.forBlock['detect_attribute'] = function(block) {
+  const x = block.getFieldValue('x');
+  return `CabbageEngine.attribute(${x})\n`;
 };
-Blockly.Blocks['engine_rotate_actor'] = {
-  init: function () {
-    this.appendDummyInput()
-      .appendField('旋转角色')
-      .appendField(new Blockly.FieldTextInput(actorname.value), 'NAME')
-      .appendField('到角度')
-      .appendField('x:')
-      .appendField(new Blockly.FieldTextInput('0.0'), 'X')
-      .appendField('°')
-      .appendField('y:')
-      .appendField(new Blockly.FieldTextInput('0.0'), 'Y')
-      .appendField('°')
-      .appendField('z:')
-      .appendField(new Blockly.FieldTextInput('0.0'), 'Z')
-      .appendField('°');
-    this.setInputsInline(true);
-    this.setPreviousStatement(true, null);
-    this.setNextStatement(true, null);
-    this.setColour('#FF5722');
-    this.setHelpUrl('');
-  }
-};
-pythonGenerator.forBlock['engine_rotate_actor'] = function(block) {
-  const x = parseFloat(block.getFieldValue('X') || '0.0').toFixed(1);
-  const y = parseFloat(block.getFieldValue('Y') || '0.0').toFixed(1);
-  const z = parseFloat(block.getFieldValue('Z') || '0.0').toFixed(1);
-  const name = block.getFieldValue('NAME');
-  return `CabbageEngine.rotateActor(${name}, [${x}, ${y}, ${z}])\n`;
-};
-Blockly.Blocks['engine_scale_actor'] = {
-  init: function () {
-    this.appendDummyInput()
-      .appendField('缩放角色')
-      .appendField(new Blockly.FieldTextInput(actorname.value), 'NAME')
-      .appendField('到比例')
-      .appendField('x:')
-      .appendField(new Blockly.FieldTextInput('1.0'), 'X')
-      .appendField('y:')
-     .appendField(new Blockly.FieldTextInput('1.0'), 'Y')
-     .appendField('z:')
-     .appendField(new Blockly.FieldTextInput('1.0'), 'Z');
-    this.setInputsInline(true);
-    this.setPreviousStatement(true, null);
-    this.setNextStatement(true, null);
-    this.setColour('#FF5722');
-    this.setHelpUrl('');
-  }
-};
-pythonGenerator.forBlock['engine_scale_actor'] = function(block) {
-  const x = parseFloat(block.getFieldValue('X') || '0.0').toFixed(1);
-  const y = parseFloat(block.getFieldValue('Y') || '0.0').toFixed(1);
-  const z = parseFloat(block.getFieldValue('Z') || '0.0').toFixed(1);
-  const name = block.getFieldValue('NAME');
-  return `CabbageEngine.scaleActor(${name}, [${x}, ${y}, ${z}])\n`;
-};
-
-
-Blockly.Blocks['event_keyboardEventHandling'] = {
-  init: function(){
-    this.appendDummyInput()
-      .appendField('当按下')
-      .appendField(new Blockly.FieldTextInput(actorname.value),'KEY');
-    this.setInputsInline(true);
-    this.setPreviousStatement(false, null);
-    this.setNextStatement(true, null);
-    this.setColour('#5C97FF');
-    this.setHelpUrl('');
-  }
-};
-pythonGenerator.forBlock['event_keyboardEventHandling'] = function(block) {
-  const key = block.getFieldValue('KEY');
-  return  `CabbageEngine.scaleActor(${key})\n`;
-};
-
-Blockly.Blocks['event_gameStart'] = {
-  init: function () {
-    this.appendDummyInput()
-      .appendField('当游戏开始时')
-    this.setInputsInline(true);
-    this.setPreviousStatement(false, null);
-    this.setNextStatement(true, null);
-    this.setColour('#5C97FF');
-    this.setHelpUrl('');
-  }
-};
-pythonGenerator.forBlock['event_gameStart'] = function(block) {
-  return `CabbageEngine.scaleaddActor()\n`;
-};
-
-Blockly.Blocks['event_cloneStart'] = {
-  init: function () {
-    this.appendDummyInput()
-      .appendField('当作为克隆体启动时')
-    this.setInputsInline(true);
-    this.setPreviousStatement(false, null);
-    this.setNextStatement(true, null);
-    this.setColour('#5C97FF');
-    this.setHelpUrl('');
-  }
-};
-pythonGenerator.forBlock['event_cloneStart'] = function(block) {
-  return `CabbageEngine.scaleaddActor()\n`;
-};
-
-Blockly.Blocks['ask'] = {
-  init: function () {
-    this.appendDummyInput()
-      .appendField('询问')
-      .appendField(new Blockly.FieldTextInput(actorname.value),'TEXT');
-    this.setInputsInline(true);
-    this.setPreviousStatement(true, null);
-    this.setNextStatement(true, null);
-    this.setColour('#5C97FF');
-    this.setHelpUrl('');
-  }
-};
-pythonGenerator.forBlock['ask'] = function(block) {
-  const text = block.getFieldValue('TEXT') || '';
-  return `CabbageEngine.scaleaddActor(${text})\n`;
-};
-
-
-Blockly.Blocks['event_scenairChange'] = {
-  init: function(){
-    this.appendDummyInput()
-      .appendField('当场景切换为')
-      .appendField(new Blockly.FieldTextInput(actorname.value),'Scenario_ID')
-      .appendField('时');
-    this.setInputsInline(true);
-    this.setPreviousStatement(false, null);
-    this.setNextStatement(true, null);
-    this.setColour('#5C97FF');
-    this.setHelpUrl('');
-  }
-};
-pythonGenerator.forBlock['event_scenairChange'] = function(block) {
-  const scid = block.getFieldValue('Scenario_ID');
-  return  `CabbageEngine.scaleActor(${scid})\n`;
-};
-
-Blockly.Blocks['variable_assignTo'] = {
-  init: function () {
-    this.appendDummyInput()
-     .appendField('将')
-     .appendField(new Blockly.FieldTextInput(), 'VARIABLENAME')
-     .appendField('设为')
-     .appendField(new Blockly.FieldTextInput(), 'VALUE')
-    this.setInputsInline(true);
-    this.setPreviousStatement(true, null);
-    this.setNextStatement(true, null);
-    this.setColour('#FF5722');
-    this.setHelpUrl('');
-  }
-};
-pythonGenerator.forBlock['variable_assignTo'] = function(block) {
-  const name = block.getFieldValue('VARIABLENAME');
-  const value = parseFloat(block.getFieldValue('VALUE') || '0.0').toFixed(1);
-  return `CabbageEngine.moveActor(${name},${value})\n`;
-};
-
-Blockly.Blocks['variable_add'] = {
-  init: function () {
-    this.appendDummyInput()
-     .appendField('将')
-     .appendField(new Blockly.FieldTextInput(), 'VARIABLENAME')
-     .appendField('加上')
-     .appendField(new Blockly.FieldTextInput(), 'VALUE')
-    this.setInputsInline(true);
-    this.setPreviousStatement(true, null);
-    this.setNextStatement(true, null);
-    this.setColour('#FF5722');
-    this.setHelpUrl('');
-  }
-};
-pythonGenerator.forBlock['variable_add'] = function(block) {
-  const name = block.getFieldValue('VARIABLENAME');
-  const value = parseFloat(block.getFieldValue('VALUE') || '0.0').toFixed(1);
-  return `CabbageEngine.moveActor(${name},${value})\n`;
-};
-
-
-Blockly.Blocks['variable_show'] = {
-  init: function () {
-    this.appendDummyInput()
-     .appendField('显示变量')
-     .appendField(new Blockly.FieldTextInput(), 'VARIABLENAME')
-    this.setInputsInline(true);
-    this.setPreviousStatement(true, null);
-    this.setNextStatement(true, null);
-    this.setColour('#FF5722');
-    this.setHelpUrl('');
-  }
-};
-pythonGenerator.forBlock['variable_show'] = function(block) {
-  const name = block.getFieldValue('VARIABLENAME');
-  return `CabbageEngine.moveActor(${name})\n`;
-};
-
-Blockly.Blocks['variable_hide'] = {
-  init: function () {
-    this.appendDummyInput()
-     .appendField('隐藏变量')
-     .appendField(new Blockly.FieldTextInput(), 'VARIABLENAME')
-    this.setInputsInline(true);
-    this.setPreviousStatement(true, null);
-    this.setNextStatement(true, null);
-    this.setColour('#FF5722');
-    this.setHelpUrl('');
-  }
-};
-pythonGenerator.forBlock['variable_hide'] = function(block) {
-  const name = block.getFieldValue('VARIABLENAME');
-  return `CabbageEngine.moveActor(${name})\n`;
-};
-
-
-
 Blockly.Blocks['math_add'] = {
   init: function() {
-    // 设置圆形外观（需搭配CSS或主题）
-    this.setStyle('math_blocks');  // 使用数学类样式（通常自带圆形）
+    this.setStyle('math_blocks'); 
     this.appendDummyInput()
-        .appendField(new Blockly.FieldTextInput(0), "VALUE1")
-        .appendField('+')
-        .appendField(new Blockly.FieldTextInput(0), "VALUE2");  // 数字输入框
-    this.setOutput(true, 'Number');  // 关键：输出数值类型
-    this.setColour(230);  // 数学积木常用橙色
-    this.setTooltip("可在数学运算中使用的圆形操作数");
+         .appendField(new Blockly.FieldTextInput(actorname.value), 'x1')
+         .appendField('+')
+         .appendField(new Blockly.FieldTextInput(actorname.value), 'x2');
+    this.setOutput(true, 'Number'); 
+    this.setColour('#7DDA58'); 
   }
 };
 pythonGenerator.forBlock['math_add'] = function(block) {
-  const value1 = block.getFieldValue('VALUE1');
-  const value2 = block.getFieldValue('VALUE2');
-  return  `CabbageEngine.scaleActor(${value1},${value2})\n`;  // 返回基础数值
+  const x1 = block.getFieldValue('x1');
+  const x2 = block.getFieldValue('x2');
+  return  `CabbageEngine.add(${x1},${x2})\n`;
 };
-
-Blockly.Blocks['math_sub'] = {
-  init: function() {
-    // 设置圆形外观
-    this.setStyle('math_blocks');  // 使用数学类样式（通常自带圆形）
-    this.appendDummyInput()
-        .appendField(new Blockly.FieldTextInput(0), "VALUE1")
-        .appendField('-')
-        .appendField(new Blockly.FieldTextInput(0), "VALUE2");  // 数字输入框
-    this.setOutput(true, 'Number');  // 关键：输出数值类型
-    this.setColour(230);  // 数学积木常用橙色
-    this.setTooltip("可在数学运算中使用的圆形操作数");
-  }
-};
-pythonGenerator.forBlock['math_sub'] = function(block) {
-  const value1 = block.getFieldValue('VALUE1');
-  const value2 = block.getFieldValue('VALUE2');
-  return  `CabbageEngine.scaleActor(${value1},${value2})\n`;  // 返回基础数值
-};
-
 Blockly.Blocks['math_mul'] = {
   init: function() {
-    // 设置圆形外观
-    this.setStyle('math_blocks');  // 使用数学类样式（通常自带圆形）
+    this.setStyle('math_blocks'); 
     this.appendDummyInput()
-        .appendField(new Blockly.FieldTextInput(0), "VALUE1")
-        .appendField('*')
-        .appendField(new Blockly.FieldTextInput(0), "VALUE2");  // 数字输入框
-    this.setOutput(true, 'Number');  // 关键：输出数值类型
-    this.setColour(230);  // 数学积木常用橙色
-    this.setTooltip("可在数学运算中使用的圆形操作数");
+         .appendField(new Blockly.FieldTextInput(actorname.value), 'x1')
+         .appendField('-')
+         .appendField(new Blockly.FieldTextInput(actorname.value), 'x2');
+    this.setOutput(true, 'Number'); 
+    this.setColour('#7DDA58'); 
   }
 };
 pythonGenerator.forBlock['math_mul'] = function(block) {
-  const value1 = block.getFieldValue('VALUE1');
-  const value2 = block.getFieldValue('VALUE2');
-  return  `CabbageEngine.scaleActor(${value1},${value2})\n`;  // 返回基础数值
+  const x1 = block.getFieldValue('x1');
+  const x2 = block.getFieldValue('x2');
+  return  `CabbageEngine.mul(${x1},${x2})\n`;
 };
-
 Blockly.Blocks['math_div'] = {
   init: function() {
-    // 设置圆形外观（需搭配CSS或主题）
-    this.setStyle('math_blocks');  // 使用数学类样式（通常自带圆形）
+    this.setStyle('math_blocks'); 
     this.appendDummyInput()
-        .appendField(new Blockly.FieldTextInput(0), "VALUE1")
-        .appendField('/')
-        .appendField(new Blockly.FieldTextInput(0), "VALUE2");  // 数字输入框
-    this.setOutput(true, 'Number');  // 关键：输出数值类型
-    this.setColour(230);  // 数学积木常用橙色
-    this.setTooltip("可在数学运算中使用的圆形操作数");
+         .appendField(new Blockly.FieldTextInput(actorname.value), 'x1')
+         .appendField('*')
+         .appendField(new Blockly.FieldTextInput(actorname.value), 'x2');
+    this.setOutput(true, 'Number'); 
+    this.setColour('#7DDA58'); 
   }
 };
 pythonGenerator.forBlock['math_div'] = function(block) {
-  const value1 = block.getFieldValue('VALUE1');
-  const value2 = block.getFieldValue('VALUE2');
-  return  `CabbageEngine.scaleActor(${value1},${value2})\n`;  // 返回基础数值
+  const x1 = block.getFieldValue('x1');
+  const x2 = block.getFieldValue('x2');
+  return  `CabbageEngine.div(${x1},${x2})\n`;
 };
-
-Blockly.Blocks['random'] = {
+Blockly.Blocks['math_sub'] = {
+  init: function() {
+    this.setStyle('math_blocks'); 
+    this.appendDummyInput()
+         .appendField(new Blockly.FieldTextInput(actorname.value), 'x1')
+         .appendField('/')
+         .appendField(new Blockly.FieldTextInput(actorname.value), 'x2');
+    this.setOutput(true, 'Number'); 
+    this.setColour('#7DDA58'); 
+  }
+};
+pythonGenerator.forBlock['math_sub'] = function(block) {
+  const x1 = block.getFieldValue('x1');
+  const x2 = block.getFieldValue('x2');
+  return  `CabbageEngine.sub(${x1},${x2})\n`;
+};
+Blockly.Blocks['math_random'] = {
   init: function () {
     this.setStyle('math_blocks');
     this.appendDummyInput()
       .appendField('在')
-      .appendField(new Blockly.FieldTextInput(0), "VALUE1")
+      .appendField(new Blockly.FieldTextInput(0), "x1")
       .appendField('到')
-      .appendField(new Blockly.FieldTextInput(0), "VALUE2")
+      .appendField(new Blockly.FieldTextInput(0), "x2")
       .appendField('之间的一个随机数');
     this.setInputsInline(true);
     this.setPreviousStatement(true, null);
@@ -492,21 +1151,194 @@ Blockly.Blocks['random'] = {
     this.setHelpUrl('');
   }
 };
-pythonGenerator.forBlock['random'] = function(block) {
-  const value1 = block.getFieldValue('VALUE1');
-  const value2 = block.getFieldValue('VALUE2');
-  return  `CabbageEngine.scaleActor(${value1},${value2})\n`;  // 返回基础数值
+pythonGenerator.forBlock['math_random'] = function(block) {
+  const x1 = block.getFieldValue('x1');
+  const x2 = block.getFieldValue('x2');
+  return  `CabbageEngine.random(${x1},${x2})\n`;
+};
+Blockly.Blocks['math_G'] = {
+  init: function() {
+    this.setStyle('math_blocks'); 
+    this.appendDummyInput()
+         .appendField(new Blockly.FieldTextInput(actorname.value), 'x1')
+         .appendField('>')
+         .appendField(new Blockly.FieldTextInput(actorname.value), 'x2');
+    this.setOutput(true, 'Number'); 
+    this.setColour('#7DDA58'); 
+  }
+};
+pythonGenerator.forBlock['math_G'] = function(block) {
+  const x1 = block.getFieldValue('x1');
+  const x2 = block.getFieldValue('x2');
+  return  `CabbageEngine.G(${x1},${x2})\n`;
+};
+Blockly.Blocks['math_L'] = {
+  init: function() {
+    this.setStyle('math_blocks'); 
+    this.appendDummyInput()
+         .appendField(new Blockly.FieldTextInput(actorname.value), 'x1')
+         .appendField('<')
+         .appendField(new Blockly.FieldTextInput(actorname.value), 'x2');
+    this.setOutput(true, 'Number'); 
+    this.setColour('#7DDA58'); 
+  }
+};
+pythonGenerator.forBlock['math_L'] = function(block) {
+  const x1 = block.getFieldValue('x1');
+  const x2 = block.getFieldValue('x2');
+  return  `CabbageEngine.L(${x1},${x2})\n`;
+};
+Blockly.Blocks['math_E'] = {
+  init: function() {
+    this.setStyle('math_blocks'); 
+    this.appendDummyInput()
+         .appendField(new Blockly.FieldTextInput(actorname.value), 'x1')
+         .appendField('=')
+         .appendField(new Blockly.FieldTextInput(actorname.value), 'x2');
+    this.setOutput(true, 'Number'); 
+    this.setColour('#7DDA58'); 
+  }
+};
+pythonGenerator.forBlock['math_E'] = function(block) {
+  const x1 = block.getFieldValue('x1');
+  const x2 = block.getFieldValue('x2');
+  return  `CabbageEngine.E(${x1},${x2})\n`;
+};
+Blockly.Blocks['math_AND'] = {
+  init: function() {
+    this.setStyle('logic_compare_blocks');
+    this.appendValueInput('A')
+      .setCheck('Boolean')
+      .appendField('');
+    this.appendValueInput('B')
+      .setCheck('Boolean')
+      .appendField('与');
+    this.setInputsInline(true);
+    this.setOutput(true, 'Boolean');
+    this.setColour('#7DDA58');
+    this.setTooltip('逻辑与运算，两个条件都满足时返回 true，否则返回 false');
+    this.setHelpUrl('');
+  }
+};
+pythonGenerator.forBlock['math_AND'] = function(block) {
+  const a = pythonGenerator.valueToCode(block, 'A', pythonGenerator.ORDER_LOGICAL_AND) || 'False';
+  const b = pythonGenerator.valueToCode(block, 'B', pythonGenerator.ORDER_LOGICAL_AND) || 'False';
+  return [a + ' and ' + b, pythonGenerator.ORDER_LOGICAL_AND];
+};
+Blockly.Blocks['math_OR'] = {
+  init: function() {
+    this.setStyle('logic_compare_blocks');
+    this.appendValueInput('A')
+      .setCheck('Boolean')
+      .appendField('');
+    this.appendValueInput('B')
+      .setCheck('Boolean')
+      .appendField('或');
+    this.setInputsInline(true);
+    this.setOutput(true, 'Boolean');
+    this.setColour('#7DDA58'); 
+    this.setTooltip('逻辑或运算，两个条件中至少一个满足时返回 true，否则返回 false');
+    this.setHelpUrl('');
+  }
+};
+pythonGenerator.forBlock['math_OR'] = function(block) {
+  const a = pythonGenerator.valueToCode(block, 'A', pythonGenerator.ORDER_LOGICAL_OR) || 'False';
+  const b = pythonGenerator.valueToCode(block, 'B', pythonGenerator.ORDER_LOGICAL_OR) || 'False';
+  return [a + ' or ' + b, pythonGenerator.ORDER_LOGICAL_OR];
+};
+Blockly.Blocks['math_NOT'] = {
+  init: function() {
+    this.setStyle('logic_compare_blocks');
+    this.appendValueInput('A')
+      .setCheck('Boolean')
+      .appendField('非');
+    this.setInputsInline(true);
+    this.setOutput(true, 'Boolean');
+    this.setColour('#7DDA58');
+    this.setTooltip('逻辑非运算，条件不满足时返回 true，满足时返回 false');
+    this.setHelpUrl('');
+  }
+};
+pythonGenerator.forBlock['math_NOT'] = function(block) {
+  const a = pythonGenerator.valueToCode(block, 'A', pythonGenerator.ORDER_LOGICAL_NOT) || 'False';
+  return ['not ' + a, pythonGenerator.ORDER_LOGICAL_NOT];
+};
+Blockly.Blocks['math_connect'] = {
+  init: function() {
+    // 使用数学类样式，通常为圆形
+    this.setStyle('math_blocks');
+    this.appendValueInput('LEFT')
+      .appendField('连接');
+    this.appendValueInput('RIGHT')
+      .appendField('和');
+    this.setInputsInline(true);
+    this.setOutput(true, 'String');
+    this.setColour(160); // 自定义颜色
+    this.setTooltip('将左右两边的内容连接成一个字符串');
+    this.setHelpUrl('');
+  }
 };
 
-Blockly.Blocks['engine_movetoplass_actor'] = { 
+// 定义连接积木块的 Python 代码生成器
+pythonGenerator.forBlock['math_connect'] = function(block) {
+  const left = pythonGenerator.valueToCode(block, 'LEFT', pythonGenerator.ORDER_NONE) || "''";
+  const right = pythonGenerator.valueToCode(block, 'RIGHT', pythonGenerator.ORDER_NONE) || "''";
+  // 确保左右两边的内容转换为字符串类型
+  const leftStr = `str(${left})`;
+  const rightStr = `str(${right})`;
+  return [leftStr + ' + ' + rightStr, pythonGenerator.ORDER_ADDITION];
+};
+
+
+
+
+
+
+Blockly.Blocks['variable_add'] = {
   init: function () {
     this.appendDummyInput()
-      .appendField('移到')
-      .appendField(new Blockly.FieldDropdown([
-        ['角色1', 'actor1'],
-        ['角色2', 'actor2'],
-        ['角色3', 'actor3']
-      ]), 'ACTOR')
+     .appendField('将')
+     .appendField(new Blockly.FieldTextInput(), 'v')
+     .appendField('增加')
+     .appendField(new Blockly.FieldTextInput(), 'x')
+    this.setInputsInline(true);
+    this.setPreviousStatement(true, null);
+    this.setNextStatement(true, null);
+    this.setColour('#FE9900');
+    this.setHelpUrl('');
+  }
+};
+pythonGenerator.forBlock['variable_add'] = function(block) {
+  const v = block.getFieldValue('v');
+  const x = parseFloat(block.getFieldValue('x') || '0.0').toFixed(1);
+  return `CabbageEngine.add(${v},${x})\n`;
+};
+Blockly.Blocks['variable_set'] = {
+  init: function () {
+    this.appendDummyInput()
+     .appendField('将')
+     .appendField(new Blockly.FieldTextInput(), 'v')
+     .appendField('设为')
+     .appendField(new Blockly.FieldTextInput(), 'x')
+    this.setInputsInline(true);
+    this.setPreviousStatement(true, null);
+    this.setNextStatement(true, null);
+    this.setColour('#FE9900');
+    this.setHelpUrl('');
+  }
+};
+pythonGenerator.forBlock['variable_set'] = function(block) {
+  const v = block.getFieldValue('v');
+  const x = parseFloat(block.getFieldValue('x') || '0.0').toFixed(1);
+  return `CabbageEngine.set(${v},${x})\n`;
+};
+
+
+Blockly.Blocks['variable_show'] = {
+  init: function () {
+    this.appendDummyInput()
+     .appendField('显示变量')
+     .appendField(new Blockly.FieldTextInput(), 'v')
     this.setInputsInline(true);
     this.setPreviousStatement(true, null);
     this.setNextStatement(true, null);
@@ -514,25 +1346,16 @@ Blockly.Blocks['engine_movetoplass_actor'] = {
     this.setHelpUrl('');
   }
 };
-
-// 修正生成器函数，确保名称和参数正确
-pythonGenerator.forBlock['engine_movetoplass_actor'] = function(block) {
-  const actor = block.getFieldValue('ACTOR');
-  return `CabbageEngine.moveToPlassActor(${actor})
-`;
+pythonGenerator.forBlock['variable_show'] = function(block) {
+  const v = block.getFieldValue('v');
+  return `CabbageEngine.show(${v})\n`;
 };
 
-Blockly.Blocks['engine_movetotimeplass_actor'] = { 
+Blockly.Blocks['variable_hide'] = {
   init: function () {
     this.appendDummyInput()
-      .appendField('在')
-      .appendField(new Blockly.FieldTextInput('1'), 'T')
-      .appendField('秒内移到')
-      .appendField(new Blockly.FieldDropdown([
-        ['角色1', 'actor1'],
-        ['角色2', 'actor2'],
-        ['角色3', 'actor3']
-      ]), 'ACTOR')
+     .appendField('隐藏变量')
+     .appendField(new Blockly.FieldTextInput(), 'v')
     this.setInputsInline(true);
     this.setPreviousStatement(true, null);
     this.setNextStatement(true, null);
@@ -540,377 +1363,18 @@ Blockly.Blocks['engine_movetotimeplass_actor'] = {
     this.setHelpUrl('');
   }
 };
-
-pythonGenerator.forBlock['engine_movetotimeplass_actor'] = function(block) {
-  const actor = block.getFieldValue('ACTOR');
-  const t = block.getFieldValue('T');
-  return `CabbageEngine.moveToTimePlassActor(${t}, ${actor})
-`;
+pythonGenerator.forBlock['variable_hide'] = function(block) {
+  const v = block.getFieldValue('v');
+  return `CabbageEngine.hide(${v})\n`;
 };
 
-Blockly.Blocks['wait'] = {
-  init: function () {
-    this.appendDummyInput()
-      .appendField('等待')
-      .appendField(new Blockly.FieldTextInput(), 'NUMBER')
-    this.setInputsInline(true);
-    this.setPreviousStatement(true, null);
-    this.setNextStatement(true, null);
-    this.setColour('#8A2BE2');
-    this.setHelpUrl('');
-  }
-};
-pythonGenerator.forBlock['wait'] = function(block) {
-  const number = parseFloat(block.getFieldValue('NUMBER') || '0.0').toFixed(1);
-  return `CabbageEngine.scalespeaddZActor(${number})\n`;
-};
 
-Blockly.Blocks['clone'] = {
-  init: function () {
-    this.appendDummyInput()
-      .appendField('克隆')
-      .appendField(new Blockly.FieldTextInput(), 'NUMBER')
-    this.setInputsInline(true);
-    this.setPreviousStatement(true, null);
-    this.setNextStatement(true, null);
-    this.setColour('#8A2BE2');
-    this.setHelpUrl('');
-  }
-};
-pythonGenerator.forBlock['clone'] = function(block) {
-  const number = parseFloat(block.getFieldValue('NUMBER') || '0.0').toFixed(1);
-  return `CabbageEngine.scalespeaddZActor(${number})\n`;
-};
 
-Blockly.Blocks['clone_del'] = {
-  init: function () {
-    this.appendDummyInput()
-      .appendField('删除此克隆体')
-    this.setInputsInline(true);
-    this.setPreviousStatement(true, null);
-    this.setNextStatement(flash, null);
-    this.setColour('#8A2BE2');
-    this.setHelpUrl('');
-  }
-};
-pythonGenerator.forBlock['clone_del'] = function(block) {
-  return `CabbageEngine.scaleaddActor()\n`;
-};
 
-Blockly.Blocks['engine_moveto_actor'] = {
-  init: function () {
-    this.appendDummyInput()
-      .appendField('删除此克隆体')
-    this.setInputsInline(true);
-    this.setPreviousStatement(true, null);
-    this.setNextStatement(flash, null);
-    this.setColour('#8A2BE2');
-    this.setHelpUrl('');
-  }
-};
-pythonGenerator.forBlock['engine_moveto_actor'] = function(block) {
-  return `CabbageEngine.scaleaddActor()\n`;
-};
 
-Blockly.Blocks['engine_movetotime_actor'] = {
-  init: function () {
-    this.appendDummyInput()
-      .appendField('删除此克隆体')
-    this.setInputsInline(true);
-    this.setPreviousStatement(true, null);
-    this.setNextStatement(flash, null);
-    this.setColour('#8A2BE2');
-    this.setHelpUrl('');
-  }
-};
-pythonGenerator.forBlock['engine_movetotime_actor'] = function(block) {
-  return `CabbageEngine.scaleaddActor()\n`;
-};
 
-Blockly.Blocks['engine_faceplass_actor'] = {
-  init: function () {
-    this.appendDummyInput()
-      .appendField('删除此克隆体')
-    this.setInputsInline(true);
-    this.setPreviousStatement(true, null);
-    this.setNextStatement(flash, null);
-    this.setColour('#8A2BE2');
-    this.setHelpUrl('');
-  }
-};
-pythonGenerator.forBlock['engine_faceplass_actor'] = function(block) {
-  return `CabbageEngine.scaleaddActor()\n`;
-};
 
-Blockly.Blocks['engine_face_actor'] = {
-  init: function () {
-    this.appendDummyInput()
-      .appendField('删除此克隆体')
-    this.setInputsInline(true);
-    this.setPreviousStatement(true, null);
-    this.setNextStatement(flash, null);
-    this.setColour('#8A2BE2');
-    this.setHelpUrl('');
-  }
-};
-pythonGenerator.forBlock['engine_face_actor'] = function(block) {
-  return `CabbageEngine.scaleaddActor()\n`;
-};
 
-Blockly.Blocks['engine_moveX_actor'] = {
-  init: function () {
-    this.appendDummyInput()
-      .appendField('删除此克隆体')
-    this.setInputsInline(true);
-    this.setPreviousStatement(true, null);
-    this.setNextStatement(flash, null);
-    this.setColour('#8A2BE2');
-    this.setHelpUrl('');
-  }
-};
-pythonGenerator.forBlock['engine_moveX_actor'] = function(block) {
-  return `CabbageEngine.scaleaddActor()\n`;
-};
-
-Blockly.Blocks['engine_movetoX_actor'] = {
-  init: function () {
-    this.appendDummyInput()
-      .appendField('删除此克隆体')
-    this.setInputsInline(true);
-    this.setPreviousStatement(true, null);
-    this.setNextStatement(flash, null);
-    this.setColour('#8A2BE2');
-    this.setHelpUrl('');
-  }
-};
-pythonGenerator.forBlock['engine_movetoX_actor'] = function(block) {
-  return `CabbageEngine.scaleaddActor()\n`;
-};
-
-Blockly.Blocks['engine_moveY_actor'] = {
-  init: function () {
-    this.appendDummyInput()
-      .appendField('删除此克隆体')
-    this.setInputsInline(true);
-    this.setPreviousStatement(true, null);
-    this.setNextStatement(flash, null);
-    this.setColour('#8A2BE2');
-    this.setHelpUrl('');
-  }
-};
-pythonGenerator.forBlock['engine_moveY_actor'] = function(block) {
-  return `CabbageEngine.scaleaddActor()\n`;
-};
-
-Blockly.Blocks['engine_movetoY_actor'] = {
-  init: function () {
-    this.appendDummyInput()
-      .appendField('删除此克隆体')
-    this.setInputsInline(true);
-    this.setPreviousStatement(true, null);
-    this.setNextStatement(flash, null);
-    this.setColour('#8A2BE2');
-    this.setHelpUrl('');
-  }
-};
-pythonGenerator.forBlock['engine_movetoY_actor'] = function(block) {
-  return `CabbageEngine.scaleaddActor()\n`;
-};
-
-Blockly.Blocks['engine_moveZ_actor'] = {
-  init: function () {
-    this.appendDummyInput()
-      .appendField('删除此克隆体')
-    this.setInputsInline(true);
-    this.setPreviousStatement(true, null);
-    this.setNextStatement(flash, null);
-    this.setColour('#8A2BE2');
-    this.setHelpUrl('');
-  }
-};
-pythonGenerator.forBlock['engine_moveZ_actor'] = function(block) {
-  return `CabbageEngine.scaleaddActor()\n`;
-};
-
-Blockly.Blocks['engine_movetoZ_actor'] = {
-  init: function () {
-    this.appendDummyInput()
-      .appendField('删除此克隆体')
-    this.setInputsInline(true);
-    this.setPreviousStatement(true, null);
-    this.setNextStatement(flash, null);
-    this.setColour('#8A2BE2');
-    this.setHelpUrl('');
-  }
-};
-pythonGenerator.forBlock['engine_movetoZ_actor'] = function(block) {
-  return `CabbageEngine.scaleaddActor()\n`;
-};
-
-Blockly.Blocks['appearance_scaleadd_actor'] = {
-  init: function () {
-    this.appendDummyInput()
-      .appendField('删除此克隆体')
-    this.setInputsInline(true);
-    this.setPreviousStatement(true, null);
-    this.setNextStatement(flash, null);
-    this.setColour('#8A2BE2');
-    this.setHelpUrl('');
-  }
-};
-pythonGenerator.forBlock['appearance_scaleadd_actor'] = function(block) {
-  return `CabbageEngine.scaleaddActor()\n`;
-};
-
-Blockly.Blocks['appearance_scale_actor'] = {
-  init: function () {
-    this.appendDummyInput()
-      .appendField('删除此克隆体')
-    this.setInputsInline(true);
-    this.setPreviousStatement(true, null);
-    this.setNextStatement(flash, null);
-    this.setColour('#8A2BE2');
-    this.setHelpUrl('');
-  }
-};
-pythonGenerator.forBlock['appearance_scale_actor'] = function(block) {
-  return `CabbageEngine.scaleaddActor()\n`;
-};
-
-Blockly.Blocks['appearance_hide_actor'] = {
-  init: function () {
-    this.appendDummyInput()
-      .appendField('删除此克隆体')
-    this.setInputsInline(true);
-    this.setPreviousStatement(true, null);
-    this.setNextStatement(flash, null);
-    this.setColour('#8A2BE2');
-    this.setHelpUrl('');
-  }
-};
-pythonGenerator.forBlock['appearance_hide_actor'] = function(block) {
-  return `CabbageEngine.scaleaddActor()\n`;
-};
-
-Blockly.Blocks['appearance_show_actor'] = {
-  init: function () {
-    this.appendDummyInput()
-      .appendField('删除此克隆体')
-    this.setInputsInline(true);
-    this.setPreviousStatement(true, null);
-    this.setNextStatement(flash, null);
-    this.setColour('#8A2BE2');
-    this.setHelpUrl('');
-  }
-};
-pythonGenerator.forBlock['appearance_show_actor'] = function(block) {
-  return `CabbageEngine.scaleaddActor()\n`;
-};
-
-Blockly.Blocks['appearance_scalespe_actor'] = {
-  init: function () {
-    this.appendDummyInput()
-      .appendField('删除此克隆体')
-    this.setInputsInline(true);
-    this.setPreviousStatement(true, null);
-    this.setNextStatement(flash, null);
-    this.setColour('#8A2BE2');
-    this.setHelpUrl('');
-  }
-};
-pythonGenerator.forBlock['appearance_scalespe_actor'] = function(block) {
-  return `CabbageEngine.scaleaddActor()\n`;
-};
-
-Blockly.Blocks['appearance_scalespeaddX_actor'] = {
-  init: function () {
-    this.appendDummyInput()
-      .appendField('删除此克隆体')
-    this.setInputsInline(true);
-    this.setPreviousStatement(true, null);
-    this.setNextStatement(flash, null);
-    this.setColour('#8A2BE2');
-    this.setHelpUrl('');
-  }
-};
-pythonGenerator.forBlock['appearance_scalespeaddX_actor'] = function(block) {
-  return `CabbageEngine.scaleaddActor()\n`;
-};
-
-Blockly.Blocks['appearance_scalespeaddY_actor'] = {
-  init: function () {
-    this.appendDummyInput()
-      .appendField('删除此克隆体')
-    this.setInputsInline(true);
-    this.setPreviousStatement(true, null);
-    this.setNextStatement(flash, null);
-    this.setColour('#8A2BE2');
-    this.setHelpUrl('');
-  }
-};
-pythonGenerator.forBlock['appearance_scalespeaddY_actor'] = function(block) {
-  return `CabbageEngine.scaleaddActor()\n`;
-};
-
-Blockly.Blocks['appearance_scalespeaddZ_actor'] = {
-  init: function () {
-    this.appendDummyInput()
-      .appendField('删除此克隆体')
-    this.setInputsInline(true);
-    this.setPreviousStatement(true, null);
-    this.setNextStatement(flash, null);
-    this.setColour('#8A2BE2');
-    this.setHelpUrl('');
-  }
-};
-pythonGenerator.forBlock['appearance_scalespeaddZ_actor'] = function(block) {
-  return `CabbageEngine.scaleaddActor()\n`;
-};
-
-Blockly.Blocks['appearance_scalespeX_actor'] = {
-  init: function () {
-    this.appendDummyInput()
-      .appendField('删除此克隆体')
-    this.setInputsInline(true);
-    this.setPreviousStatement(true, null);
-    this.setNextStatement(flash, null);
-    this.setColour('#8A2BE2');
-    this.setHelpUrl('');
-  }
-};
-pythonGenerator.forBlock['appearance_scalespeX_actor'] = function(block) {
-  return `CabbageEngine.scaleaddActor()\n`;
-};
-
-Blockly.Blocks['appearance_scalespeY_actor'] = {
-  init: function () {
-    this.appendDummyInput()
-      .appendField('删除此克隆体')
-    this.setInputsInline(true);
-    this.setPreviousStatement(true, null);
-    this.setNextStatement(flash, null);
-    this.setColour('#8A2BE2');
-    this.setHelpUrl('');
-  }
-};
-pythonGenerator.forBlock['appearance_scalespeY_actor'] = function(block) {
-  return `CabbageEngine.scaleaddActor()\n`;
-};
-
-Blockly.Blocks['appearance_scalespeZ_actor'] = {
-  init: function () {
-    this.appendDummyInput()
-      .appendField('删除此克隆体')
-    this.setInputsInline(true);
-    this.setPreviousStatement(true, null);
-    this.setNextStatement(flash, null);
-    this.setColour('#8A2BE2');
-    this.setHelpUrl('');
-  }
-};
-pythonGenerator.forBlock['appearance_scalespeZ_actor'] = function(block) {
-  return `CabbageEngine.scaleaddActor()\n`;
-};
 
 // 使用 JSON 格式的工具箱配置
 const TOOLBOX_CONFIG = {
@@ -920,152 +1384,153 @@ const TOOLBOX_CONFIG = {
     {
       kind: 'category',
       name: '引擎',
-      colour: '#FF5722',
+      colour: '#5631E4',
       contents: [
-        { kind: 'block', type: 'engine_move_actor' },
-        { kind: 'block', type: 'engine_movetoplass_actor' },
-        { kind: 'block', type: 'engine_moveto_actor' },
-        { kind: 'block', type: 'engine_movetotimeplass_actor' },
-        { kind: 'block', type: 'engine_movetotime_actor' },
-        { kind: 'block', type: 'engine_rotate_actor' },
-        { kind: 'block', type: 'engine_faceplass_actor' },
-        { kind: 'block', type: 'engine_face_actor' },
-        { kind: 'block', type: 'engine_moveX_actor' },
-        { kind: 'block', type: 'engine_movetoX_actor' },
-        { kind: 'block', type: 'engine_moveY_actor' },
-        { kind: 'block', type: 'engine_movetoY_actor' },
-        { kind: 'block', type: 'engine_moveZ_actor' },
-        { kind: 'block', type: 'engine_movetoZ_actor' },
+        { kind: 'block', type: 'engine_move' },
+        { kind: 'block', type: 'engine_rotateX' },
+        { kind: 'block', type: 'engine_rotateY' },
+        { kind: 'block', type: 'engine_face' },
+        { kind: 'block', type: 'engine_moveto' },
+        { kind: 'block', type: 'engine_movetoXYZ' },
+        { kind: 'block', type: 'engine_movetoXYZtime' },
+        { kind: 'block', type: 'engine_Xset' },
+        { kind: 'block', type: 'engine_Yset' },
+        { kind: 'block', type: 'engine_Zset' },
+        { kind: 'block', type: 'engine_Xadd' },
+        { kind: 'block', type: 'engine_Yadd' },
+        { kind: 'block', type: 'engine_Zadd' },
+        { kind: 'block', type: 'engine_X' },
+        { kind: 'block', type: 'engine_Y' },
+        { kind: 'block', type: 'engine_Z' }
       ]
     },
     {
       kind: 'category',
       name: '外观',
-      colour: '#8A2BE2',
+      colour: '#C501F6',
       contents: [
-        { kind: 'block', type: 'appearance_scaleadd_actor' },
-        { kind: 'block', type: 'appearance_scale_actor' },
-        { kind: 'block', type: 'appearance_hide_actor' },
-        { kind: 'block', type: 'appearance_show_actor' },
-        { kind: 'block', type: 'appearance_scalespe_actor'},
-        { kind: 'block', type: 'appearance_scalespeaddX_actor'},
-        { kind: 'block', type: 'appearance_scalespeaddY_actor'},
-        { kind: 'block', type: 'appearance_scalespeaddZ_actor'},
-        { kind: 'block', type: 'appearance_scalespeX_actor'},
-        { kind: 'block', type: 'appearance_scalespeY_actor'},
-        { kind: 'block', type: 'appearance_scalespeZ_actor'}
+        { kind: 'block', type: 'appearance_cartoonSet' },
+        { kind: 'block', type: 'appearance_nextCartoon' },
+        { kind: 'block', type: 'appearance_playCartoon' },
+        { kind: 'block', type: 'appearance_stopCartoon' },
+        { kind: 'block', type: 'appearance_resetCartoon'},
+        { kind: 'block', type: 'appearance_sizeAdd'},
+        { kind: 'block', type: 'appearance_sizeSet'},
+        { kind: 'block', type: 'appearance_show'},
+        { kind: 'block', type: 'appearance_hide'},
+        { kind: 'block', type: 'appearance_cartoon'},
+        { kind: 'block', type: 'appearance_size'}
       ]
     },
     {
       kind: 'category',
       name: '事件',
-      colour: '#855E42',
+      colour: '#FFDE59',
       contents: [
-        { kind: 'block', type: 'event_keyboardEventHandling'},
-        { kind: 'bkock', type: 'event_gameStart'},
-        { kind: 'bkock', type: 'event_scenairChange'},
-        { kind: 'bkock', type: 'event_cloneStart'},
-      ]
-    },
-    {
-      kind: 'category',
-      name: '变量',
-      colour: '#FF6680',
-      contents: [
-        { kind: 'block', type: 'variable_assignTo' },
-        { kind: 'block', type: 'variable_add' },
-        { kind: 'block', type: 'variable_show' },
-        { kind: 'block', type: 'variable_hide' },
-        { kind: 'block', type: 'math_change' }
-      ]
-    },
-    {
-      kind: 'category',
-      name: '数学',
-      colour: '#FFAB19',
-      contents: [
-        { kind: 'block', type: 'math_add' },
-        { kind: 'block', type: 'math_mul' },
-        { kind: 'block', type: 'math_div' },
-        { kind: 'block', type: 'math_sub' },
-        { kind: 'block', type: 'random' },
-        { kind: 'block', type: 'logic_compare' }
+        { kind: 'block', type: 'event_gameStart'},
+        { kind: 'bkock', type: 'event_keyboard'},
+        { kind: 'bkock', type: 'event_RB'},
+        { kind: 'bkock', type: 'event_broadcast'},
+        { kind: 'bkock', type: 'event_broadcastWait'}
+
       ]
     },
     {
       kind: 'category',
       name: '控制',
-      colour: '#FFAB19',
+      colour: '#FE9900',
       contents: [
-        { kind: 'block', type: 'wait' },
-        { kind: 'block', type: 'ask' },
-        { kind: 'block', type: 'clone'},
-        { kind: 'block', type: 'clone_del'}
+        { kind: 'block', type: 'control_wait'},
+        { kind: 'bkock', type: 'control_for'},
+        { kind: 'bkock', type: 'control_forX'},
+        { kind: 'bkock', type: 'control_if'},
+        { kind: 'bkock', type: 'control_else'},
+        { kind: 'bkock', type: 'control_wait2'},
+        { kind: 'bkock', type: 'control_until'},
+        { kind: 'bkock', type: 'control_stop'},
+        { kind: 'bkock', type: 'control_cloneStart'},
+        { kind: 'bkock', type: 'control_clone'},
+        { kind: 'bkock', type: 'control_cloneDEL'},
+        { kind: 'bkock', type: 'control_senceSet'},
+        { kind: 'bkock', type: 'control_nextSence'},
       ]
     },
     {
       kind: 'category',
       name: '侦测',
-      colour: '#00FFFF',
+      colour: '#42EEF4',
       contents: [
-        { kind: 'block', type: 'detect_collision'},
-        { kind: 'block', type: 'detect_press_mouse'},
-        { kind: 'block', type: 'detect_press'},
-
+        { kind: 'block', type: 'detect_touch'},
+        { kind: 'block', type: 'detect_distance'},
+        { kind: 'block', type: 'detect_ask'},
+        { kind: 'block', type: 'detect_keyboard1'},
+        { kind: 'block', type: 'detect_keyboard0'},
+        { kind: 'block', type: 'detect_mouse1'},
+        { kind: 'block', type: 'detect_mouse0'},
+        { kind: 'block', type: 'detect_attribute'}
+      ]
+    },
+    {
+      kind: 'category',
+      name: '运算',
+      colour: '#7DDA58',
+      contents: [
+        { kind: 'block', type: 'math_add' },
+        { kind: 'block', type: 'math_mul' },
+        { kind: 'block', type: 'math_div' },
+        { kind: 'block', type: 'math_sub' },
+        { kind: 'block', type: 'math_random' },
+        { kind: 'block', type: 'math_G' },
+        { kind: 'block', type: 'math_L' },
+        { kind: 'block', type: 'math_E' },
+        { kind: 'block', type: 'math_AND' },
+        { kind: 'block', type: 'math_OR' },
+        { kind: 'block', type: 'math_NOT' },
+        { kind: 'block', type: 'math_connect' },
+        { kind: 'block', type: 'math_str' },
+        { kind: 'block', type: 'math_strNumber' },
+        { kind: 'block', type: 'math_strInside' },
+        { kind: 'block', type: 'math_mod' },
+        { kind: 'block', type: 'math_other' }
+      ]
+    },
+    {
+      kind: 'category',
+      name: '变量',
+      colour: '#FE9900',
+      contents: [
+        { kind: 'block', type: 'variable_add' },
+        { kind: 'block', type: 'variable_set' },
+        { kind: 'block', type: 'variable_show' },
+        { kind: 'block', type: 'variable_hide' }
+      ]
+    },
+    {
+      kind: 'category',
+      name: '列表',
+      colour: '#E4080A',
+      contents: [
+        { kind: 'block', type: 'list_add' },
+        { kind: 'block', type: 'list_del' },
+        { kind: 'block', type: 'list_delAll'},
+        { kind: 'block', type: 'list_insert'},
+        { kind: 'block', type: 'list_override' },
+        { kind: 'block', type: 'list_list' },
+        { kind: 'block', type: 'list_fristSer'},
+        { kind: 'block', type: 'list_number'},
+        { kind: 'block', type: 'list_incode' },
+        { kind: 'block', type: 'list_show'},
+        { kind: 'block', type: 'list_hide'}
       ]
     }
   ]
 };
 
 const BLOCK_CATEGORY_MAP = {
-  'engine_move_actor': '引擎',
-  'engine_moveto_actor': '引擎',
-  'engine_movetotimeplass_actor': '引擎',
-  'engine_movetotime_actor': '引擎',
-  'engine_movetoplass_actor': '引擎',
-  'engine_faceplass_actor': '引擎',
-  'engine_face_actor': '引擎',
-  'engine_rotate_actor': '引擎',
-  'engine_moveX_actor': '引擎',
-  'engine_movetoX_actor': '引擎',
-  'engine_moveY_actor': '引擎',
-  'engine_movetoY_actor': '引擎',
-  'engine_moveZ_actor': '引擎',
-  'engine_movetoZ_actor': '引擎',
-  'appearance_scaleadd_actor': '外观',
-  'appearance_scale_actor': '外观',
-  'appearance_hide_actor': '外观',
-  'appearance_show_actor': '外观',
-  'appearance_scalespe_actor': '外观',
-  'appearance_scalespeaddX_actor': '外观',
-  'appearance_scalespeaddY_actor': '外观',
-  'appearance_scalespeaddZ_actor': '外观',
-  'appearance_scalespeX_actor': '外观',
-  'appearance_scalespeY_actor': '外观',
-  'appearance_scalespeZ_actor': '外观',
-  'logic_compare': '数学',
-  'logic_boolean': '逻辑',
-  'math_change': '变量',
-  'event_keyboardEventHandling':'事件',
-  'event_gameStart':'事件',
-  'event_scenairChange':'事件',
-  'event_cloneStart':'事件',
-  'variable_assignTo':'变量',
-  'variable_add':'变量',
-  'variable_show':'变量',
-  'variable_hide':'变量',
-  'detect_collision':'侦测',
-  'detect_press_mouse':'侦测',
-  'detect_press':'侦测',
-  'math_add':'数学',
-  'math_mul':'数学',
-  'math_div':'数学',
-  'math_sub':'数学',
-  'random':'数学',
-  'wait':'控制',
-  'ask':'控制',
-  'clone':'控制',
-  'clone_del':'控制',
+  'engine_move': '引擎',
+ 
+
+ 
   
 
 
