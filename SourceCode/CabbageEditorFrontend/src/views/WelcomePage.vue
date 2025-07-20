@@ -56,12 +56,12 @@
                     <p class="button-text">继续游戏<br />Continue</p>
                 </button>
             </router-link>
-            <!--游戏设置-->
-            <router-link to="/SetUp" class="w-full max-w-xs">
+            <!--主题切换-->
+            <router-link to="" class="w-full max-w-xs">
                 <button 
-                @click="removeActors"    
+                @click="handleVersionSelect(selectedVersion === 'fun' ? 'pro' : 'fun')"    
                 class="welcome-button">
-                    <p class="button-text">游戏设置<br />Setting</p>
+                    <p class="button-text">主题切换<br />Theme</p>
                 </button>
             </router-link>
             <!--退出游戏-->
@@ -88,7 +88,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onBeforeUnmount, onUnmounted, computed } from 'vue';
+import { ref, onMounted, onBeforeUnmount, onUnmounted, computed, provide } from 'vue';
 import '@/assets/welcome-page.css'
 import '@/assets/welcome-pagePE.css'
 import { useRouter } from 'vue-router';
@@ -259,7 +259,13 @@ const handleKeyDown = (event) => {
 // 版本切换处理
 const handleVersionSelect = (version) => {
   selectedVersion.value = version
-  localStorage.setItem('selectedVersion', version)
+  try {
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem('selectedVersion', version)
+    }
+  } catch (e) {
+    console.warn('localStorage access error:', e)
+  }
 }
 
 const Out = () => {
