@@ -567,8 +567,6 @@ pythonGenerator.forBlock['event_keyboard'] = function(block) {
   const x = block.getFieldValue('x');
   return `CabbageEngine.keyboard(${x})\n`;
 };
-import { ref } from 'vue';
-
 // 定义响应式的广播列表，初始为空
 const broadcastList = ref([]);
 // 新建广播的函数
