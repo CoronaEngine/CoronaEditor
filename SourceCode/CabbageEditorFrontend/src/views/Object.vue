@@ -136,7 +136,7 @@ Blockly.Blocks['engine_rotateX'] = {
     this.setHelpUrl('');
   }
 };
-pythonGenerator.forBlock['engine_move'] = function(block) {
+pythonGenerator.forBlock['engine_rotateX'] = function(block) {
   const x = block.getFieldValue('x');
   return `CabbageEngine.rotateX(${x})\n`;
 };
@@ -153,7 +153,7 @@ Blockly.Blocks['engine_rotateY'] = {
     this.setHelpUrl('');
   }
 };
-pythonGenerator.forBlock['engine_move'] = function(block) {
+pythonGenerator.forBlock['engine_rotateY'] = function(block) {
   const x = block.getFieldValue('x');
   return `CabbageEngine.rotateY(${x})\n`;
 };
@@ -170,7 +170,7 @@ Blockly.Blocks['engine_face'] = {
     this.setHelpUrl('');
   }
 };
-pythonGenerator.forBlock['engine_move'] = function(block) {
+pythonGenerator.forBlock['engine_face'] = function(block) {
   const x = block.getFieldValue('x');
   return `CabbageEngine.face(${x})\n`;
 };
@@ -196,10 +196,11 @@ pythonGenerator.forBlock['engine_moveto'] = function(block) {
 Blockly.Blocks['engine_movetoXYZ'] = {
   init: function () {
     this.appendDummyInput()
-     .appendField('移到')
-     .appendField(new Blockly.FieldTextInput(actorname.value), 'x1')
-     .appendField(new Blockly.FieldTextInput(actorname.value), 'x2')
-     .appendField(new Blockly.FieldTextInput(actorname.value), 'x3');
+      .appendField('移动到')
+      .appendField(new Blockly.FieldDropdown([
+        ['随机位置', 'random_position'],
+        ['准星位置', 'sight_position']
+      ]), 'POSITION');
     this.setInputsInline(true);
     this.setPreviousStatement(true, null); 
     this.setNextStatement(true, null);
@@ -208,10 +209,8 @@ Blockly.Blocks['engine_movetoXYZ'] = {
   }
 };
 pythonGenerator.forBlock['engine_movetoXYZ'] = function(block) {
-  const x1 = block.getFieldValue('x1');
-  const x2 = block.getFieldValue('x2');
-  const x3 = block.getFieldValue('x3');
-  return `CabbageEngine.movetoXYZ(${x1}, ${x2}, ${x3})\n`;
+  const position = block.getFieldValue('POSITION');
+  return `CabbageEngine.movetoXYZ(${position})\n`;
 };
 Blockly.Blocks['engine_movetoXYZtime'] = {
   init: function () {
@@ -1278,12 +1277,9 @@ Blockly.Blocks['math_connect'] = {
     this.setHelpUrl('');
   }
 };
-
-// 定义连接积木块的 Python 代码生成器
 pythonGenerator.forBlock['math_connect'] = function(block) {
   const left = pythonGenerator.valueToCode(block, 'LEFT', pythonGenerator.ORDER_NONE) || "''";
   const right = pythonGenerator.valueToCode(block, 'RIGHT', pythonGenerator.ORDER_NONE) || "''";
-  // 确保左右两边的内容转换为字符串类型
   const leftStr = `str(${left})`;
   const rightStr = `str(${right})`;
   return [leftStr + ' + ' + rightStr, pythonGenerator.ORDER_ADDITION];
@@ -1367,7 +1363,39 @@ pythonGenerator.forBlock['variable_hide'] = function(block) {
   const v = block.getFieldValue('v');
   return `CabbageEngine.hide(${v})\n`;
 };
+Blockly.Blocks['list_show'] = {
+  init: function () {
+    this.appendDummyInput()
+     .appendField('显示列表')
+     .appendField(new Blockly.FieldTextInput(), 'v')
+    this.setInputsInline(true);
+    this.setPreviousStatement(true, null);
+    this.setNextStatement(true, null);
+    this.setColour('E4080A');
+    this.setHelpUrl('');
+  }
+};
+pythonGenerator.forBlock['list_show'] = function(block) {
+  const v = block.getFieldValue('v');
+  return `CabbageEngine.show(${v})\n`;
+};
 
+Blockly.Blocks['list_hide'] = {
+  init: function () {
+    this.appendDummyInput()
+     .appendField('隐藏列表')
+     .appendField(new Blockly.FieldTextInput(), 'v')
+    this.setInputsInline(true);
+    this.setPreviousStatement(true, null);
+    this.setNextStatement(true, null);
+    this.setColour('E4080A');
+    this.setHelpUrl('');
+  }
+};
+pythonGenerator.forBlock['list_hide'] = function(block) {
+  const v = block.getFieldValue('v');
+  return `CabbageEngine.hide(${v})\n`;
+};
 
 
 
@@ -1486,12 +1514,12 @@ const TOOLBOX_CONFIG = {
         { kind: 'block', type: 'math_AND' },
         { kind: 'block', type: 'math_OR' },
         { kind: 'block', type: 'math_NOT' },
-        { kind: 'block', type: 'math_connect' },
+        { kind: 'block', type: 'math_connect' }/* ,
         { kind: 'block', type: 'math_str' },
         { kind: 'block', type: 'math_strNumber' },
         { kind: 'block', type: 'math_strInside' },
         { kind: 'block', type: 'math_mod' },
-        { kind: 'block', type: 'math_other' }
+        { kind: 'block', type: 'math_other' } */
       ]
     },
     {
@@ -1510,7 +1538,7 @@ const TOOLBOX_CONFIG = {
       name: '列表',
       colour: '#E4080A',
       contents: [
-        { kind: 'block', type: 'list_add' },
+       /*  { kind: 'block', type: 'list_add' },
         { kind: 'block', type: 'list_del' },
         { kind: 'block', type: 'list_delAll'},
         { kind: 'block', type: 'list_insert'},
@@ -1518,7 +1546,7 @@ const TOOLBOX_CONFIG = {
         { kind: 'block', type: 'list_list' },
         { kind: 'block', type: 'list_fristSer'},
         { kind: 'block', type: 'list_number'},
-        { kind: 'block', type: 'list_incode' },
+        { kind: 'block', type: 'list_incode' }, */
         { kind: 'block', type: 'list_show'},
         { kind: 'block', type: 'list_hide'}
       ]
@@ -1528,13 +1556,90 @@ const TOOLBOX_CONFIG = {
 
 const BLOCK_CATEGORY_MAP = {
   'engine_move': '引擎',
- 
-
- 
-  
-
-
-
+  'engine_rotateX': '引擎',
+  'engine_rotateY': '引擎',
+  'engine_face': '引擎',
+  'engine_moveto': '引擎',
+  'engine_movetoXYZ': '引擎',
+  'engine_movetoXYZtime': '引擎',
+  'engine_Xset': '引擎',
+  'engine_Yset': '引擎',
+  'engine_Zset': '引擎',
+  'engine_Xadd': '引擎',
+  'engine_Yadd': '引擎',
+  'engine_Zadd': '引擎',
+  'engine_X': '引擎',
+  'engine_Y': '引擎',
+  'engine_Z': '引擎',
+  'appearance_cartoonSet': '外观',
+  'appearance_nextCartoon': '外观',
+  'appearance_playCartoon': '外观',
+  'appearance_stopCartoon': '外观',
+  'appearance_resetCartoon': '外观',
+  'appearance_sizeAdd': '外观',
+  'appearance_sizeSet': '外观',
+  'appearance_show': '外观',
+  'appearance_hide': '外观',
+  'appearance_cartoon':'外观',
+  'appearance_size': '外观',
+  'event_gameStart': '事件',
+  'event_keyboard': '事件',
+  'event_RB': '事件',
+  'event_broadcast': '事件',
+  'event_broadcastWait': '事件',
+  'control_wait': '控制',
+  'control_for': '控制',
+  'control_forX': '控制',
+  'control_if': '控制',
+  'control_else': '控制',
+  'control_wait2': '控制',
+  'control_until': '控制',
+  'control_stop': '控制',
+  'control_cloneStart': '控制',
+  'control_clone': '控制',
+  'control_cloneDEL': '控制',
+  'control_senceSet': '控制',
+  'control_nextSence': '控制',
+  'detect_touch': '侦测',
+  'detect_distance': '侦测',
+  'detect_ask': '侦测',
+  'detect_keyboard1': '侦测',
+  'detect_keyboard0': '侦测',
+  'detect_mouse1': '侦测',
+  'detect_mouse0': '侦测',
+  'detect_attribute': '侦测',
+  'math_add': '运算',
+  'math_mul': '运算',
+  'math_div': '运算',
+  'math_sub': '运算',
+  'math_random': '运算',
+  'math_G': '运算',
+  'math_L': '运算',
+  'math_E': '运算',
+  'math_AND': '运算',
+  'math_OR': '运算',
+  'math_NOT': '运算',
+  'math_connect': '运算',
+/*   'math_str': '运算',
+  'math_strNumber': '运算',
+  'math_strInside': '运算',
+  'math_mod': '运算',
+  'math_other': '运算', */
+  'variable_add': '变量',
+  'variable_set': '变量',
+  'variable_show': '变量',
+  'variable_hide': '变量',
+/*   'list_add': '列表',
+  'list_del': '列表',
+  'list_delAll': '列表',
+  'list_insert': '列表',
+  'list_override': '列表',
+  'list_list': '列表',
+  'list_fristSer': '列表',
+  'list_number': '列表',
+  'list_incode': '列表', */
+  'list_show': '列表',
+  'list_hide': '列表'
 };
 
 const WORKSPACE_CONFIG = {
