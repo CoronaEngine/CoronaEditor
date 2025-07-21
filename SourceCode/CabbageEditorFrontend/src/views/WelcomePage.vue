@@ -57,9 +57,9 @@
                 </button>
             </router-link>
             <!--主题切换-->
-            <router-link to="" class="w-full max-w-xs">
+            <router-link to="/WelcomePagePE" class="w-full max-w-xs">
                 <button 
-                @click="handleVersionSelect(selectedVersion === 'fun' ? 'pro' : 'fun')"    
+                @click="removeActors"    
                 class="welcome-button">
                     <p class="button-text">主题切换<br />Theme</p>
                 </button>
