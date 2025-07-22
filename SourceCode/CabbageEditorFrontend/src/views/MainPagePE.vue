@@ -44,9 +44,13 @@ const router = useRouter();
 
 const goToHome = () => {
   if (window.pyBridge) {
+    tabs.value.forEach(tab => {
+      window.pyBridge.removeDockWidget(tab.id);
+    });
     window.pyBridge.removeDockWidget("PetPE");
-    window.pyBridge.removeDockWidget("SceneBarPe");
     window.pyBridge.removeDockWidget("AITalkBarPE");
+    window.pyBridge.removeDockWidget("ObjectPE");
+    window.pyBridge.removeDockWidget("SceneBarPe");
   }
   router.push('/WelcomePagePE');
 };
