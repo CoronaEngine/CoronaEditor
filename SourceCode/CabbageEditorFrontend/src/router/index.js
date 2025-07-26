@@ -49,21 +49,6 @@ const routes = [
       component: () => import('../views/MainPagePE.vue')
     },
     {
-      path: '/SceneBarPE',
-      name: 'SceneBarPE',
-      component: () => import('../views/SceneBarPe.vue')
-    },
-    {
-      path: '/PetPE',
-      name: 'PetPE',
-      component: () => import('../views/PetPE.vue')
-    },
-    {
-      path: '/AITalkBarPE',
-      name: 'AITalkBarPE',
-      component: () => import('../views/AITalkBarPE.vue')
-    },
-    {
       path: '/SetUp',
       name: 'SetUp',
       component: () => import('../views/SetUp.vue')
