@@ -62,7 +62,12 @@ const routes = [
       path: '/AITalkBarPE',
       name: 'AITalkBarPE',
       component: () => import('../views/AITalkBarPE.vue')
-    }
+    },
+    {
+      path: '/SetUp',
+      name: 'SetUp',
+      component: () => import('../views/SetUp.vue')
+    },
 ]
 
 const router = createRouter({
