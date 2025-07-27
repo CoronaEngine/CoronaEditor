@@ -56,12 +56,11 @@
                     <p class="button-text">继续游戏<br />Continue</p>
                 </button>
             </router-link>
-            <!--主题切换-->
-            <router-link to="/WelcomePagePE" class="w-full max-w-xs">
-                <button 
-                @click="removeActors"    
-                class="welcome-button">
-                    <p class="button-text">主题切换<br />Theme</p>
+            <!--游戏设置-->
+            <router-link to=" " class="w-full max-w-xs">
+                <button @click="removeActors"
+                    class="welcome-button">
+                    <p class="button-text">游戏设置<br />Exit</p>
                 </button>
             </router-link>
             <!--退出游戏-->
@@ -84,13 +83,30 @@
       />
     </button>
   </div>
+
+<div class="w-[140px] overflow-hidden">
+     <div
+         v-for="item in themeArr"
+         :key="item.id"
+         @click="onItemClick(item)"
+         class="flex items-center p-1 cursor-pointer rounded
+          hover:bg-zinc-100/60 dark:hover:bg-zinc-800"
+     >
+         <m-svg-icon
+             :name="item.icon"
+             class="w-1.5 h-1.5 mr-1"
+             fillClass="fill-zinc-900 dark:fill-zinc-300"
+         ></m-svg-icon>
+         <span class="text-zinc-900 dark:text-zinc-300 text-sm">{{ item.name }}</span>
+     </div>
+ </div>
+
 </div>
 </template>
 
 <script setup>
 import { ref, onMounted, onBeforeUnmount, onUnmounted, computed, provide } from 'vue';
 import '@/assets/welcome-page.css'
-import '@/assets/welcome-pagePE.css'
 import { useRouter } from 'vue-router';
 import eventBus from '@/utils/eventBus';
 
