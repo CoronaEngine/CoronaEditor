@@ -39,16 +39,6 @@ const routes = [
       component: () => import('../views/Test.vue')
     },
     {
-        path: '/WelcomePagePE',
-        name: 'WelcomePagePE',
-        component: () => import('../views/WelcomePagePE.vue')
-    },
-    {
-      path: '/MainPagePE',
-      name: 'MainPagePE',
-      component: () => import('../views/MainPagePE.vue')
-    },
-    {
       path: '/SetUp',
       name: 'SetUp',
       component: () => import('../views/SetUp.vue')
