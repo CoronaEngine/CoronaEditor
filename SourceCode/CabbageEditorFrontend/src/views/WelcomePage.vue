@@ -79,7 +79,7 @@
       @click="goToHome"
       class="home-button">
       <img 
-        src="@/assets/首页的小房子按钮.png" 
+        src="@/assets/home.png" 
         class="home-button-img"
       />
     </button>
