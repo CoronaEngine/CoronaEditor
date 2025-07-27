@@ -107,6 +107,7 @@
 <script setup>
 import { ref, onMounted, onBeforeUnmount, onUnmounted, computed, provide } from 'vue';
 import '@/assets/welcome-page.css'
+import '@/assets/welcome-pagePE.css'
 import { useRouter } from 'vue-router';
 import eventBus from '@/utils/eventBus';
 
