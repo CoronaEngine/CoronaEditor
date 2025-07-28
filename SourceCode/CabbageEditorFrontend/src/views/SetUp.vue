@@ -62,7 +62,7 @@
     if (window.pyBridge) {
     window.pyBridge.removeDockWidget("SetUp");
     }
-    router.push('/');
+    eventBus.emit('return-to-welcome');
     };
 
     onMounted(() => {
