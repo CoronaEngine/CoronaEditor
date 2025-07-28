@@ -287,7 +287,7 @@ const handleVersionSelect = (version) => {
 
 // 控制设置窗口显示
 const openSetup = (index) => {
-  const size = { width: 320, height: 320};
+  const size = { width: 500, height: 600};
   if (window.pyBridge) {
   window.pyBridge.addDockWidget("SetUp", "/SetUp", "float", "center", JSON.stringify(size));
   }
