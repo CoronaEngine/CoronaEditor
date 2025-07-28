@@ -58,7 +58,7 @@
             </router-link>
             <!--游戏设置-->
             <router-link to=" " class="w-full max-w-xs">
-                <button @click="removeActors"
+                <button @click="openSetup(scene)"
                     class="welcome-button">
                     <p class="button-text">游戏设置<br />Exit</p>
                 </button>
@@ -284,6 +284,14 @@ const handleVersionSelect = (version) => {
     console.warn('localStorage access error:', e)
   }
 }
+
+// 控制设置窗口显示
+const openSetup = (index) => {
+  const size = { width: 320, height: 320};
+  if (window.pyBridge) {
+  window.pyBridge.addDockWidget("SetUp", "/SetUp", "float", "bottom_right", JSON.stringify(size));
+  }
+};
 
 const Out = () => {
     if (window.pyBridge) {
