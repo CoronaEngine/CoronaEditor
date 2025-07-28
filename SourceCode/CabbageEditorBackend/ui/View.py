@@ -4,7 +4,7 @@ from PyQt6.QtGui import QColor, QGuiApplication, QPixmap, QPainter
 from PyQt6.QtWebChannel import QWebChannel
 from PyQt6.QtWebEngineWidgets import QWebEngineView
 from PyQt6.QtWebEngineCore import QWebEngineProfile, QWebEngineSettings
-import Bridge
+from utils import Bridge
 import os
 import sys
 import json

@@ -1,4 +1,3 @@
-
 class CabbageEngine():
 
     class Scene():

@@ -1,4 +1,4 @@
-import ui.View as View
+from ui import View
 import os
 import sys
 import importlib.util
