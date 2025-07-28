@@ -57,19 +57,19 @@
                 </button>
             </router-link>
             <!--游戏设置-->
-            <router-link to=" " class="w-full max-w-xs">
+            <div class="w-full max-w-xs">
                 <button @click="openSetup(scene)"
                     class="welcome-button">
                     <p class="button-text">游戏设置<br />Exit</p>
                 </button>
-            </router-link>
+            </div>
             <!--退出游戏-->
-            <router-link to=" " class="w-full max-w-xs">
+            <div class="w-full max-w-xs">
                 <button @click="Out"
                     class="welcome-button">
                     <p class="button-text">结束游戏<br />Exit</p>
                 </button>
-            </router-link>
+            </div>
         </div>
     </div>
     <!-- 返回首页按钮 -->
@@ -289,7 +289,7 @@ const handleVersionSelect = (version) => {
 const openSetup = (index) => {
   const size = { width: 320, height: 320};
   if (window.pyBridge) {
-  window.pyBridge.addDockWidget("SetUp", "/SetUp", "float", "bottom_right", JSON.stringify(size));
+  window.pyBridge.addDockWidget("SetUp", "/SetUp", "float", "center", JSON.stringify(size));
   }
 };
 
