@@ -1,3 +1,4 @@
+from logging import root
 from PyQt6.QtCore import (QThread,QUrl,pyqtSignal,pyqtSlot,QObject)
 from PyQt6.QtWidgets import QApplication,QFileDialog
 import json
@@ -40,8 +41,8 @@ class Bridge(QObject):
     remove_route = pyqtSignal(str)
     ai_response = pyqtSignal(str)
     dock_event = pyqtSignal(str, str)
-    script_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "script")
-    saves_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "saves")
+    script_dir = os.path.join(root_dir, "CabbageEditor", "script")
+    saves_dir = os.path.join(root_dir, "CabbageEditor", "saves")
     os.makedirs(script_dir, exist_ok=True)
     os.makedirs(saves_dir, exist_ok=True)
     obj_dir = ""
