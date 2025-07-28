@@ -81,14 +81,12 @@ class Bridge(QObject):
 
     @pyqtSlot(str,str)
     def CreateActor(self, scene_name, obj_path):
-        print(f"创建角色: {obj_path}")
         name = os.path.basename(obj_path)
         object = CabbageEngine.Actor(scene_dict[scene_name]["scene"], obj_path)
         scene_dict[scene_name]["actor_dict"][name]={
             "actor":object,
             "path":obj_path
         }
-        print(scene_dict[scene_name]["actor_dict"])
 
     @pyqtSlot()
     def RemoveActor(self):
@@ -96,7 +94,6 @@ class Bridge(QObject):
             "scene": None,
             "actor_dict": {}
         }
-        print(scene_dict["mainscene"]["actor_dict"])
 
     @pyqtSlot(str)
     def CreateScene(self, data):
@@ -106,7 +103,6 @@ class Bridge(QObject):
                 "scene": CabbageEngine.Scene(),
                 "actor_dict": {}
             }
-            print(f"场景创建成功: {scene_dict[scene_name]}")
         else:
             print(f"场景已存在: {scene_name}")
 

@@ -40,14 +40,13 @@ class MainWindow(QMainWindow):
         self.osd = CustomWindow(self)
         self.osd.resize(self.size())
         self.osd.move(self.geometry().x(), self.geometry().y())
-        #正常使用
+
         self.BrowserWidget = BrowserWidget(self.osd)
         self.osd.setCentralWidget(self.BrowserWidget)
 
         self.osd.show()
 
     def changeEvent(self, event):
-        """处理窗口状态变化事件"""
         if event.type() == QEvent.Type.WindowStateChange:
             if self.windowState() == Qt.WindowState.WindowMinimized:
                 if self.osd:
@@ -61,7 +60,6 @@ class MainWindow(QMainWindow):
         super().changeEvent(event)
 
     def moveEvent(self, event):
-        """处理窗口移动事件"""
         x = int(event.pos().x() - event.oldPos().x())
         y = int(event.pos().y() - event.oldPos().y())
         if self.osd:
@@ -97,16 +95,15 @@ class MainWindow(QMainWindow):
 
     def configure_web_engine(self):
         profile = QWebEngineProfile.defaultProfile()
-        # 清除现有缓存
+        
         profile.clearHttpCache()
-        # 配置页面设置
         settings = profile.settings()
+
         settings.setAttribute(QWebEngineSettings.WebAttribute.JavascriptEnabled, True)
         settings.setAttribute(QWebEngineSettings.WebAttribute.LocalStorageEnabled, False)
         settings.setAttribute(QWebEngineSettings.WebAttribute.WebGLEnabled, False)
         settings.setAttribute(QWebEngineSettings.WebAttribute.AutoLoadImages, True)
         settings.setAttribute(QWebEngineSettings.WebAttribute.Accelerated2dCanvasEnabled, False)
-        # 添加其他性能优化设置
         settings.setAttribute(QWebEngineSettings.WebAttribute.PlaybackRequiresUserGesture, True)
         settings.setAttribute(QWebEngineSettings.WebAttribute.PdfViewerEnabled, False)
         settings.setAttribute(QWebEngineSettings.WebAttribute.PluginsEnabled, False)
