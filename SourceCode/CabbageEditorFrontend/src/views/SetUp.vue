@@ -1,41 +1,35 @@
 <template>
-<div class="bborder-2 border-[#84a65b] rounded-md relative">
+<div class="relative min-w-[300px] rounded-md border-2 border-[#84a65b] bg-black/70 backdrop-blur-sm">
     <!-- 标题栏 -->
-    <div class="titlebar flex items-center w-full p-2 rounded-t-md justify-between bg-black cursor-move select-none"
+    <div class="titlebar flex items-center w-full cursor-move select-none justify-between rounded-t-md bg-black p-2"
       @mousemove="onDrag" @mouseup="stopDrag" @mouseleave="stopDrag">
-      <div class="text-white font-medium w-auto whitespace-nowrap">设置</div>
-      <!-- 按钮组 -->
-      <div class="flex w-full space-x-2 justify-end">
-        <button @click.stop="closeDock"
-          class="px-2 py-1 bg-gray-700 hover:bg-gray-600 text-white text-sm rounded transition-colors duration-200">
-          ×
-        </button>
-      </div>
+      <div class="w-auto whitespace-nowrap font-medium text-white">设置</div>
+      <!-- 关闭按钮 -->
+      <button @click.stop="closeDock"
+        class="rounded px-2 py-1 text-sm text-white transition-colors duration-200 hover:bg-gray-600 bg-gray-700">
+        ×
+      </button>
+    </div>
 
-    <div class="w-full max-w-xs">
-    <button 
+    <!-- 按钮容器 -->
+    <div class="button-group flex flex-col items-center space-y-4 p-4">
+      <button 
         @click="emitProVersion"
-        class="w-full rounded-none bg-[#9E9E9E]/50 hover:bg-white/50 font-bold py-2 px-4 sm:py-3 sm:px-6 md:py-4 md:px-8 
-        transform hover:scale-110 hover:px-9 hover:py-6 hover:w-[110%] origin-center 
-        transition-all duration-300 transition-[transform,padding]"
-        >专业版本</button>
-    </div>
-    <div class="w-full max-w-xs">
-    <button
+        class="setup-button w-full min-w-[200px] max-w-xs rounded-md border border-transparent bg-[#9E9E9E]/50 px-6 py-3 font-bold text-white transition-all duration-300 hover:scale-105 hover:border-[#84a65b] hover:bg-white/50 active:scale-95">
+        专业版本
+      </button>
+      
+      <button
         @click="emitFunVersion"
-        class="w-full rounded-none bg-[#9E9E9E]/50 hover:bg-white/50 font-bold py-2 px-4 sm:py-3 sm:px-6 md:py-4 md:px-8 
-        transform hover:scale-110 hover:px-9 hover:py-6 hover:w-[110%] origin-center 
-        transition-all duration-300 transition-[transform,padding]"
-        >娱乐版本</button>
-    </div>
-    <div class="w-full max-w-xs">
-    <button
+        class="setup-button w-full min-w-[200px] max-w-xs rounded-md border border-transparent bg-[#9E9E9E]/50 px-6 py-3 font-bold text-white transition-all duration-300 hover:scale-105 hover:border-[#84a65b] hover:bg-white/50 active:scale-95">
+        娱乐版本
+      </button>
+      
+      <button
         @click="removeActors"
-        class="w-full rounded-none bg-[#9E9E9E]/50 hover:bg-white/50 font-bold py-2 px-4 sm:py-3 sm:px-6 md:py-4 md:px-8 
-        transform hover:scale-110 hover:px-9 hover:py-6 hover:w-[110%] origin-center 
-        transition-all duration-300 transition-[transform,padding]"
-        >返回初始页面</button>
-    </div>
+        class="setup-button w-full min-w-[200px] max-w-xs rounded-md border border-transparent bg-[#9E9E9E]/50 px-6 py-3 font-bold text-white transition-all duration-300 hover:scale-105 hover:border-[#84a65b] hover:bg-white/50 active:scale-95">
+        返回初始页面
+      </button>
     </div>
 </div>
 </template>
