@@ -4,22 +4,22 @@
     @contextmenu="openContextMenu($event)"
     @mousedown="startDrag" @mousemove="onDrag" @mouseup="stopDrag" @mouseleave="stopDrag"
     >
-        <div class="w-full max-w-xs">
+    <div class="w-full max-w-xs">
     <button 
     @click="emitProVersion"
     class="w-full rounded-none bg-[#9E9E9E]/50 hover:bg-white/50 font-bold py-2 px-4 sm:py-3 sm:px-6 md:py-4 md:px-8 
     transform hover:scale-110 hover:px-9 hover:py-6 hover:w-[110%] origin-center 
     transition-all duration-300 transition-[transform,padding]"
     >专业版本</button>
-</div>
-        <div class="w-full max-w-xs">
+    </div>
+    <div class="w-full max-w-xs">
     <button
     @click="emitFunVersion"
     class="w-full rounded-none bg-[#9E9E9E]/50 hover:bg-white/50 font-bold py-2 px-4 sm:py-3 sm:px-6 md:py-4 md:px-8 
     transform hover:scale-110 hover:px-9 hover:py-6 hover:w-[110%] origin-center 
     transition-all duration-300 transition-[transform,padding]"
     >娱乐版本</button>
-</div>
+    </div>
         <router-link to="/" class="w-full max-w-xs">
             <button
             @click="removeActors"
@@ -33,7 +33,7 @@
 </template>
 
 <script setup>
-    import { ref, onMounted, onUnmounted } from 'vue';
+    import { ref, onMounted } from 'vue';
     import { useDragResize } from '@/composables/useDragResize';
     import eventBus from '@/utils/eventBus';
 
@@ -99,10 +99,6 @@
 }
 
     onMounted(() => {
-        document.addEventListener('mousemove', onDrag);
-        document.addEventListener('mouseup', stopDrag);
-    });
-    onUnmounted(() => {
         document.addEventListener('mousemove', onDrag);
         document.addEventListener('mouseup', stopDrag);
     });
