@@ -1,3 +1,4 @@
+from logging import root
 import os
 from PyQt6.QtCore import QUrl
 
@@ -18,9 +19,7 @@ try:
     print("import CabbageEngine")
 except ImportError:
     from CabbageEngineFallback import CabbageEngine
-    root_dir = os.path.split(
-        os.path.split(os.path.split(os.path.split(os.path.abspath(__file__))[0])[0])[0]
-    )[0]
+    root_dir = os.path.split(os.path.split(os.path.split(os.path.split(os.path.split(os.path.abspath(__file__))[0])[0])[0])[0])[0]
     html_path = os.path.join(
         root_dir,
         "CabbageEditor",
@@ -29,7 +28,6 @@ except ImportError:
         "dist",
         "index.html",
     )
-    print(html_path)
     url = QUrl.fromLocalFile(html_path)
     obj_dir = os.path.join(root_dir, "TestCase", "AddModelTest")
     print("import CabbageEngine Fallback")

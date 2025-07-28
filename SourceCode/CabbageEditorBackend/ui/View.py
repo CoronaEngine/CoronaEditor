@@ -5,6 +5,7 @@ from PyQt6.QtWebChannel import QWebChannel
 from PyQt6.QtWebEngineWidgets import QWebEngineView
 from PyQt6.QtWebEngineCore import QWebEngineProfile, QWebEngineSettings
 from utils import Bridge
+from utils.CentealManager import CentralManager
 import os
 import sys
 import json
@@ -15,7 +16,7 @@ try:
 except ImportError:
     from CabbageEngineFallback import CabbageEngine
 
-from StaticComponents import scene_dict,url
+from utils.StaticComponents import scene_dict,url
 
 class CustomWindow(QMainWindow):
     def __init__(self, parent=None):
@@ -152,7 +153,7 @@ class BrowserWidget(QWebEngineView):
     def __init__(self, Main_Window):
         super(BrowserWidget, self).__init__(Main_Window)
         self.Main_Window = Main_Window
-        self.CentralManager = Bridge.CentralManager()
+        self.CentralManager = CentralManager()
 
         self.setMinimumSize(1, 1)
         self.setStyleSheet("background: transparent;")

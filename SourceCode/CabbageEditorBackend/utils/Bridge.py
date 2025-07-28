@@ -5,11 +5,8 @@ import os
 import time
 
 from httpx._models import Response
-
-# from LargeLanguageModel.mcp_client import qa_one_sync
 from mcp_client import qa_one_sync
-from StaticComponents import root_dir, html_path, url, obj_dir, scene_dict
-
+from utils.StaticComponents import root_dir, html_path, url, obj_dir, scene_dict
 
 try:
     import CabbageEngine
@@ -356,22 +353,6 @@ def run():
     def forwardDockEvent(self, event_type, event_data):
         self.dock_event.emit(event_type, event_data)
 
-
-class CentralManager:
-    def __init__(self):
-        self.docks = {}
-
-    def register_dock(self, routename, dock):
-        self.docks[routename] = dock
-
-    def delete_dock(self, routename):
-        del self.docks[routename]
-
-    def send_json_to_dock(self, routename, json_data):
-        if routename in self.docks:
-            self.docks[routename].send_message_to_dock(json_data)
-        else:
-            print(f"[ERROR] 未找到路由 {routename} 对应的 DockWidget")
 
 class FileHandler:
     def __init__(self):
