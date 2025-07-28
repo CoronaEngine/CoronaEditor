@@ -26,7 +26,7 @@
       </button>
       
       <button
-        @click="removeActors"
+        @click="goToHome"
         class="w-full max-w-xs rounded-md bg-[#5f9dc6]/50 px-6 py-3 font-bold text-black/80 transition-[transform,background-color] duration-200 ease-out hover:scale-[1.03] hover:bg-white/50">
         <p class="text-center text-sm sm:text-base md:text-lg">返回初始页面</p>
       </button>
@@ -58,13 +58,12 @@
     }
     };
 
-    const removeActors = () => {
+    const goToHome = () => {
     if (window.pyBridge) {
-        window.pyBridge.RemoveActor();
-    } else {
-        console.error("Python SendMessageToDock 未连接！");
+    window.pyBridge.removeDockWidget("SetUp");
     }
-}
+    router.push('/');
+    };
 
     onMounted(() => {
         document.addEventListener('mousemove', onDrag);
