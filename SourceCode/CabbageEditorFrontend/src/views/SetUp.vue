@@ -15,20 +15,20 @@
     <div class="button-group flex flex-col items-center space-y-4 p-4">
       <button 
         @click="emitProVersion"
-        class="setup-button w-full min-w-[200px] max-w-xs rounded-md border border-transparent bg-[#9E9E9E]/50 px-6 py-3 font-bold text-white transition-all duration-300 hover:scale-105 hover:border-[#84a65b] hover:bg-white/50 active:scale-95">
-        专业版本
+        class="w-full max-w-xs rounded-md bg-[#5f9dc6]/50 px-6 py-3 font-bold text-black/80 transition-[transform,background-color] duration-200 ease-out hover:scale-[1.03] hover:bg-white/50">
+        <p class="text-center text-sm sm:text-base md:text-lg">专业版本</p>
       </button>
       
       <button
         @click="emitFunVersion"
-        class="setup-button w-full min-w-[200px] max-w-xs rounded-md border border-transparent bg-[#9E9E9E]/50 px-6 py-3 font-bold text-white transition-all duration-300 hover:scale-105 hover:border-[#84a65b] hover:bg-white/50 active:scale-95">
-        娱乐版本
+        class="w-full max-w-xs rounded-md bg-[#5f9dc6]/50 px-6 py-3 font-bold text-black/80 transition-[transform,background-color] duration-200 ease-out hover:scale-[1.03] hover:bg-white/50">
+        <p class="text-center text-sm sm:text-base md:text-lg">娱乐版本</p>
       </button>
       
       <button
         @click="removeActors"
-        class="setup-button w-full min-w-[200px] max-w-xs rounded-md border border-transparent bg-[#9E9E9E]/50 px-6 py-3 font-bold text-white transition-all duration-300 hover:scale-105 hover:border-[#84a65b] hover:bg-white/50 active:scale-95">
-        返回初始页面
+        class="w-full max-w-xs rounded-md bg-[#5f9dc6]/50 px-6 py-3 font-bold text-black/80 transition-[transform,background-color] duration-200 ease-out hover:scale-[1.03] hover:bg-white/50">
+        <p class="text-center text-sm sm:text-base md:text-lg">返回初始页面</p>
       </button>
     </div>
 </div>
