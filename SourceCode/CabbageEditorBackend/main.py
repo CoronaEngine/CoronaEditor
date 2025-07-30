@@ -1,4 +1,4 @@
-from ui import View
+from ui import MainWindow
 import os
 import sys
 import importlib.util
@@ -51,10 +51,10 @@ def run(isReload):
         runScript = importlib.util.module_from_spec(runscript_spec)
         runscript_spec.loader.exec_module(runScript)
         runScript.run()
-    View.app.processEvents()
+    MainWindow.app.processEvents()
 
 if __name__ == '__main__':
      print('python main')
      cleanup_blockly_files()
      while(True):
-        View.app.processEvents()
+        MainWindow.app.processEvents()

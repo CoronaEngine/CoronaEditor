@@ -5,7 +5,7 @@ import asyncio
 from contextlib import asynccontextmanager
 from typing import Dict, Any, AsyncIterator
 # from QtWindow import Bridge, scene_dict
-import Bridge
+from utils.Bridge import Bridge
 # print(QtWindow.__file__)
 # print(dir(QtWindow))
 
@@ -14,7 +14,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("TransformMCPServer")
 
 # Create shared bridge instance
-qt_bridge = QtWindow.Bridge()
+qt_bridge = Bridge()
 
 
 @asynccontextmanager
