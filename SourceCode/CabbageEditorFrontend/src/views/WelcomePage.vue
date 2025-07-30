@@ -72,16 +72,6 @@
             </div>
         </div>
     </div>
-    <!-- 返回首页按钮 -->
-    <button 
-      v-show="true"
-      @click="goToHome"
-      class="home-button">
-      <img 
-        src="@/assets/home.png" 
-        class="home-button-img"
-      />
-    </button>
   </div>
 
 <div class="w-[140px] overflow-hidden">
@@ -127,10 +117,6 @@ const themeClass = computed(() => {
   console.log('Current theme class:', cls)
   return cls
 })
-
-const goToHome = () => {
-  router.push('/');
-};
 
 const toggleAnnouncements = () => {
   showAnnouncements.value = !showAnnouncements.value;
@@ -287,7 +273,7 @@ const handleVersionSelect = (version) => {
 
 // 控制设置窗口显示
 const openSetup = (index) => {
-  const size = { width: 320, height: 320};
+  const size = { width: 600, height:320 };
   if (window.pyBridge) {
   window.pyBridge.addDockWidget("SetUp", "/SetUp", "float", "center", JSON.stringify(size));
   }

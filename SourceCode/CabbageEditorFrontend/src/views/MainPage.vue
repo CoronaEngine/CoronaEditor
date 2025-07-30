@@ -39,6 +39,7 @@
 import { ref, onMounted, onUnmounted } from 'vue';
 import { useRouter } from 'vue-router';
 import "@/assets/welcome-page.css";
+import eventBus from '@/utils/eventBus';
 
 const router = useRouter();
 
@@ -180,6 +181,13 @@ const switchTab = (index) => {
   activeTab.value = index;
 };
 
+const handleReturnToWelcome = () => {
+  if (window.pyBridge) {
+    window.pyBridge.removeAllDockWidgets();
+  }
+  router.push('/');
+};
+
 // 控制包菜精显示
 const cabbagetalk = () => {
   const size = { width: 160, height: 160};
@@ -216,10 +224,12 @@ onMounted(() => {
   createScene();
   cabbagetalk();
   document.addEventListener('keydown', handleKeyDown);
+  eventBus.on('return-to-welcome', handleReturnToWelcome);
 });
 
 // 在onUnmounted中移除事件监听
 onUnmounted(() => {
   document.removeEventListener('keydown', handleKeyDown);
+  eventBus.off('return-to-welcome', handleReturnToWelcome);
 });
 </script>
