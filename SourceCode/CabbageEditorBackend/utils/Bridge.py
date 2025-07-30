@@ -1,13 +1,10 @@
 from logging import root
 from PyQt6.QtCore import QThread, pyqtSignal, pyqtSlot, QObject
 from PyQt6.QtWidgets import QApplication
-import json
-import os
-import time
+import json, os, time
 
-from httpx._models import Response
 from mcp_client import qa_one_sync
-from utils.StaticComponents import root_dir, html_path, url, obj_dir, scene_dict
+from utils.StaticComponents import root_dir, scene_dict
 from utils.FileHandleComponent import FileHandler
 
 try:
