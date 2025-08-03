@@ -2,13 +2,12 @@ from PyQt6.QtWebEngineWidgets import QWebEngineView
 from PyQt6.QtWebChannel import QWebChannel
 from PyQt6.QtCore import Qt, QPoint
 from PyQt6.QtGui import QColor, QGuiApplication
-from utils.StaticComponents import url
-from utils.CentealManager import CentralManager
+from utils.CentralManager import CentralManager
 from utils.Bridge import Bridge
 from ui.DockWidget import AddDock, RemoveDock
 
 class BrowserWidget(QWebEngineView):
-    def __init__(self, Main_Window):
+    def __init__(self, Main_Window, url:str):
         super(BrowserWidget, self).__init__(Main_Window)
         self.Main_Window = Main_Window
         self.CentralManager = CentralManager()
@@ -21,16 +20,16 @@ class BrowserWidget(QWebEngineView):
         self.load(url)
         self.setContentsMargins(0, 0, 0, 0)
 
-        self._setup_web_channel()
-        self._connect_signals()
+        self.setup_web_channel()
+        self.connect_signals()
 
-    def _setup_web_channel(self):
+    def setup_web_channel(self):
         self.channel = QWebChannel()
         self.bridge = Bridge(self.CentralManager)
         self.channel.registerObject("pyBridge", self.bridge)
         self.page().setWebChannel(self.channel)
 
-    def _connect_signals(self):
+    def connect_signals(self):
         self.bridge.create_route.connect(self.AddDockWidget)
         self.bridge.remove_route.connect(self.RemoveDockWidget)
 
@@ -39,7 +38,7 @@ class BrowserWidget(QWebEngineView):
             print("错误：routename 和 routepath 不能为空")
             return
         browser = QWebEngineView()
-        dock_area, isFloat, pos = self._get_dock_area(position, floatposition)
+        dock_area, isFloat, pos = self.get_dock_area(position, floatposition)
 
         if self.CentralManager.docks.get(routename):
             self.RemoveDockWidget(routename)
@@ -76,7 +75,7 @@ class BrowserWidget(QWebEngineView):
                 dock.bridge.create_route.disconnect()
                 dock.bridge.remove_route.disconnect()
 
-    def _get_dock_area(self, position, floatposition):
+    def get_dock_area(self, position, floatposition):
         position_map = {
             "left": (Qt.DockWidgetArea.LeftDockWidgetArea, False, None),
             "right": (Qt.DockWidgetArea.RightDockWidgetArea, False, None),
@@ -93,7 +92,7 @@ class BrowserWidget(QWebEngineView):
                 "bottom_right": (Qt.DockWidgetArea.AllDockWidgetAreas, True, screen.geometry().bottomRight()-QPoint(150,200)),
                 "center": (Qt.DockWidgetArea.AllDockWidgetAreas, True, screen.geometry().center()),
             }
-            return float_position_map.get(floatposition.lower(), (Qt.DockWidgetArea.AllDockWidgetAreas, True, "top_left"))
+            return float_position_map.get(floatposition.lower(), (Qt.DockWidgetArea.AllDockWidgetAreas, True, screen.geometry().topLeft()))
 
         return position_map.get(
             position.lower(), (Qt.DockWidgetArea.LeftDockWidgetArea, False, None)

@@ -4,8 +4,6 @@ import sys
 import importlib.util
 import glob
 
-#import CabbageEngine
-
 _cleaned_up = False
 
 def cleanup_blockly_files():

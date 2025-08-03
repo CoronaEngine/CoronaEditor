@@ -4,7 +4,7 @@ from PyQt6.QtWebEngineWidgets import QWebEngineView
 from PyQt6.QtWebEngineCore import QWebEngineProfile, QWebEngineSettings
 from utils.Bridge import Bridge
 import os, sys
-from utils.StaticComponents import url
+from utils.StaticComponents import scene_dict, url
 from ui.CustomWindow import CustomWindow
 from ui.RenderWidget import RenderWidget
 from ui.BrowserWidget import BrowserWidget
@@ -18,19 +18,19 @@ class MainWindow(QMainWindow):
         self.setWindowTitle("CabbageEngine")
         self.configure_web_engine()
 
-        self.RenderWidget = RenderWidget(self)
+        self.RenderWidget = RenderWidget(self, scene_dict)
         self.setCentralWidget(self.RenderWidget)
 
         self.osd = CustomWindow(self)
         self.osd.resize(self.size())
         self.osd.move(self.geometry().x(), self.geometry().y())
 
-        self.BrowserWidget = BrowserWidget(self.osd)
+        self.BrowserWidget = BrowserWidget(self.osd, url)
         self.osd.setCentralWidget(self.BrowserWidget)
 
         self.osd.show()
 
-    def changeEvent(self, event):
+    def changeEvent(self, event) -> None:
         if event.type() == QEvent.Type.WindowStateChange:
             if self.windowState() == Qt.WindowState.WindowMinimized:
                 if self.osd:
@@ -43,14 +43,14 @@ class MainWindow(QMainWindow):
                     self.osd.show()
         super().changeEvent(event)
 
-    def moveEvent(self, event):
+    def moveEvent(self, event) -> None:
         x = int(event.pos().x() - event.oldPos().x())
         y = int(event.pos().y() - event.oldPos().y())
         if self.osd:
             self.osd.move(self.osd.pos().x() + x, self.osd.pos().y() + y)
         super().moveEvent(event)
 
-    def reloadWidget(self):
+    def reloadWidget(self) -> None:
         central_widget = self.centralWidget()
         if central_widget:
             central_widget.setParent(None)
@@ -68,16 +68,16 @@ class MainWindow(QMainWindow):
         self.BrowserWidget = Bridge.BrowserWidget(self)
         self.setCentralWidget(self.BrowserWidget)
 
-    def closeEvent(self, event):
+    def closeEvent(self, event) -> None:
         QApplication.instance().quit()
         event.accept()
         os._exit(0)
     
-    def resizeEvent(self,event):
+    def resizeEvent(self,event) -> None:
         self.osd.resize(self.size())
         super().resizeEvent(event)
 
-    def configure_web_engine(self):
+    def configure_web_engine(self) -> None:
         profile = QWebEngineProfile.defaultProfile()
         
         profile.clearHttpCache()
