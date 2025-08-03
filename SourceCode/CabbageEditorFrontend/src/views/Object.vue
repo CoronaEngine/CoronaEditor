@@ -1855,7 +1855,7 @@ const handleBlockCreate = (event) => {
 
 const updatePosition = () => {
   if (window.pyBridge) {
-    window.pyBridge.Actor_Operation(JSON.stringify({
+    window.pyBridge.actorOperation(JSON.stringify({
       Operation: "Move",
       sceneName: scenename.value,
       x: parseFloat(px.value),
@@ -1869,7 +1869,7 @@ const updatePosition = () => {
 
 const updateRotation = () => {
   if (window.pyBridge) {
-    window.pyBridge.Actor_Operation(JSON.stringify({
+    window.pyBridge.actorOperation(JSON.stringify({
       Operation: "Rotate",
       sceneName: scenename.value,
       x: parseFloat(rx.value),
@@ -1883,7 +1883,7 @@ const updateRotation = () => {
 
 const updateScale = () => {
   if (window.pyBridge) {
-    window.pyBridge.Actor_Operation(JSON.stringify({
+    window.pyBridge.actorOperation(JSON.stringify({
       Operation: "Scale",
       sceneName: scenename.value,
       x: parseFloat(sx.value),

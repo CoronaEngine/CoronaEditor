@@ -79,19 +79,8 @@ class MainWindow(QMainWindow):
 
     def configure_web_engine(self) -> None:
         profile = QWebEngineProfile.defaultProfile()
-        
-        profile.clearHttpCache()
         settings = profile.settings()
-
-        settings.setAttribute(QWebEngineSettings.WebAttribute.JavascriptEnabled, True)
-        settings.setAttribute(QWebEngineSettings.WebAttribute.LocalStorageEnabled, False)
-        settings.setAttribute(QWebEngineSettings.WebAttribute.WebGLEnabled, False)
-        settings.setAttribute(QWebEngineSettings.WebAttribute.AutoLoadImages, True)
-        settings.setAttribute(QWebEngineSettings.WebAttribute.Accelerated2dCanvasEnabled, False)
-        settings.setAttribute(QWebEngineSettings.WebAttribute.PlaybackRequiresUserGesture, True)
-        settings.setAttribute(QWebEngineSettings.WebAttribute.PdfViewerEnabled, False)
-        settings.setAttribute(QWebEngineSettings.WebAttribute.PluginsEnabled, False)
-        settings.setAttribute(QWebEngineSettings.WebAttribute.ShowScrollBars,False)
+        settings.setAttribute(QWebEngineSettings.WebAttribute.ShowScrollBars, False)
 
 app = QApplication(sys.argv)
 window = MainWindow()

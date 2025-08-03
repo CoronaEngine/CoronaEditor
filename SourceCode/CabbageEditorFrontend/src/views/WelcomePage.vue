@@ -149,8 +149,8 @@ onBeforeUnmount(() => {
 
 const createActor = () => {
     if (window.pyBridge) {
-        window.pyBridge.CreateActor(currentScene.value,`./Resource/Cabbage/armadillo.obj`);
-        window.pyBridge.CreateActor(currentScene.value,`./Resource/Cabbage/Ball.obj`);
+        window.pyBridge.createActor(currentScene.value,`./Resource/Cabbage/armadillo.obj`);
+        window.pyBridge.createActor(currentScene.value,`./Resource/Cabbage/Ball.obj`);
     } else {
         console.error("Python SendMessageToDock 未连接！");
     }
@@ -180,7 +180,7 @@ const handleActorMove = (direction, deltaTime = 16) => {
     case 'rotateRight':
       // 新增右旋转逻辑
       if (window.pyBridge) {
-        window.pyBridge.Actor_Operation(JSON.stringify({
+        window.pyBridge.actorOperation(JSON.stringify({
           Operation: "Rotate",
           sceneName: "mainscene",
           x: 0,
@@ -193,7 +193,7 @@ const handleActorMove = (direction, deltaTime = 16) => {
     case 'rotateLeft':
       // 新增左旋转逻辑
       if (window.pyBridge) {
-        window.pyBridge.Actor_Operation(JSON.stringify({
+        window.pyBridge.actorOperation(JSON.stringify({
           Operation: "Rotate",
           sceneName: "mainscene",
           x: 0,
@@ -218,7 +218,7 @@ const handleActorMove = (direction, deltaTime = 16) => {
   }
 
   if (window.pyBridge) {
-    window.pyBridge.Actor_Operation(JSON.stringify({
+    window.pyBridge.actorOperation(JSON.stringify({
       Operation: "Move",
       sceneName: "mainscene",
       x: x,
@@ -289,7 +289,7 @@ const Out = () => {
 
 const removeActors = () => {
     if (window.pyBridge) {
-        window.pyBridge.RemoveActor();
+        window.pyBridge.removeActor();
     } else {
         console.error("Python SendMessageToDock 未连接！");
     }
