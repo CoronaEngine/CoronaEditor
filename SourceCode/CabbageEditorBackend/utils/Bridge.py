@@ -3,6 +3,8 @@ from PyQt6.QtCore import QThread, pyqtSignal, pyqtSlot, QObject
 from PyQt6.QtWidgets import QApplication
 import json, os, time
 
+import traceback
+
 from mcp_client import qa_one_sync
 from utils.StaticComponents import root_dir, scene_dict
 from utils.FileHandleComponent import FileHandler
@@ -94,7 +96,7 @@ class Bridge(QObject):
     @pyqtSlot(str,str)
     def sendMessageToDock(self, routename, json_data):
         try:
-            self.central_manager.send_json_to_dock(routename,json_data)
+            self.central_manager.send_json_to_dock(routename, json_data)
         except json.JSONDecodeError:
             print("发送消息失败：无效的JSON字符串")
         except Exception as e:
