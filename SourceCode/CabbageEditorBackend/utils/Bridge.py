@@ -1,13 +1,12 @@
 from logging import root
 from PyQt6.QtCore import QThread, pyqtSignal, pyqtSlot, QObject
 from PyQt6.QtWidgets import QApplication
-import json
-import os
-import time
+import json, os, time
 
-from httpx._models import Response
+import traceback
+
 from mcp_client import qa_one_sync
-from utils.StaticComponents import root_dir, html_path, url, obj_dir, scene_dict
+from utils.StaticComponents import root_dir, scene_dict
 from utils.FileHandleComponent import FileHandler
 
 try:
@@ -67,20 +66,8 @@ class Bridge(QObject):
     def removeDockWidget(self, routename):
         self.remove_route.emit(routename)
 
-    @pyqtSlot(str)
-    def HandleDockResize(self, data):
-        try:
-            resize_data = json.loads(data)
-            width = float(resize_data.get("width"))
-            height = float(resize_data.get("height"))
-            self.dock_event.emit(
-                "resize", json.dumps({"width": width, "height": height})
-            )
-        except Exception as e:
-            print(f"处理resize事件失败: {str(e)}")
-
     @pyqtSlot(str,str)
-    def CreateActor(self, scene_name, obj_path):
+    def createActor(self, scene_name, obj_path):
         name = os.path.basename(obj_path)
         object = CabbageEngine.Actor(scene_dict[scene_name]["scene"], obj_path)
         scene_dict[scene_name]["actor_dict"][name]={
@@ -89,14 +76,14 @@ class Bridge(QObject):
         }
 
     @pyqtSlot()
-    def RemoveActor(self):
+    def removeActor(self):
         scene_dict["mainscene"] = {
             "scene": None,
             "actor_dict": {}
         }
 
     @pyqtSlot(str)
-    def CreateScene(self, data):
+    def createScene(self, data):
         scene_name = json.loads(data).get("sceneName")
         if scene_name not in scene_dict:
             scene_dict[scene_name] = {
@@ -107,16 +94,16 @@ class Bridge(QObject):
             print(f"场景已存在: {scene_name}")
 
     @pyqtSlot(str,str)
-    def send_message_to_dock(self, routename, json_data):
+    def sendMessageToDock(self, routename, json_data):
         try:
-            self.central_manager.send_json_to_dock(routename,json_data)
+            self.central_manager.send_json_to_dock(routename, json_data)
         except json.JSONDecodeError:
             print("发送消息失败：无效的JSON字符串")
         except Exception as e:
             print(f"发送消息失败: {str(e)}")
 
     @pyqtSlot(str)
-    def SendMessageToAI(self, ai_message: str):
+    def sendMessageToAI(self, ai_message: str):
         """
         接收来自UI的信号，将消息放入一个工作线程中去请求AI，
         并通过信号将结果发回UI。
@@ -160,7 +147,7 @@ class Bridge(QObject):
         self.worker_thread.start()
 
     @pyqtSlot(str, str)
-    def open_file_dialog(self, sceneName, file_type="model"):
+    def openFileDialog(self, sceneName, file_type="model"):
         file_handler = FileHandler()
         if file_type == "model":
             _, file_path = file_handler.open_file("选择模型文件", "3D模型文件 (*.obj *.fbx *.dae)")
@@ -208,7 +195,7 @@ class Bridge(QObject):
                     self.dock_event.emit("sceneError", json.dumps(error_response))
 
     @pyqtSlot(str,str)
-    def HandleActorDelete(self, sceneName, actorName):
+    def actorDelete(self, sceneName, actorName):
         try:
             if actorName not in scene_dict[sceneName]["actor_dict"]:
                 print(f"当前场景中的角色列表: {list(scene_dict[sceneName]['actor_dict'].keys())}")
@@ -220,7 +207,7 @@ class Bridge(QObject):
             return str(e)
 
     @pyqtSlot(str)
-    def Actor_Operation(self,data):
+    def actorOperation(self,data):
         try:
             Actor_data = json.loads(data)
             sceneName = Actor_data.get("sceneName")
@@ -241,7 +228,7 @@ class Bridge(QObject):
             return
 
     @pyqtSlot(str)
-    def HandleCameraMove(self, data):
+    def cameraMove(self, data):
         try:
             move_data = json.loads(data)
             sceneName = move_data.get("sceneName", "scene1")
@@ -254,7 +241,7 @@ class Bridge(QObject):
             print(f"摄像头移动错误: {str(e)}")
 
     @pyqtSlot(str)
-    def HandleSunDirection(self, data):
+    def sunDirection(self, data):
         try:
             sun_data = json.loads(data)
             sceneName = sun_data.get("sceneName","scene1")
@@ -317,7 +304,7 @@ def run():
             self.dock_event.emit("scriptError", json.dumps(error_response))
 
     @pyqtSlot(str)
-    def HandleSceneSave(self, data):
+    def sceneSave(self, data):
         try:
             scene_data = json.loads(data)
             file_handler = FileHandler()

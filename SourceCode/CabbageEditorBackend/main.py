@@ -1,12 +1,17 @@
-from ui import MainWindow
 import os
 import sys
 import importlib.util
 import glob
 
-#import CabbageEngine
+os.environ["QT_DISABLE_DIRECT_COMPOSITION"] = "1"
+os.environ["QTWEBENGINE_CHROMIUM_FLAGS"] = "--disable-gpu --disable-software-rasterizer --enable-native-gpu-memory-buffers=false --disable-gpu-compositing --disable-gpu-rasterization --disable-oop-rasterization"
+os.environ["QT_QUICK_BACKEND"] = "software"
+os.environ["QT_ANGLE_PLATFORM"] = "d3d11"
+os.environ["QT_QPA_PLATFORM"] = "windows"
 
 _cleaned_up = False
+
+from ui import MainWindow
 
 def cleanup_blockly_files():
     global _cleaned_up

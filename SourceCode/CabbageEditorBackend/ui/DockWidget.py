@@ -2,12 +2,11 @@ from PyQt6.QtWidgets import QDockWidget, QWidget
 from PyQt6.QtWebChannel import QWebChannel
 from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtGui import QColor
-from utils.StaticComponents import url
 from utils.Bridge import Bridge
 import json
 
 class AddDock(QDockWidget):
-    def __init__(self, browser, name, path, CentralManager, Main_Window, isFloat):
+    def __init__(self, browser, name: str, path: str, CentralManager, Main_Window, isFloat: bool):
         super(AddDock, self).__init__(name, Main_Window)
         self.Main_Window = Main_Window
         self.max_width = int(Main_Window.width() * 0.3)
@@ -18,19 +17,37 @@ class AddDock(QDockWidget):
         self.name = name
         self.worker_threads = []
 
-        url.setFragment(path)
+        from PyQt6.QtCore import QUrl
+        from utils.StaticComponents import url as base_url
+        self.url = QUrl(base_url.toString())
+        self.url.setFragment(path)
 
-        self._setup_ui()
-        self._setup_web_channel()
-        self._connect_signals()
+        self.setup_ui()
+        self.setup_web_channel()
+        self.connect_signals()
 
         if isFloat:
             self.setFloating(True)
             self.show()
 
-    def _setup_ui(self):
+    def setup_ui(self) -> None:
         self.setMinimumSize(1, 1)
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
+        self.update_stylesheet()
+        self.setMaximumWidth(self.max_width)
+        self.setMinimumHeight(self.min_height)
+        self.setTitleBarWidget(QWidget())
+        self.setContentsMargins(0, 0, 0, 0)
+
+        self.browser.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
+        self.browser.setStyleSheet("background: transparent;")
+        self.browser.page().setBackgroundColor(QColor(Qt.GlobalColor.transparent))
+        self.browser.setContextMenuPolicy(Qt.ContextMenuPolicy.NoContextMenu)
+        self.browser.load(self.url)
+
+        self.setWidget(self.browser)
+
+    def update_stylesheet(self) ->None:
         self.round_corner_stylesheet = """
             QDockWidget {
                 background: rgba(0, 0, 0, 0); 
@@ -46,66 +63,54 @@ class AddDock(QDockWidget):
                 height: 0px;
             }
         """
-        self.setMaximumWidth(self.max_width)
-        self.setMinimumHeight(self.min_height)
         self.setStyleSheet(self.round_corner_stylesheet)
-        self.setTitleBarWidget(QWidget())
-        self.setContentsMargins(0, 0, 0, 0)
 
-        self.browser.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
-        self.browser.setStyleSheet("background: transparent;")
-        self.browser.page().setBackgroundColor(QColor(Qt.GlobalColor.transparent))
-        self.browser.setContextMenuPolicy(Qt.ContextMenuPolicy.NoContextMenu)
-        self.browser.load(url)
-
-        self.setWidget(self.browser)
-
-    def _setup_web_channel(self):
+    def setup_web_channel(self) -> None:
         self.channel = QWebChannel()
         self.bridge = Bridge(self.centralmanager)
         self.channel.registerObject("pyBridge", self.bridge)
         self.browser.page().setWebChannel(self.channel)
         self.centralmanager.register_dock(self.name, self)
 
-    def _connect_signals(self):
+    def connect_signals(self) -> None:
         self.bridge.ai_response.connect(self.send_ai_message_to_js)
         self.bridge.dock_event.connect(self.dock_event)
         self.topLevelChanged.connect(self.handle_top_level_change)
         self.destroyed.connect(self.cleanup_resources)
 
-    def dock_event(self, event_type, event_data):
-        match event_type:
-            case "drag" if self.isFloating():
-                try:
-                    data = json.loads(event_data)
-                    current_pos = self.pos()
-                    new_x = current_pos.x() + data["deltaX"]
-                    new_y = current_pos.y() + data["deltaY"]
-                    self.move(new_x, new_y)
-                except Exception as e:
-                    print(f"处理拖拽事件失败: {str(e)}")
-            case "close":
-                self.close()
-            case "float":
+    def dock_event(self, event_type: str, event_data: str) -> None:
+        if event_type == "drag" and self.isFloating():
+            try:
+                data = json.loads(event_data)
+                current_pos = self.pos()
+                new_x = current_pos.x() + data["deltaX"]
+                new_y = current_pos.y() + data["deltaY"]
+                self.move(new_x, new_y)
+            except Exception as e:
+                print(f"处理拖拽事件失败: {str(e)}")
+        elif event_type == "close":
+            self.close()
+        elif event_type == "float":
+            try:
                 data = json.loads(event_data)
                 self.setFloating(data["isFloating"])
                 self.raise_()
-            case "resize":
-                try:
-                    data = json.loads(event_data)
-                    x = int(data.get("x", self.pos().x()))
-                    y = int(data.get("y", self.pos().y()))
-                    width = int(data["width"])
-                    height = int(data["height"])
-                    self.move(x, y)
-                    self.resize(width, height)
-                    self.update()
-                except Exception as e:
-                    print(f"处理resize事件失败: {str(e)}")
-            case _:
-                pass
+            except Exception as e:
+                print(f"处理float事件失败: {str(e)}")
+        elif event_type == "resize":
+            try:
+                data = json.loads(event_data)
+                x = int(data.get("x", self.pos().x()))
+                y = int(data.get("y", self.pos().y()))
+                width = int(data["width"])
+                height = int(data["height"])
+                self.move(x, y)
+                self.resize(width, height)
+                self.update()
+            except Exception as e:
+                print(f"处理resize事件失败: {str(e)}")
 
-    def handle_top_level_change(self):
+    def handle_top_level_change(self) -> None:
         if self.isFloating():
             self.setStyleSheet(self.round_corner_stylesheet)
             self.setFeatures(
@@ -122,10 +127,10 @@ class AddDock(QDockWidget):
             if hasattr(self, "browser"):
                 self.browser.update()
 
-    def send_message_to_dock(self,json_data):
+    def send_message_to_dock(self, json_data: str) -> None:
         self.bridge.dock_event.emit("jsonData", json_data)
 
-    def send_ai_message_to_js(self, message):
+    def send_ai_message_to_js(self, message: str) -> None:
         try:
             if not isinstance(message, str):
                 message = str(message)
@@ -139,7 +144,7 @@ class AddDock(QDockWidget):
         except Exception as e:
             print(f"发送消息到JS失败: {str(e)}")
 
-    def cleanup_resources(self):
+    def cleanup_resources(self) -> None:
         try:
             if hasattr(self, "browser"):
                 self.browser.deleteLater()
@@ -150,7 +155,7 @@ class AddDock(QDockWidget):
         except Exception as e:
             print(f"资源清理异常: {str(e)}")
 
-    def closeEvent(self, event):
+    def closeEvent(self, event) -> None:
         try:
             for thread in self.worker_threads:
                 thread.quit()
@@ -171,7 +176,7 @@ class RemoveDock(QWidget):
             print(f"[DEBUG] 开始删除 {name}")
             dock.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
 
-            def step1():
+            def step1() -> None:
                 if dock and dock.isWidgetType():
                     content = dock.widget()
                     if content:
@@ -185,7 +190,7 @@ class RemoveDock(QWidget):
                         content.setParent(None)
                 QTimer.singleShot(50, step2)
 
-            def step2():
+            def step2() -> None:
                 try:
                     if dock and dock.isWidgetType() and dock.isVisible():
                         print(f"[DEBUG] Step2 删除dock {name}")
@@ -200,7 +205,7 @@ class RemoveDock(QWidget):
 
                 QTimer.singleShot(50, step3)
 
-            def step3():
+            def step3() -> None:
                 print(f"[DEBUG] Step3 最终确认 {name}")
 
             QTimer.singleShot(0, step1)

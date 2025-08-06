@@ -1,24 +1,25 @@
 from PyQt6.QtWidgets import QWidget
 from PyQt6.QtCore import QRect, pyqtSignal
 from PyQt6.QtGui import QPainter, QPixmap
+from typing import Any, Dict, Optional
 import os
-from utils.StaticComponents import scene_dict
-
-try:
-    import CabbageEngine
-    print("import CabbageEngine")
-except ImportError:
-    from CabbageEngineFallback import CabbageEngine
 
 class RenderWidget(QWidget):
     geometry_changed = pyqtSignal(QRect)
 
-    def __init__(self, Main_Window):
+    def __init__(self, Main_Window, scene_dict: Dict[str, Dict[str, Any]]):
         super(RenderWidget, self).__init__()
         self.Main_Window = Main_Window
 
         self.setGeometry(0, 0, self.Main_Window.width(), self.Main_Window.height())
         self.setStyleSheet("QLabel {background-color: transparent;}")
+
+        try:
+            import CabbageEngine
+            print("import CabbageEngine")
+        except ImportError:
+            from CabbageEngineFallback import CabbageEngine
+
         self.mainscene = CabbageEngine.Scene(
             int(self.winId()),False
         )
@@ -31,13 +32,15 @@ class RenderWidget(QWidget):
             "actor_dict":{}
         }
 
-        self.image_path = os.path.join(os.path.dirname(__file__), "background")
-        self.pixmap = None
-        if self.image_path:
+        self.image_path = os.path.join(os.path.dirname(__file__), "background.png")
+        self.pixmap: Optional[QPixmap] = None
+        if self.image_path and os.path.exists(self.image_path):
             self.pixmap = QPixmap(self.image_path)
             self.update()
+        else:
+            print(f"警告: 背景图片路径不存在: {self.image_path}")
 
-    def paintEvent(self, event):
+    def paintEvent(self, event) -> None:
         if self.pixmap:
             painter = QPainter(self)
             painter.drawPixmap(self.rect(), self.pixmap)

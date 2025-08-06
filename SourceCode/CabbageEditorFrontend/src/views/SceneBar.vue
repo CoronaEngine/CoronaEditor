@@ -113,7 +113,7 @@ const controlObject = (scene) => {
 
 const updateSunPosition = () => {
   if (window.pyBridge) {
-    window.pyBridge.HandleSunDirection(JSON.stringify({
+    window.pyBridge.sunDirection(JSON.stringify({
       sceneName: currentSceneName.value,
       px: parseFloat(px.value),
       py: parseFloat(py.value),
@@ -124,7 +124,7 @@ const updateSunPosition = () => {
 }
 
 const saveScene = () => {
-  if (window.pyBridge && window.pyBridge.HandleSceneSave) {
+  if (window.pyBridge && window.pyBridge.sceneSave) {
     const sceneData = {
       actors: sceneImages.value.map(scene => ({
         name: scene.name,
@@ -132,19 +132,19 @@ const saveScene = () => {
         type: scene.type
       }))
     };
-    window.pyBridge.HandleSceneSave(JSON.stringify(sceneData));
+    window.pyBridge.sceneSave(JSON.stringify(sceneData));
   }
 };
 
 const handleFileImport = () => {
-  if (window.pyBridge && window.pyBridge.open_file_dialog) {
-    window.pyBridge.open_file_dialog(currentSceneName.value, 'model');
+  if (window.pyBridge && window.pyBridge.openFileDialog) {
+    window.pyBridge.openFileDialog(currentSceneName.value, 'model');
   }
 };
 
 const handleSceneImport = () => {
-  if (window.pyBridge && window.pyBridge.open_file_dialog) {
-    window.pyBridge.open_file_dialog(currentSceneName.value, 'scene');
+  if (window.pyBridge && window.pyBridge.openFileDialog) {
+    window.pyBridge.openFileDialog(currentSceneName.value, 'scene');
   }
 };
 
@@ -181,8 +181,8 @@ const handleDockEvent = (event_type, event_data) => {
 
 const deleteActor = (scene) => {
   try {
-    if (window.pyBridge && window.pyBridge.HandleActorDelete) {
-      window.pyBridge.HandleActorDelete(currentSceneName.value,scene.name);
+    if (window.pyBridge && window.pyBridge.actorDelete) {
+      window.pyBridge.actorDelete(currentSceneName.value,scene.name);
       // 删除关联的Dock窗口
       const widgetName = `Object_${scene.name}`;
       window.pyBridge.removeDockWidget(widgetName);
@@ -210,7 +210,7 @@ const DayNightCycle = () => {
       pz.value = z.toFixed(2);
       
       if(window.pyBridge){
-        window.pyBridge.HandleSunDirection(JSON.stringify({
+        window.pyBridge.sunDirection(JSON.stringify({
           px: x,
           py: y,
           pz: z
@@ -243,7 +243,7 @@ onMounted(() => {
   document.addEventListener('mouseup', handleResizeUp);
   document.addEventListener('mousemove', onDrag);
   document.addEventListener('mouseup', stopDrag);
-  window.pyBridge.send_message_to_dock("AITalkBar", JSON.stringify({"content": "Hello, World!"}));
+  window.pyBridge.sendMessageToDock("AITalkBar", JSON.stringify({"content": "Hello, World!"}));
   if (window.pyBridge) {
     window.pyBridge.dock_event.connect(handleDockEvent);
   }

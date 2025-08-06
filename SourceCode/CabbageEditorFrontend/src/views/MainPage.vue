@@ -150,7 +150,7 @@ const handleCameraMove = (direction) => {
   }
 
   if (window.pyBridge) {
-    window.pyBridge.HandleCameraMove(JSON.stringify({
+    window.pyBridge.cameraMove(JSON.stringify({
       sceneName: tabs.value[activeTab.value]?.id || 'scene1',
       position: [...position],
       forward: [...forward],
@@ -214,7 +214,7 @@ const Out = () => {
 
 const createScene = () => {
   if (window.pyBridge) {
-    window.pyBridge.CreateScene(JSON.stringify({sceneName:"scene1"}));
+    window.pyBridge.createScene(JSON.stringify({sceneName:"scene1"}));
   }
 };
 

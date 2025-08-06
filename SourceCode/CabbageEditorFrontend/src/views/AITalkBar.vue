@@ -79,7 +79,7 @@ const userInput = ref('');
 const SendMessageToAI = (query) => {
   if (window.pyBridge) {
     const testStr = JSON.stringify({ message: query });
-    window.pyBridge.SendMessageToAI(testStr);
+    window.pyBridge.sendMessageToAI(testStr);
   } else {
     console.error("Python SendMessageToDock 未连接！");
   }
