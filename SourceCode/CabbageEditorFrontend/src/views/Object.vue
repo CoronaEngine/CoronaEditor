@@ -89,7 +89,6 @@ import { useRoute } from 'vue-router';
 import * as Blockly from 'blockly/core';
 import * as CN from 'blockly/msg/zh-hans';
 import { pythonGenerator } from 'blockly/python';
-import 'blockly/blocks';
 import { useDragResize } from '@/composables/useDragResize';
 
 const { dragState,startDrag,startResize,stopDrag,onDrag,stopResize,onResize } = useDragResize();
@@ -104,8 +103,6 @@ const scenename = ref(null);
 const actorname = ref(null);
 const routename = ref(null);
 const flash = ref(null);
-
-Blockly.setLocale(CN);
 
 import { defineEngineBlocks } from '@/blockly/blocks/engine.js';
 import { defineAppearanceBlocks } from '@/blockly/blocks/appearance.js';
