@@ -109,11 +109,16 @@ Blockly.setLocale(CN);
 
 import { defineEngineBlocks } from '@/blockly/blocks/engine.js';
 import { defineAppearanceBlocks } from '@/blockly/blocks/appearance.js';
-import { defineEventBlocks } from '../blockly/blocks/event';
+import { defineEventBlocks } from '@/blockly/blocks/event.js';
+import { defineControlBlocks } from '@/blockly/blocks/control.js';
+import { defineDetectBlocks } from '@/blockly/blocks/detect.js';
 
 import { defineEngineGenerators } from '@/blockly/generators/engine.js';
 import { defineAppearanceGenerators } from '@/blockly/generators/appearance.js';
 import { defineEventGenerators } from '@/blockly/generators/event.js';
+import { defineControlGenerators } from '@/blockly/generators/control.js';
+import { defineDetectGenerators } from '@/blockly/generators/detect.js';
+
 
 
 // 定义响应式的广播列表，初始为空
@@ -131,421 +136,34 @@ const initBlocklyAndGenerators = () => {
   defineEngineBlocks(actorname);
   defineAppearanceBlocks(actorname);
   defineEventBlocks(actorname, flash, broadcastList, createNewBroadcast);
+  defineControlBlocks(actorname);
+  defineDetectBlocks(actorname);
 
   defineEngineGenerators();
   defineAppearanceGenerators();
   defineEventGenerators();
+  defineControlGenerators();
+  defineDetectGenerators();
   
 };
 
 
 
-Blockly.Blocks['control_wait'] = {
-  init: function () {
-    this.appendDummyInput()
-     .appendField('等待')
-     .appendField(new Blockly.FieldTextInput(actorname.value), 'x')
-     .appendField('秒')
-    this.setInputsInline(true);
-    this.setPreviousStatement(true, null); 
-    this.setNextStatement(true, null);
-    this.setColour('#FE9900');
-    this.setHelpUrl('');
-  }
-};
-pythonGenerator.forBlock['control_wait'] = function(block) {
-  const x = block.getFieldValue('x');
-  return `CabbageEngine.wait(${x})\n`;
-};
-Blockly.Blocks['control_for'] = {
-  init: function () {
-    this.appendStatementInput('DO')
-      .setCheck(null)
-      .appendField('重复执行（永久）');
-    this.setInputsInline(true);
-    this.setPreviousStatement(true, null);
-    this.setNextStatement(true, null);
-    this.setColour('#FE9900');
-    this.setTooltip('无限循环执行内部代码块');
-    this.setHelpUrl('');
-  }
-};
-pythonGenerator.forBlock['control_for'] = function (block) {
-  let branch = pythonGenerator.statementToCode(block, 'DO');
-  if (pythonGenerator.STATEMENT_PREFIX) {
-    branch = pythonGenerator.prefixLines(
-      pythonGenerator.STATEMENT_PREFIX.replace(/%1/g, '\'' + block.id + '\''),
-      pythonGenerator.INDENT) + branch;
-  }
-  const code = `while True:\n` + pythonGenerator.prefixLines(branch, pythonGenerator.INDENT);
-  return code;
-};
-Blockly.Blocks['control_forX'] = {
-  init: function () {
-    this.appendValueInput('TIMES')
-      .setCheck('Number')
-      .appendField('重复执行')
-      .appendField(new Blockly.FieldNumber(1, 1), 'DEFAULT_TIMES')
-      .appendField('次');
-    this.appendStatementInput('DO')
-      .setCheck(null)
-      .appendField('执行');
-    this.setInputsInline(true);
-    this.setPreviousStatement(true, null);
-    this.setNextStatement(true, null);
-    this.setColour('#FE9900'); // 控制类积木常用颜色
-    this.setTooltip('重复执行指定次数的代码块');
-    this.setHelpUrl('');
-  }
-};
-// 定义重复执行 x 次积木块的 Python 代码生成器
-pythonGenerator.forBlock['control_forX'] = function (block) {
-  const times = pythonGenerator.valueToCode(block, 'TIMES', pythonGenerator.ORDER_NONE) || block.getFieldValue('DEFAULT_TIMES');
-  const branch = pythonGenerator.statementToCode(block, 'DO');
-  const code = `for _ in range(${times}):\n` + pythonGenerator.prefixLines(branch, pythonGenerator.INDENT);
-  return code;
-};
-Blockly.Blocks['control_if'] = {
-  init: function () {
-    this.appendValueInput('CONDITION')
-      .setCheck('Boolean')
-      .appendField('如果');
-    this.appendStatementInput('DO')
-      .setCheck(null)
-      .appendField('那么');
-    this.setInputsInline(true);
-    this.setPreviousStatement(true, null);
-    this.setNextStatement(true, null);
-    this.setColour('#FE9900'); 
-    this.setTooltip('如果条件满足，则执行对应的代码块');
-    this.setHelpUrl('');
-  }
-};
-pythonGenerator.forBlock['control_if'] = function (block) {
-  const condition = pythonGenerator.valueToCode(block, 'CONDITION', pythonGenerator.ORDER_NONE) || 'False';
-  const branch = pythonGenerator.statementToCode(block, 'DO');
-  const code = `if ${condition}:\n` + pythonGenerator.prefixLines(branch, pythonGenerator.INDENT);
-  return code;
-};
-// 定义如果那么否则积木块
-Blockly.Blocks['control_else'] = {
-  init: function () {
-    this.appendValueInput('CONDITION')
-      .setCheck('Boolean')
-      .appendField('如果');
-    this.appendStatementInput('DO')
-      .setCheck(null)
-      .appendField('那么');
-    this.appendStatementInput('ELSE')
-      .setCheck(null)
-      .appendField('否则');
-    this.setInputsInline(true);
-    this.setPreviousStatement(true, null);
-    this.setNextStatement(true, null);
-    this.setColour('#FE9900'); // 控制类积木常用颜色
-    this.setTooltip('如果条件满足，执行对应的代码块；否则，执行另一个代码块');
-    this.setHelpUrl('');
-  }
-};
-
-// 定义如果那么否则积木块的 Python 代码生成器
-pythonGenerator.forBlock['control_else'] = function (block) {
-  const condition = pythonGenerator.valueToCode(block, 'CONDITION', pythonGenerator.ORDER_NONE) || 'False';
-  const branch = pythonGenerator.statementToCode(block, 'DO');
-  const elseBranch = pythonGenerator.statementToCode(block, 'ELSE');
-  let code = `if ${condition}:\n` + pythonGenerator.prefixLines(branch, pythonGenerator.INDENT);
-  if (elseBranch) {
-    code += `else:\n` + pythonGenerator.prefixLines(elseBranch, pythonGenerator.INDENT);
-  }
-  return code;
-};
 
 
-Blockly.Blocks['control_wait2'] = {
-  init: function() {
-    this.appendValueInput('CONDITION')
-      .setCheck('Boolean') // 确保输入为布尔类型
-      .appendField('等待直到');
-    this.setInputsInline(true);
-    this.setPreviousStatement(true, null);
-    this.setNextStatement(true, null);
-    this.setColour('#FE9900'); 
-    this.setTooltip('等待直到条件满足后继续执行');
-    this.setHelpUrl('');
-  }
-};
 
-// 定义等待直到条件满足积木块的 Python 代码生成器
-pythonGenerator.forBlock['control_wait2'] = function(block) {
-  const condition = pythonGenerator.valueToCode(block, 'CONDITION', pythonGenerator.ORDER_NONE) || 'False';
-  const code = `while not (${condition}):\n` +
-               pythonGenerator.prefixLines('    pass\n', pythonGenerator.INDENT);
-  return code;
-};
-// 定义重复执行直到的积木块
-Blockly.Blocks['control_until'] = {
-  init: function() {
-    this.appendValueInput('CONDITION')
-      .setCheck('Boolean') // 确保输入为布尔类型
-      .appendField('重复执行直到');
-    this.appendStatementInput('DO')
-      .setCheck(null)
-      .appendField('执行');
-    this.setInputsInline(true);
-    this.setPreviousStatement(true, null);
-    this.setNextStatement(true, null);
-    this.setColour('#FE9900'); 
-    this.setTooltip('重复执行代码块，直到条件满足');
-    this.setHelpUrl('');
-  }
-};
 
-// 定义重复执行直到积木块的 Python 代码生成器
-pythonGenerator.forBlock['control_until'] = function(block) {
-  const condition = pythonGenerator.valueToCode(block, 'CONDITION', pythonGenerator.ORDER_NONE) || 'False';
-  const branch = pythonGenerator.statementToCode(block, 'DO');
-  const code = `while not (${condition}):\n` +
-               pythonGenerator.prefixLines(branch, pythonGenerator.INDENT);
-  return code;
-};
-const stopOptions = [
-  ['当前脚本', 'CURRENT_SCRIPT'],
-  ['全部脚本', 'ALL_SCRIPTS'],
-  ['该角色的其他脚本', 'OTHER_SCRIPTS_OF_ACTOR']
-];
-Blockly.Blocks['control_stop'] = {
-  init: function () {
-    this.appendDummyInput()
-      .appendField('停止')
-      .appendField(new Blockly.FieldDropdown(stopOptions), 'STOP_OPTION');
-    this.setInputsInline(true);
-    this.setPreviousStatement(true, null); 
-    this.setNextStatement(true, null);
-    this.setColour('#FE9900');
-    this.setTooltip('停止指定的脚本执行');
-  }
-};
 
-// 定义停止积木块的 Python 代码生成器
-pythonGenerator.forBlock['control_stop'] = function(block) {
-  const stopOption = block.getFieldValue('STOP_OPTION');
-  return `CabbageEngine.stop("${stopOption}")\n`;
-};
-Blockly.Blocks['control_cloneStart'] = {
-  init: function () {
-    this.appendDummyInput()
-     .appendField('当作为克隆体启动时')
-    this.setInputsInline(true);
-    this.setPreviousStatement(flash, null); 
-    this.setNextStatement(true, null);
-    this.setColour('#FFDE59');
-    this.setHelpUrl('');
-  }
-};
-pythonGenerator.forBlock['control_cloneStart'] = function(block) {
-  return `CabbageEngine.cloneStart()\n`;
-};
-Blockly.Blocks['control_clone'] = {
-  init: function () {
-    this.appendDummyInput()
-     .appendField('克隆')
-     .appendField(new Blockly.FieldTextInput(actorname.value), 'x')
-    this.setInputsInline(true);
-    this.setPreviousStatement(true, null); 
-    this.setNextStatement(true, null);
-    this.setColour('#FE9900');
-    this.setHelpUrl('');
-  }
-};
-pythonGenerator.forBlock['control_clone'] = function(block) {
-  const x = block.getFieldValue('x');
-  return `CabbageEngine.clone(${x})\n`;
-};
-Blockly.Blocks['control_cloneDEL'] = {
-  init: function () {
-    this.appendDummyInput()
-     .appendField('删除此克隆体') 
-    this.setInputsInline(true);
-    this.setPreviousStatement(true, null); 
-    this.setNextStatement(flash, null);
-    this.setColour('#FE9900');
-    this.setHelpUrl('');
-  }
-};
-pythonGenerator.forBlock['control_cloneDEL'] = function(block) {
-  return `CabbageEngine.deleteClone()\n`;
-};
-Blockly.Blocks['control_senceSet'] = {
-  init: function () {
-    this.appendDummyInput()
-     .appendField('换成')
-     .appendField(new Blockly.FieldTextInput(actorname.value), 'x')
-     .appendField('场景')
-    this.setInputsInline(true);
-    this.setPreviousStatement(true, null); 
-    this.setNextStatement(true, null);
-    this.setColour('#FE9900');
-    this.setHelpUrl('');
-  }
-};
-pythonGenerator.forBlock['control_senceSet'] = function(block) {
-  const x = block.getFieldValue('x');
-  return `CabbageEngine.setScene(${x})\n`;
-};
-Blockly.Blocks['control_nextSence'] = {
-  init: function () {
-    this.appendDummyInput()
-     .appendField('下一个场景') 
-    this.setInputsInline(true);
-    this.setPreviousStatement(true, null); 
-    this.setNextStatement(true, null);
-    this.setColour('#FE9900');
-    this.setHelpUrl('');
-  }
-};
-pythonGenerator.forBlock['control_nextSence'] = function(block) {
-  return `CabbageEngine.nextScene()\n`;
-};
 
-Blockly.Blocks['detect_touch'] = {
-  init: function () {
-    this.setStyle('logic_compare_blocks');
-    this.appendDummyInput()
-      .appendField('碰到')
-      .appendField(new Blockly.FieldTextInput(actorname.value), 'x')
-    this.setOutput(true, 'Boolean');  // 设置输出为布尔值
-    this.setInputsInline(true);
-    this.setColour('#00FFFF');
-    this.setHelpUrl('');
-    this.setTooltip('检测该按钮是否被按下，返回true或false');
-  }
-};
-pythonGenerator.forBlock['detect_touch'] = function(block) {
-  const x = block.getFieldValue('x');
-  return `CabbageEngine.touch(${x})`;
-};
-Blockly.Blocks['detect_distance'] = {
-  init: function() {
-    this.setStyle('math_blocks'); 
-    this.appendDummyInput()
-         .appendField('到')
-         .appendField(new Blockly.FieldTextInput(actorname.value), 'x')
-         .appendField('的距离');
-    this.setOutput(true, 'Number'); 
-    this.setColour('#42EEF4'); 
-  }
-};
-pythonGenerator.forBlock['detect_distance'] = function(block) {
-  const x = block.getFieldValue('x');
-  return  `CabbageEngine.distance(${x})\n`;
-};
-Blockly.Blocks['detect_ask'] = {
-  init: function () {
-    this.appendDummyInput()
-     .appendField('询问')
-     .appendField(new Blockly.FieldTextInput(actorname.value), 'x')
-     .appendField('并等待')
-    this.setInputsInline(true);
-    this.setPreviousStatement(true, null); 
-    this.setNextStatement(true, null);
-    this.setColour('#42EEF4');
-    this.setHelpUrl('');
-  }
-};
-pythonGenerator.forBlock['detect_ask'] = function(block) {
-  const x = block.getFieldValue('x');
-  return `CabbageEngine.ask(${x})\n`;
-};
-Blockly.Blocks['detect_keyboard1'] = {
-  init: function () {
-    this.setStyle('logic_compare_blocks');
-    this.appendDummyInput()
-      .appendField('按下')
-      .appendField(new Blockly.FieldTextInput(actorname.value), 'x')
-      .appendField('？')
-    this.setOutput(true, 'Boolean');  // 设置输出为布尔值
-    this.setInputsInline(true);
-    this.setColour('#42EEF4');
-    this.setHelpUrl('');
-    this.setTooltip('检测该按键是否被按下，返回true或false');
-  }
-};
-pythonGenerator.forBlock['detect_keyboard1'] = function(block) {
-  const x = block.getFieldValue('x');
-  return `CabbageEngine.keyboard(${x})`;
-};
-Blockly.Blocks['detect_keyboard0'] = {
-  init: function () {
-    this.setStyle('logic_compare_blocks');
-    this.appendDummyInput()
-      .appendField('松开')
-      .appendField(new Blockly.FieldTextInput(actorname.value), 'x')
-      .appendField('？')
-    this.setOutput(true, 'Boolean');  // 设置输出为布尔值
-    this.setInputsInline(true);
-    this.setColour('#42EEF4');
-    this.setHelpUrl('');
-    this.setTooltip('检测该按键是否被松开，返回true或false');
-  }
-};
-pythonGenerator.forBlock['detect_keyboard0'] = function(block) {
-  const x = block.getFieldValue('x');
-  return `CabbageEngine.keyboard0(${x})`;
-};
-Blockly.Blocks['detect_mouse1'] = {
-  init: function () {
-    this.setStyle('logic_compare_blocks');
-    this.appendDummyInput()
-      .appendField('按下鼠标？')
-    this.setOutput(true, 'Boolean');  // 设置输出为布尔值
-    this.setInputsInline(true);
-    this.setColour('#42EEF4');
-    this.setHelpUrl('');
-    this.setTooltip('检测鼠标是否被按下，返回true或false');
-  }
-};
-pythonGenerator.forBlock['detect_mouse1'] = function(block) {
-  return `CabbageEngine.mouse1()`;
-};
-Blockly.Blocks['detect_mouse0'] = {
-  init: function () {
-    this.setStyle('logic_compare_blocks');
-    this.appendDummyInput()
-      .appendField('松开鼠标？')
-    this.setOutput(true, 'Boolean');  // 设置输出为布尔值
-    this.setInputsInline(true);
-    this.setColour('#42EEF4');
-    this.setHelpUrl('');
-    this.setTooltip('检测鼠标是否被松开，返回true或false');
-  }
-};
-pythonGenerator.forBlock['detect_mouse0'] = function(block) {
-  return `CabbageEngine.mouse0()`;
-};
-const detectAttribute = [
-  ['动画名称', 'NAME'],
-  ['动画编号', 'ID'],
-  ['X坐标', 'X'],
-  ['Y坐标', 'Y'],
-  ['Z坐标', 'Z'],
-  ['方向', 'DIRECTION'],
-  ['大小', 'SIZE'],
-];
-Blockly.Blocks['detect_attribute'] = {
-  init: function () {
-    this.appendDummyInput()
-      .appendField(new Blockly.FieldDropdown(detectAttribute), 'x');
-    this.setInputsInline(true);
-    this.setPreviousStatement(true, null); 
-    this.setNextStatement(true, null);
-    this.setColour('#FE9900');
-    this.setTooltip('检测指定的属性');
-  }
-};
-pythonGenerator.forBlock['detect_attribute'] = function(block) {
-  const x = block.getFieldValue('x');
-  return `CabbageEngine.attribute(${x})\n`;
-};
+
+
+
+
+
+
+
+
+
 Blockly.Blocks['math_add'] = {
   init: function() {
     this.setStyle('math_blocks'); 
