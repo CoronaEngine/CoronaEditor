@@ -200,9 +200,7 @@ const cabbagetalk = () => {
 const openSceneBar = (index) => {
   if (window.pyBridge) {
     const sceneName = tabs.value[index]?.id || 'scene1';
-    window.pyBridge.addDockWidget(sceneName, `/SceneBar?sceneName=${sceneName}`, "left");
-  } else {
-    window.pyBridge.removeDockWidget(sceneName);
+    window.pyBridge.addDockWidget("SceneBar", `/SceneBar?sceneName=${sceneName}`, "left");
   }
 };
 
