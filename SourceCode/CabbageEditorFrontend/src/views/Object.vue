@@ -112,12 +112,19 @@ import { defineAppearanceBlocks } from '@/blockly/blocks/appearance.js';
 import { defineEventBlocks } from '@/blockly/blocks/event.js';
 import { defineControlBlocks } from '@/blockly/blocks/control.js';
 import { defineDetectBlocks } from '@/blockly/blocks/detect.js';
+import { defineMathBlocks } from '@/blockly/blocks/math.js';
+import { defineVariableBlocks } from '@/blockly/blocks/variable.js';
+import { defineListBlocks } from '@/blockly/blocks/list.js';
 
 import { defineEngineGenerators } from '@/blockly/generators/engine.js';
 import { defineAppearanceGenerators } from '@/blockly/generators/appearance.js';
 import { defineEventGenerators } from '@/blockly/generators/event.js';
 import { defineControlGenerators } from '@/blockly/generators/control.js';
 import { defineDetectGenerators } from '@/blockly/generators/detect.js';
+import { defineMathGenerators } from '@/blockly/generators/math.js';
+import { defineVariableGenerators } from '@/blockly/generators/variable.js';
+import { defineListGenerators } from '@/blockly/generators/list.js';
+
 
 
 
@@ -138,13 +145,19 @@ const initBlocklyAndGenerators = () => {
   defineEventBlocks(actorname, flash, broadcastList, createNewBroadcast);
   defineControlBlocks(actorname);
   defineDetectBlocks(actorname);
+  defineMathBlocks(actorname);
+  defineVariableBlocks();
+  defineListBlocks(actorname);
 
   defineEngineGenerators();
   defineAppearanceGenerators();
   defineEventGenerators();
   defineControlGenerators();
   defineDetectGenerators();
-  
+  defineMathGenerators();
+  defineVariableGenerators();
+  defineListGenerators();
+
 };
 
 
@@ -164,332 +177,49 @@ const initBlocklyAndGenerators = () => {
 
 
 
-Blockly.Blocks['math_add'] = {
-  init: function() {
-    this.setStyle('math_blocks'); 
-    this.appendDummyInput()
-         .appendField(new Blockly.FieldTextInput(actorname.value), 'x1')
-         .appendField('+')
-         .appendField(new Blockly.FieldTextInput(actorname.value), 'x2');
-    this.setOutput(true, 'Number'); 
-    this.setColour('#7DDA58'); 
-  }
-};
-pythonGenerator.forBlock['math_add'] = function(block) {
-  const x1 = block.getFieldValue('x1');
-  const x2 = block.getFieldValue('x2');
-  return  `CabbageEngine.add(${x1},${x2})\n`;
-};
-Blockly.Blocks['math_mul'] = {
-  init: function() {
-    this.setStyle('math_blocks'); 
-    this.appendDummyInput()
-         .appendField(new Blockly.FieldTextInput(actorname.value), 'x1')
-         .appendField('-')
-         .appendField(new Blockly.FieldTextInput(actorname.value), 'x2');
-    this.setOutput(true, 'Number'); 
-    this.setColour('#7DDA58'); 
-  }
-};
-pythonGenerator.forBlock['math_mul'] = function(block) {
-  const x1 = block.getFieldValue('x1');
-  const x2 = block.getFieldValue('x2');
-  return  `CabbageEngine.mul(${x1},${x2})\n`;
-};
-Blockly.Blocks['math_div'] = {
-  init: function() {
-    this.setStyle('math_blocks'); 
-    this.appendDummyInput()
-         .appendField(new Blockly.FieldTextInput(actorname.value), 'x1')
-         .appendField('*')
-         .appendField(new Blockly.FieldTextInput(actorname.value), 'x2');
-    this.setOutput(true, 'Number'); 
-    this.setColour('#7DDA58'); 
-  }
-};
-pythonGenerator.forBlock['math_div'] = function(block) {
-  const x1 = block.getFieldValue('x1');
-  const x2 = block.getFieldValue('x2');
-  return  `CabbageEngine.div(${x1},${x2})\n`;
-};
-Blockly.Blocks['math_sub'] = {
-  init: function() {
-    this.setStyle('math_blocks'); 
-    this.appendDummyInput()
-         .appendField(new Blockly.FieldTextInput(actorname.value), 'x1')
-         .appendField('/')
-         .appendField(new Blockly.FieldTextInput(actorname.value), 'x2');
-    this.setOutput(true, 'Number'); 
-    this.setColour('#7DDA58'); 
-  }
-};
-pythonGenerator.forBlock['math_sub'] = function(block) {
-  const x1 = block.getFieldValue('x1');
-  const x2 = block.getFieldValue('x2');
-  return  `CabbageEngine.sub(${x1},${x2})\n`;
-};
-Blockly.Blocks['math_random'] = {
-  init: function () {
-    this.setStyle('math_blocks');
-    this.appendDummyInput()
-      .appendField('在')
-      .appendField(new Blockly.FieldTextInput(0), "x1")
-      .appendField('到')
-      .appendField(new Blockly.FieldTextInput(0), "x2")
-      .appendField('之间的一个随机数');
-    this.setInputsInline(true);
-    this.setPreviousStatement(true, null);
-    this.setNextStatement(true, null);
-    this.setColour('#8A2BE2');
-    this.setHelpUrl('');
-  }
-};
-pythonGenerator.forBlock['math_random'] = function(block) {
-  const x1 = block.getFieldValue('x1');
-  const x2 = block.getFieldValue('x2');
-  return  `CabbageEngine.random(${x1},${x2})\n`;
-};
-Blockly.Blocks['math_G'] = {
-  init: function() {
-    this.setStyle('math_blocks'); 
-    this.appendDummyInput()
-         .appendField(new Blockly.FieldTextInput(actorname.value), 'x1')
-         .appendField('>')
-         .appendField(new Blockly.FieldTextInput(actorname.value), 'x2');
-    this.setOutput(true, 'Number'); 
-    this.setColour('#7DDA58'); 
-  }
-};
-pythonGenerator.forBlock['math_G'] = function(block) {
-  const x1 = block.getFieldValue('x1');
-  const x2 = block.getFieldValue('x2');
-  return  `CabbageEngine.G(${x1},${x2})\n`;
-};
-Blockly.Blocks['math_L'] = {
-  init: function() {
-    this.setStyle('math_blocks'); 
-    this.appendDummyInput()
-         .appendField(new Blockly.FieldTextInput(actorname.value), 'x1')
-         .appendField('<')
-         .appendField(new Blockly.FieldTextInput(actorname.value), 'x2');
-    this.setOutput(true, 'Number'); 
-    this.setColour('#7DDA58'); 
-  }
-};
-pythonGenerator.forBlock['math_L'] = function(block) {
-  const x1 = block.getFieldValue('x1');
-  const x2 = block.getFieldValue('x2');
-  return  `CabbageEngine.L(${x1},${x2})\n`;
-};
-Blockly.Blocks['math_E'] = {
-  init: function() {
-    this.setStyle('math_blocks'); 
-    this.appendDummyInput()
-         .appendField(new Blockly.FieldTextInput(actorname.value), 'x1')
-         .appendField('=')
-         .appendField(new Blockly.FieldTextInput(actorname.value), 'x2');
-    this.setOutput(true, 'Number'); 
-    this.setColour('#7DDA58'); 
-  }
-};
-pythonGenerator.forBlock['math_E'] = function(block) {
-  const x1 = block.getFieldValue('x1');
-  const x2 = block.getFieldValue('x2');
-  return  `CabbageEngine.E(${x1},${x2})\n`;
-};
-Blockly.Blocks['math_AND'] = {
-  init: function() {
-    this.setStyle('logic_compare_blocks');
-    this.appendValueInput('A')
-      .setCheck('Boolean')
-      .appendField('');
-    this.appendValueInput('B')
-      .setCheck('Boolean')
-      .appendField('与');
-    this.setInputsInline(true);
-    this.setOutput(true, 'Boolean');
-    this.setColour('#7DDA58');
-    this.setTooltip('逻辑与运算，两个条件都满足时返回 true，否则返回 false');
-    this.setHelpUrl('');
-  }
-};
-pythonGenerator.forBlock['math_AND'] = function(block) {
-  const a = pythonGenerator.valueToCode(block, 'A', pythonGenerator.ORDER_LOGICAL_AND) || 'False';
-  const b = pythonGenerator.valueToCode(block, 'B', pythonGenerator.ORDER_LOGICAL_AND) || 'False';
-  return [a + ' and ' + b, pythonGenerator.ORDER_LOGICAL_AND];
-};
-Blockly.Blocks['math_OR'] = {
-  init: function() {
-    this.setStyle('logic_compare_blocks');
-    this.appendValueInput('A')
-      .setCheck('Boolean')
-      .appendField('');
-    this.appendValueInput('B')
-      .setCheck('Boolean')
-      .appendField('或');
-    this.setInputsInline(true);
-    this.setOutput(true, 'Boolean');
-    this.setColour('#7DDA58'); 
-    this.setTooltip('逻辑或运算，两个条件中至少一个满足时返回 true，否则返回 false');
-    this.setHelpUrl('');
-  }
-};
-pythonGenerator.forBlock['math_OR'] = function(block) {
-  const a = pythonGenerator.valueToCode(block, 'A', pythonGenerator.ORDER_LOGICAL_OR) || 'False';
-  const b = pythonGenerator.valueToCode(block, 'B', pythonGenerator.ORDER_LOGICAL_OR) || 'False';
-  return [a + ' or ' + b, pythonGenerator.ORDER_LOGICAL_OR];
-};
-Blockly.Blocks['math_NOT'] = {
-  init: function() {
-    this.setStyle('logic_compare_blocks');
-    this.appendValueInput('A')
-      .setCheck('Boolean')
-      .appendField('非');
-    this.setInputsInline(true);
-    this.setOutput(true, 'Boolean');
-    this.setColour('#7DDA58');
-    this.setTooltip('逻辑非运算，条件不满足时返回 true，满足时返回 false');
-    this.setHelpUrl('');
-  }
-};
-pythonGenerator.forBlock['math_NOT'] = function(block) {
-  const a = pythonGenerator.valueToCode(block, 'A', pythonGenerator.ORDER_LOGICAL_NOT) || 'False';
-  return ['not ' + a, pythonGenerator.ORDER_LOGICAL_NOT];
-};
-Blockly.Blocks['math_connect'] = {
-  init: function() {
-    // 使用数学类样式，通常为圆形
-    this.setStyle('math_blocks');
-    this.appendValueInput('LEFT')
-      .appendField('连接');
-    this.appendValueInput('RIGHT')
-      .appendField('和');
-    this.setInputsInline(true);
-    this.setOutput(true, 'String');
-    this.setColour(160); // 自定义颜色
-    this.setTooltip('将左右两边的内容连接成一个字符串');
-    this.setHelpUrl('');
-  }
-};
-pythonGenerator.forBlock['math_connect'] = function(block) {
-  const left = pythonGenerator.valueToCode(block, 'LEFT', pythonGenerator.ORDER_NONE) || "''";
-  const right = pythonGenerator.valueToCode(block, 'RIGHT', pythonGenerator.ORDER_NONE) || "''";
-  const leftStr = `str(${left})`;
-  const rightStr = `str(${right})`;
-  return [leftStr + ' + ' + rightStr, pythonGenerator.ORDER_ADDITION];
-};
 
 
 
 
 
 
-Blockly.Blocks['variable_add'] = {
-  init: function () {
-    this.appendDummyInput()
-     .appendField('将')
-     .appendField(new Blockly.FieldTextInput(), 'v')
-     .appendField('增加')
-     .appendField(new Blockly.FieldTextInput(), 'x')
-    this.setInputsInline(true);
-    this.setPreviousStatement(true, null);
-    this.setNextStatement(true, null);
-    this.setColour('#FE9900');
-    this.setHelpUrl('');
-  }
-};
-pythonGenerator.forBlock['variable_add'] = function(block) {
-  const v = block.getFieldValue('v');
-  const x = parseFloat(block.getFieldValue('x') || '0.0').toFixed(1);
-  return `CabbageEngine.add(${v},${x})\n`;
-};
-Blockly.Blocks['variable_set'] = {
-  init: function () {
-    this.appendDummyInput()
-     .appendField('将')
-     .appendField(new Blockly.FieldTextInput(), 'v')
-     .appendField('设为')
-     .appendField(new Blockly.FieldTextInput(), 'x')
-    this.setInputsInline(true);
-    this.setPreviousStatement(true, null);
-    this.setNextStatement(true, null);
-    this.setColour('#FE9900');
-    this.setHelpUrl('');
-  }
-};
-pythonGenerator.forBlock['variable_set'] = function(block) {
-  const v = block.getFieldValue('v');
-  const x = parseFloat(block.getFieldValue('x') || '0.0').toFixed(1);
-  return `CabbageEngine.set(${v},${x})\n`;
-};
 
 
-Blockly.Blocks['variable_show'] = {
-  init: function () {
-    this.appendDummyInput()
-     .appendField('显示变量')
-     .appendField(new Blockly.FieldTextInput(), 'v')
-    this.setInputsInline(true);
-    this.setPreviousStatement(true, null);
-    this.setNextStatement(true, null);
-    this.setColour('#FF5722');
-    this.setHelpUrl('');
-  }
-};
-pythonGenerator.forBlock['variable_show'] = function(block) {
-  const v = block.getFieldValue('v');
-  return `CabbageEngine.show(${v})\n`;
-};
 
-Blockly.Blocks['variable_hide'] = {
-  init: function () {
-    this.appendDummyInput()
-     .appendField('隐藏变量')
-     .appendField(new Blockly.FieldTextInput(), 'v')
-    this.setInputsInline(true);
-    this.setPreviousStatement(true, null);
-    this.setNextStatement(true, null);
-    this.setColour('#FF5722');
-    this.setHelpUrl('');
-  }
-};
-pythonGenerator.forBlock['variable_hide'] = function(block) {
-  const v = block.getFieldValue('v');
-  return `CabbageEngine.hide(${v})\n`;
-};
-Blockly.Blocks['list_show'] = {
-  init: function () {
-    this.appendDummyInput()
-     .appendField('显示列表')
-     .appendField(new Blockly.FieldTextInput(), 'v')
-    this.setInputsInline(true);
-    this.setPreviousStatement(true, null);
-    this.setNextStatement(true, null);
-    this.setColour('E4080A');
-    this.setHelpUrl('');
-  }
-};
-pythonGenerator.forBlock['list_show'] = function(block) {
-  const v = block.getFieldValue('v');
-  return `CabbageEngine.show(${v})\n`;
-};
 
-Blockly.Blocks['list_hide'] = {
-  init: function () {
-    this.appendDummyInput()
-     .appendField('隐藏列表')
-     .appendField(new Blockly.FieldTextInput(), 'v')
-    this.setInputsInline(true);
-    this.setPreviousStatement(true, null);
-    this.setNextStatement(true, null);
-    this.setColour('E4080A');
-    this.setHelpUrl('');
-  }
-};
-pythonGenerator.forBlock['list_hide'] = function(block) {
-  const v = block.getFieldValue('v');
-  return `CabbageEngine.hide(${v})\n`;
-};
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
