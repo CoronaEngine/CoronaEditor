@@ -109,8 +109,11 @@ Blockly.setLocale(CN);
 
 import { defineEngineBlocks } from '@/blockly/blocks/engine.js';
 import { defineAppearanceBlocks } from '@/blockly/blocks/appearance.js';
+import { defineEventBlocks } from '../blockly/blocks/event';
+
 import { defineEngineGenerators } from '@/blockly/generators/engine.js';
 import { defineAppearanceGenerators } from '@/blockly/generators/appearance.js';
+import { defineEventGenerators } from '@/blockly/generators/event.js';
 
 
 // 定义响应式的广播列表，初始为空
@@ -127,9 +130,11 @@ const initBlocklyAndGenerators = () => {
 
   defineEngineBlocks(actorname);
   defineAppearanceBlocks(actorname);
+  defineEventBlocks(actorname, flash, broadcastList, createNewBroadcast);
 
   defineEngineGenerators();
   defineAppearanceGenerators();
+  defineEventGenerators();
   
 };
 
