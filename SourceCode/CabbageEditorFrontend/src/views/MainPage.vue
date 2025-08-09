@@ -1,26 +1,38 @@
 <template>
   <div class="relative min-h-screen w-full bg-white/5" tabindex="0" @keydown="handleKeyDown" @wheel="handleWheel" >
     <!-- 场景栏 -->
-    <div class="w-full bg-[#4b6554]/90 border-b border-gray-200/65 h-10 relative">
-      <div class="flex items-center space-x-1 px-2">
-        <div v-for="(tab, index) in tabs" :key="index"
-          class="px-4 py-2 cursor-pointer rounded-t-lg flex items-center gap-2" :class="{
+    <div class="w-full bg-[#4b6554]/90 border-b border-gray-200/65 h-12 relative">
+      <div class="flex items-center space-x-1 px-2 overflow-x-auto scroll-smooth tab-container">
+        <div 
+          v-for="(tab, index) in tabs" 
+          :key="index"
+          class="px-4 py-2 cursor-pointer rounded-t-lg flex items-center gap-2" 
+          :class="{
             'bg-white/65 border-b-2 border-blue-500': activeTab === index,
             'hover:bg-gray-200/65': activeTab !== index
-          }" @click="switchTab(index)" @dblclick="openSceneBar(index)">
+          }" 
+          @click="switchTab(index)" 
+          @dblclick="openSceneBar(index)">
           {{ tab.name }}
-          <button v-if="tabs.length > 1" @click.stop="closeTab(index)" class="hover:bg-gray-300/50 rounded-full p-1">
-            ×
-          </button>
+        <button 
+          v-if="tabs.length > 1" 
+          @click.stop="closeTab(index)" 
+          class="hover:bg-gray-300/50 rounded-full p-1">
+          ×
+        </button>
         </div>
 
-        <button @click="addNewTab" class="px-3 py-1 text-xl font-bold hover:bg-gray-200/50 rounded-lg">
+        <button 
+          @click="addNewTab" 
+          class="px-3 py-1 text-xl font-bold hover:bg-gray-200/50 rounded-lg"
+        >
           +
         </button>
-        <button @click.stop="Out"
-        class="absolute right-2 top-1/2 -translate-y-1/2 w-6 h-6 flex items-center justify-center bg-transparent hover:bg-gray-600/20 text-black rounded transition-colors duration-200">
-        <span class="transform scale-125">×</span>
-      </button>
+        <button 
+          @click.stop="Out"
+          class="absolute right-2 top-1/2 -translate-y-1/2 w-6 h-6 flex items-center justify-center bg-transparent hover:bg-gray-600/20 text-black rounded transition-colors duration-200">
+          <span class="transform scale-125">×</span>
+        </button>
       </div>
     </div>
     <!-- 返回首页按钮 -->
