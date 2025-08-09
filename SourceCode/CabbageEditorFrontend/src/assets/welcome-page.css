@@ -22,7 +22,8 @@
   content: url('');
   height: auto;
   transform-style: preserve-3d;
-  animation: float 3s ease-in-out infinite;
+  /* 移除3D动画*/
+  /* animation: float 3s ease-in-out infinite; */
 }
 
 .theme-fun .announcement-container {
