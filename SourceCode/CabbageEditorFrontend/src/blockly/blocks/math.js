@@ -1,13 +1,13 @@
 import * as Blockly from 'blockly/core';
 
-export const defineMathBlocks = (actorname) => {
+export const defineMathBlocks = () => {
     Blockly.Blocks['math_add'] = {
         init: function () {
             this.setStyle('math_blocks');
             this.appendDummyInput()
-                .appendField(new Blockly.FieldTextInput(actorname.value), 'x1')
+                .appendField(new Blockly.FieldTextInput(0), 'x1')
                 .appendField('+')
-                .appendField(new Blockly.FieldTextInput(actorname.value), 'x2');
+                .appendField(new Blockly.FieldTextInput(0), 'x2');
             this.setOutput(true, 'Number');
             this.setColour('#7DDA58');
         }
@@ -17,9 +17,9 @@ export const defineMathBlocks = (actorname) => {
         init: function () {
             this.setStyle('math_blocks');
             this.appendDummyInput()
-                .appendField(new Blockly.FieldTextInput(actorname.value), 'x1')
+                .appendField(new Blockly.FieldTextInput(0), 'x1')
                 .appendField('-')
-                .appendField(new Blockly.FieldTextInput(actorname.value), 'x2');
+                .appendField(new Blockly.FieldTextInput(0), 'x2');
             this.setOutput(true, 'Number');
             this.setColour('#7DDA58');
         }
@@ -29,9 +29,9 @@ export const defineMathBlocks = (actorname) => {
         init: function () {
             this.setStyle('math_blocks');
             this.appendDummyInput()
-                .appendField(new Blockly.FieldTextInput(actorname.value), 'x1')
+                .appendField(new Blockly.FieldTextInput(0), 'x1')
                 .appendField('*')
-                .appendField(new Blockly.FieldTextInput(actorname.value), 'x2');
+                .appendField(new Blockly.FieldTextInput(0), 'x2');
             this.setOutput(true, 'Number');
             this.setColour('#7DDA58');
         }
@@ -41,9 +41,9 @@ export const defineMathBlocks = (actorname) => {
         init: function () {
             this.setStyle('math_blocks');
             this.appendDummyInput()
-                .appendField(new Blockly.FieldTextInput(actorname.value), 'x1')
+                .appendField(new Blockly.FieldTextInput(0), 'x1')
                 .appendField('/')
-                .appendField(new Blockly.FieldTextInput(actorname.value), 'x2');
+                .appendField(new Blockly.FieldTextInput(0), 'x2');
             this.setOutput(true, 'Number');
             this.setColour('#7DDA58');
         }
@@ -61,7 +61,7 @@ export const defineMathBlocks = (actorname) => {
             this.setInputsInline(true);
             this.setPreviousStatement(true, null);
             this.setNextStatement(true, null);
-            this.setColour('#8A2BE2');
+            this.setColour('#7DDA58');
             this.setHelpUrl('');
         }
     };
@@ -70,9 +70,9 @@ export const defineMathBlocks = (actorname) => {
         init: function () {
             this.setStyle('math_blocks');
             this.appendDummyInput()
-                .appendField(new Blockly.FieldTextInput(actorname.value), 'x1')
+                .appendField(new Blockly.FieldTextInput(0), 'x1')
                 .appendField('>')
-                .appendField(new Blockly.FieldTextInput(actorname.value), 'x2');
+                .appendField(new Blockly.FieldTextInput(0), 'x2');
             this.setOutput(true, 'Number');
             this.setColour('#7DDA58');
         }
@@ -82,9 +82,9 @@ export const defineMathBlocks = (actorname) => {
         init: function () {
             this.setStyle('math_blocks');
             this.appendDummyInput()
-                .appendField(new Blockly.FieldTextInput(actorname.value), 'x1')
+                .appendField(new Blockly.FieldTextInput(0), 'x1')
                 .appendField('<')
-                .appendField(new Blockly.FieldTextInput(actorname.value), 'x2');
+                .appendField(new Blockly.FieldTextInput(0), 'x2');
             this.setOutput(true, 'Number');
             this.setColour('#7DDA58');
         }
@@ -94,9 +94,9 @@ export const defineMathBlocks = (actorname) => {
         init: function () {
             this.setStyle('math_blocks');
             this.appendDummyInput()
-                .appendField(new Blockly.FieldTextInput(actorname.value), 'x1')
+                .appendField(new Blockly.FieldTextInput(0), 'x1')
                 .appendField('=')
-                .appendField(new Blockly.FieldTextInput(actorname.value), 'x2');
+                .appendField(new Blockly.FieldTextInput(0), 'x2');
             this.setOutput(true, 'Number');
             this.setColour('#7DDA58');
         }
@@ -160,7 +160,7 @@ export const defineMathBlocks = (actorname) => {
                 .appendField('和');
             this.setInputsInline(true);
             this.setOutput(true, 'String');
-            this.setColour(160); // 自定义颜色
+            this.setColour('#7DDA58'); // 自定义颜色
             this.setTooltip('将左右两边的内容连接成一个字符串');
             this.setHelpUrl('');
         }

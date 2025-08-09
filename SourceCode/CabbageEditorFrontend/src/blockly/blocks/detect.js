@@ -113,7 +113,7 @@ export const defineDetectBlocks = (actorname) => {
       this.setInputsInline(true);
       this.setPreviousStatement(true, null);
       this.setNextStatement(true, null);
-      this.setColour('#FE9900');
+      this.setColour('#42EEF4');
       this.setTooltip('检测指定的属性');
     }
   };
