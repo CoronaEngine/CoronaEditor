@@ -142,7 +142,7 @@ const initBlocklyAndGenerators = () => {
   defineEventBlocks(actorname, flash, broadcastList, createNewBroadcast);
   defineControlBlocks(actorname);
   defineDetectBlocks(actorname);
-  defineMathBlocks(actorname);
+  defineMathBlocks();
   defineVariableBlocks();
   defineListBlocks(actorname);
 

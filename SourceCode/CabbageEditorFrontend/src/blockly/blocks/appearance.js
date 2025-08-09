@@ -92,7 +92,7 @@ export const defineAppearanceBlocks = (actorname) => {
       this.appendDummyInput()
         .appendField('动画');
       this.setOutput(true, 'Number');  // 关键：输出数值类型
-      this.setColour('#5631E4');
+      this.setColour('#C501F6');
       this.setTooltip("该角色的动画序号");
     }
   };
@@ -103,7 +103,7 @@ export const defineAppearanceBlocks = (actorname) => {
       this.appendDummyInput()
         .appendField('大小');
       this.setOutput(true, 'Number');  // 关键：输出数值类型
-      this.setColour('#5631E4');
+      this.setColour('#C501F6');
       this.setTooltip("该角色的大小");
     }
   };
