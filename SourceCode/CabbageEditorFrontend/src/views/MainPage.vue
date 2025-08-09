@@ -24,7 +24,7 @@
 
         <button 
           @click="addNewTab" 
-          class="px-3 py-1 text-xl font-bold hover:bg-gray-200/50 rounded-lg"
+          class="px-4 py-2 text-xl font-bold hover:bg-gray-200/20 rounded-lg"
         >
           +
         </button>
@@ -181,6 +181,13 @@ const openSetup = () => {
 // 关闭标签页
 const closeTab = (index) => {
   if (tabs.value.length > 1) {
+    const closedTab = tabs.value[index];
+    if (window.pyBridge) {
+      window.pyBridge.removeDockWidget("AITalkBar");
+      window.pyBridge.removeDockWidget("Object");
+      window.pyBridge.removeDockWidget("SceneBar");
+    }
+
     tabs.value.splice(index, 1);
     if (activeTab.value >= index) {
       activeTab.value = Math.max(0, activeTab.value - 1);
