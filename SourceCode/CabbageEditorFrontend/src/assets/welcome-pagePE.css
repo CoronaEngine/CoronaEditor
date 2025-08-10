@@ -22,7 +22,6 @@
   content: url('');
   height: auto;
   transform-style: preserve-3d;
-  animation: float 3s ease-in-out infinite;
 }
 
 .theme-pro .announcement-container {
