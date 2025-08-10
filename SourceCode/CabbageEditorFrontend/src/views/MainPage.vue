@@ -84,7 +84,13 @@ const tabs = ref([
 
 // 添加新标签页
 const addNewTab = () => {
-  const newIndex = tabs.value.length + 1;
+// 获取当前最大的场景编号
+  const maxSceneNumber = tabs.value.reduce((max, tab) => {
+    const number = parseInt(tab.name.replace('场景', ''), 10) || 0;
+    return Math.max(max, number);
+  }, 0);
+
+  const newIndex = maxSceneNumber + 1;
   tabs.value.push({
     name: `场景${newIndex}`,
     id: `scene${newIndex}`
@@ -241,12 +247,12 @@ onMounted(() => {
   createScene();
   cabbagetalk();
   document.addEventListener('keydown', handleKeyDown);
-  eventBus.on('return-to-welcome', handleReturnToWelcome);
+  eventBus.on('request-tabs-data', (callback) => {callback(tabs.value);});
 });
 
 // 在onUnmounted中移除事件监听
 onUnmounted(() => {
   document.removeEventListener('keydown', handleKeyDown);
-  eventBus.off('return-to-welcome', handleReturnToWelcome);
+  eventBus.off('request-tabs-data');
 });
 </script>
