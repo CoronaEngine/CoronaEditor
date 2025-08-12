@@ -1,5 +1,5 @@
 <template>
-  <div class="relative min-h-screen w-full bg-white/5" tabindex="0" @keydown="handleKeyDown" @wheel="handleWheel" >
+  <div class="relative min-h-screen w-full bg-white/5" tabindex="0">
     <!-- 场景栏 -->
     <div class="w-full bg-[#4b6554]/90 border-b border-gray-200/65 h-12 relative">
       <div class="flex items-center space-x-1 px-2 overflow-x-auto scroll-smooth tab-container">
@@ -125,6 +125,7 @@ const handleKeyDown = (event) => {
       handleCameraMove('rotateRight');
       break;
     case 'escape':
+      event.preventDefault();
       openSetup();
       break;
   }
