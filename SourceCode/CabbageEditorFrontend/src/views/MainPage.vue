@@ -58,12 +58,15 @@ const router = useRouter();
 const goToHome = () => {
   if (window.pyBridge) {
     tabs.value.forEach(tab => {
-      window.pyBridge.removeDockWidget(tab.id);
+      if (tab && tab.id) {
+        window.pyBridge.removeDockWidget(tab.id);
+      }
     });
     window.pyBridge.removeDockWidget("Pet");
     window.pyBridge.removeDockWidget("AITalkBar");
     window.pyBridge.removeDockWidget("Object");
     window.pyBridge.removeDockWidget("SceneBar");
+    window.pyBridge.removeDockWidget("SetUp");
   }
   router.push('/');
 };
@@ -248,12 +251,12 @@ onMounted(() => {
   createScene();
   cabbagetalk();
   document.addEventListener('keydown', handleKeyDown);
-  eventBus.on('request-tabs-data', (callback) => {callback(tabs.value);});
+  eventBus.on('return-to-home', goToHome);
 });
 
 // 在onUnmounted中移除事件监听
 onUnmounted(() => {
   document.removeEventListener('keydown', handleKeyDown);
-  eventBus.off('request-tabs-data');
+  eventBus.off('return-to-home', goToHome);
 });
 </script>

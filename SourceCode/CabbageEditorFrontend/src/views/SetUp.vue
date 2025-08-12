@@ -17,21 +17,18 @@
          class="w-full max-w-xs rounded-md bg-[#5f9dc6]/50 px-6 py-3 font-bold text-black/80 hover:bg-[#5f9dc6]/70">
         <p class="text-center text-sm sm:text-base md:text-lg">专业版本</p>
       </button>
-      
       <button
         @click="emitFunVersion"
         class="w-full max-w-xs rounded-md bg-[#5f9dc6]/50 px-6 py-3 font-bold text-black/80 hover:bg-[#5f9dc6]/70">
         <p class="text-center text-sm sm:text-base md:text-lg">娱乐版本</p>
       </button>
-      
       <button
         @click=""
         class="w-full max-w-xs rounded-md bg-[#5f9dc6]/50 px-6 py-3 font-bold text-black/80 hover:bg-[#5f9dc6]/70">
         <p class="text-center text-sm sm:text-base md:text-lg">存档</p>
       </button>
-
       <button
-        @click="goToHome"
+        @click="goWelcome"
         class="w-full max-w-xs rounded-md bg-[#5f9dc6]/50 px-6 py-3 font-bold text-black/80 hover:bg-[#5f9dc6]/70">
         <p class="text-center text-sm sm:text-base md:text-lg">返回初始页面</p>
       </button>
@@ -50,12 +47,10 @@
     const showContextMenu = ref(false);
 
     const emitProVersion = () => {
-        removeActors();
         eventBus.emit('version-selected', 'pro');
     }
 
     const emitFunVersion = () => {
-        removeActors();
         eventBus.emit('version-selected', 'fun');
     }
 
@@ -65,23 +60,13 @@
     }
     };
 
-    const goToHome = () => {
-    if (window.pyBridge) {
-      window.pyBridge.removeDockWidget("SetUp");
-      window.pyBridge.removeDockWidget("Pet");
-      window.pyBridge.removeDockWidget("AITalkBar");
-      window.pyBridge.removeDockWidget("Object");
-      window.pyBridge.removeDockWidget("SceneBar");
-      // 通过事件获取标签页数据
-      eventBus.emit('request-tabs-data', (tabs) => {
-        tabs.forEach(tab => window.pyBridge.removeDockWidget(tab.id));
-      });
-    }
-    // 延迟路由跳转确保所有dock widgets完全移除
-    setTimeout(() => {
-      router.push('/');
-    }, 100);
-    eventBus.emit('return-to-welcome');
+    const goWelcome = () => {
+      try {
+        // 发送返回首页的信号到MainPage
+        eventBus.emit('return-to-home', {});
+      } catch (error) {
+        console.error('发送返回首页信号出错:', error);
+      }
     };
 
     onMounted(() => {
