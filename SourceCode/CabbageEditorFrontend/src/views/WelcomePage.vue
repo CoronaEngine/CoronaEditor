@@ -38,6 +38,31 @@
             </div>
         </div>
 
+        <!-- 存档面板 -->
+        <div class="save-panel-container">
+          <div class="save-panel">
+              <div class="relative p-6">
+                  <p class="text-center text-2xl font-bold text-black mb-4">存档</p>
+                  <div class="h-64 overflow-y-auto space-y-4">
+                      <template v-if="saves?.length > 0">
+                        <div v-for="(save, index) in saves" 
+                            :key="index"
+                            @click="loadSave(save)"
+                            class="bg-white/5 rounded-lg p-4 cursor-pointer hover:bg-blue-100">
+                          <div class="flex justify-between items-center">
+                            <p class="text-black/80 font-medium">{{ save.name }}</p>
+                            <p class="text-sm text-gray-600">{{ save.time }}</p>
+                          </div>
+                        </div>
+                    </template>
+                    <div v-else class="text-center text-gray-500">
+                        暂无历史存档
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
         <!--按钮部分-->
         <div class="button-container">
             <!--开始游戏-->
@@ -45,7 +70,7 @@
                 <button
                     @click="removeActors" 
                     class="welcome-button">
-                    <p class="button-text">开始游戏<br />Start Game</p>
+                    <p class="button-text">开始创作<br />Start creating</p>
                 </button>
             </router-link>
             <!--继续游戏-->
@@ -53,21 +78,21 @@
                 <button
                     @click="removeActors" 
                     class="welcome-button">
-                    <p class="button-text">继续游戏<br />Continue</p>
+                    <p class="button-text">继续创作<br />Continue creating</p>
                 </button>
             </router-link>
             <!--游戏设置-->
             <div class="w-full max-w-xs">
                 <button @click="openSetup(scene)"
                     class="welcome-button">
-                    <p class="button-text">游戏设置<br />Exit</p>
+                    <p class="button-text">设置<br />Set up</p>
                 </button>
             </div>
             <!--退出游戏-->
             <div class="w-full max-w-xs">
                 <button @click="Out"
                     class="welcome-button">
-                    <p class="button-text">结束游戏<br />Exit</p>
+                    <p class="button-text">结束<br />Exit</p>
                 </button>
             </div>
         </div>
@@ -111,6 +136,7 @@ const jumpSpeed = ref(0);
 const gravity = 0.01;
 const router = useRouter();
 const selectedVersion = ref('fun');
+const saves = ref([])
 
 const themeClass = computed(() => {
   const cls = selectedVersion.value === 'pro' ? 'theme-pro' : 'theme-fun'
