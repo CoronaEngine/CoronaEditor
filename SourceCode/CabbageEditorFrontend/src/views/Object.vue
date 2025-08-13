@@ -400,6 +400,21 @@ const handleResizeUp = () => {
   if (dragState.value.isResizing) stopResize();
 };
 
+const handleKeyDown = (event) => {
+  event.preventDefault();
+  switch(event.key.toLowerCase()) {
+    case 'escape':
+      openSetup();
+      break;
+  }
+};
+// 调用Esc
+const openSetup = () => {
+  if (window.pyBridge) {
+    window.pyBridge.addDockWidget("SetUp", "/SetUp", "float", "center");
+  }
+}
+
 onMounted(() => {
   scenename.value = route.query.sceneName;
   actorname.value = route.query.objectName;
@@ -410,6 +425,7 @@ onMounted(() => {
   document.addEventListener('mouseup', handleResizeUp);
   document.addEventListener('mousemove', onDrag);
   document.addEventListener('mouseup', stopDrag);
+  document.addEventListener('keydown', handleKeyDown);
 });
 
 // 组件卸载时清理
@@ -420,6 +436,7 @@ onUnmounted(() => {
   document.removeEventListener('mouseup', handleResizeUp);
   document.removeEventListener('mousemove', onDrag);
   document.removeEventListener('mouseup', stopDrag);
+  document.removeEventListener('keydown', handleKeyDown);
 });
 </script>
 

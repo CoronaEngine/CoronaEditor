@@ -128,7 +128,6 @@ const closeFloat = () => {
   }
 };
 
-
 // 双击事件处理
 const handleDoubleClick = () => {
   if (window.pyBridge) {
@@ -159,6 +158,20 @@ const handleDockEvent = (eventType, eventData) => {
   }
 }
 
+const handleKeyDown = (event) => {
+  event.preventDefault();
+  switch(event.key.toLowerCase()) {
+    case 'escape':
+      openSetup();
+      break;
+  }
+};
+// 调用Esc
+const openSetup = () => {
+  if (window.pyBridge) {
+    window.pyBridge.addDockWidget("SetUp", "/SetUp", "float", "center");
+  }
+}
 
 onMounted(() => {
   document.addEventListener('mousemove', handleResizeMove);
@@ -168,6 +181,7 @@ onMounted(() => {
   document.addEventListener('mousemove', onResize);
   document.addEventListener('mouseup', stopResize);
   window.pyBridge.dock_event.connect(handleDockEvent);
+  document.addEventListener('keydown', handleKeyDown);
 });
 
 onUnmounted(() => {
@@ -178,5 +192,6 @@ onUnmounted(() => {
   document.removeEventListener('mousemove', onResize);
   document.removeEventListener('mouseup', stopResize);
   window.pyBridge.dock_event.disconnect(handleDockEvent);
+  document.removeEventListener('keydown', handleKeyDown);
 });
 </script>

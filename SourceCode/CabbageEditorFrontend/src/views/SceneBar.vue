@@ -225,7 +225,7 @@ const DayNightCycle = () => {
 //关闭浮动窗口
 const closeFloat = () => {
   if (window.pyBridge) {
-    window.pyBridge.removeDockWidget(currentSceneName.value);
+    window.pyBridge.removeDockWidget("SceneBar");
   }
 };
 
@@ -237,6 +237,21 @@ const handleResizeUp = () => {
   if (dragState.value.isResizing) stopResize();
 };
 
+const handleKeyDown = (event) => {
+  event.preventDefault();
+  switch(event.key.toLowerCase()) {
+    case 'escape':
+      openSetup();
+      break;
+  }
+};
+// 调用Esc
+const openSetup = () => {
+  if (window.pyBridge) {
+    window.pyBridge.addDockWidget("SetUp", "/SetUp", "float", "center");
+  }
+}
+
 onMounted(() => {
   currentSceneName.value = route.query.sceneName || 'scene1';
   document.addEventListener('mousemove', handleResizeMove);
@@ -246,7 +261,8 @@ onMounted(() => {
   window.pyBridge.sendMessageToDock("AITalkBar", JSON.stringify({"content": "Hello, World!"}));
   if (window.pyBridge) {
     window.pyBridge.dock_event.connect(handleDockEvent);
-  }
+  };
+  document.addEventListener('keydown', handleKeyDown);
 });
 
 onUnmounted(() => {
@@ -256,6 +272,7 @@ onUnmounted(() => {
   document.removeEventListener('mouseup', stopDrag);
   if (window.pyBridge) {
     window.pyBridge.dockEvent.disconnect(handleDockEvent);
-  }
+  };
+  document.removeEventListener('keydown', handleKeyDown);
 });
 </script>
