@@ -351,9 +351,8 @@ onMounted(() => {
   createScene();
   cabbagetalk();
   document.addEventListener('keydown', handleKeyDown);
-  console.log('MainPage.vue: 监听return-to-home事件');
   const returnToHomeHandler = () => {
-    console.log('MainPage.vue: 接收到return-to-home事件');
+    console.log('MainPage.vue: 接收到return-to-home信号');
     goToHome();
   };
   eventBus.on('return-to-home', returnToHomeHandler);
