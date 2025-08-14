@@ -13,7 +13,12 @@
           }" 
           @click="switchTab(index)" 
           @dblclick="openSceneBar(index)">
-          {{ tab.name }}
+          <span
+            class="max-w-[120px] truncate px-2 py-1 text-gray-700 select-none"
+            >
+            {{ tab.name }}
+          </span>
+
         <button 
           v-if="tabs.length > 1" 
           @click.stop="closeTab(index)" 
@@ -35,6 +40,48 @@
         </button>
       </div>
     </div>
+    <!-- 自定义弹窗 -->
+    <div
+      v-if="showDialog"
+      class="fixed top-0 left-0 w-full h-full flex items-center justify-center bg-black/50"
+    >
+      <div class="bg-gray-100/95 p-6 rounded shadow w-96 h-40 flex flex-col gap-4" >
+        <div>
+          <label
+            for="new-tab-name"
+            class="block text-sm font-medium text-gray-700"
+          >
+          添加场景
+          </label>
+          <input
+            id="new-tab-name"
+            v-model="inputState.newTabName"
+            type="text"
+            class="mt-1 px-3 py-2 bg-gray-100 border border-gray-300 rounded-md w-full"
+            ref="nameInput"
+            @keyup.enter="confirmAddTab"
+            autofocus
+          />
+        </div>
+        <div class="flex justify-between">
+          <button
+            @click="confirmAddTab"
+            class="px-4 py-2 text-white bg-blue-500 rounded-md hover:bg-blue-600 transition-colors 
+                  duration-200 shadow-sm hover:shadow-md focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+          >
+            创建场景
+          </button>
+          <button
+            @click="cancelAddTab"
+            class="px-4 py-2 text-gray-600 bg-gray-100 rounded-md hover:bg-gray-200 transition-colors 
+                  duration-200 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+          >
+            取消
+          </button>
+        </div>
+      </div>
+    </div>
+
     <!-- 返回首页按钮 -->
     <button 
       @click="goToHome"
@@ -48,7 +95,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted } from 'vue';
+import { ref, onMounted, onUnmounted, reactive, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import "@/assets/welcome-page.css";
 import eventBus from '@/utils/eventBus';
@@ -86,19 +133,66 @@ const tabs = ref([
 ]);
 
 // 添加新标签页
-const addNewTab = () => {
-// 获取当前最大的场景编号
-  const maxSceneNumber = tabs.value.reduce((max, tab) => {
-    const number = parseInt(tab.name.replace('场景', ''), 10) || 0;
-    return Math.max(max, number);
-  }, 0);
+const showDialog = ref(false);
+const inputState = reactive({
+  newTabName: '',
+});
 
-  const newIndex = maxSceneNumber + 1;
-  tabs.value.push({
-    name: `场景${newIndex}`,
-    id: `scene${newIndex}`
-  });
-  activeTab.value = tabs.value.length - 1;
+watch(showDialog, (newVal) => {
+  if (newVal) {
+    nextTick(() => {
+      const input = document.getElementById('new-tab-name');
+      if (input) {
+        input.select();
+      }
+    });
+  }
+});
+
+const addNewTab = () => {
+  const sceneNumbers = tabs.value
+  .map(tab => {
+      const match = tab.name.match(/^场景(\d+)$/);
+      return match ? parseInt(match[1]) : null
+    })
+    .filter(num => num !== null);
+  
+  const maxSceneNumber = sceneNumbers.length > 0 
+    ? Math.max(...sceneNumbers) 
+    : 0;
+  
+  inputState.newTabName = `场景${maxSceneNumber + 1}`;
+  showDialog.value = true;
+};
+
+const confirmAddTab = () => {
+  if (inputState.newTabName.trim()) {
+    const maxSceneNumber = tabs.value.reduce((max, tab) => {
+      const match = tab.name.match(/场景(\d+)/);
+      return match ? Math.max(max, parseInt(match[1])) : max;
+    }, 0);
+    // 生成新场景名称
+    const newTabName = `场景${maxSceneNumber + 1}`;
+    const finalName = inputState.newTabName.trim() || newTabName;
+    // 添加新标签页
+    tabs.value.push({
+      name: finalName,
+      id: `scene${Date.now()}`,
+      editing: false,
+    });
+
+    activeTab.value = tabs.value.length - 1;
+    showDialog.value = false;
+    inputState.newTabName = '';
+  } else {
+    alert('请输入标签名称');
+  }
+};
+
+// 清空输入框
+const cancelAddTab = () => {
+  showDialog.value = false;
+  inputState.newTabName = '';
 };
 
 const handleWheel = (event) => {
@@ -107,6 +201,12 @@ const handleWheel = (event) => {
 };
 
 const handleKeyDown = (event) => {
+  // 检查输入框是否聚焦
+  const inputElement = document.getElementById('new-tab-name');
+  if (inputElement && inputElement === document.activeElement) {
+    return;
+  }
+
   event.preventDefault();
   switch(event.key.toLowerCase()) {
     case 'w':
@@ -251,12 +351,17 @@ onMounted(() => {
   createScene();
   cabbagetalk();
   document.addEventListener('keydown', handleKeyDown);
-  eventBus.on('return-to-home', goToHome);
+  console.log('MainPage.vue: 监听return-to-home事件');
+  const returnToHomeHandler = () => {
+    console.log('MainPage.vue: 接收到return-to-home事件');
+    goToHome();
+  };
+  eventBus.on('return-to-home', returnToHomeHandler);
 });
 
 // 在onUnmounted中移除事件监听
 onUnmounted(() => {
   document.removeEventListener('keydown', handleKeyDown);
-  eventBus.off('return-to-home', goToHome);
+  eventBus.off('return-to-home', returnToHomeHandler);
 });
 </script>

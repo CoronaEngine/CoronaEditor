@@ -62,7 +62,7 @@
   position: fixed;
   top: 5rem;
   right: 5rem;
-  width: 24rem;
+  width: 650px;
   background-color: rgba(255, 255, 255, 0.2);
   backdrop-filter: blur(12px);
   border-radius: 0.75rem;
@@ -106,7 +106,7 @@
 
 @media (min-width: 1024px) {
   .theme-fun .button-container {
-    width: 33.333333%;
+    width: 40%;
   }
 }
 
@@ -197,8 +197,8 @@
 /* 存档面板容器 */
 .save-panel-container {
     position: fixed;
-    bottom: 50px;
-    right: 50px;
+    bottom: 4rem;
+    right: 5rem;
     z-index: 50;
     width: 650px;
 }
