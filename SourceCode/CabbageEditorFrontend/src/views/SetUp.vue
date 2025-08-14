@@ -63,6 +63,7 @@
     const goWelcome = () => {
       try {
         // 发送返回首页的信号到MainPage
+        console.log('SetUp.vue: 发送return-to-home事件');
         eventBus.emit('return-to-home', {});
       } catch (error) {
         console.error('发送返回首页信号出错:', error);
