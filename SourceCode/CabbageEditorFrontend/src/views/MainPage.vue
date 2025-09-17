@@ -76,16 +76,6 @@
         </div>
       </div>
     </div>
-
-    <!-- 返回首页按钮 -->
-    <button 
-      @click="goToHome"
-      class="home-button">
-      <img 
-        src="@/assets/home.png" 
-        class="home-button-img"
-      />
-    </button>
   </div>
 </template>
 

@@ -67,6 +67,11 @@
 
     const goWelcome = () => {
       window.pyBridge.send_message_to_main("go_home", "");
+      window.pyBridge.removeDockWidget("Pet");
+      window.pyBridge.removeDockWidget("AITalkBar");
+      window.pyBridge.removeDockWidget("Object");
+      window.pyBridge.removeDockWidget("SceneBar");
+      window.pyBridge.removeDockWidget("SetUp");
     };
 
     const Out = () => {
