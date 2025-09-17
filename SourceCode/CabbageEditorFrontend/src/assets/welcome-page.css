@@ -62,7 +62,7 @@
   position: fixed;
   top: 5rem;
   right: 5rem;
-  width: 650px;
+  width: 24rem;
   background-color: rgba(255, 255, 255, 0.2);
   backdrop-filter: blur(12px);
   border-radius: 0.75rem;
@@ -106,7 +106,7 @@
 
 @media (min-width: 1024px) {
   .theme-fun .button-container {
-    width: 40%;
+    width: 33.333333%;
   }
 }
 
@@ -197,10 +197,10 @@
 /* 存档面板容器 */
 .save-panel-container {
     position: fixed;
-    bottom: 4rem;
+    bottom: 50px;
     right: 5rem;
     z-index: 50;
-    width: 650px;
+    width: 24rem;
 }
 
 /* 存档面板 */
@@ -210,5 +210,5 @@
     border-radius: 1rem;
     box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
     border: 1px solid rgba(255, 255, 255, 0.2);
-    min-height: 400px;
+    min-height: 300px;
 }
