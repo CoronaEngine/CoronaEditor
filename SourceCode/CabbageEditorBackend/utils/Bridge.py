@@ -41,6 +41,7 @@ class Bridge(QObject):
     remove_route = pyqtSignal(str)
     ai_response = pyqtSignal(str)
     dock_event = pyqtSignal(str, str)
+    command_to_main = pyqtSignal(str, str)
     script_dir = os.path.join(root_dir, "CabbageEditor", "script")
     saves_dir = os.path.join(root_dir, "CabbageEditor", "saves")
     os.makedirs(script_dir, exist_ok=True)
@@ -193,6 +194,13 @@ class Bridge(QObject):
                     print(f"加载场景失败: {str(e)}")
                     error_response = {"type": "error", "message": str(e)}
                     self.dock_event.emit("sceneError", json.dumps(error_response))
+
+    @pyqtSlot(str, str)
+    def send_message_to_main(self, command_name, command_data):
+        try:
+            self.command_to_main.emit(command_name, command_data)
+        except Exception as e:
+            print(f"send_message_to_main failed: {str(e)}")
 
     @pyqtSlot(str,str)
     def actorDelete(self, sceneName, actorName):

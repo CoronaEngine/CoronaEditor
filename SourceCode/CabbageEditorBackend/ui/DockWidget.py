@@ -128,7 +128,10 @@ class AddDock(QDockWidget):
                 self.browser.update()
 
     def send_message_to_dock(self, json_data: str) -> None:
-        self.bridge.dock_event.emit("jsonData", json_data)
+        self.bridge.dock_event.emit("dockData", json_data)
+
+    def send_message_to_main(self, json_data: str) -> None:
+        self.bridge.dock_event.emit("mainData", json_data)
 
     def send_ai_message_to_js(self, message: str) -> None:
         try:

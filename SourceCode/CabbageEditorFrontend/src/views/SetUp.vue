@@ -61,11 +61,7 @@
     };
 
     const goWelcome = () => {
-      try {
-        eventBus.emit('return-to-home', {});
-      } catch (error) {
-        console.error('发送信号出错:', error);
-      }
+      window.pyBridge.send_message_to_main("go_home", "");
     };
 
     onMounted(() => {
