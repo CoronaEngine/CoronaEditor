@@ -351,16 +351,10 @@ onMounted(() => {
   createScene();
   cabbagetalk();
   document.addEventListener('keydown', handleKeyDown);
-  const returnToHomeHandler = () => {
-    console.log('MainPage.vue: 接收到return-to-home信号');
-    goToHome();
-  };
-  eventBus.on('return-to-home', returnToHomeHandler);
 });
 
 // 在onUnmounted中移除事件监听
 onUnmounted(() => {
   document.removeEventListener('keydown', handleKeyDown);
-  eventBus.off('return-to-home', returnToHomeHandler);
 });
 </script>

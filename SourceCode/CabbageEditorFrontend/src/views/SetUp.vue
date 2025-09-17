@@ -32,6 +32,11 @@
         class="w-full max-w-xs rounded-md bg-[#5f9dc6]/50 px-6 py-3 font-bold text-black/80 hover:bg-[#5f9dc6]/70">
         <p class="text-center text-sm sm:text-base md:text-lg">返回初始页面</p>
       </button>
+      <button
+        @click.stop="Out"
+        class="w-full max-w-xs rounded-md bg-[#5f9dc6]/50 px-6 py-3 font-bold text-black/80 hover:bg-[#5f9dc6]/70">
+        <p class="text-center text-sm sm:text-base md:text-lg">退出引擎</p>
+      </button>
     </div>
 </div>
 </template>
@@ -63,6 +68,14 @@
     const goWelcome = () => {
       window.pyBridge.send_message_to_main("go_home", "");
     };
+
+    const Out = () => {
+    if (window.pyBridge) {
+        window.pyBridge.closeprocess();
+    } else {
+        console.error("Python SendMessageToDock 未连接！");
+    }
+}
 
     onMounted(() => {
       document.addEventListener('mousemove', onDrag);
