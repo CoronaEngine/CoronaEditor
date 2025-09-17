@@ -33,11 +33,6 @@
         >
           +
         </button>
-        <button 
-          @click.stop="Out"
-          class="absolute right-2 top-1/2 -translate-y-1/2 w-6 h-6 flex items-center justify-center bg-transparent hover:bg-gray-600/20 text-black rounded transition-colors duration-200">
-          <span class="transform scale-125">×</span>
-        </button>
       </div>
     </div>
     <!-- 自定义弹窗 -->

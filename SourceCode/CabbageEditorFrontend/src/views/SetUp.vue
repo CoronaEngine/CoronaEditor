@@ -12,7 +12,7 @@
 
     <!-- 按钮容器 -->
     <div class="button-group flex flex-col items-center space-y-4 p-4">
-      <button 
+      <!--<button 
         @click="emitProVersion"
          class="w-full max-w-xs rounded-md bg-[#5f9dc6]/50 px-6 py-3 font-bold text-black/80 hover:bg-[#5f9dc6]/70">
         <p class="text-center text-sm sm:text-base md:text-lg">专业版本</p>
@@ -21,7 +21,7 @@
         @click="emitFunVersion"
         class="w-full max-w-xs rounded-md bg-[#5f9dc6]/50 px-6 py-3 font-bold text-black/80 hover:bg-[#5f9dc6]/70">
         <p class="text-center text-sm sm:text-base md:text-lg">娱乐版本</p>
-      </button>
+      </button>-->
       <button
         @click=""
         class="w-full max-w-xs rounded-md bg-[#5f9dc6]/50 px-6 py-3 font-bold text-black/80 hover:bg-[#5f9dc6]/70">
