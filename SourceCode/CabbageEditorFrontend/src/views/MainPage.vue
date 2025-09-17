@@ -33,11 +33,6 @@
         >
           +
         </button>
-        <button 
-          @click.stop="Out"
-          class="absolute right-2 top-1/2 -translate-y-1/2 w-6 h-6 flex items-center justify-center bg-transparent hover:bg-gray-600/20 text-black rounded transition-colors duration-200">
-          <span class="transform scale-125">×</span>
-        </button>
       </div>
     </div>
     <!-- 自定义弹窗 -->
@@ -81,16 +76,6 @@
         </div>
       </div>
     </div>
-
-    <!-- 返回首页按钮 -->
-    <button 
-      @click="goToHome"
-      class="home-button">
-      <img 
-        src="@/assets/home.png" 
-        class="home-button-img"
-      />
-    </button>
   </div>
 </template>
 
@@ -351,16 +336,10 @@ onMounted(() => {
   createScene();
   cabbagetalk();
   document.addEventListener('keydown', handleKeyDown);
-  const returnToHomeHandler = () => {
-    console.log('MainPage.vue: 接收到return-to-home信号');
-    goToHome();
-  };
-  eventBus.on('return-to-home', returnToHomeHandler);
 });
 
 // 在onUnmounted中移除事件监听
 onUnmounted(() => {
   document.removeEventListener('keydown', handleKeyDown);
-  eventBus.off('return-to-home', returnToHomeHandler);
 });
 </script>
