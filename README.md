@@ -10,11 +10,8 @@
 	- 支持Python层的热重载，保存文件自动更新Python代码逻辑
   
 ### 环境配置
-- 使用CMake并根据本地环境相应预设
-	- CMake将自动下载Node.js与Python的相关依赖
+- 运行build.py将自动下载Node.js与Python的相关依赖
 - Python层可独立运行
-	- 需要在CMake后，使用ExternalEnvironment中Python环境
  	- 程序入口为SourceCode\CabbageEditorBackend\main.py
 - Web层可独立运行
-	- 需要Node.js环境
  	- 代码位于SourceCode\CabbageEditorFrontend
