@@ -341,10 +341,9 @@ const loadSave = (save) => {
     const target = archives.find(a => a.id === save.id);
     
     if (target && window.pyBridge) {
-      // 清空当前场景
+      // 清空场景
       window.pyBridge.removeActor();
-      
-      // 加载存档中的对象
+      // 加载存档
       target.sceneData.forEach(actor => {
         window.pyBridge.createActor(currentScene.value, actor.path);
       });
