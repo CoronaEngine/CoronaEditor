@@ -5,7 +5,7 @@
       <!-- LOGO -->
       <div class="welcome-logo">
         <img 
-          src="@/assets/CabbageEngine-LOGO.png" 
+          src="@/assets/CabbageEngine-LOGO.png"
           alt="Cabbage Engine Logo"
           class="welcome-logo-img"
         />
@@ -210,7 +210,7 @@ const handleActorMove = (direction, deltaTime = 16) => {
           Operation: "Rotate",
           sceneName: "mainscene",
           x: 0,
-          y: -Math.PI/36, // 5度旋转
+          y: -Math.PI/30, // 5度旋转
           z: 0,
           actorName: actorid.value[0]
         }));
@@ -223,7 +223,7 @@ const handleActorMove = (direction, deltaTime = 16) => {
           Operation: "Rotate",
           sceneName: "mainscene",
           x: 0,
-          y: Math.PI/36, // 5度旋转
+          y: Math.PI/30, // 5度旋转
           z: 0,
           actorName: actorid.value[0]
         }));
