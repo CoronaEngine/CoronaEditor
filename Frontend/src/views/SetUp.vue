@@ -51,6 +51,8 @@
     const { stopDrag,onDrag} = useDragResize();
     const showContextMenu = ref(false);
     const sceneImages = ref([]);
+    const showArchiveDialog = ref(false);
+    const archiveName = ref('');
 
     const emitProVersion = () => {
         eventBus.emit('version-selected', 'pro');
@@ -67,29 +69,28 @@
     };
 
     const Archive = () => {
-      if (window.pyBridge && window.pyBridge.sceneSave) {
-        const sceneData = {
-          actors: sceneImages.value.map(scene => ({
-            name: scene.name,
-            path: scene.path,
-          }))
-        };
-        window.pyBridge.sceneSave(JSON.stringify(sceneData));
+    if (window.pyBridge && window.pyBridge.sceneSave) {
+      const sceneData = {
+        actors: sceneImages.value.map(scene => ({
+          name: scene.name,
+          path: scene.path,
+        }))
       };
+      window.pyBridge.sceneSave(JSON.stringify(sceneData));
+    };
 
     try {
-    // 生成带时间戳的存档数据
     const newArchive = {
       id: Date.now(),
-      name: '存档',
+      name: '未命名存档',
       time: new Date().toLocaleDateString('zh-CN', { 
         year: 'numeric', 
         month: '2-digit', 
         day: '2-digit' 
       }),
       sceneData: sceneImages.value.map(scene => ({
-        name: data.name,
-        path: data.path,
+        name: scene.name,
+        path: scene.path,
         type: scene.type
       }))
     };
@@ -97,8 +98,8 @@
     const existingSaves = JSON.parse(localStorage.getItem('archives') || '[]');
     existingSaves.unshift(newArchive);
     localStorage.setItem('archives', JSON.stringify(existingSaves));
-
     eventBus.emit('archives-updated');
+    
         window.pyBridge.send_message_to_main("go_home", "");
         window.pyBridge.removeDockWidget("Pet");
         window.pyBridge.removeDockWidget("AITalkBar");
@@ -110,6 +111,7 @@
   }
 }
 
+/*
   const handleDockEvent = (event_type, event_data) => {
   if (event_type === 'actorCreated') {
     try {
@@ -140,6 +142,7 @@
     print(event_data)
   }
 };
+*/
 
     const goWelcome = () => {
       window.pyBridge.send_message_to_main("go_home", "");
