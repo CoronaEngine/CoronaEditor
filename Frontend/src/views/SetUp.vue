@@ -51,8 +51,6 @@
     const { stopDrag,onDrag} = useDragResize();
     const showContextMenu = ref(false);
     const sceneImages = ref([]);
-    const showArchiveDialog = ref(false);
-    const archiveName = ref('');
 
     const emitProVersion = () => {
         eventBus.emit('version-selected', 'pro');
@@ -69,49 +67,23 @@
     };
 
     const Archive = () => {
-    if (window.pyBridge && window.pyBridge.sceneSave) {
-      const sceneData = {
-        actors: sceneImages.value.map(scene => ({
-          name: scene.name,
-          path: scene.path,
-        }))
+      if (window.pyBridge && window.pyBridge.sceneSave) {
+        const sceneData = {
+          actors: sceneImages.value.map(scene => ({
+            name: scene.name,
+            path: scene.path,
+          }))
+        };
+        window.pyBridge.sceneSave(JSON.stringify(sceneData));
       };
-      window.pyBridge.sceneSave(JSON.stringify(sceneData));
-    };
+      window.pyBridge.send_message_to_main("go_home", "");
+      window.pyBridge.removeDockWidget("Pet");
+      window.pyBridge.removeDockWidget("AITalkBar");
+      window.pyBridge.removeDockWidget("Object");
+      window.pyBridge.removeDockWidget("SceneBar");
+      window.pyBridge.removeDockWidget("SetUp");
+    }
 
-    try {
-    const newArchive = {
-      id: Date.now(),
-      name: '未命名存档',
-      time: new Date().toLocaleDateString('zh-CN', { 
-        year: 'numeric', 
-        month: '2-digit', 
-        day: '2-digit' 
-      }),
-      sceneData: sceneImages.value.map(scene => ({
-        name: scene.name,
-        path: scene.path,
-        type: scene.type
-      }))
-    };
-    // 存储到 localStorage
-    const existingSaves = JSON.parse(localStorage.getItem('archives') || '[]');
-    existingSaves.unshift(newArchive);
-    localStorage.setItem('archives', JSON.stringify(existingSaves));
-
-    eventBus.emit('archives-updated');
-        window.pyBridge.send_message_to_main("go_home", "");
-        window.pyBridge.removeDockWidget("Pet");
-        window.pyBridge.removeDockWidget("AITalkBar");
-        window.pyBridge.removeDockWidget("Object");
-        window.pyBridge.removeDockWidget("SceneBar");
-        window.pyBridge.removeDockWidget("SetUp");
-    }catch (error) {
-    console.error('存档失败:', error);
-  }
-}
-
-/*
   const handleDockEvent = (event_type, event_data) => {
   if (event_type === 'actorCreated') {
     try {
@@ -142,7 +114,6 @@
     print(event_data)
   }
 };
-*/
 
     const goWelcome = () => {
       window.pyBridge.send_message_to_main("go_home", "");
