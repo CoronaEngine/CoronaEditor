@@ -51,6 +51,8 @@
     const { stopDrag,onDrag} = useDragResize();
     const showContextMenu = ref(false);
     const sceneImages = ref([]);
+    const showArchiveDialog = ref(false);
+    const archiveName = ref('');
 
     const emitProVersion = () => {
         eventBus.emit('version-selected', 'pro');
