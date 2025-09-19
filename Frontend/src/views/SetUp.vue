@@ -51,8 +51,6 @@
     const { stopDrag,onDrag} = useDragResize();
     const showContextMenu = ref(false);
     const sceneImages = ref([]);
-    const showArchiveDialog = ref(false);
-    const archiveName = ref('');
 
     const emitProVersion = () => {
         eventBus.emit('version-selected', 'pro');
@@ -98,8 +96,8 @@
     const existingSaves = JSON.parse(localStorage.getItem('archives') || '[]');
     existingSaves.unshift(newArchive);
     localStorage.setItem('archives', JSON.stringify(existingSaves));
-
     eventBus.emit('archives-updated');
+    
         window.pyBridge.send_message_to_main("go_home", "");
         window.pyBridge.removeDockWidget("Pet");
         window.pyBridge.removeDockWidget("AITalkBar");
