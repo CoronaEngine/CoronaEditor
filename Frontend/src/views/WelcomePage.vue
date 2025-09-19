@@ -42,7 +42,7 @@
         <div class="save-panel-container">
           <div class="save-panel">
               <div class="relative p-6">
-                  <p class="text-center text-2xl font-bold text-black mb-4">存档</p>
+                  <p class="text-center text-2xl font-bold text-black mb-4">存档栏</p>
                   <div class="h-64 overflow-y-auto space-y-4">
                       <template v-if="saves?.length > 0">
                         <div v-for="(save, index) in saves" 
@@ -321,6 +321,41 @@ const removeActors = () => {
     }
 }
 
+// 存档相关逻辑
+const loadArchives = () => {
+  try {
+    const archives = JSON.parse(localStorage.getItem('archives') || '[]');
+    saves.value = archives.map(archive => ({
+      id: archive.id,
+      name: archive.name,
+      time: archive.time
+    }));
+  } catch (e) {
+    console.error('加载存档失败:', e);
+  }
+}
+
+const loadSave = (save) => {
+  try {
+    const archives = JSON.parse(localStorage.getItem('archives') || '[]');
+    const target = archives.find(a => a.id === save.id);
+    
+    if (target && window.pyBridge) {
+      // 清空当前场景
+      window.pyBridge.removeActor();
+      
+      // 加载存档中的对象
+      target.sceneData.forEach(actor => {
+        window.pyBridge.createActor(currentScene.value, actor.path);
+      });
+      
+      router.push('/MainPage');
+    }
+  } catch (error) {
+    console.error('加载存档失败:', error);
+  }
+}
+
 onMounted(() => {
   try {
     const savedVersion = localStorage?.getItem('selectedVersion')
@@ -333,14 +368,16 @@ onMounted(() => {
     console.warn('localStorage access error:', e)
     selectedVersion.value = 'fun'
   }
-
   createActor();
   document.addEventListener('keydown', handleKeyDown);
   eventBus.on('version-selected', handleVersionSelect);
+  loadArchives();
+  eventBus.on('archives-updated', loadArchives);
 });
 
 onUnmounted(() => {
-  eventBus.off('version-selected', handleVersionSelect)
-  document.removeEventListener('keydown', handleKeyDown)
+  eventBus.off('version-selected', handleVersionSelect);
+  document.removeEventListener('keydown', handleKeyDown);
+  eventBus.off('archives-updated', loadArchives);
 })
 </script>
