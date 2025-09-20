@@ -51,8 +51,8 @@
 }
 
 .theme-pro .announcement-button img {
-  width: 4rem;
-  height: 4.5rem;
+  width: 3rem;
+  height: 3rem;
   object-fit: contain;
 }
 
@@ -60,7 +60,7 @@
   position: fixed;
   top: 5rem;
   right: 5rem;
-  width: 40rem;
+  width: 24rem;
   background-color: rgba(255, 255, 255, 0.5);
   backdrop-filter: blur(12px);
   border-radius: 0.75rem;
@@ -92,7 +92,7 @@
 
 @media (min-width: 640px) {
   .theme-pro .button-container {
-    width: 70%;
+    width: 75%;
   }
 }
 
