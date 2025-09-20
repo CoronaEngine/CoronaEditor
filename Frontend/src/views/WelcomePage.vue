@@ -5,7 +5,7 @@
       <!-- LOGO -->
       <div class="welcome-logo">
         <img 
-          src="@/assets/CabbageEngine-LOGO.png" 
+          src="@/assets/CabbageEngine-LOGO.png"
           alt="Cabbage Engine Logo"
           class="welcome-logo-img"
         />
