@@ -60,7 +60,7 @@
 
 .theme-fun .announcement-button-img {
   width: 4.5rem;
-  height: 5rem;
+  height: 3rem;
   object-fit: contain;
   opacity: 0.6;
   transition: transform 0.8s ease-in-out;
@@ -128,7 +128,7 @@
   height: 88px;   /* 高度设为60像素 */
   border-radius: 0.5rem;
   /*background-color: rgba(135, 163, 107, 0.359);*/
-  background-color: rgba(177, 193, 174, 0.38);
+  background-color: rgba(229, 236, 228, 0.425);
   font-weight: 700;
   padding: 1rem 1.5rem;
   transition: all 0.33s, transform 0.3s, padding 0.3s;
@@ -220,12 +220,12 @@
     bottom: 100px;
     right: 53px;
     z-index: 50;
-    width: 20rem;
+    width: 35rem;
 }
 
 /* 存档面板 */
 .save-panel {
-    background: rgba(177, 193, 174, 0.353);
+    background: rgba(220, 230, 218, 0.353);
     backdrop-filter: blur(5px);
     border-radius: 1rem;
     box-shadow: 0 4px 6px rgba(0, 0, 0, 0.088);
