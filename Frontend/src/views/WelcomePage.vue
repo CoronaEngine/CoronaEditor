@@ -321,6 +321,40 @@ const removeActors = () => {
     }
 }
 
+// 存档相关逻辑
+const loadArchives = () => {
+  try {
+    const archives = JSON.parse(localStorage.getItem('archives') || '[]');
+    saves.value = archives.map(archive => ({
+      id: archive.id,
+      name: archive.name,
+      time: archive.time
+    }));
+  } catch (e) {
+    console.error('加载存档失败:', e);
+  }
+}
+
+const loadSave = (save) => {
+  try {
+    const archives = JSON.parse(localStorage.getItem('archives') || '[]');
+    const target = archives.find(a => a.id === save.id);
+    
+    if (target && window.pyBridge) {
+      // 清空场景
+      window.pyBridge.removeActor();
+      // 加载存档
+      target.sceneData.forEach(actor => {
+        window.pyBridge.createActor(currentScene.value, actor.path);
+      });
+      
+      router.push('/MainPage');
+    }
+  } catch (error) {
+    console.error('加载存档失败:', error);
+  }
+}
+
 onMounted(() => {
   try {
     const savedVersion = localStorage?.getItem('selectedVersion')
@@ -337,9 +371,13 @@ onMounted(() => {
   createActor();
   document.addEventListener('keydown', handleKeyDown);
   eventBus.on('version-selected', handleVersionSelect);
+  loadArchives();
+  eventBus.on('archives-updated', loadArchives);
 });
 
 onUnmounted(() => {
+  eventBus.off('version-selected', handleVersionSelect)
+  document.removeEventListener('keydown', handleKeyDown)
   eventBus.off('version-selected', handleVersionSelect)
   document.removeEventListener('keydown', handleKeyDown)
 })
