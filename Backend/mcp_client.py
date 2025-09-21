@@ -6,9 +6,9 @@ from contextlib import AsyncExitStack, asynccontextmanager # type: ignore
 from openai import OpenAI
 
 from mcp import ClientSession
-from mcp.server import FastMCP
+from mcp.server.fastmcp import FastMCP
 
-# try:
+# try
 #     from transform_server import app as server_app
 # except ImportError:
 #     from LargeLanguageModel.web_search import app as server_app

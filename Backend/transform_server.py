@@ -28,7 +28,7 @@ async def server_lifespan(server: FastMCP) -> AsyncIterator[Dict[str, Any]]:
 # MCP app
 app = FastMCP(
     "TransformMCP",
-    description="Transform server calling Qt actor operations",
+    # description="Transform server calling Qt actor operations",
     lifespan=server_lifespan,
 )
 
