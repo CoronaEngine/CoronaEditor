@@ -10,10 +10,10 @@ from utils.StaticComponents import root_dir, scene_dict
 from utils.FileHandleComponent import FileHandler
 
 try:
-    import CabbageEngine
-    print("import CabbageEngine")
+    import CoronaEngine
+    print("import CoronaEngine")
 except ImportError:
-    from CabbageEngineFallback import CabbageEngine
+    from CoronaEngineFallback import CoronaEngine
 
 class WorkerThread(QThread):
     finished = pyqtSignal()
@@ -70,7 +70,7 @@ class Bridge(QObject):
     @pyqtSlot(str,str)
     def createActor(self, scene_name, obj_path):
         name = os.path.basename(obj_path)
-        object = CabbageEngine.Actor(scene_dict[scene_name]["scene"], obj_path)
+        object = CoronaEngine.Actor(scene_dict[scene_name]["scene"], obj_path)
         scene_dict[scene_name]["actor_dict"][name]={
             "actor":object,
             "path":obj_path
@@ -88,7 +88,7 @@ class Bridge(QObject):
         scene_name = json.loads(data).get("sceneName")
         if scene_name not in scene_dict:
             scene_dict[scene_name] = {
-                "scene": CabbageEngine.Scene(),
+                "scene": CoronaEngine.Scene(),
                 "actor_dict": {}
             }
         else:
@@ -156,7 +156,7 @@ class Bridge(QObject):
                 try:
                     print(f"选择的模型文件路径: {file_path}")
                     name = os.path.basename(file_path)
-                    object = CabbageEngine.Actor(scene_dict[sceneName]["scene"], file_path)
+                    object = CoronaEngine.Actor(scene_dict[sceneName]["scene"], file_path)
                     scene_dict[sceneName]["actor_dict"][name] = {
                         "actor": object,
                         "path": file_path
@@ -178,7 +178,7 @@ class Bridge(QObject):
                     for actor in scene_data.get("actors", []):
                         path = actor.get("path")
                         if path:
-                            actor_obj = CabbageEngine.Actor(scene_dict[sceneName]["scene"], path)
+                            actor_obj = CoronaEngine.Actor(scene_dict[sceneName]["scene"], path)
                             name = os.path.basename(path)
                             scene_dict[sceneName]["actor_dict"][name] = {
                                 "name": name,
@@ -226,11 +226,11 @@ class Bridge(QObject):
             z = float(Actor_data.get("z",0.0))
             match Operation:
                 case "Scale":
-                    CabbageEngine.Actor.scale(scene_dict[sceneName]["actor_dict"][actorName]["actor"],[x,y,z])
+                    CoronaEngine.Actor.scale(scene_dict[sceneName]["actor_dict"][actorName]["actor"],[x,y,z])
                 case "Move":
-                    CabbageEngine.Actor.move(scene_dict[sceneName]["actor_dict"][actorName]["actor"],[x,y,z])
+                    CoronaEngine.Actor.move(scene_dict[sceneName]["actor_dict"][actorName]["actor"],[x,y,z])
                 case "Rotate":
-                    CabbageEngine.Actor.rotate(scene_dict[sceneName]["actor_dict"][actorName]["actor"],[x,y,z])
+                    CoronaEngine.Actor.rotate(scene_dict[sceneName]["actor_dict"][actorName]["actor"],[x,y,z])
         except Exception as e:
             print(f"Actor transform error: {str(e)}")
             return
@@ -244,7 +244,7 @@ class Bridge(QObject):
             forward = move_data.get("forward", [0.0, 1.5, 0.0])
             up = move_data.get("up", [0.0, -1.0, 0.0])
             fov = float(move_data.get("fov", 45.0))
-            CabbageEngine.Scene.setCamera(scene_dict[sceneName]["scene"],position, forward, up, fov)
+            CoronaEngine.Scene.setCamera(scene_dict[sceneName]["scene"],position, forward, up, fov)
         except Exception as e:
             print(f"摄像头移动错误: {str(e)}")
 
@@ -257,7 +257,7 @@ class Bridge(QObject):
             py = float(sun_data.get("py", 1.0))
             pz = float(sun_data.get("pz", 1.0))
             direction = [px, py, pz]
-            CabbageEngine.Scene.setSunDirection(scene_dict[sceneName]["scene"],direction)
+            CoronaEngine.Scene.setSunDirection(scene_dict[sceneName]["scene"],direction)
         except Exception as e:
             error_response = {"type": "error", "message": str(e)}
             self.dock_event.emit("sunDirectionError", json.dumps(error_response))
@@ -272,9 +272,9 @@ class Bridge(QObject):
             )
             fullcode = f"""
 try:
-    import CabbageEngine
+    import CoronaEngine
 except ImportError:
-    from CabbageEngineFallback import CabbageEngine
+    from CoronaEngineFallback import CoronaEngine
 
 def run():
 {indented_code}

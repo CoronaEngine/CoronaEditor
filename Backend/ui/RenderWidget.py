@@ -15,12 +15,12 @@ class RenderWidget(QWidget):
         self.setStyleSheet("QLabel {background-color: transparent;}")
 
         try:
-            import CabbageEngine
-            print("import CabbageEngine")
+            import CoronaEngine
+            print("import CoronaEngine")
         except ImportError:
-            from CabbageEngineFallback import CabbageEngine
+            from CoronaEngineFallback import CoronaEngine
 
-        self.mainscene = CabbageEngine.Scene(
+        self.mainscene = CoronaEngine.Scene(
             int(self.winId()),False
         )
         self.mainscene.setCamera(

@@ -4,49 +4,49 @@ export const defineMathGenerators = () => {
     pythonGenerator.forBlock['math_add'] = function (block) {
         const x1 = block.getFieldValue('x1');
         const x2 = block.getFieldValue('x2');
-        return `CabbageEngine.add(${x1},${x2})\n`;
+        return `CoronaEngine.add(${x1},${x2})\n`;
     };
 
     pythonGenerator.forBlock['math_mul'] = function (block) {
         const x1 = block.getFieldValue('x1');
         const x2 = block.getFieldValue('x2');
-        return `CabbageEngine.mul(${x1},${x2})\n`;
+        return `CoronaEngine.mul(${x1},${x2})\n`;
     };
 
     pythonGenerator.forBlock['math_div'] = function (block) {
         const x1 = block.getFieldValue('x1');
         const x2 = block.getFieldValue('x2');
-        return `CabbageEngine.div(${x1},${x2})\n`;
+        return `CoronaEngine.div(${x1},${x2})\n`;
     };
 
     pythonGenerator.forBlock['math_sub'] = function (block) {
         const x1 = block.getFieldValue('x1');
         const x2 = block.getFieldValue('x2');
-        return `CabbageEngine.sub(${x1},${x2})\n`;
+        return `CoronaEngine.sub(${x1},${x2})\n`;
     };
 
     pythonGenerator.forBlock['math_random'] = function (block) {
         const x1 = block.getFieldValue('x1');
         const x2 = block.getFieldValue('x2');
-        return `CabbageEngine.random(${x1},${x2})\n`;
+        return `CoronaEngine.random(${x1},${x2})\n`;
     };
 
     pythonGenerator.forBlock['math_G'] = function (block) {
         const x1 = block.getFieldValue('x1');
         const x2 = block.getFieldValue('x2');
-        return `CabbageEngine.G(${x1},${x2})\n`;
+        return `CoronaEngine.G(${x1},${x2})\n`;
     };
 
     pythonGenerator.forBlock['math_L'] = function (block) {
         const x1 = block.getFieldValue('x1');
         const x2 = block.getFieldValue('x2');
-        return `CabbageEngine.L(${x1},${x2})\n`;
+        return `CoronaEngine.L(${x1},${x2})\n`;
     };
 
     pythonGenerator.forBlock['math_E'] = function (block) {
         const x1 = block.getFieldValue('x1');
         const x2 = block.getFieldValue('x2');
-        return `CabbageEngine.E(${x1},${x2})\n`;
+        return `CoronaEngine.E(${x1},${x2})\n`;
     };
 
     pythonGenerator.forBlock['math_AND'] = function (block) {

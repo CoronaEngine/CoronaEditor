@@ -3,7 +3,7 @@ import { pythonGenerator } from "blockly/python";
 export const defineControlGenerators = () => {
     pythonGenerator.forBlock['control_wait'] = function (block) {
         const x = block.getFieldValue('x');
-        return `CabbageEngine.wait(${x})\n`;
+        return `CoronaEngine.wait(${x})\n`;
     };
 
     pythonGenerator.forBlock['control_for'] = function (block) {
@@ -64,28 +64,28 @@ export const defineControlGenerators = () => {
     // 定义停止积木块的 Python 代码生成器
     pythonGenerator.forBlock['control_stop'] = function (block) {
         const stopOption = block.getFieldValue('STOP_OPTION');
-        return `CabbageEngine.stop("${stopOption}")\n`;
+        return `CoronaEngine.stop("${stopOption}")\n`;
     };
 
     pythonGenerator.forBlock['control_cloneStart'] = function (block) {
-        return `CabbageEngine.cloneStart()\n`;
+        return `CoronaEngine.cloneStart()\n`;
     };
 
     pythonGenerator.forBlock['control_clone'] = function (block) {
         const x = block.getFieldValue('x');
-        return `CabbageEngine.clone(${x})\n`;
+        return `CoronaEngine.clone(${x})\n`;
     };
 
     pythonGenerator.forBlock['control_cloneDEL'] = function (block) {
-        return `CabbageEngine.deleteClone()\n`;
+        return `CoronaEngine.deleteClone()\n`;
     };
 
     pythonGenerator.forBlock['control_senceSet'] = function (block) {
         const x = block.getFieldValue('x');
-        return `CabbageEngine.setScene(${x})\n`;
+        return `CoronaEngine.setScene(${x})\n`;
     };
 
     pythonGenerator.forBlock['control_nextSence'] = function (block) {
-        return `CabbageEngine.nextScene()\n`;
+        return `CoronaEngine.nextScene()\n`;
     };
 }

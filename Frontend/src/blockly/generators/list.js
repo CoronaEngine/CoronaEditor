@@ -3,11 +3,11 @@ import { pythonGenerator } from "blockly/python";
 export const defineListGenerators = () => {
     pythonGenerator.forBlock['list_show'] = function (block) {
         const v = block.getFieldValue('v');
-        return `CabbageEngine.show(${v})\n`;
+        return `CoronaEngine.show(${v})\n`;
     };
 
     pythonGenerator.forBlock['list_hide'] = function (block) {
         const v = block.getFieldValue('v');
-        return `CabbageEngine.hide(${v})\n`;
+        return `CoronaEngine.hide(${v})\n`;
     };
 }

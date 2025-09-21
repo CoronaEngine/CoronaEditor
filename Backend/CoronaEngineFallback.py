@@ -1,4 +1,4 @@
-class CabbageEngine():
+class CoronaEngine():
 
     class Scene():
         def __init__(self,winID=None,lightField=None):
@@ -6,13 +6,13 @@ class CabbageEngine():
             self.lightField = lightField
             return
         def setDisplaySurface(self,winId):
-            print("CabbageEngine.setDisplaySurface")
+            print("CoronaEngine.setDisplaySurface")
             return True
         def setCamera(self,position, forward, worldup, fov):
-            print("CabbageEngine.setCamera")
+            print("CoronaEngine.setCamera")
             return True        
         def setSunDirection(self,direction):
-            print("CabbageEngine.setSunDirection")
+            print("CoronaEngine.setSunDirection")
             return True
     
     class Actor():
@@ -20,11 +20,11 @@ class CabbageEngine():
             self.path = path
             return
         def move(self,position):
-            print("CabbageEngine.moveActor")
+            print("CoronaEngine.moveActor")
             return True
         def rotate(self,rotate):
-            print("CabbageEngine.rotateActor")
+            print("CoronaEngine.rotateActor")
             return True
         def scale(self,scale):
-            print("CabbageEngine.scaleActor")
+            print("CoronaEngine.scaleActor")
             return True

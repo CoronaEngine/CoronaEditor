@@ -9,10 +9,10 @@ url = QUrl.fromLocalFile(html_path)
 print(html_path)
 
 try:
-    import CabbageEngine
-    print("import CabbageEngine")
+    import CoronaEngine
+    print("import CoronaEngine")
 except ImportError:
-    from CabbageEngineFallback import CabbageEngine
+    from CoronaEngineFallback import CoronaEngine
     root_dir = os.path.split(os.path.split(os.path.split(os.path.split(os.path.abspath(__file__))[0])[0])[0])[0]
     html_path = os.path.join(
         root_dir,
@@ -23,7 +23,7 @@ except ImportError:
     )
     url = QUrl.fromLocalFile(html_path)
     obj_dir = os.path.join(root_dir, "TestCase", "AddModelTest")
-    print("import CabbageEngine Fallback")
+    print("import CoronaEngine Fallback")
 
 scene_dict = {}
 
