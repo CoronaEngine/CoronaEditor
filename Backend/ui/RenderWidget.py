@@ -24,7 +24,7 @@ class RenderWidget(QWidget):
             int(self.winId()),False
         )
         self.mainscene.setCamera(
-            [0.0, 5.0, 10.0], [0.0, 1.5, 0.0], [0.0, -1.0, 0.0], 45.0
+            [10.0, 10.0, 0.0], [-1.0, -1.0, -1.0], [0.0, 1.0, 0.0], 45.0
         )
         print(self.mainscene)
         scene_dict["mainscene"]={

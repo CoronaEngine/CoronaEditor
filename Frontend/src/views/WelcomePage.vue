@@ -368,7 +368,6 @@ onMounted(() => {
     selectedVersion.value = 'fun'
   }
 
-  createActor();
   document.addEventListener('keydown', handleKeyDown);
   eventBus.on('version-selected', handleVersionSelect);
   loadArchives();

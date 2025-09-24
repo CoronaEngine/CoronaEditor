@@ -70,7 +70,7 @@ class Bridge(QObject):
     @pyqtSlot(str,str)
     def createActor(self, scene_name, obj_path):
         name = os.path.basename(obj_path)
-        object = CoronaEngine.Actor(scene_dict[scene_name]["scene"], obj_path)
+        object = CoronaEngine.Actor(obj_path)
         scene_dict[scene_name]["actor_dict"][name]={
             "actor":object,
             "path":obj_path
@@ -156,7 +156,7 @@ class Bridge(QObject):
                 try:
                     print(f"选择的模型文件路径: {file_path}")
                     name = os.path.basename(file_path)
-                    object = CoronaEngine.Actor(scene_dict[sceneName]["scene"], file_path)
+                    object = CoronaEngine.Actor(file_path)
                     scene_dict[sceneName]["actor_dict"][name] = {
                         "actor": object,
                         "path": file_path
@@ -178,7 +178,7 @@ class Bridge(QObject):
                     for actor in scene_data.get("actors", []):
                         path = actor.get("path")
                         if path:
-                            actor_obj = CoronaEngine.Actor(scene_dict[sceneName]["scene"], path)
+                            actor_obj = CoronaEngine.Actor(path)
                             name = os.path.basename(path)
                             scene_dict[sceneName]["actor_dict"][name] = {
                                 "name": name,
