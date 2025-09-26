@@ -2,6 +2,7 @@ import os
 import sys
 import importlib.util
 import glob
+import queue
 
 os.environ["QT_DISABLE_DIRECT_COMPOSITION"] = "1"
 os.environ["QTWEBENGINE_CHROMIUM_FLAGS"] = "--disable-gpu --disable-software-rasterizer --enable-native-gpu-memory-buffers=false --disable-gpu-compositing --disable-gpu-rasterization --disable-oop-rasterization"
@@ -12,6 +13,8 @@ os.environ["QT_QPA_PLATFORM"] = "windows"
 _cleaned_up = False
 
 from ui import MainWindow
+
+msg_queue = queue.Queue()
 
 def cleanup_blockly_files():
     global _cleaned_up
@@ -56,7 +59,15 @@ def run(isReload):
         runScript = importlib.util.module_from_spec(runscript_spec)
         runscript_spec.loader.exec_module(runScript)
         runScript.run()
+
+    if not msg_queue.empty():
+        print(msg_queue.get())
+
     MainWindow.app.processEvents()
+
+
+def put_queue(msg):
+    msg_queue.put(msg)
 
 if __name__ == '__main__':
      print('python main')
