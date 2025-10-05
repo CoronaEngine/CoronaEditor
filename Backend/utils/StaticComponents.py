@@ -1,29 +1,20 @@
-from logging import root
-import os
+from pathlib import Path
 from PyQt6.QtCore import QUrl
 
-root_dir = os.path.split(os.path.split(os.path.split(os.path.abspath(__file__))[0])[0])[0]
-html_path = os.path.join(root_dir, "Frontend", "dist", "index.html")
-obj_dir = os.path.join(root_dir, "TestCase", "AddModelTest")
-url = QUrl.fromLocalFile(html_path)
-print(html_path)
+root_dir = Path(__file__).resolve().parents[3]
+html_path = root_dir / "CoronaEditor" / "Frontend" / "dist" / "index.html"
+url = QUrl.fromLocalFile(str(html_path))
 
 try:
-    import CoronaEngine
-    print("import CoronaEngine")
+    import CoronaEngine  # type: ignore
+    print("[StaticComponents] import CoronaEngine")
 except ImportError:
-    from CoronaEngineFallback import CoronaEngine
-    root_dir = os.path.split(os.path.split(os.path.split(os.path.split(os.path.abspath(__file__))[0])[0])[0])[0]
-    html_path = os.path.join(
-        root_dir,
-        "CoronaEditor",
-        "Frontend",
-        "dist",
-        "index.html",
-    )
-    url = QUrl.fromLocalFile(html_path)
-    obj_dir = os.path.join(root_dir, "TestCase", "AddModelTest")
-    print("import CoronaEngine Fallback")
+    try:
+        from CoronaEngineFallback import CoronaEngine  # type: ignore
+        print("[StaticComponents] import CoronaEngineFallback")
+    except ImportError:
+        print("[StaticComponents] CoronaEngine 未找到 (需要 -DBUILD_CORONA_EDITOR=ON)")
+
 
 scene_dict = {}
 
