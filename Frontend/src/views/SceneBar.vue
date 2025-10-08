@@ -61,7 +61,7 @@
 
 
       <div class="flex-1 overflow-y-auto">
-        <!-- 场景列表 - 瀑布流布局 -->
+        <!-- 场景列表-瀑布流布局 -->
         <div class="grid grid-cols-1 gap-4">
           <div v-for="scene in sceneImages" :key="scene.name" class="mb-4 break-inside-avoid">
             <div class="bg-[#E8E8E8]/80 rounded-lg shadow-sm overflow-hidden hover:bg-[#E8E8E8]/80 transition-all duration-200">
