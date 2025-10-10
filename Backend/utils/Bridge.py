@@ -42,7 +42,7 @@ class Bridge(QObject):
     ai_response = pyqtSignal(str)
     dock_event = pyqtSignal(str, str)
     command_to_main = pyqtSignal(str, str)
-    script_dir = os.path.join(root_dir, "CabbageEditor", "script")
+    script_dir = os.path.join(root_dir, "CabbageEditor", "Backend", "script")
     saves_dir = os.path.join(root_dir, "CabbageEditor", "saves")
     os.makedirs(script_dir, exist_ok=True)
     os.makedirs(saves_dir, exist_ok=True)
