@@ -5,6 +5,10 @@
     <div class="text-white font-medium w-auto whitespace-nowrap">角色</div>
     <!-- 按钮组 -->
     <div class="flex w-full space-x-2 justify-end">
+      <button @click="exportCode"
+        class="px-2 py-1 bg-blue-600 hover:bg-blue-500 text-white text-sm rounded transition-colors duration-200">
+        导出
+      </button>
       <button @click.stop="closeFloat"
         class="px-2 py-1 bg-gray-700 hover:bg-gray-600 text-white text-sm rounded transition-colors duration-200">
         ×
@@ -80,7 +84,32 @@
     <div class="absolute top-0 right-0 w-4 h-4 cursor-ne-resize z-40" @mousedown="(e) => startResize(e, 'ne')"></div>
     <div class="absolute bottom-0 left-0 w-4 h-4 cursor-sw-resize z-40" @mousedown="(e) => startResize(e, 'sw')"></div>
     <div class="absolute bottom-0 right-0 w-4 h-4 cursor-se-resize z-40" @mousedown="(e) => startResize(e, 'se')"></div>
-</div>
+  </div>
+    <div v-if="showExportModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+    <div class="bg-white rounded-lg p-6 w-[70%] max-w-2xl mx-auto">
+      <div class="flex justify-between items-center mb-4">
+        <h3 class="text-lg font-semibold">导出代码</h3>
+        <button @click="showExportModal = false" class="text-gray-500 hover:text-gray-700">
+          ×
+        </button>
+      </div>
+      <pre class="bg-gray-100 p-4 rounded-md overflow-auto max-h-96">{{ exportedCode }}</pre>
+      <div class="mt-4 flex justify-end space-x-2">
+        <button 
+          @click="copyToClipboard"
+          class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-500 transition-colors"
+        >
+          复制代码
+        </button>
+        <button 
+          @click="showExportModal = false"
+          class="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600 transition-colors"
+        >
+          关闭
+        </button>
+      </div>
+    </div>
+  </div>
 </template>
 
 <script setup>
@@ -103,6 +132,8 @@ const scenename = ref(null);
 const actorname = ref(null);
 const routename = ref(null);
 const flash = ref(null);
+const showExportModal = ref(false);
+const exportedCode = ref('');
 
 import { defineEngineBlocks } from '@/blockly/blocks/engine.js';
 import { defineAppearanceBlocks } from '@/blockly/blocks/appearance.js';
@@ -414,6 +445,32 @@ const openSetup = () => {
     window.pyBridge.addDockWidget("SetUp", "/SetUp", "float", "center");
   }
 }
+
+const exportCode = () => {
+  try {
+    // 生成Blockly代码
+    const code = pythonGenerator.workspaceToCode(workspace.value);
+    if (!code) {
+      alert('没有可导出的代码');
+      return;
+    }
+    exportedCode.value = code;
+    showExportModal.value = true;
+  } catch (error) {
+    console.error('导出代码失败:', error);
+    alert('导出代码时发生错误');
+  }
+};
+
+const copyToClipboard = async () => {
+  try {
+    await navigator.clipboard.writeText(exportedCode.value);
+    alert('代码已复制');
+  } catch (err) {
+    console.error('复制失败:', err);
+    alert('复制失败');
+  }
+};
 
 onMounted(() => {
   scenename.value = route.query.sceneName;
