@@ -2,7 +2,7 @@
   <div class="border-2 border-[#84a65b] rounded-md relative">
     <!-- 标题栏 -->
     <div class="titlebar flex items-center w-full p-2 rounded-t-md justify-between bg-[#84A65B] cursor-move select-none"
-      @mousedown="startDrag" @mousemove="onDrag" @mouseup="stopDrag" @mouseleave="stopDrag">
+      @mousedown="startDrag" @mousemove="onDrag" @mouseup="stopDrag" @mouseleave="stopDrag" @dblclick="handleDoubleClick">
       <div class="text-white font-medium w-auto whitespace-nowrap">场景</div>
       <!-- 按钮组 -->
       <div class="flex w-full space-x-2 justify-end">
@@ -97,7 +97,7 @@ import { ref, onMounted, onUnmounted } from 'vue';
 import { useRoute } from 'vue-router';
 import { useDragResize } from '@/composables/useDragResize';
 
-const { dragState,startDrag,startResize,stopDrag,onDrag,stopResize,onResize } = useDragResize();
+const { dragState,startDrag,startResize,stopDrag,onDrag,stopResize,onResize, handleDoubleClick } = useDragResize();
 const sceneImages = ref([]);
 const route = useRoute();
 const currentSceneName = ref('');

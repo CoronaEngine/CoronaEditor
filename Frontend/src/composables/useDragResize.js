@@ -59,7 +59,15 @@ export function useDragResize() {
     event.preventDefault();
   };
 
-
+  // 双击处理逻辑
+const handleDoubleClick = () => {
+  if (isFloating.value && window.pyBridge) {
+    isFloating.value = false;
+    window.pyBridge.forwardDockEvent('float', JSON.stringify({
+      isFloating: false
+    }));
+  }
+};
 
   const startResize = (event, direction) => {
     if (event.button !== 0) return;
@@ -131,5 +139,5 @@ export function useDragResize() {
     dragState.value.isResizing = false;
   };
 
-  return {dragState,startDrag,startResize,stopDrag,onDrag,stopResize,onResize};
+  return {dragState,startDrag,startResize,stopDrag,onDrag,stopResize,onResize, handleDoubleClick, isFloating };
 }

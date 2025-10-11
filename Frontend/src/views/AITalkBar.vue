@@ -3,7 +3,7 @@
     <!-- 标题栏 -->
     <div
       class="border-t-2 border-r-2 border-l-2 border-gray-950 titlebar fixed top-0 left-0 right-0 flex items-center w-full p-2 justify-between bg-[#84A65B] cursor-move select-none z-50"
-      @mousedown="startDrag" @mousemove="onDrag" @mouseup="stopDrag" @mouseleave="stopDrag">
+      @mousedown="startDrag" @mousemove="onDrag" @mouseup="stopDrag" @mouseleave="stopDrag" @dblclick="handleDoubleClick">
       <div class="text-white font-medium w-auto whitespace-nowrap">助手</div>
       <!-- 按钮组 -->
       <div class="flex w-full space-x-2 justify-end">
@@ -68,7 +68,7 @@
 import { ref, inject, onMounted, onUnmounted } from 'vue';
 import { useDragResize } from '@/composables/useDragResize';
 
-const { dragState,startDrag,startResize,stopDrag,onDrag,stopResize,onResize } = useDragResize();
+const { dragState,startDrag,startResize,stopDrag,onDrag,stopResize,onResize, handleDoubleClick } = useDragResize();
 const eventBus = inject('eventBus');
 
 const messages = ref([
@@ -127,7 +127,7 @@ const closeFloat = () => {
     window.pyBridge.removeDockWidget("AITalkBar");
   }
 };
-
+/*
 // 双击事件处理
 const handleDoubleClick = () => {
   if (window.pyBridge) {
@@ -138,7 +138,7 @@ const handleDoubleClick = () => {
     console.error("Python SendMessageToDock 未连接！");
   }
 };
-
+*/
 const handleResizeMove = (e) => {
   if (dragState.value.isResizing) onResize(e);
 };
