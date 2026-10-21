@@ -11,6 +11,7 @@ PySide6
 # Computer Vision
 opencv-python
 Pillow
+trimesh
 
 # Cryptographic library
 cryptography
@@ -18,12 +19,14 @@ alibabacloud-oss-v2
 
 # HTTP client
 httpx
+requests
 flask
 flask-cors
 gevent
 
 # LangChain v1.0
 langchain
+pydantic
 langgraph
 langchain-openai
 langchain-mcp-adapters
@@ -41,6 +44,7 @@ bitsandbytes
 accelerate
 sqlite-vec
 numpy
+qwen-vl-utils
 
 --extra-index-url https://download.pytorch.org/whl/cu126
 torch
