@@ -2,7 +2,7 @@
 
 This module deliberately accepts Python dictionaries only.  It does not read AI result
 files, parse result XML, write Blockly targets, or update the project manifest.  The XML
-under docs is a read-only capability catalog used to validate the JSON contract here.
+beside this module is a read-only capability catalog used to validate the JSON contract here.
 """
 
 from __future__ import annotations
@@ -18,11 +18,7 @@ SCHEMA_VERSION = 1
 TARGET_ID = "node_graph:project:global"
 VALID_NODE_TYPES = {"start", "custom", "end"}
 VALID_PORT_SIDES = {"left", "right", "bottom"}
-CONTRACT_PATH = (
-    Path(__file__).resolve().parents[3]
-    / "docs"
-    / "CoronaBlocksDocument.internal-ai-contract.xml"
-)
+CONTRACT_PATH = Path(__file__).with_name("CoronaBlocksDocument.internal-ai-contract.xml")
 
 
 @dataclass(frozen=True)

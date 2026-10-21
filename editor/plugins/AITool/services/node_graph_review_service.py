@@ -268,16 +268,16 @@ class NodeGraphReviewService:
 
     @classmethod
     def _find_contract_path(cls, start_path: Path | str | None = None) -> Path:
-        """Find the repository contract from both source and packaged editor layouts."""
+        """Find the runtime catalog in either source or deployed editor layouts."""
         start = Path(start_path or __file__).resolve()
         search_roots = [start] if start.is_dir() else list(start.parents)
         for root in search_roots:
-            candidate = root / "docs" / cls.CONTRACT_FILENAME
+            candidate = root / "script_runtime" / "blockly" / cls.CONTRACT_FILENAME
             if candidate.is_file():
                 return candidate
         # Keep a deterministic path in diagnostics when the checkout is incomplete.
         fallback_root = search_roots[-1] if search_roots else start.parent
-        return fallback_root / "docs" / cls.CONTRACT_FILENAME
+        return fallback_root / "script_runtime" / "blockly" / cls.CONTRACT_FILENAME
 
     def review(self, payload: Any) -> dict[str, Any]:
         try:

@@ -2,6 +2,8 @@ import importlib.util
 import io
 import json
 import pathlib
+import shutil
+import tempfile
 import sys
 import time
 import types
@@ -59,22 +61,15 @@ class NodeGraphReviewServiceTests(unittest.TestCase):
             self.assertTrue(resolved.is_file())
             self.assertEqual(NodeGraphReviewService.CONTRACT_FILENAME, resolved.name)
 
-        with self.subTest("packaged CabbageEditor layout"):
-            fake_service = (
-                MODULE_PATH.parents[4]
-                / "build"
-                / "examples"
-                / "engine"
-                / "RelWithDebInfo"
-                / "CabbageEditor"
-                / "plugins"
-                / "AITool"
-                / "services"
-                / "node_graph_review_service.py"
-            )
+        with self.subTest("packaged CabbageEditor layout"), tempfile.TemporaryDirectory() as directory:
+            editor = pathlib.Path(directory) / "中文 runtime" / "CabbageEditor"
+            catalog = editor / "script_runtime" / "blockly" / NodeGraphReviewService.CONTRACT_FILENAME
+            catalog.parent.mkdir(parents=True)
+            shutil.copy2(resolved, catalog)
+            fake_service = editor / "plugins" / "AITool" / "services" / "node_graph_review_service.py"
             resolved = NodeGraphReviewService._find_contract_path(fake_service)
             self.assertTrue(resolved.is_file())
-            self.assertEqual(NodeGraphReviewService.CONTRACT_FILENAME, resolved.name)
+            self.assertEqual(catalog, resolved)
 
     def test_parses_fenced_json_with_surrounding_text(self):
         result = NodeGraphReviewService._parse_model_result(

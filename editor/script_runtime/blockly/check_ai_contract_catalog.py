@@ -13,9 +13,9 @@ import re
 import sys
 import xml.etree.ElementTree as ET
 
-REPO_ROOT = Path(__file__).resolve().parents[3]
-TOOLBOX_PATH = REPO_ROOT / "editor" / "Frontend" / "src" / "blockly" / "configs" / "toolboxConfig.js"
-CONTRACT_PATH = REPO_ROOT / "docs" / "CoronaBlocksDocument.internal-ai-contract.xml"
+EDITOR_ROOT = Path(__file__).resolve().parents[2]
+TOOLBOX_PATH = EDITOR_ROOT / "Frontend" / "src" / "blockly" / "configs" / "toolboxConfig.js"
+CONTRACT_PATH = Path(__file__).with_name("CoronaBlocksDocument.internal-ai-contract.xml")
 BLOCK_CALL_PATTERN = re.compile(r"\bblock\(\s*(['\"])([^'\"]+)\1")
 VALID_SHAPES = {"output", "statement", "hat", "definition", "terminal"}
 VALID_PROJECT_USAGE = {"project-safe", "actor-context"}
