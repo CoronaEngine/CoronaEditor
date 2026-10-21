@@ -3,44 +3,9 @@
 """
 
 from dataclasses import dataclass
+import os
 from pathlib import Path
 from typing import Optional
-
-
-def _runtime_paths() -> dict:
-    """Consume native resolved paths; standalone Python uses source defaults."""
-    try:
-        import CoronaEngine
-    except ModuleNotFoundError as error:
-        if error.name != "CoronaEngine":
-            raise
-    else:
-        getter = getattr(CoronaEngine, "_get_runtime_paths", None)
-        if callable(getter):
-            return getter()
-    editor_root = Path(__file__).resolve().parents[1]
-    user_data = editor_root.parent
-    return {
-        "editor_root": str(editor_root),
-        "frontend_index": str(editor_root / "Frontend" / "dist" / "index.html"),
-        "asset_roots": [str(user_data / "assets")],
-        "user_data_dir": str(user_data),
-        "cache_dir": str(user_data / "cache"),
-        "editor_state_file": str(user_data / "CoronaEditor.ini"),
-        "project_data_dir": str(user_data / "data"),
-    }
-
-
-def get_editor_state_path() -> Path:
-    return Path(_runtime_paths()["editor_state_file"])
-
-
-def get_user_data_dir() -> Path:
-    return Path(_runtime_paths()["user_data_dir"])
-
-
-def get_project_data_dir() -> Path:
-    return Path(_runtime_paths()["project_data_dir"])
 
 
 @dataclass(frozen=True)
@@ -59,8 +24,8 @@ class PathsConfig:
 
 def get_default_paths() -> PathsConfig:
     """获取默认路径配置"""
-    paths = _runtime_paths()
-    repo_root = Path(paths["editor_root"])
+    # 从当前文件位置计算项目根目录
+    repo_root = Path(__file__).resolve().parents[1]
     config_dir = repo_root / "config"
     autosave_dir = get_project_media_dir()
     assets_model_dir = get_project_models_dir()
@@ -68,8 +33,8 @@ def get_default_paths() -> PathsConfig:
 
     return PathsConfig(
         repo_root=repo_root,
-        frontend_dist=Path(paths["frontend_index"]),
-        generated_script_dir=Path(paths["user_data_dir"]) / "runtime" / "generated",
+        frontend_dist=repo_root / "Frontend" / "dist" / "index.html",
+        generated_script_dir=repo_root / "runtime" / "generated",
         autosave_dir=autosave_dir,
         config_dir=config_dir,
         assets_model_dir=assets_model_dir,
@@ -83,7 +48,7 @@ def get_default_paths() -> PathsConfig:
 # ---------------------------------------------------------------------------
 
 def _get_active_project_path() -> Path:
-    """获取当前活跃项目路径；未打开项目时使用用户数据目录。"""
+    """获取当前活跃项目路径，未打开项目时回退到 cwd。"""
     try:
         from runtime.project_context import get_active_project_path
 
@@ -92,7 +57,7 @@ def _get_active_project_path() -> Path:
             return Path(project_path)
     except Exception:
         pass
-    return get_user_data_dir() / "scratch"
+    return Path(os.getcwd())
 
 
 def get_project_media_dir() -> Path:
@@ -123,23 +88,5 @@ def get_project_recognition_db() -> Path:
 
 
 def get_repository_assets_dir() -> Path:
-    """Return the first configured read-only asset root."""
-    roots = get_repository_assets_dirs()
-    if not roots:
-        raise RuntimeError("No resources.asset_roots are configured")
-    return roots[0]
-
-
-def get_repository_assets_dirs() -> tuple[Path, ...]:
-    return tuple(Path(root) for root in _runtime_paths()["asset_roots"])
-
-
-def resolve_repository_asset_path(relative: str) -> Path:
-    name = Path(relative)
-    if name.anchor or ".." in name.parts or not relative:
-        raise ValueError("Asset name must be relative to an asset root")
-    for root in get_repository_assets_dirs():
-        candidate = root / name
-        if candidate.exists():
-            return candidate
-    return get_repository_assets_dir() / name
+    """Return the repository-bundled asset root (read-only runtime fallback)."""
+    return get_default_paths().repo_root.parent / "assets"

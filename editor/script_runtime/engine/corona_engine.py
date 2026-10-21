@@ -135,22 +135,15 @@ _clone_threads: dict[str, list[_threading.Thread]] = {}
 _handler_threads: dict[str, list[_threading.Thread]] = {}
 
 
-def _bundled_audio_roots() -> tuple[_Path, ...]:
-    """Search bundled audio in the host's configured asset-root order."""
-    try:
-        from config.paths_config import get_repository_assets_dirs
-    except ImportError:
-        # Keep the runtime importable in minimal script-host environments.
-        return (_Path(__file__).resolve().parents[3] / "assets" / "audio",)
-    return tuple(root / "audio" for root in get_repository_assets_dirs())
-
-
 def _bundled_audio_root() -> _Path:
-    """Compatibility accessor for tools expecting a single bundled directory."""
-    roots = _bundled_audio_roots()
-    if not roots:
-        raise RuntimeError("No resources.asset_roots are configured")
-    return roots[0]
+    """Resolve repository-bundled audio after the runtime package move."""
+    try:
+        from config.paths_config import get_repository_assets_dir
+
+        return get_repository_assets_dir() / "audio"
+    except Exception:
+        # Keep the runtime importable in minimal script-host environments.
+        return _Path(__file__).resolve().parents[3] / "assets" / "audio"
 
 
 def _current_context() -> ScratchRuntimeContext:
@@ -5220,7 +5213,7 @@ def _ensure_audio(name):
     if project_root:
         project = _Path(project_root)
         roots.extend((project / 'Resource' / 'audio', project / 'assets' / 'audio', project / 'Audio'))
-    roots.extend(_bundled_audio_roots())
+    roots.append(_bundled_audio_root())
     suffixes = ('',) if raw_path.suffix else ('.wav', '.mp3', '.ogg')
     for root in roots:
         for suffix in suffixes:

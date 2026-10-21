@@ -13,7 +13,6 @@ import logging
 import os
 import shutil
 from pathlib import Path
-from .paths_config import get_editor_state_path, get_project_data_dir
 
 # Keep the historical logger name so older host log filters remain effective.
 logger = logging.getLogger("config.project_state")
@@ -28,7 +27,9 @@ class CoronaSettings:
         self.project_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
         if config_path is None:
-            self.config_path = str(get_editor_state_path())
+            self.config_path = os.path.join(
+                os.path.dirname(self.project_path), "CoronaEditor.ini"
+            )
         else:
             self.config_path = config_path
 
@@ -64,7 +65,6 @@ class CoronaSettings:
         return project_ini if os.path.isfile(project_ini) else ""
 
     def _ensure_file_exists(self):
-        Path(self.config_path).parent.mkdir(parents=True, exist_ok=True)
         if not os.path.exists(self.config_path):
             template_path = os.path.join(self.project_path, "CoronaEditor.ini")
             if os.path.exists(template_path):
@@ -89,10 +89,7 @@ class CoronaSettings:
             project_path = self.config.get("General", "last_project", fallback="") or ""
             if not project_path:
                 return False
-            project_path = Path(project_path)
-            if not project_path.is_absolute():
-                project_path = Path(self.config_path).parent / project_path
-            project_path = str(project_path.resolve())
+            project_path = os.path.abspath(project_path)
             ini_path = self._project_config_path(project_path)
             if not os.path.isdir(project_path) or not ini_path:
                 return False
@@ -229,7 +226,7 @@ class CoronaSettings:
         self.save()
 
     def get_default_path(self) -> str:
-        return self.config.get("General", "default_path", fallback="") or str(get_project_data_dir())
+        return self.config.get("General", "default_path", fallback="")
 
     def set_default_path(self, path: str):
         self.config.set("General", "default_path", path)

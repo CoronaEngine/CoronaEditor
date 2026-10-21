@@ -56,9 +56,7 @@ def get_project_root(*, fallback_to_environment=True) -> Path:
         configured = (os.environ.get("CORONAENGINE_PROJECT") or "").strip()
         if configured:
             return Path(configured).expanduser()
-    from config.paths_config import get_user_data_dir
-
-    return get_user_data_dir() / "scratch"
+    return Path.cwd()
 
 
 def set_active_project_path(project_path, native_engine=None):
