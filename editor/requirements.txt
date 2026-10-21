@@ -46,7 +46,8 @@ sqlite-vec
 numpy
 qwen-vl-utils
 
---extra-index-url https://download.pytorch.org/whl/cu126
-torch
-torchvision
+# CPU wheels only; the Python layer does not require CUDA.
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch==2.14.1+cpu
+torchvision==0.29.1+cpu
 
