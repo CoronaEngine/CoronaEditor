@@ -227,15 +227,15 @@ onUnmounted(() => {
 }
 
 .dock-zone-left {
-  border-right: 1px solid #30281c;
+  border-right: 1px solid #1b241d;
 }
 
 .dock-zone-right {
-  border-left: 1px solid #30281c;
+  border-left: 1px solid #1b241d;
 }
 
 .dock-zone-bottom {
-  border-top: 1px solid #30281c;
+  border-top: 1px solid #1b241d;
 }
 
 .dock-bottom-row {
@@ -248,7 +248,7 @@ onUnmounted(() => {
 }
 
 .dock-zone-dragover {
-  outline: 2px solid #d8b86c;
+  outline: 2px solid #b3995d;
   outline-offset: -2px;
   background: #29220f;
 }
@@ -275,7 +275,7 @@ onUnmounted(() => {
   position: absolute;
   z-index: 30;
   flex: 0 0 auto;
-  background: #30281c;
+  background: #1b241d;
   transition: background-color 120ms ease;
 }
 
@@ -303,7 +303,7 @@ onUnmounted(() => {
 }
 
 .dock-sep:hover {
-  background: #b8924a;
+  background: #b3995d;
 }
 
 :global(body.dock-resizing-column),

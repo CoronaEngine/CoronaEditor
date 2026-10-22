@@ -65,7 +65,7 @@ onBeforeUnmount(() => {
   position: relative;
   display: inline-block;
   min-width: 120px;
-  background: #3c3c3c;
+  background: #2b362d;
   border: none;
   color: white;
   cursor: pointer;
@@ -85,7 +85,7 @@ onBeforeUnmount(() => {
   top: 100%;
   left: 0;
   right: 0;
-  background: #3c3c3c;
+  background: #2b362d;
   border: 1px solid #555;
   max-height: 200px;
   overflow-y: auto;
@@ -99,7 +99,7 @@ onBeforeUnmount(() => {
   background: #555;
 }
 .select-option.selected {
-  background: #d8b86c;
+  background: #b3995d;
   color: white;
 }
 </style>

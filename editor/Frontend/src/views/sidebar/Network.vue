@@ -1,11 +1,11 @@
 <template>
   <div
-    class="flex-1 min-h-0 h-full w-full rounded-lg overflow-hidden relative bg-[#282828]/90 flex flex-col text-white font-sans"
+    class="flex-1 min-h-0 h-full w-full rounded-lg overflow-hidden relative bg-[#1b241d]/90 flex flex-col text-white font-sans"
   >
     <DockTitleBar
       v-if="!isDocked"
       title="局域网聊天"
-      extraClass="bg-[#D8B86C]"
+      extraClass="bg-[#b3995d]"
       @close="closeFloat"
     />
 
@@ -19,7 +19,7 @@
             type="text"
             maxlength="31"
             placeholder="输入名称..."
-            class="bg-[#1e1e1e] border border-gray-600 rounded px-2 py-1.5 text-white focus:border-[#4a9eff] focus:outline-none"
+            class="bg-[#121a14] border border-gray-600 rounded px-2 py-1.5 text-white focus:border-[#4a9eff] focus:outline-none"
           />
         </div>
 
@@ -30,7 +30,7 @@
             type="number"
             min="1024"
             max="65535"
-            class="bg-[#1e1e1e] border border-gray-600 rounded px-2 py-1.5 text-white w-24 focus:border-[#4a9eff] focus:outline-none"
+            class="bg-[#121a14] border border-gray-600 rounded px-2 py-1.5 text-white w-24 focus:border-[#4a9eff] focus:outline-none"
           />
         </div>
 
@@ -79,7 +79,7 @@
             v-for="peer in discoveredPeers"
             :key="peer.stable_id"
             @click="selectDiscoveredPeer(peer)"
-            class="w-full text-left px-2 py-1.5 bg-[#1e1e1e] hover:bg-[#333] rounded"
+            class="w-full text-left px-2 py-1.5 bg-[#121a14] hover:bg-[#2b362d] rounded"
           >
             <div class="text-gray-200 truncate">{{ peer.name }}</div>
             <div class="text-gray-500 text-[10px]">{{ peer.ip }}:{{ peer.port }} · {{ peer.role === 'host' ? '房主' : '客户端' }}</div>
@@ -94,7 +94,7 @@
             v-model="remoteIp"
             type="text"
             placeholder="192.168.1.100"
-            class="bg-[#1e1e1e] border border-gray-600 rounded px-2 py-1.5 text-white focus:border-[#4a9eff] focus:outline-none"
+            class="bg-[#121a14] border border-gray-600 rounded px-2 py-1.5 text-white focus:border-[#4a9eff] focus:outline-none"
           />
         </div>
         <div class="flex gap-2">
@@ -105,7 +105,7 @@
               type="number"
               min="1024"
               max="65535"
-              class="bg-[#1e1e1e] border border-gray-600 rounded px-2 py-1.5 text-white w-24 focus:border-[#4a9eff] focus:outline-none"
+              class="bg-[#121a14] border border-gray-600 rounded px-2 py-1.5 text-white w-24 focus:border-[#4a9eff] focus:outline-none"
             />
           </div>
           <div class="flex flex-col gap-1 flex-1">
@@ -114,14 +114,14 @@
               v-model="remotePeerName"
               type="text"
               placeholder="可选"
-              class="bg-[#1e1e1e] border border-gray-600 rounded px-2 py-1.5 text-white focus:border-[#4a9eff] focus:outline-none"
+              class="bg-[#121a14] border border-gray-600 rounded px-2 py-1.5 text-white focus:border-[#4a9eff] focus:outline-none"
             />
           </div>
         </div>
         <button
           @click="doConnectToPeer"
           :disabled="!remoteIp.trim() || connectStatus === 'connecting'"
-          class="px-4 py-1.5 bg-[#D8B86C] hover:bg-[#6f8d4a] rounded text-white font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          class="px-4 py-1.5 bg-[#b3995d] hover:bg-[#6f8d4a] rounded text-white font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
           加入房间
         </button>
@@ -147,7 +147,7 @@
           <div
             v-for="peer in peers"
             :key="peer.name"
-            class="flex items-center gap-2 px-2 py-1 bg-[#1e1e1e] rounded"
+            class="flex items-center gap-2 px-2 py-1 bg-[#121a14] rounded"
           >
             <span class="w-2 h-2 rounded-full bg-green-400"></span>
             <span class="text-gray-300 truncate">{{ peer.name }}</span>

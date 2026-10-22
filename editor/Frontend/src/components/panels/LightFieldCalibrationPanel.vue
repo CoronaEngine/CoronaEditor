@@ -106,8 +106,8 @@ onMounted(apply);
   height: 100%;
   box-sizing: border-box;
   overflow-y: auto;
-  background: #181818;
-  color: #e0e0e0;
+  background: #141d16;
+  color: #e8ede3;
 }
 
 .lfd-calib__group {
@@ -130,7 +130,7 @@ onMounted(apply);
 }
 
 .lfd-calib__name {
-  color: #e0e0e0;
+  color: #e8ede3;
   font-size: 10px;
   min-width: 52px;
 }
@@ -141,14 +141,14 @@ onMounted(apply);
   padding: 3px 10px;
   font-size: 10px;
   color: #cbd5e1;
-  background: #2a2a2a;
-  border: 1px solid #3c3c3c;
+  background: #263126;
+  border: 1px solid #2b362d;
   border-radius: 4px;
   cursor: pointer;
 }
 
 .lfd-calib__reset:hover {
   background: #353535;
-  border-color: #d8b86c;
+  border-color: #b3995d;
 }
 </style>
