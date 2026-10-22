@@ -121,18 +121,10 @@ const current = () => !disposed && !leaving && worldModeState.status === 'ready'
  */
 const groundYAt = (x, z) => heightAt(x, z);
 const camera = createStoryCameraController({
-  // 主世界：第三人称跟随（原样）。小世界：自由视角 / 俯视视角，见 viewportStoryWorldCamera.js。
-  // 两台控制器都建好、只让当前世界的那台收输入；`role()` 在 bindPlayer 时与每次调用时读，
-  // 页面是在 `gameplay.load()` 之后才 bind 的，所以这里必须读 ref 而不是常量。
-  // `getGroundY` 与 `modelYawOffset` 走 `...options` 转交给两台控制器：小世界的相机要用地面线
-  // 算「隐形主角」的脚 y，写回存档时又要用模型朝向偏移换算逻辑朝向。
-  createControls: options => createStoryWorldControls({ ...options,
-    createThirdPerson: createPlayerController,
-    role: () => (roleRef.value === 'child' ? 'child' : 'main'),
-    modelYawOffset: PLAYER_MODEL_YAW_OFFSET,
-    // 玩家的地面线：地图是 phantom（引擎不为它建碰撞体），脚下多高只能由烘好的高度网格回答。
-    // `heightAt` 在没有网格时返回 null，控制器便退回原来的固定地板。
-    getGroundY: groundYAt }),
+  createControls: options => createStoryWorldControls({
+    ...options, createThirdPerson: createPlayerController, role: () => roleRef.value,
+    getGroundY: groundYAt, modelYawOffset: PLAYER_MODEL_YAW_OFFSET,
+  }),
   onError: error => {
     if (current()) gameplayError.value = error.message;
     notifyWorldError(error);
@@ -2223,6 +2215,8 @@ function onKeyDown(event) {
     }
     return;
   }
+  // 物品栏：调整模式与对话（上面两个分支）已经吃掉数字键，因此这里只在
+  // 小世界、面板关闭时接管数字键与 B。主世界里这套键完全不生效。
   if (route === 'hotbar-slot') {
     event.preventDefault(); event.stopPropagation();
     if (!event.repeat) selectHotbarSlot(Number(event.key) - 1);
@@ -2342,9 +2336,7 @@ onMounted(async () => {
   initialization = trackWorldSessionWork((async () => {
     const init = unwrap(await editorApi.main.onInit());
     if (!current()) return;
-    const scenes = init?.scenes || [];
-    const index = Math.min(Math.max(Number(init?.active_index) || 0, 0), Math.max(0, scenes.length - 1));
-    sceneId = scenes[index]?.path || init?.path;
+    sceneId = init?.scene?.path;
     if (!sceneId) throw new Error('当前世界没有可用场景');
     // 原生三角面移动的结果必须回送控制器：没有这条登记，按键只会更新输入状态，
     // 移动请求一直挂在 pendingMove 上等回调，角色永远不动（15 秒后还会报超时）。

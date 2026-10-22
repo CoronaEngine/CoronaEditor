@@ -20,7 +20,7 @@
   lifecycle。
 - 引擎场景只能通过 `api.editor_api` 或 `native_scene_state`
   访问；不得直接导入 `CoronaCore`、native `Actor`、`Scene` 或底层 binding。
-- 场景列表统一通过 native `scene.list_routes`，不得从 legacy Scene store 枚举路由。
+- 当前场景统一通过 native `scene.get_snapshot` 获取；不提供场景列表或场景切换。
 - Agent Runtime 的相对资源路径先解析到 `runtime.project_context` 的活动项目根目录；
   绝对路径不重定位。
 - API key 只能由 `configuration/` 从 `.env` 或受控本地配置读取，日志不得输出秘钥。

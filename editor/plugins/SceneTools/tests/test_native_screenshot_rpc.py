@@ -8,7 +8,7 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
         return pathlib.Path(__file__).resolve().parents[4]
 
     def _handler_source(self):
-        repo_root = self._repo_root()
+        repo_root = self._repo_root().parent
         handler_path = repo_root / "src" / "systems" / "ui" / "cef" / "cef_editor_native_api_handlers.cpp"
         return handler_path.read_text(encoding="utf-8")
 
@@ -3261,9 +3261,7 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
         self.assertIn('scene.vision_storage == "project_sidecar"', source)
         self.assertIn('Corona::API::load_vision_scene(path_to_utf8(sidecar_json))', source)
         self.assertIn('CFW_LOG_ERROR("Vision sidecar scene missing', source)
-        self.assertIn("migrate_project_sidecar_scene_to_embedded", source)
-        self.assertIn("create_embedded_vision_document(scene.project_root, sidecar_json, document)", source)
-        self.assertIn("scene_ini = read_ini_file(scene_file)", source)
+        self.assertNotIn("migrate_project_sidecar_scene_to_embedded", source)
 
     def test_vision_scene_load_event_supports_embedded_json_payload(self):
         repo_root = pathlib.Path(__file__).resolve().parents[4]

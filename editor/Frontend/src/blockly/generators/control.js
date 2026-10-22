@@ -105,14 +105,6 @@ export const defineControlGenerators = () => {
     return `CoronaEngine.deleteClone()\n`;
   };
 
-  pythonGenerator.forBlock['control_senceSet'] = function (block) {
-    const x = block.getFieldValue('x');
-    return `CoronaEngine.setScene("${x}")\n`;
-  };
-
-  pythonGenerator.forBlock['control_nextSence'] = function () {
-    return `CoronaEngine.nextScene()\n`;
-  };
 
   pythonGenerator.forBlock['control_restart_level'] = function () {
     return 'CoronaEngine.restart_level()\n';

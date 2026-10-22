@@ -69,9 +69,8 @@ def handle_navigation_request(payload: str, *, api=None) -> dict:
             init = _unwrap(api.main.on_init())
             if not isinstance(init, dict):
                 raise SubworldError('无法确定当前场景，已取消保存')
-            scenes = init.get('scenes', [])
-            index = init.get('active_index', 0)
-            route = scenes[index].get('path') if isinstance(index, int) and 0 <= index < len(scenes) else init.get('path')
+            scene = init.get('scene')
+            route = scene.get('path') if isinstance(scene, dict) else None
             if not isinstance(route, str) or not route or (source / route).resolve() != source / 'scene.ini':
                 raise SubworldError('当前场景与剧情世界不匹配，已取消保存')
             assert_source()

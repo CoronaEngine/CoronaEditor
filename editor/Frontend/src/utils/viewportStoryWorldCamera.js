@@ -374,23 +374,21 @@ export function createStoryWorldControls({
     setSpeed: value => call('setSpeed', [value]),
     // 绑定按「世界角色」路由，不看就绪标记：正是这次绑定让另一台控制器变得可用。
     bindPlayer: (actor, offset) => (childWorld() ? small : third).bindPlayer(actor, offset),
+    // Native replies belong to the controller that submitted the move, including
+    // a late reply while navigation is waiting to save its final pose.
+    acceptMeshMove: event => third.acceptMeshMove?.(event) ?? false,
     onCameraBound: () => call('onCameraBound', []),
     snapshotPlayer: () => call('snapshotPlayer', []),
-    /**
-     * 原生三角面移动的回调必须回到「正在驱动玩家的那台控制器」。
-     *
-     * 主世界的第三人称只有在 `acceptMeshMove` 收到原生姿态之后才更新玩家位置（它不再自行
-     * 套用未确认的位移，`pendingMove` 会一直挂着直到超时）。页面把 `camera.acceptMeshMove`
-     * 交给 `editorApi.events.onMeshMoveResult`，所以分派器少这一条转发，主世界的 WASD 就
-     * 永远落不了地。小世界的相机没有这个能力，`call` 会返回 undefined（不是抛错）。
-     */
-    acceptMeshMove: event => call('acceptMeshMove', [event]),
     acknowledgePlayerSave: pose => call('acknowledgePlayerSave', [pose]),
     viewMode: () => call('viewMode', []),
     setViewMode: next => call('setViewMode', [next]),
     cycleViewMode: () => call('cycleViewMode', []),
     // 输入复位与释放对两个控制器都做：切世界之后另一个手里的按键不能留在按下状态。
-    resetInput() { third.resetInput(); small.resetInput(); },
+    resetInput() {
+      const settled = third.resetInput();
+      small.resetInput();
+      return settled;
+    },
     dispose() { third.dispose(); small.dispose(); },
   };
 }

@@ -78,6 +78,13 @@ class CoronaEditor:
     def update_project_context(cls, project_path):
         """Apply the native launcher's authoritative project on the Python thread."""
         normalized_path = os.path.abspath(os.path.expanduser(str(project_path or "").strip()))
+        if os.path.isfile(normalized_path) and os.path.splitext(normalized_path)[1].lower() in {".xml", ".pbrt"}:
+            # External geometry is a transient scene, never a portable project.
+            settings_manager.active_project_path = normalized_path
+            settings_manager.active_project_config = None
+            if cls.CoronaEngine is not None:
+                cls.CoronaEngine.active_project_path = normalized_path
+            return True
         if not normalized_path or not settings_manager.set_active_project(normalized_path):
             return False
         if cls.CoronaEngine is not None:

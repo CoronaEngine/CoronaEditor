@@ -26,9 +26,7 @@ import { appService } from '@/services/appService.js';
 import { coronaEventBus } from '@/utils/eventBus.js';
 
 const { closePanel, isDocked } = useDockPanel();
-// Keep the route empty until MainPage reports the active scene. Passing the generic
-// DEFAULT_SCENE_NAME into listActorTree can make the native scene router reload a
-// different scene, which resets the main viewport camera when this panel opens.
+// An empty route binds to the current scene until MainPage publishes its identity.
 const sceneName = ref('');
 const workspaceRef = ref(null);
 let closeStopPromise = null;

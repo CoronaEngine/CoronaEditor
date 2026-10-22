@@ -3,7 +3,7 @@ import { Buffer } from 'node:buffer';
 import test from 'node:test';
 import { setImmediate } from 'node:timers/promises';
 import { createEditorWindowSession } from '../../src/services/editorWindowSession.js';
-import { portableWorldMode, readWorldProjectInfo } from '../../src/services/worldModeService.js';
+import { readWorldProjectInfo } from '../../src/services/worldModeService.js';
 import { memoryStorage, deferred } from './windowSessionFixtures.mjs';
 
 function harness(overrides = {}) {
@@ -184,30 +184,12 @@ test('story and unreadable storage fail closed before sending window commands', 
   assert.equal(h.commands.filter(command => command.cmd === panel.cmd).length, 0);
 });
 
-const format = '[format]\ntype=corona_scene_folder\nversion=1\n';
-test('portable defaults use actual markers instead of the native story fallback', async () => {
-  for (const mode of [undefined, '', 'creative', '3d', 'multiplayer', 'Story']) {
-    assert.equal(portableWorldMode(format + (mode === undefined ? '' : `[world]\ntype=${mode}`)), 'creative');
-  }
-  assert.equal(portableWorldMode('\uFEFF' + format + '[WORLD]\n TYPE = story\r\n'), 'story');
-  assert.equal(portableWorldMode(format + '[world]\ntype=story\ntype=creative'), 'creative');
-  assert.equal(portableWorldMode('[world]\ntype=story', 'story'), 'story'); // legacy
-  const info = { project_path: 'D:\\中文世界\\', mode: 'story', entrance_scene: 'scene.ini' };
-  const reads = [];
-  const api = { projectSettings: { getActiveProjectInfo: async () => ({ data: info }) }, ai: {
-    readLocalFileAsBase64: async path => {
-      reads.push(path);
-      return { data: `data:application/octet-stream;base64,${Buffer.from(format).toString('base64')}` };
-    },
-  } };
-  const resolved = await readWorldProjectInfo(api);
-  assert.equal(resolved.mode, 'creative');
-  assert.equal(resolved.project_path, info.project_path);
-  assert.deepEqual(reads, ['D:\\中文世界/scene.ini']);
-  api.ai.readLocalFileAsBase64 = async () => '';
-  await assert.rejects(readWorldProjectInfo(api), /无法读取/);
-  info.mode = '3d';
-  assert.equal((await readWorldProjectInfo(api)).mode, '3d');
+test('world mode uses authoritative native scene metadata', async () => {
+  const info = { project_path: 'D:/world', mode: 'creative' };
+  const api = { projectSettings: { getActiveProjectInfo: async () => ({ data: info }) } };
+  assert.deepEqual(await readWorldProjectInfo(api), info);
+  info.mode = 'story';
+  assert.equal((await readWorldProjectInfo(api)).mode, 'story');
 });
 
 test('a same-revision disable supersedes an enable awaiting retirement', async () => {

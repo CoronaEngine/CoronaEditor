@@ -3,6 +3,7 @@ import test from 'node:test';
 import { createStoryCameraController } from '../../src/utils/viewportStoryCamera.js';
 import { createViewportCameraController } from '../../src/utils/viewportCameraController.js';
 import { createPlayerController } from '../../../game/frontend/playerController.mjs';
+import { createMeshMoveHost, createPlayerControllerWithHost } from './meshMoveFixture.mjs';
 import { SMALL_WORLD_CAMERA, SMALL_WORLD_VIEW_LABELS, SMALL_WORLD_VIEWS,
   createSmallWorldCamera, createStoryWorldControls } from '../../src/utils/viewportStoryWorldCamera.js';
 
@@ -34,6 +35,43 @@ const playerActor = (position = [0, 0.9, 0]) => ({ handle: 41,
   // 「玩家三角形几何边界未就绪」——这是引擎快照本来就有的字段，测试必须照真机给全。
   local_aabb: [-0.25, -0.9, -0.25, 0.25, 0.9, 0.25],
   geometry: { position: [...position], rotation: [0, -Math.PI / 2, 0], scale: [1, 1, 1] } });
+
+test('native movement replies cross both camera wrappers and settle the save barrier after input stops', async t => {
+  const timer = clock();
+  let role = 'main';
+  const host = createMeshMoveHost({
+    autoReply: false,
+    readActor: () => camera.snapshotPlayer(),
+    onResult: result => assert.equal(camera.acceptMeshMove(result), true),
+  });
+  const camera = createStoryCameraController({
+    getBridge: () => ({ cameraMove: () => true, moveActorMesh: host.moveActorMesh }),
+    getRect: () => ({ left: 0, top: 0, width: 800, height: 600 }),
+    createControls: options => createStoryWorldControls({ ...options, role: () => role,
+      createThirdPerson: createPlayerController }),
+    ...timer,
+  });
+  t.after(() => { host.flush(); camera.dispose(); });
+  camera.bind({ cameras: [cameraPose()] }, 'scene.ini');
+  camera.bindPlayer(playerActor(), 0.45);
+  camera.keyDown(event({ code: 'KeyD' }));
+  timer.step(50);
+  assert.equal(host.pending.length, 1);
+  assert.equal(camera.snapshotPlayer().position[0], 0, 'only native replies may advance the player');
+  const result = host.pending[0];
+  assert.equal(camera.acceptMeshMove({ ...result, requestId: 'unrelated' }), false);
+  let settled = false;
+  const stopped = camera.resetInput().then(() => { settled = true; });
+  await Promise.resolve();
+  assert.equal(settled, false, 'save must wait for the pending native result');
+  role = 'child';
+  host.flush();
+  await stopped;
+  assert.equal(settled, true);
+  near(camera.snapshotPlayer().position[0], 0.15);
+  assert.equal(camera.acceptMeshMove(result), false, 'duplicate replies cannot apply movement twice');
+  assert.equal(timer.frames.size, 0, 'a late reply must not resume stopped input');
+});
 
 /**
  * One small-world camera plus the pose it submits, driven by a manual frame clock (the same
@@ -192,7 +230,7 @@ test('the invisible player is the ground point under the camera, and its pose is
 test('the dispatcher routes each world to its own camera, and zoom only exists in the small world', () => {
   const made = [];
   const createThirdPerson = options => {
-    const controller = createPlayerController(options);
+    const controller = createPlayerControllerWithHost(options);
     made.push(controller);
     return controller;
   };
@@ -304,10 +342,8 @@ test('裸鼠标转向只属于小世界的自由视角：俯视与主世界都�
   const timer = clock();
   let pose = cameraPose();
   const controls = createStoryWorldControls({
-    createThirdPerson: createPlayerController, role: () => 'main',
-    // `moveActorMesh` 是新版第三人称控制器在 bindPlayer 时唯一多要求的接口（原生三角面移动）；
-    // 缺了它主世界的绑定会直接抛「当前引擎缺少玩家实时控制接口」，与相机分派本身无关。
-    getBridge: () => ({ cameraMove: () => true, actorTransform: () => true, moveActorMesh: () => true }),
+    createThirdPerson: createPlayerControllerWithHost, role: () => 'main',
+    getBridge: () => ({ cameraMove: () => true, actorTransform: () => true }),
     getPose: () => pose, setPose: next => { pose = next; }, submitPose: () => true, ...timer,
   });
   controls.bindPlayer(playerActor(), 0.45);
@@ -366,10 +402,8 @@ test('主世界的裸鼠标转向仍然是它自己那一套，没有被小世�
   const timer = clock();
   let pose = cameraPose([0, 0, 0], [0, 0, 1]);
   const controls = createStoryWorldControls({
-    createThirdPerson: createPlayerController, role: () => 'main',
-    // `moveActorMesh` 是新版第三人称控制器在 bindPlayer 时唯一多要求的接口（原生三角面移动）；
-    // 缺了它主世界的绑定会直接抛「当前引擎缺少玩家实时控制接口」，与相机分派本身无关。
-    getBridge: () => ({ cameraMove: () => true, actorTransform: () => true, moveActorMesh: () => true }),
+    createThirdPerson: createPlayerControllerWithHost, role: () => 'main',
+    getBridge: () => ({ cameraMove: () => true, actorTransform: () => true }),
     getPose: () => pose, setPose: next => { pose = next; }, submitPose: () => true,
     getRect: () => ({ left: 0, top: 0, width: 800, height: 600 }), ...timer,
   });

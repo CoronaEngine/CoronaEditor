@@ -42,8 +42,6 @@ export const TOOLBOX_CONFIG = {
         block('control_cloneStart'),
         block('control_clone'),
         block('control_cloneDEL'),
-        block('control_senceSet'),
-        block('control_nextSence'),
         block('control_restart_level'),
         block('control_cooldown_ready'),
         block('control_start_cooldown'),

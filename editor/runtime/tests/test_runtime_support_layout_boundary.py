@@ -24,9 +24,8 @@ def test_scene_support_owns_scene_manifest_and_autosave_helpers():
 
     assert scene_support.is_file()
     scene_source = scene_support.read_text(encoding="utf-8")
-    assert "def get_project_scenes" in scene_source
+    assert "def get_project_scenes" not in scene_source
     assert "def auto_save" in scene_source
-    assert "from runtime.scene_support import" in script_runtime.read_text(encoding="utf-8")
     assert "from runtime.scene_support import" in blockly_runtime.read_text(encoding="utf-8")
     assert not (EDITOR_ROOT / "runtime" / "project_support.py").exists()
     assert not (
@@ -44,12 +43,12 @@ def test_runtime_project_support_has_no_compatibility_wrappers():
     assert not (runtime_root / "project_copy.py").exists()
 
 
-def test_project_templates_owns_template_and_project_ini_helpers():
+def test_project_templates_only_creates_asset_descriptors():
     templates = EDITOR_ROOT / "runtime" / "project_templates.py"
 
     assert templates.is_file()
     template_source = templates.read_text(encoding="utf-8")
-    assert "def create_project_from_template" in template_source
-    assert "def normalize_project_runtime_paths" in template_source
-    assert "def update_project_config" in template_source
+    assert "def create_actor_from_template" in template_source
+    assert "def normalize_project_runtime_paths" not in template_source
+    assert "def update_project_config" not in template_source
     assert not (EDITOR_ROOT / "runtime" / "project_support.py").exists()

@@ -5,6 +5,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 HANDLERS = (
     REPO_ROOT
     / ".."
+    / ".."
     / "src"
     / "systems"
     / "ui"
@@ -30,7 +31,7 @@ def test_project_settings_save_is_owned_by_native_handler():
     assert '{"save_active_project_info", []' in section
     assert "detect_scene_folder" in section
     assert 'replace_ini_section_from_map(portable->scene_file, "scene"' in section
-    assert "旧项目为只读" in section
+    assert "需要有效的 scene.ini" in section
 
 
 def test_project_settings_python_entry_is_only_a_manifest_adapter():

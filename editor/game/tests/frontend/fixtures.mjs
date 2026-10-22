@@ -35,7 +35,7 @@ export function apiFixture({ actors = [], wrapped = true } = {}) {
   const get = guid => state.actors.find(a => a.actor_guid === guid);
   const mutate = (op, guid, fn) => { calls.push([op, guid]); const actor = get(guid); fn(actor); return wrap({ status: 'success', actor: structuredClone(actor) }); };
   const api = {
-    main: { onInit: async () => wrap({ scenes: [{ path: 'scene.ini' }] }) },
+    main: { onInit: async () => wrap({ scene: { path: 'scene.ini' } }) },
     scene: {
       getSnapshot: async () => wrap(structuredClone(state)),
       setActorTransform: async (scene, guid, transform) => mutate('transform', guid, a => {

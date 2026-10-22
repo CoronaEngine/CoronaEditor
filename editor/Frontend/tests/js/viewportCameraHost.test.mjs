@@ -2,6 +2,8 @@ import { NAVIGATION_KEY } from '../../../game/frontend/storyNavigation.mjs';
 import { actorFixture, gameplayConfig, projectReady } from '../../../game/tests/frontend/fixtures.mjs';
 import * as gameplayModule from '../../../game/frontend/storyGameplay.mjs';
 import * as storyPropsModule from '../../../game/frontend/storyProps.mjs';
+import * as storyPlayerAnimationModule from '../../../game/frontend/storyPlayerAnimation.mjs';
+import * as storyBossAiModule from '../../../game/frontend/storyBossAi.mjs';
 import * as storyLootModule from '../../../game/frontend/storyLoot.mjs';
 import * as prophetDialogueModule from '../../../game/frontend/prophetDialogue.mjs';
 import * as storyCubeModule from '../../../game/frontend/storyCube.mjs';
@@ -59,7 +61,7 @@ const makeHost = new Function('deps', `
     refreshSceneCameraBinding, syncSceneCameraBinding, broadcastViewportControlsState,
     getEditorControlsState, normalizeVisionRenderMode, visionAccumulationFromCamera, visionDenoiseFromCamera, visionStablePlanesFromCamera, visionDenoiserFromCamera } = deps;
   const DEFAULT_SCENE_NAME = 'scene.ini';
-  const tabs = ref([{id: DEFAULT_SCENE_NAME}]), activeTab = ref(0);
+  const currentSceneId = ref(DEFAULT_SCENE_NAME);
   const getViewportRenderRect = () => ({ left: 0, top: 0, width: 800, height: 600 });
   const indexActorsByHandle = () => new Map();
   const sceneGridEnabled = ref(true), sceneLightSettings = reactive({ direction: {} });
@@ -218,7 +220,7 @@ for (const node of [...imports].reverse()) {
 const makeStory = new Function('modules', 'window', 'document', `${setupSource}; return StoryWorld;`);
 const deferred = () => { let resolve; const promise = new Promise(done => { resolve = done; }); return { promise, resolve }; };
 async function mountStory(t, { pendingInit = null, sceneSnapshot = { data: snapshot() }, role = 'main',
-  navigationFailures = 0 } = {}) {
+  navigationFailures = 0, expectInitError = false } = {}) {
   const mounted = [], unmounted = [], frames = new Map(), calls = [], routes = [];
   const listeners = new Map(); let id = 0, time = 0;
   // 小世界切换准备：把页面真正交给控制器的 options 抓住，并记录每次桥调用，
@@ -251,11 +253,11 @@ async function mountStory(t, { pendingInit = null, sceneSnapshot = { data: snaps
   const moves = [];
   const stateWrites = [];
   window.coronaBridge.moveActorMesh = (...args) => { moves.push(args); calls.push(['moveActorMesh', ...args]); return true; };
-  let meshMoveCallback = null;
+  let motionCallback = null;
   const ack = ({ position, grounded = false, rotation = [0, -Math.PI / 2, 0], status = 'success' } = {}) => {
     const request = moves.at(-1);
     assert.ok(request, '还没有移动请求可以回送');
-    assert.equal(meshMoveCallback({ requestId: request[2], actorHandle: request[0], status,
+    assert.equal(motionCallback({ requestId: request[2], actorHandle: request[0], status,
       position, rotation, grounded }), true, '页面必须把原生回调转给相机控制器');
     return request;
   };
@@ -263,8 +265,13 @@ async function mountStory(t, { pendingInit = null, sceneSnapshot = { data: snaps
     vue: { ref, nextTick, watch, reactive, computed, onMounted: fn => mounted.push(fn), onUnmounted: fn => unmounted.push(fn) },
     'vue-router': { onBeforeRouteLeave() {}, useRouter: () => ({ replace: async path => routes.push(path) }) },
     '@/api/editorApi.js': { editorApi: {
+      events: { onMeshMoveResult: async callback => {
+        assert.equal(typeof callback, 'function'); motionCallback = callback; return 1;
+      } },
+      off: async token => { assert.equal(token, 1); motionCallback = null; },
       project: { getProjectLoadStatus: async () => projectReady('world') },
       sceneTools: {
+        setActorAnimation: async () => ({ status: 'success' }),
         setActorState: async (scene, guid, state) => {
           const actor = placementActor(guid);
           // 单独记可见性写入：`calls` 还留着「页面究竟动过哪些引擎接口」的严格断言。
@@ -309,10 +316,7 @@ async function mountStory(t, { pendingInit = null, sceneSnapshot = { data: snaps
           state: { version: 2, revision: 0, rage: 0, boss: { hp: 200 }, drop: null, inventory: { worldFragment: 0 } },
           config: gameplayConfig };
       } },
-      main: { onInit: async () => pendingInit ? pendingInit.promise : ({ scenes: [{ path: 'scene.ini' }] }) },
-      // 页面的移动回调登记：真机由原生三角面移动的完成事件触发，测试里由 `ack` 手动喂。
-      events: { onMeshMoveResult: async callback => { meshMoveCallback = callback; return 'mesh-move-token'; } },
-      off: async () => {},
+      main: { onInit: async () => pendingInit ? pendingInit.promise : ({ scene: { path: 'scene.ini' } }) },
       scene: { getSnapshot: async () => ({ ...(sceneSnapshot.data ?? sceneSnapshot), actors: sceneActors }),
         setActorTransform: async (scene, guid, transform) => { calls.push(['playerSave', guid]);
           const actor = placementActor(guid);
@@ -331,6 +335,8 @@ async function mountStory(t, { pendingInit = null, sceneSnapshot = { data: snaps
       NAVIGATION_KEY },
     '../../../../game/frontend/storyActors.mjs': { ensureStoryCharacters, syncPlacementActors },
     '../../../../game/frontend/storyProps.mjs': storyPropsModule,
+    '../../../../game/frontend/storyPlayerAnimation.mjs': storyPlayerAnimationModule,
+    '../../../../game/frontend/storyBossAi.mjs': storyBossAiModule,
     '../../../../game/frontend/storyLoot.mjs': storyLootModule,
     '../../../../game/frontend/prophetDialogue.mjs': prophetDialogueModule,
     '../../../../game/frontend/storyCube.mjs': storyCubeModule,
@@ -372,10 +378,13 @@ async function mountStory(t, { pendingInit = null, sceneSnapshot = { data: snaps
   page.surface.value = { focus() {}, getBoundingClientRect: () => ({ left: 0, top: 0, width: 800, height: 600 }) };
   const mounting = Promise.all(mounted.map(fn => fn()));
   if (!pendingInit) await mounting;
-  // 注意：页面卸载时用全局 `clearInterval` 收 actorTimer，因此 harness 的 window 注册表只
-  // 负责「不创建真实定时器」，不拿来断言清理（留给 unmounted 钩子自己的断言）。
-  const cleanup = async () => { for (const fn of unmounted) fn(); await flushWorldSessionSaves(); assert.equal(listeners.size, 0); assert.equal(frames.size, 0); };
+  const cleanup = async () => { for (const fn of unmounted) fn(); await flushWorldSessionSaves(); assert.equal(listeners.size, 0); assert.equal(frames.size, 0); assert.equal(motionCallback, null); };
   t.after(cleanup);
+  if (!pendingInit && !expectInitError) {
+    assert.deepEqual(calls.filter(call => call[0] === 'alert'), [], 'story initialization must succeed');
+    assert.deepEqual(routes, []);
+    assert.equal(page.initializing.value, false);
+  }
   /**
    * 真机链路：浏览器把 keydown 交给**页面自己注册的那个监听器**
    * （`onMounted` 里的 `document.addEventListener('keydown', onKeyDown)`），而不是测试直接
@@ -430,13 +439,13 @@ test('real story page binds player follow and stops on blur, hidden state, exit 
 test('story Escape works during loading and late initialization cannot bind a camera', async t => {
   const pending = deferred(), h = await mountStory(t, { pendingInit: pending });
   h.page.onKeyDown(input({ code: 'Escape', stopPropagation() {} }));
-  pending.resolve({ scenes: [{ path: 'scene.ini' }] }); await h.mounting;
+  pending.resolve({ scene: { path: 'scene.ini' } }); await h.mounting;
   await new Promise(resolve => setImmediate(resolve));
   assert.deepEqual(h.routes, ['/StartScreen']); assert.equal(h.calls.length, 0);
 });
 
 test('story missing-camera error returns to launcher without editor actions', async t => {
-  const h = await mountStory(t, { sceneSnapshot: { cameras: [] } });
+  const h = await mountStory(t, { sceneSnapshot: { cameras: [] }, expectInitError: true });
   assert.deepEqual(h.routes, ['/StartScreen']);
   assert.deepEqual(h.calls, [['alert', '当前场景没有可用相机']]);
 });

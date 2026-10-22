@@ -35,16 +35,10 @@ class ProjectLauncher(PluginBase):
     def create_multiplayer_project(project_data: dict) -> dict:
         return CoronaEditorApi.project.create_multiplayer_project(project_data)
 
-    @staticmethod
-    def copy_existing_to_data(payload: dict) -> dict:
-        return CoronaEditorApi.project.copy_existing_to_data(payload)
 
     @staticmethod
     def open_project(project_path: str) -> dict:
         return CoronaEditorApi.project.open_project(project_path, {})
 
-    @staticmethod
-    def set_project_mode(mode_data: dict) -> bool:
-        return CoronaEditorApi.project.set_project_mode(mode_data)
 
 __all__ = ["ProjectLauncher"]

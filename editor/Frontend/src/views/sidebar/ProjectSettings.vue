@@ -30,37 +30,6 @@
         />
       </div>
 
-      <!-- 项目模式 -->
-      <div class="flex flex-col gap-1">
-        <label class="text-gray-400">{{ t('projectSettings.projectMode') }}</label>
-        <select
-          v-model="form.mode"
-          class="bg-[#18221a] border border-[#2b362d] rounded px-2 py-1.5 text-white focus:border-[#b3995d] outline-none"
-        >
-          <option value="3d">3D</option>
-          <option value="2d">2D</option>
-        </select>
-      </div>
-
-      <!-- 入口场景 -->
-      <div class="flex flex-col gap-1">
-        <label class="text-gray-400">{{ t('projectSettings.entryScene') }}</label>
-        <div class="flex items-center gap-2">
-          <input
-            v-model="form.entrance_scene"
-            type="text"
-            class="flex-1 bg-[#18221a] border border-[#2b362d] rounded px-2 py-1.5 text-white focus:border-[#b3995d] outline-none"
-            placeholder="Scene/main.scene"
-          />
-          <button
-            class="px-3 py-1.5 bg-[#b3995d] hover:bg-[#6f8d4b] rounded text-white"
-            @click="handleBrowseScene"
-          >
-            {{ t('common.browse') }}
-          </button>
-        </div>
-      </div>
-
       <!-- 核心版本 -->
       <div class="flex flex-col gap-1">
         <label class="text-gray-400">{{ t('projectSettings.coreVersion') }}</label>
@@ -131,8 +100,6 @@ const statusOk = ref(true);
 
 const form = ref({
   name: '',
-  mode: '3d',
-  entrance_scene: '',
   core_version: '',
   create_time: '',
   last_opened: '',
@@ -170,8 +137,6 @@ const handleSave = async () => {
   try {
     const payload = {
       name: form.value.name,
-      mode: form.value.mode,
-      entrance_scene: form.value.entrance_scene,
       core_version: form.value.core_version,
     };
     const res = await editorApi.projectSettings.saveActiveProjectInfo(payload);
@@ -187,18 +152,6 @@ const handleSave = async () => {
   }
 };
 
-const handleBrowseScene = async () => {
-  try {
-    const res = await editorApi.projectSettings.browseSceneFile();
-    if (res && res.success && res.path) {
-      form.value.entrance_scene = res.path;
-    } else if (res && res.error) {
-      setStatus(res.error, false);
-    }
-  } catch (e) {
-    setStatus(String(e), false);
-  }
-};
 
 const closeFloat = () => {
   if (closeDockPanel) {

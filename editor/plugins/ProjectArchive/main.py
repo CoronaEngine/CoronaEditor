@@ -1,7 +1,7 @@
-"""Project archive migration facade.
+"""Single-scene archive loading facade.
 
 Archive format parsing belongs to :mod:`runtime.archive`; this plugin owns
-only the historical request facade and its load-policy/diagnostic mapping.
+only the request facade and its load-policy/diagnostic mapping.
 """
 
 from __future__ import annotations

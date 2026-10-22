@@ -1685,14 +1685,14 @@ onMounted(async () => {
   const queryString = window.location.hash?.split('?')[1] || window.location.search?.slice(1);
   const urlSceneName = queryString ? new URLSearchParams(queryString).get('sceneName') : null;
 
-  // 从 OnInit 返回值中取活跃场景：scenes 数组 + active_index
+  // OnInit 只返回当前场景。
   const initData = result?.data ?? result;
-  const activeScene = initData?.scenes?.[initData?.active_index ?? 0];
+  const activeScene = initData?.scene;
   currentSceneName.value = urlSceneName || activeScene?.path || DEFAULT_SCENE_NAME;
 
   await OnInitObjTree();
   await RefreshRenderBackendState();
-  // 后端对象变化：场景切换/物体变化时重新加载场景树
+  // 后端对象变化：项目打开/物体变化时重新加载场景树
   actorChangedCallbackToken = await editorApi.events.onActorChanged(onActorChangeEvent);
   sceneTreeChangedCallbackToken =
     await editorApi.events.onSceneTreeChanged(onSceneTreeChangedEvent);
@@ -1700,7 +1700,7 @@ onMounted(async () => {
   nodeSelectionCallbackToken = await editorApi.events.onActorSelectionChanged(handleModelNodePick);
 });
 
-// 场景切换时刷新当前场景树；actor 选择只更新详情面板，不重建树，避免点击闪烁。
+// 项目打开时刷新当前场景树；actor 选择只更新详情面板，不重建树，避免点击闪烁。
 const onActorChangeEvent = (payload, maybeSceneId /*, actorId, oldPath */) => {
   const type = payload?.actor_type ?? payload?.type ?? payload;
   const sceneId = payload?.scene ?? maybeSceneId;
