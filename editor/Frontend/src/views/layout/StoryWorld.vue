@@ -498,8 +498,8 @@ const SLOT_BY_ID = {};
 GEAR_SLOTS.forEach(slot => { SLOT_BY_ID[slot.id] = slot; });
 const BAG_TABS = [
   { id: 'all', name: '全部' },
-  { id: 'equip', name: '兵甲' },
-  { id: 'usable', name: '丹散' },
+  { id: 'equip', name: '装备' },
+  { id: 'usable', name: '治疗物品' },
   { id: 'mat', name: '材料' },
 ];
 /* 界面自带的器物表；其中「世界碎片」一格接真实存档数量 */
@@ -546,13 +546,13 @@ const BAG_ITEMS = [
   { u: 'chest-2', name: '素麻战衣', type: '轻甲', cat: 'equip', slot: 'chest', rarity: 'fine', glyph: 'g-chest-l',
     stats: [['护体', '+71'], ['回气', '+4/s']],
     flavor: '洗得发白的粗麻，针脚却密得看不出线头。' },
-  { u: 'use-1', name: '回春丹', type: '丹散', cat: 'usable', rarity: 'fine', glyph: 'g-pill', qty: 12,
+  { u: 'use-1', name: '回春丹', type: '治疗物品', cat: 'usable', rarity: 'fine', glyph: 'g-pill', qty: 12,
     stats: [['回复生命', '240'], ['念咒时长', '1.2s']],
     flavor: '入口先苦后甘，苦的那口才是药。' },
-  { u: 'use-2', name: '凝神散', type: '丹散', cat: 'usable', rarity: 'fine', glyph: 'g-pill', qty: 8,
+  { u: 'use-2', name: '凝神散', type: '治疗物品', cat: 'usable', rarity: 'fine', glyph: 'g-pill', qty: 8,
     stats: [['回复法力', '180'], ['念咒时长', '1.0s']],
     flavor: '化在舌下，像咽了一口山里的凉雾。' },
-  { u: 'use-3', name: '青铜小还丹', type: '丹散', cat: 'usable', rarity: 'rare', glyph: 'g-elixir', qty: 3,
+  { u: 'use-3', name: '青铜小还丹', type: '治疗物品', cat: 'usable', rarity: 'rare', glyph: 'g-elixir', qty: 3,
     stats: [['回复生命', '520'], ['回复法力', '260'], ['念咒时长', '1.8s']],
     flavor: '丹衣上浮着铜绿，老药师说这是它睡醒的样子。' },
   { u: 'use-4', name: '朱砂符纸', type: '符纸', cat: 'usable', rarity: 'fine', glyph: 'g-scroll', qty: 5,
@@ -1221,7 +1221,7 @@ function bagDropItem(uid) {
   if (found.from === 'gear') bag.gear[found.slot] = null;
   else bag.cells[found.idx] = null;
   bag.sel = null;
-  bagToast(`${found.item.cat === 'equip' ? '熔去' : '弃之'} · ${found.item.name}`);
+  bagToast(`${found.item.cat === 'equip' ? '售卖' : '丢弃'} · ${found.item.name}`);
   // 弃置要落在存档里，否则重进世界会按计数把这件东西补回来。
   adjustGearLedger(found.item.u, -1);
   gameplay.discardItem(found.item.u).catch(() => {});
@@ -1412,7 +1412,7 @@ const bagDetailInfo = computed(() => {
   } else if (item.cat === 'usable') {
     actions.push({ act: 'use', label: '服用' });
   }
-  actions.push({ act: 'drop', label: item.cat === 'equip' ? '熔去' : '弃之', ghost: true });
+  actions.push({ act: 'drop', label: item.cat === 'equip' ? '售卖' : '丢弃', ghost: true });
   return {
     item,
     uid: item.uid,
@@ -2411,15 +2411,6 @@ onUnmounted(() => {
         </div>
       </div>
 
-      <!-- 左下：操作提示 -->
-      <aside v-if="!inventoryOpen" class="action-tips" aria-label="操作提示">
-        <p>
-          <template v-for="([key, text], index) in controlHints" :key="key">
-            <template v-if="index"> · </template>{{ text }} <kbd>{{ key }}</kbd>
-          </template>
-        </p>
-      </aside>
-
       <!-- 右下：气刃槽 + 战技群 -->
       <div v-if="!inventoryOpen && showCombatHud" class="action-cluster">
         <div class="focus-system">
@@ -2440,7 +2431,6 @@ onUnmounted(() => {
               <polygon points="24,10 32,28 16,28" fill="rgba(230,213,167,.4)" />
               <polygon points="24,10 32,28 16,28" />
             </svg>
-            <span class="key-tag">{{ heavySkill.key }}</span>
             <span class="ui-tooltip" role="tooltip">{{ heavySkill.name }} · {{ heavySkill.rageCost }} 怒气</span>
           </button>
         </div>
@@ -2457,10 +2447,8 @@ onUnmounted(() => {
               <svg class="spell-icon" viewBox="0 0 48 48" v-html="skillIconInner(id)" />
               <div class="spell-cd-overlay"></div>
               <span class="spell-cd-num">{{ cooldownSeconds(id) }}</span>
-              <span class="spell-key">{{ skill.key }}</span>
               <span class="ui-tooltip" role="tooltip">{{ skill.name }} · {{ skill.rageCost }} 怒气</span>
             </button>
-            <span class="spell-name">{{ skill.name }}</span>
           </div>
         </div>
       </div>
@@ -2490,11 +2478,6 @@ onUnmounted(() => {
               <span v-if="!entry.empty" class="hotbar__count" aria-hidden="true">{{ entry.available }}</span>
             </button>
           </div>
-          <p class="hotbar__hint">
-            <span v-if="hotbarSelected && !hotbarSelected.empty">已选：{{ hotbarSelected.name }}</span>
-            <span v-else>第 {{ (hotbarSelected?.slot ?? 0) + 1 }} 格是空的</span>
-            <span class="hotbar__tip">滚轮换格 · 数字键 1 - {{ hotbarSlots.length }} · B 在身前放置 · F 取回身边的方块 · 共 {{ placements.length }} / {{ MAX_PLACEMENTS }}</span>
-          </p>
         </section>
       </div>
       <!-- 小世界状态：顶部中央（顶部中央只在小世界空闲，主世界归 Boss 血条） -->
@@ -2629,8 +2612,7 @@ onUnmounted(() => {
                 <svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2"/><circle cx="12" cy="12" r="4"/></svg>
               </div>
               <div class="bag__title-wrap">
-                <h1 class="bag__title">战术编成 // 收纳库</h1>
-                <span class="bag__sub">TACTICAL LOADOUT &amp; SECURE INVENTORY</span>
+                <h1 class="bag__title">背包</h1>
               </div>
               <div class="bag__headline"></div>
               <div class="purse" title="荒野代币">
@@ -2646,13 +2628,6 @@ onUnmounted(() => {
 
               <!-- 左上：武装编成与人偶 -->
               <div class="colL">
-                <div class="secHead">
-                  <span class="secHead__dot"></span>
-                  <span class="secHead__txt">现役武装编成</span>
-                  <div class="secHead__line"></div>
-                  <span class="secHead__meta">{{ bagGearMetaText }}</span>
-                </div>
-
               <div class="dollWrap">
                 <div class="doll">
                   <div class="figure" title="机体投影">
@@ -2663,19 +2638,17 @@ onUnmounted(() => {
                     :data-slot="slot.id" :title="slot.name"
                     :class="{ has: Boolean(bag.gear[slot.id]), 'is-sel': bag.gear[slot.id] && bag.gear[slot.id].uid === bag.sel, ['r-' + (bag.gear[slot.id]?.rarity || 'common')]: true }"
                     :aria-label="bag.gear[slot.id] ? `${slot.name}：${bag.gear[slot.id].name}` : `${slot.name}（空）`"
-                    @click="bagSelectGear(slot.id)" @dblclick="bagUnequip(slot.id)"
-                    @pointerenter="bag.gear[slot.id] && bagShowTip(bag.gear[slot.id], $event)"
-                    @pointermove="bagMoveTip($event)" @pointerleave="bagHideTip">
+                    @click="bagSelectGear(slot.id)" @dblclick="bagUnequip(slot.id)">
                     <span class="eslot__ph">{{ slot.name }}</span>
                     <span v-if="bag.gear[slot.id]" class="icon" aria-hidden="true" v-html="bagIconHTML(bag.gear[slot.id])" />
                   </button>
                 </div>
 
                 <div class="hero-stats">
-                  <div class="hstat"><span class="hstat-name">物理强度</span><span class="hstat-val">{{ bagHeroStats.atk }}</span></div>
-                  <div class="hstat"><span class="hstat-name">护甲防御</span><span class="hstat-val">{{ bagHeroStats.def }}</span></div>
-                  <div class="hstat"><span class="hstat-name">暴击共鸣</span><span class="hstat-val">{{ bagHeroStats.crit }}%</span></div>
-                  <div class="hstat"><span class="hstat-name">耐久上限</span><span class="hstat-val">{{ bagHeroStats.hp }}</span></div>
+                  <div class="hstat"><span class="hstat-name">战力值</span><span class="hstat-val">{{ bagHeroStats.atk }}</span></div>
+                  <div class="hstat"><span class="hstat-name">防御值</span><span class="hstat-val">{{ bagHeroStats.def }}</span></div>
+                  <div class="hstat"><span class="hstat-name">暴击率</span><span class="hstat-val">{{ bagHeroStats.crit }}%</span></div>
+                  <div class="hstat"><span class="hstat-name">耐久值</span><span class="hstat-val">{{ bagHeroStats.hp }}</span></div>
                 </div>
               </div>
               </div>
@@ -2697,9 +2670,7 @@ onUnmounted(() => {
                       :disabled="!cell.filled" :tabindex="cell.filled && selectedSlot === cell.index ? 0 : -1"
                       :aria-label="cell.item ? `${cell.item.name}，数量 ${cell.item.qty}` : `空格 ${cell.index + 1}`"
                       @click="bagSelectSlot(cell.index)" @dblclick="bagDoubleAct({ index: cell.index })"
-                      @focus="selectedSlot = cell.index"
-                      @pointerenter="cell.item && bagShowTip(cell.item, $event)"
-                      @pointermove="bagMoveTip($event)" @pointerleave="bagHideTip">
+                      @focus="selectedSlot = cell.index">
                       <span v-if="cell.item" class="icon" aria-hidden="true" v-html="bagIconHTML(cell.item)" />
                       <span v-if="cell.item && cell.item.qty > 1" class="qty">{{ cell.item.qty }}</span>
                     </button>
@@ -2712,7 +2683,7 @@ onUnmounted(() => {
                 <div class="sector__body">
                   <header class="sector__head">
                     <span class="secHead__dot"></span>
-                    <span class="sector__title">世界坐标 // WORLDS</span>
+                    <span class="sector__title">当前世界 // WORLDS</span>
                   </header>
                   <div class="sector__row">
                     <div class="sector__art" :aria-label="bagWorld ? `${bagWorld.name}：${bagWorld.tier}` : '未有界'" v-html="bagWorldScene"></div>
@@ -2759,7 +2730,6 @@ onUnmounted(() => {
                     </div>
                   </div>
                 </div>
-                <p v-else class="detail__empty">点击对应资源块以加载结构图谱</p>
               </div>
 
             </div>
@@ -2770,30 +2740,10 @@ onUnmounted(() => {
                 <span>收纳空间利用率：</span>
                 <b>{{ bagFootInfo.capText }}</b>
               </div>
-              <div class="hints">
-                <span>单击选择检视</span>
-                <span><kbd>双击 / 装配</kbd> 极速换装</span>
-                <span><kbd>Esc</kbd> 退出终端</span>
-              </div>
             </footer>
 
           </div>
         </section>
-      </div>
-
-      <!-- 跟随光标的浮签 -->
-      <div ref="bagTip" class="tip" role="tooltip" :class="{ 'is-on': bag.tipOn }"
-        :aria-hidden="bag.tipOn ? 'false' : 'true'" :style="bag.tipStyle">
-        <p v-if="bag.tipItem" class="tip__name">{{ bag.tipItem.name }}
-          <span class="tip__rarity" :class="`r-${bag.tipItem.rarity}`">{{ RARITY[bag.tipItem.rarity].label }}</span>
-          <span v-if="bag.tipItem.qty > 1" class="tip__rarity">× {{ bag.tipItem.qty }}</span>
-        </p>
-        <p v-if="bag.tipItem" class="tip__type">{{ bagTypeLine(bag.tipItem) }}</p>
-        <div v-if="bag.tipItem" class="tip__stats">
-          <div v-for="pair in (bag.tipItem.stats || [])" :key="pair[0]"><span>{{ pair[0] }}</span><b>{{ pair[1] }}</b></div>
-        </div>
-        <p v-if="bag.tipItem" class="tip__flavor">{{ bag.tipItem.flavor }}</p>
-        <p v-if="bag.tipItem" class="tip__foot">{{ bagTipFoot(bag.tipItem) }}</p>
       </div>
 
       <!-- 提示语 -->
@@ -2967,7 +2917,9 @@ onUnmounted(() => {
 }
 /* 小世界状态：顶部中央。放到这里的唯一原因是物品栏要占用底部中央（Minecraft 位置），
    而顶部中央在小世界是空的（图例左上、世界铭牌右上、小世界没有首领血条）。 */
+/* 顶部中央的小世界状态条已隐藏：只保留右上角的世界指示器。 */
 .subworld-notice {
+  display: none;
   position: absolute; top: 18px; left: 50%; transform: translateX(-50%);
   display: grid; gap: 5px; justify-items: center; padding: 4px 12px; text-align: center; z-index: 3;
   background: rgba(16, 14, 12, .82); border: 1px solid var(--gold-line);
@@ -3037,10 +2989,10 @@ onUnmounted(() => {
 .hotbar {
   position: static; display: grid; gap: 4px; justify-items: center;
 }
-.hotbar__slots { display: flex; gap: 6px; }
+.hotbar__slots { display: flex; gap: 8px; }
 .hotbar__slot {
   position: relative; display: grid; place-items: center; gap: 1px;
-  width: clamp(44px, 4.4vw, 54px); height: clamp(44px, 4.4vw, 54px);
+  width: clamp(50px, 5vw, 62px); height: clamp(50px, 5vw, 62px);
   padding: 3px; box-sizing: border-box; cursor: pointer;
   background: rgba(11, 17, 15, .78); border: 1px solid var(--c-stone);
   color: var(--c-paper);
@@ -3053,17 +3005,17 @@ onUnmounted(() => {
 }
 .hotbar__slot.is-empty { opacity: .55; }
 .hotbar__key {
-  position: absolute; top: 1px; left: 3px; font-size: 10px; line-height: 1;
+  position: absolute; top: 1px; left: 3px; font-size: 11px; line-height: 1;
   color: var(--c-gold-dim); font-variant-numeric: tabular-nums;
 }
-.hotbar__name { font-size: 11px; font-weight: 500; line-height: 1.2; text-align: center; color: var(--c-paper); }
+.hotbar__name { font-size: 12px; font-weight: 500; line-height: 1.2; text-align: center; color: var(--c-paper); }
 .hotbar__count {
-  position: absolute; right: 3px; bottom: 1px; font-size: 11px; line-height: 1;
+  position: absolute; right: 3px; bottom: 1px; font-size: 12px; line-height: 1;
   color: var(--c-gold-bright); text-shadow: 0 1px 2px #000;
   font-variant-numeric: tabular-nums;
 }
 .hotbar__hint {
-  display: flex; gap: 10px; margin: 0; padding: 2px 8px; font-size: 10.5px; line-height: 1.5;
+  display: flex; gap: 10px; margin: 0; padding: 3px 9px; font-size: 11.5px; line-height: 1.5;
   color: var(--c-paper-dim); background: rgba(11, 17, 15, .6); border: 1px solid var(--c-stone);
 }
 .hotbar__tip { color: var(--c-gold-dim); }
