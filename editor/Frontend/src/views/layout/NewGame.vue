@@ -241,7 +241,7 @@ const handleCreate = async () => {
             console.warn('World task initialization failed; opening the world with fallback tasks:', taskError?.message || taskError);
           }
         } else {
-          // project.ini already contains the prompt. MainPage will retry loading the
+          // scene.ini already contains the prompt. MainPage will retry loading the
           // current world and let the task service recover from that durable value.
           console.warn('Python project activation is still pending; skipped the creation-page task request to protect the previous world.');
         }

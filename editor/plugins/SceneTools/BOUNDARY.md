@@ -46,7 +46,7 @@ C++ Engine/Editor Host 持有场景事实、revision、持久化和事件语义�
 如发现外部宿主依赖旧入口，使用删除提交的 revert 恢复兼容层后再进行有契约的迁移。
 
 
-- Vision native handler 覆盖所有受支持的导入、绑定、相机和场景切换路径；
+- Vision native handler 覆盖所有受支持的导入、绑定、相机和当前场景重载路径；
 - SceneTools 不再需要旧 Python Scene 的代理/持久化状态；
 - MainView、AITool、Frontend Vision 面板和旧宿主回归通过；
 - `API_OWNERSHIP.md` 中的 Vision legacy 行更新并记录回滚路径。

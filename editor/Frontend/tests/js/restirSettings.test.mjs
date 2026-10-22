@@ -216,6 +216,7 @@ test('the actual panel disables apply until settings are ready', async t => {
 test('a cold ReSTIR view can become ready after more than thirty seconds', async t => {
   let elapsed = 0, reads = 0;
   t.mock.method(Date, 'now', () => elapsed);
+  t.mock.timers.enable({ apis: ['setTimeout'] });
   const f = await fixture({ getRestirSettings: async () => {
     reads++;
     if (reads <= 2) {
@@ -226,7 +227,9 @@ test('a cold ReSTIR view can become ready after more than thirty seconds', async
   } }); t.after(f.stop);
   f.state.open.value = true; await settle();
   assert.equal(await f.state.apply(), false);
-  await new Promise(resolve => setTimeout(resolve, 400));
+  t.mock.timers.tick(150); await settle();
+  t.mock.timers.tick(150); await settle();
+  assert.equal(reads, 3);
   assert.equal(f.state.error.value, '');
   assert.equal(f.state.loaded.value, true);
   assert.equal(f.state.draft.value.max_depth, 7);

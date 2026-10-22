@@ -15,7 +15,7 @@ def test_manifest_and_script_runtime_have_canonical_owners():
 
 
 def test_cpp_editor_manifest_owner_is_outside_the_cef_host_directory():
-    root = EDITOR_ROOT.parent
+    root = EDITOR_ROOT.parent.parent
     canonical = root / "src" / "systems" / "ui" / "editor_api" / "cef_editor_api.cpp"
     cmake = (root / "src" / "systems" / "ui" / "CMakeLists.txt").read_text(encoding="utf-8")
     assert canonical.is_file()

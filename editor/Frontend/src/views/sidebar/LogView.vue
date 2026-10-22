@@ -1,10 +1,10 @@
 <template>
   <div
-    class="flex-1 min-h-0 w-full rounded-lg overflow-hidden flex flex-col bg-[#1e1e1e] text-gray-300 font-mono text-xs"
+    class="flex-1 min-h-0 w-full rounded-lg overflow-hidden flex flex-col bg-[#121a14] text-gray-300 font-mono text-xs"
   >
-    <DockTitleBar v-if="!isDocked" title="日志" extraClass="bg-[#D8B86C]" routePath="/LogView" @close="closeFloat" />
+    <DockTitleBar v-if="!isDocked" title="日志" extraClass="bg-[#b3995d]" routePath="/LogView" @close="closeFloat" />
 
-    <div class="p-2 bg-[#2d2d2d] flex gap-4 items-center border-b border-black">
+    <div class="p-2 bg-[#202b22] flex gap-4 items-center border-b border-black">
       <div class="flex gap-2">
         <label v-for="s in ['Engine', 'Python', 'Vue']" :key="s" class="flex items-center gap-1">
           <input v-model="filterSources" type="checkbox" :value="s" />
@@ -16,13 +16,13 @@
         v-model="filterLevel"
         :options="levelOptions"
         placeholder="所有级别"
-        class="bg-[#3c3c3c] border-none text-white px-1 outline-none"
+        class="bg-[#2b362d] border-none text-white px-1 outline-none"
       />
 
       <input
         v-model="searchText"
         placeholder="搜索..."
-        class="flex-1 bg-[#3c3c3c] border-none px-2 py-0.5 outline-none"
+        class="flex-1 bg-[#2b362d] border-none px-2 py-0.5 outline-none"
       />
       <button class="text-red-400 hover:text-red-300" @click="logs = []">清空</button>
     </div>

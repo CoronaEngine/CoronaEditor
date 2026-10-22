@@ -85,7 +85,7 @@ class ScriptsManagerReloadTests(unittest.TestCase):
         self.assertEqual(manager.state, "stopped")
 
     def test_cpp_runtime_does_not_reload_editor_main_module(self):
-        repo_root = Path(__file__).resolve().parents[3]
+        repo_root = Path(__file__).resolve().parents[4]
         source = (
             repo_root / "src" / "systems" / "script" / "python" / "python_api.cpp"
         ).read_text(encoding="utf-8")

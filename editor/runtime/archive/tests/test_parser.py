@@ -406,39 +406,32 @@ class ArchiveParserTests(unittest.TestCase):
 
             self.assertEqual(raised.exception.code, "DUPLICATE_ACTOR_GUID")
 
-    def test_legacy_project_resolves_entrance_scene_and_reports_missing_resource(self):
+    def test_old_formats_are_rejected_without_fallback_or_writes(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
-            scene_dir = root / "Scene"
-            scene_dir.mkdir()
-            (root / "project.ini").write_text(
-                "[Project]\nname = Legacy\nentrance_scene = Scene/default.scene\n",
+            for name in ("project.ini", "old.scene", "vision.json"):
+                path = root / name
+                path.write_text("[Project]\nname = Old\n", encoding="utf-8")
+                with self.subTest(source=name), self.assertRaises(ArchiveParseError) as error:
+                    parse_archive(str(path))
+                self.assertEqual(error.exception.code, "UNSUPPORTED_ARCHIVE_TYPE")
+            before = {p.name: p.read_bytes() for p in root.iterdir()}
+            with self.assertRaises(ArchiveParseError):
+                parse_archive(str(root))
+            self.assertEqual(before, {p.name: p.read_bytes() for p in root.iterdir()})
+
+    def test_directory_and_scene_file_resolve_to_same_single_scene(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            (root / "scene.ini").write_text(
+                "[format]\ntype = corona_scene_folder\nversion = 1\n[scene]\nname = Current\n",
                 encoding="utf-8",
             )
-            (scene_dir / "default.scene").write_text(
-                "\n".join(
-                    [
-                        "[base]",
-                        "name = Default",
-                        "[actors]",
-                        "missing.name = Missing",
-                        "missing.actor_guid = missing-guid",
-                        "missing.route = Model/missing.fbx",
-                        "",
-                    ]
-                ),
-                encoding="utf-8",
-            )
-
-            snapshot = parse_archive(str(root / "project.ini"))
-
-            self.assertEqual(snapshot["archive_type"], "legacy_project")
-            self.assertTrue(snapshot["project"]["legacy"])
-            self.assertEqual(snapshot["scene"]["route"], "Scene/default.scene")
-            self.assertEqual(snapshot["scene"]["name"], "Default")
-            self.assertEqual(snapshot["diagnostics"][0]["code"], "RESOURCE_NOT_FOUND")
-            self.assertTrue(snapshot["diagnostics"][0]["recoverable"])
-            self.assertEqual(snapshot["diagnostics"][0]["actor_guid"], "missing-guid")
+            (root / "project.ini").write_text("invalid old configuration", encoding="utf-8")
+            folder = parse_archive(str(root))
+            self.assertEqual(folder, parse_archive(str(root / "scene.ini")))
+            self.assertEqual(folder["scene"]["route"], "scene.ini")
+            self.assertEqual(folder["project"], {"name": "Current"})
 
     def test_non_finite_transform_is_rejected_instead_of_defaulted(self):
         with tempfile.TemporaryDirectory() as temp_dir:

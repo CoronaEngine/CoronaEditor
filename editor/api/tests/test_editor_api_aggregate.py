@@ -22,16 +22,16 @@ from api.editor_api import (
 
 
 class EditorAggregateApiTest(unittest.TestCase):
-    def test_project_copy_uses_native_aggregate_contract(self):
-        payload = {"sourcePath": "D:/legacy/project.ini", "dataRoot": "D:/runtime/data"}
+    def test_vision_import_uses_native_aggregate_contract(self):
+        payload = "D:/source/vision.json"
         with patch(
             "api.editor_api._invoke_manifest_cpp_api",
             return_value={"ok": True, "name": "project", "path": "D:/runtime/data/project"},
         ) as invoke:
-            result = CoronaEditorApi.project.copy_existing_to_data(payload)
+            result = CoronaEditorApi.project.import_vision_scene(payload)
 
         self.assertTrue(result["ok"])
-        invoke.assert_called_once_with("project.copy_existing_to_data", [payload])
+        invoke.assert_called_once_with("project.import_vision_scene", [payload])
 
     def test_script_runtime_manifest_lookup_uses_script_channel(self):
         import api.editor_api as editor_api_module
@@ -108,35 +108,6 @@ class EditorAggregateApiTest(unittest.TestCase):
             ],
         )
 
-    def test_script_runtime_scene_routes_use_the_restricted_scene_channel(self):
-        with patch(
-            "api.editor_api._invoke_script_manifest_cpp_api",
-            side_effect=[
-                {
-                    "status": "success",
-                    "scenes": [{"path": "Scene/level.scene", "name": "Level"}],
-                    "active_scene": "Scene/level.scene",
-                },
-                {
-                    "status": "success",
-                    "scene": "Scene/other.scene",
-                    "active_scene": "Scene/other.scene",
-                },
-            ],
-        ) as invoke:
-            adapter = get_script_runtime_editor_api()
-            routes = adapter.scene.list_routes()
-            switched = adapter.scene.switch("Scene/other.scene")
-
-        self.assertEqual(routes["active_scene"], "Scene/level.scene")
-        self.assertEqual(switched["scene"], "Scene/other.scene")
-        self.assertEqual(
-            [call.args for call in invoke.call_args_list],
-            [
-                ("scene.list_routes", []),
-                ("scene.switch", ["Scene/other.scene"]),
-            ],
-        )
 
     def test_resource_search_adapter_uses_manifest_wrapper(self):
         with patch(

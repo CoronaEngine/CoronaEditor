@@ -14,13 +14,14 @@ class StoryNavigationTests(unittest.TestCase):
     save = fixtures.SubworldTests.save
     validate = fixtures.SubworldTests.validate
     assert_clean_failure = fixtures.SubworldTests.assert_clean_failure
+    assert_no_residue = fixtures.SubworldTests.assert_no_residue
     def setUp(self):
         fixtures.SubworldTests.setUp(self)
-        self.info = {'mode': 'story', 'project_path': str(self.root), 'entrance_scene': 'scene.ini'}
+        self.info = {'mode': 'story', 'project_path': str(self.root)}
         self.api = SimpleNamespace(
             project_settings=SimpleNamespace(get_active_project_info=Mock(side_effect=lambda: {'data': self.info})),
             main=SimpleNamespace(on_init=Mock(return_value={'data': {
-                'scenes': [{'path': 'scene.ini'}], 'active_index': 0, 'path': 'scene.ini'}}),
+                'scene': {'path': 'scene.ini'}}}),
                 scene_save=Mock(return_value={'data': {'ok': True, 'status': 'success'}})),
             project=SimpleNamespace(validate_portable_scene=Mock(return_value={'data': {'ok': True, 'status': 'portable_v1'}})),
         )
@@ -42,8 +43,12 @@ class StoryNavigationTests(unittest.TestCase):
         result = self.navigate()
         self.assertEqual(result['status'], 'ok', result)
         self.api.main.scene_save.assert_called_once_with('scene.ini')
+        # Switching happens inside the Python update phase, so the native per-file
+        # sha256 pass is not repeated here; content is verified once by the copy in
+        # game.runtime.subworlds._verify_staged, which hashes every byte it copies.
+        self.assertTrue(self.api.project.validate_portable_scene.call_args_list)
         for call in self.api.project.validate_portable_scene.call_args_list:
-            self.assertIs(call.args[0]['verifyHashes'], True)
+            self.assertIs(call.args[0]['verifyHashes'], False)
         self.assertTrue(result['navigation']['created'])
         self.info['project_path'] = result['navigation']['target']
         result = self.navigate('exit')
@@ -87,17 +92,26 @@ class StoryNavigationTests(unittest.TestCase):
         self.assert_clean_failure()
 
     def test_wrong_scene_route_does_not_save_or_reload_another_scene(self):
-        self.api.main.on_init.return_value = {'scenes': [{'path': '../other/scene.ini'}], 'active_index': 0}
+        self.api.main.on_init.return_value = {'scene': {'path': '../other/scene.ini'}}
         result = self.navigate()
         self.assertEqual(result['status'], 'error')
         self.api.main.scene_save.assert_not_called()
 
     def test_changed_authoritative_world_does_not_save_the_old_route(self):
         self.api.main.on_init.side_effect = lambda: (self.info.update(project_path=str(self.root / 'other'))
-                                                   or {'path': 'scene.ini'})
+                                                   or {'scene': {'path': 'scene.ini'}})
         result = self.navigate()
         self.assertEqual(result['status'], 'error')
         self.api.main.scene_save.assert_not_called()
+
+    def test_old_multiscene_and_malformed_init_payloads_are_rejected_before_save(self):
+        for payload in ({'scenes': [{'path': 'scene.ini'}], 'active_index': 0},
+                        {'path': 'scene.ini'}, {'scene': []}, {'scene': None}):
+            with self.subTest(payload=payload):
+                self.api.main.on_init.return_value = payload
+                self.assertEqual(self.navigate()['status'], 'error')
+                self.api.main.scene_save.assert_not_called()
+                self.assertFalse((self.root / '.game/subworld').exists())
 
     def test_concurrent_prepare_is_rejected(self):
         with story_navigation._preparing:

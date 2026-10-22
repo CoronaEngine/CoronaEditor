@@ -3,11 +3,6 @@
     class="relative h-screen border-2 border-[#d8b86c] bg-[#282828]/95 text-white overflow-hidden flex flex-col font-sans"
   >
     <div class="flex-1 min-h-0 p-20 bg-[#1e1e1e] flex flex-col">
-      <div class="mb-10 shrink-0">
-        <h2 class="text-5xl font-bold text-[#d8b86c] mb-2">Corona Editor</h2>
-        <p class="text-base text-gray-500">版本: {{ appVersion }}</p>
-      </div>
-
       <div class="shrink-0 mb-6">
         <h3 class="text-base font-semibold text-gray-400 uppercase tracking-wider">
           最近项目
@@ -46,13 +41,6 @@
                 </span>
               </div>
               <div class="text-xs text-gray-500 truncate mt-1">{{ proj.path }}</div>
-              <button
-                v-if="proj.if_exists && proj.legacy"
-                class="mt-2 px-2 py-1 text-[10px] rounded bg-[#84a65b] hover:bg-[#95b86c]"
-                @click.stop="migrateLegacyProject(proj)"
-              >
-                另存为便携场景
-              </button>
             </div>
             <div class="shrink-0 min-w-40 text-right">
               <div class="text-[11px] text-gray-600 uppercase tracking-wider">上次编辑</div>
@@ -148,15 +136,13 @@ onUnmounted(() => {
   }
 });
 
-const migrationDiagnostics = (result) => (result?.diagnostics || [])
-  .map((item) => `${item.actor || 'scene'}: ${item.path || ''} — ${item.message || ''}`)
-  .join('\n');
 
 const archiveDiagnostics = (result) => (result?.diagnostics || [])
   .map((item) => {
-    const actor = item.actor_name || item.actor_guid || '场景';
+    const actor = item.actor_name || item.actor_guid || item.shape_type || '场景';
     const path = item.resource_path || item.path || '';
-    return `${actor}: ${path}${path ? ' — ' : ''}${item.message || item.code || '加载失败'}`;
+    const count = item.count > 1 ? `（${item.count} 项）` : '';
+    return `${actor}${count}: ${path}${path ? ' — ' : ''}${item.message || item.code || '加载失败'}`;
   })
   .join('\n');
 
@@ -165,37 +151,6 @@ const openSelectedProject = () => {
   if (project) handleOpenProject(project.path, project);
 };
 
-const migrateLegacyProject = async (project) => {
-  if (!project?.path || !project.if_exists || !project.legacy) return false;
-  try {
-    const selected = await editorApi.project.choosePortableSceneTarget();
-    const targetPath = unwrapResponse(selected);
-    if (!targetPath) return false;
-
-    const migrated = await projectLauncherService.migrateLegacyScene({
-      sourcePath: project.path,
-      targetPath,
-      sceneName: project.name || 'PortableScene',
-    });
-    const result = unwrapResponse(migrated);
-    if (!result?.ok) {
-      window.alert(`迁移失败：\n${migrationDiagnostics(result)}`);
-      return false;
-    }
-
-    recentProjects.value = recentProjects.value.map((item) =>
-      item.path === project.path
-        ? { ...item, path: result.path, legacy: false, name: project.name }
-        : item,
-    );
-    selectedProject.value = result.path;
-    await handleOpenProject(result.path);
-    return true;
-  } catch (error) {
-    console.error('旧项目迁移失败:', error);
-    return false;
-  }
-};
 
 const handleOpenProject = async (path, project = null) => {
   try {
@@ -205,7 +160,7 @@ const handleOpenProject = async (path, project = null) => {
     if (opened?.status === 'decision_required') {
       const details = archiveDiagnostics(opened);
       const proceed = window.confirm(
-        `存档中有部分资源无法加载：\n\n${details}\n\n是否保留占位对象并降级打开？`,
+        `场景中有部分资源无法加载：\n\n${details}\n\n是否继续打开可用几何？缺失资源保留占位，不支持的形状将跳过。`,
       );
       if (!proceed) return;
       result = await projectLauncherService.openProject(path, { loadPolicy: 'degraded' });
@@ -224,22 +179,6 @@ const handleOpenProject = async (path, project = null) => {
       window.alert(`存档服务错误：${opened.message || '无法解析存档'}`);
       return;
     }
-    if (opened?.legacy) {
-      const promptKey = `corona.legacyMigrationPrompted:${opened.path}`;
-      if (!window.localStorage?.getItem(promptKey)) {
-        window.localStorage?.setItem(promptKey, 'true');
-        if (window.confirm('这是旧格式存档。是否另存为便携场景文件夹？')) {
-          const migrated = await migrateLegacyProject({
-            ...(project || {}),
-            path: opened.path,
-            if_exists: true,
-            legacy: true,
-            name: project?.name || opened.path.split(/[\\/]/).pop() || 'PortableScene',
-          });
-          if (migrated) return;
-        }
-      }
-    }
     if (opened?.ok) {
       router.push('/');
     }
@@ -254,7 +193,13 @@ const handleImport = async () => {
   try {
     const result = await editorApi.project.openProjectFile();
     if (result?.data?.path) {
-      await handleOpenProject(result.data.path);
+      let path = result.data.path;
+      if (path.toLowerCase().endsWith('.json')) {
+        const imported = unwrapResponse(await projectLauncherService.importVisionScene(path));
+        if (!imported?.ok || !imported.path) throw new Error(imported?.message || 'Vision 导入失败');
+        path = imported.path;
+      }
+      await handleOpenProject(path);
     }
   } catch (error) {
     console.error('打开现有项目失败:', error);

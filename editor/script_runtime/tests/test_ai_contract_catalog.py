@@ -17,7 +17,7 @@ class AiContractCatalogTests(unittest.TestCase):
     def test_current_contract_matches_current_toolbox(self):
         result = check_contract_catalog(TOOLBOX_PATH, CONTRACT_PATH)
         self.assertTrue(result["success"], result["errors"])
-        self.assertEqual(262, result["toolboxCount"])
+        self.assertEqual(260, result["toolboxCount"])
         self.assertEqual(result["toolboxCount"], result["catalogCount"])
         self.assertEqual(result["catalogCount"], result["declaredCount"])
 

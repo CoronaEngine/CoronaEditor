@@ -249,8 +249,10 @@ export function createStoryGameplay({ api, projectPath, readPlayer, readBoss, re
     }
     return (ruleCache = response.state);
   }
-  async function saveWorldRules(rules) {
-    const response = unwrapGameplay(await request({ action: 'saveWorldRules', rules }));
+  async function saveWorldRules(rules, tuning = null) {
+    const body = { action: 'saveWorldRules', rules };
+    if (Array.isArray(tuning)) body.tuning = tuning;
+    const response = unwrapGameplay(await request(body));
     if (response?.status !== 'ok' || !Array.isArray(response.state?.rules)) {
       throw new Error(response?.message || '保存世界规则失败');
     }

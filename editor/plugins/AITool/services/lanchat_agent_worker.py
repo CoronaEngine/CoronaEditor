@@ -8546,7 +8546,7 @@ class LANChatAgentWorker:
             or dict(seed_plan.get("review_policy") or {}).get("source_context_agents")
             or []
         )
-        scene_name = str(data.get("scene_name") or seed_plan.get("scene_name") or "Scene/鍦烘櫙1.scene")
+        scene_name = str(data.get("scene_name") or seed_plan.get("scene_name") or "scene.ini")
         if action_type == "post_generation_add":
             runtime_action = "post_generation_add"
         else:

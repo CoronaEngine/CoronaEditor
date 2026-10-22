@@ -8,7 +8,9 @@ A rule is the installed form of a fragment from game/data/fragments.json. The ca
 stays read-only content; only what the player installed belongs here.
 
 **A rule may name the ONE object it acts on** (`target`, an actor guid): 碎片改为可作用于单独
-物体. `target` is OPTIONAL, and that is what keeps old worlds working: a rule saved before
+物体. 同一块碎片可以有多条记录，每条指向不同 target，因此一块碎片可以同时装到多个物体上；
+同一 target 上重复装同一块碎片仍然会被拒绝。`target` is OPTIONAL, and that is what keeps old
+worlds working: a rule saved before
 targets existed has no `target`, and it keeps its old meaning — it applies to every eligible
 object (`storyWorldRules.mjs` `rulesFor`). The save format therefore stays `version: 1`; a
 version bump would make every existing world unreadable for no gain, because nothing that reads
@@ -29,7 +31,10 @@ import tempfile
 
 SAVE_PATH = Path('.game/story-world-rules.json')
 MAX_BYTES = 65536
-MAX_RULES = 16
+MAX_RULES = 64
+# 每块碎片记住的最近一次调整值。拆下碎片时规则记录会消失，但这份「调参记忆」保留，
+# 下次装到任意物体上仍然使用玩家最后调好的数字，而不是目录默认值。
+MAX_TUNING = 16
 _TYPES = ('sway', 'spin')
 _AXES = ('x', 'y', 'z')
 # sway 的 amplitude 是位移（米）；spin 的 amplitude 是绕轴旋转的幅度（度），两者都只要求
@@ -106,6 +111,42 @@ def validate_rule(entry: object) -> dict:
     return rule
 
 
+def _tuning(value: object) -> list[dict]:
+    """The remembered last-adjusted numbers of fragments, independent of installed rules.
+
+    A fragment removed from every object leaves no rule behind, but the player's tuning is
+    still theirs: this list keeps it so re-installing starts from those numbers. It is
+    validated exactly like a rule's numeric fields (the catalogue itself lives in the
+    frontend, so only the shared bounds and axis rules are enforced here).
+    """
+    if value is None:
+        return []
+    if not isinstance(value, list) or len(value) > MAX_TUNING:
+        raise WorldRuleError('碎片调参记忆列表无效')
+    result, seen = [], set()
+    for entry in value:
+        if not isinstance(entry, dict):
+            raise WorldRuleError('碎片调参记忆必须是对象')
+        fragment_id = entry.get('fragmentId')
+        if not isinstance(fragment_id, str) or not fragment_id or len(fragment_id) > 64:
+            raise WorldRuleError('碎片调参记忆标识无效')
+        rule_type = entry.get('type')
+        if rule_type not in _TYPES:
+            raise WorldRuleError('碎片调参记忆类型无效')
+        if entry.get('axis') not in _TYPE_AXES[rule_type]:
+            raise WorldRuleError('碎片调参记忆方向无效')
+        if not _positive(entry.get('amplitude'), limit=_AMPLITUDE_LIMIT):
+            raise WorldRuleError('碎片调参记忆幅度无效')
+        if not _positive(entry.get('periodMs'), limit=_PERIOD_LIMIT_MS):
+            raise WorldRuleError('碎片调参记忆周期无效')
+        if fragment_id in seen:
+            raise WorldRuleError('碎片调参记忆不能重复')
+        seen.add(fragment_id)
+        result.append({'fragmentId': fragment_id, 'type': rule_type, 'axis': entry['axis'],
+                       'amplitude': entry['amplitude'], 'periodMs': entry['periodMs']})
+    return result
+
+
 def validate_state(state: object) -> dict:
     if not isinstance(state, dict) or state.get('version') != 1:
         raise WorldRuleError('不支持的世界规则存档版本')
@@ -115,14 +156,24 @@ def validate_state(state: object) -> dict:
     rules, seen = [], set()
     for entry in raw:
         rule = validate_rule(entry)
-        # 一块碎片只有一条规则，因此也只有**一个**目标物体：同一块碎片不能同时装在两件物体
-        # 上。想作用于两件物体就装两块不同的碎片（例如浮动 + 旋转），它们各自带自己的目标，
-        # 由前端针对每条规则分别合成。
-        if rule['fragmentId'] in seen:
-            raise WorldRuleError('同一碎片不能重复装入')
-        seen.add(rule['fragmentId'])
+        # 同一块碎片可以同时装到多个物体上：每条记录仍然是「一块碎片 × 一个目标」，
+        # 因此重复键是 (fragmentId, target)，而不是单独的 fragmentId。旧规则没有 target，
+        # 仍然只允许存在一条，避免同一块碎片出现两条「作用于整个世界」的记录。
+        key = (rule['fragmentId'], rule.get('target'))
+        if key in seen:
+            raise WorldRuleError('同一碎片不能重复装到同一个物体上')
+        seen.add(key)
         rules.append(rule)
-    return {'version': 1, 'rules': rules}
+    # 同一块碎片一旦有定向记录，旧版留下的无 target 记录就不能再保留：它表示「整个世界」，
+    # 会让玩家选中部分物体后仍然看到所有物体都在动。读取和保存都在这里归一化。
+    targeted_fragments = {rule['fragmentId'] for rule in rules if rule.get('target')}
+    rules = [rule for rule in rules
+             if rule.get('target') or rule['fragmentId'] not in targeted_fragments]
+    tuning = _tuning(state.get('tuning'))
+    result = {'version': 1, 'rules': rules}
+    if tuning:
+        result['tuning'] = tuning
+    return result
 
 
 def initial_state() -> dict:
@@ -142,8 +193,8 @@ def load(root: Path) -> dict:
         raise WorldRuleError(f'世界规则存档损坏，未覆盖原文件：{error}') from error
 
 
-def save(root: Path, rules: object) -> dict:
-    state = validate_state({'version': 1, 'rules': rules})
+def save(root: Path, rules: object, tuning: object = None) -> dict:
+    state = validate_state({'version': 1, 'rules': rules, 'tuning': tuning})
     folder = Path(root) / '.game'
     folder.mkdir(exist_ok=True)
     fd, temporary = tempfile.mkstemp(prefix='.story-world-rules-', suffix='.tmp', dir=folder)

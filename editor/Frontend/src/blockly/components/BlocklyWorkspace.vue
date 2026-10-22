@@ -1,12 +1,12 @@
 <template>
   <div
     :class="embedded ? 'flex-1 min-h-0 w-full' : 'h-screen'"
-    class="rounded-lg overflow-hidden relative bg-[#282828]/90 flex flex-col text-white font-sans"
+    class="rounded-lg overflow-hidden relative bg-[#1b241d]/90 flex flex-col text-white font-sans"
   >
     <DockTitleBar
       v-if="!embedded && !isDocked"
       :title="editingTarget ? `${t('blockly.title')} - ${editingTarget}` : t('blockly.title')"
-      extraClass="bg-[#D8B86C]"
+      extraClass="bg-[#b3995d]"
       routePath="/ScratchTool"
       @close="handleClose"
     />
@@ -61,9 +61,9 @@
         <div
           id="drag-overlay"
           class="absolute inset-0 z-20 flex items-center justify-center pointer-events-none"
-          style="background: rgba(216,184,108,0.15); border: 3px dashed #d8b86c; display: none;"
+          style="background: rgba(179, 153, 93,0.15); border: 3px dashed #b3995d; display: none;"
         >
-          <div class="text-center text-[#d8b86c]">
+          <div class="text-center text-[#b3995d]">
             <div class="text-4xl mb-2">📂</div>
             <div class="text-lg font-bold">{{ t('blockly.dragImport') }}</div>
           </div>
@@ -82,7 +82,7 @@
           class="absolute top-4 left-1/2 -translate-x-1/2 z-30 px-4 py-2 rounded shadow-lg text-sm font-medium transition-opacity duration-300 pointer-events-none"
           style="opacity: 0;"
         ></div>
-        <div id="status-overlay" class="absolute inset-0 flex items-center justify-center z-10" style="background: #1e1e1e;">
+        <div id="status-overlay" class="absolute inset-0 flex items-center justify-center z-10" style="background: #121a14;">
           <div class="text-center">
             <div class="text-xl font-bold text-green-400 mb-2">{{ t('blockly.title') }}</div>
             <div class="text-sm text-gray-400">{{ t('blockly.loadingWorkspace') }}</div>
@@ -104,7 +104,7 @@
 
       <div
         v-if="store.hasLayoutSider.value"
-        class="w-80 flex flex-col border-l border-gray-700 bg-[#1e1e1e]"
+        class="w-80 flex flex-col border-l border-gray-700 bg-[#121a14]"
       >
         <div class="flex items-center justify-between px-3 py-2 border-b border-gray-700">
           <span class="text-sm text-gray-300 font-medium">{{ t('blockly.pythonCode') }}</span>
@@ -1464,7 +1464,7 @@ defineExpose({
 }
 
 .toolbar-btn:hover {
-  color: #e0e0e0;
+  color: #e8ede3;
   background: rgba(255,255,255,0.06);
   border-color: rgba(255,255,255,0.12);
 }
