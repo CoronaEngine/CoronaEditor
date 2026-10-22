@@ -150,7 +150,7 @@ async function initializeStoryCharacters({ api, sceneId, frontendUrl, isCurrent 
   }
   // Creatures belong to the main world and are NOT gated on `boss.hp`, unlike the boss: they
   // are the arena's other monsters, so killing the boss must not empty the arena. The small
-  // world keeps its own cast (player + prophet), which is why this branch names 'main'.
+  // world keeps only the player, which is why this branch names 'main'.
   const visibleCharacters = STORY_CHARACTERS.filter(character => !gameplay
     ? !isMonsterRole(character.role)
     : character.role === 'player'
@@ -158,8 +158,7 @@ async function initializeStoryCharacters({ api, sceneId, frontendUrl, isCurrent 
       // A monster stays in the arena until its own health reaches zero; the boss's health
       // has no effect on them. A save that predates the roster has no entry and stays alive.
       || (gameplay.role === 'main' && isMonsterRole(character.role)
-          && ((gameplay.state.monsters?.[character.role]?.hp ?? 1) > 0))
-      || (gameplay.role === 'child' && character.role === 'prophet'));
+          && ((gameplay.state.monsters?.[character.role]?.hp ?? 1) > 0)));
   if (gameplay) {
     const visibleGuids = new Set(visibleCharacters.map(character => character.guid));
     // Only manage game-owned actors; scenery and user-authored models stay untouched.

@@ -31,7 +31,7 @@ import { MAX_PLACEMENTS, PLACED_BLOCK_REACH, PLACEMENT_DISTANCE, blockSpawnTrans
   removePlacement, sanitizePlacements } from '../../../../game/frontend/storyProps.mjs';
 import { PROPHET_INTERACTION, prophetAvailable, prophetDistance,
   normalizeDialogue } from '../../../../game/frontend/prophetDialogue.mjs';
-import { ensureStoryCube, cubeTransformOf, playerFacingYaw } from '../../../../game/frontend/storyCube.mjs';
+import { ensureStoryCube, cubeTransformOf, playerFacingYaw, CUBE_GUID } from '../../../../game/frontend/storyCube.mjs';
 import { MONSTER_EQUIPMENT } from '../../../../game/frontend/storyLoot.mjs';
 import { ensureStoryMap, MAP_PLACEMENT, SUBWORLD_MAP_PLACEMENT } from '../../../../game/frontend/storyMap.mjs';
 import { heightAt } from '../../../../game/frontend/storyMapHeight.mjs';
@@ -167,11 +167,6 @@ function playerAnimationSwitcher() {
   return playerAnimation;
 }
 /**
- * 小怪简易版：让一只小怪发现玩家后走过去、进入范围就挥砍。
- * 用 100ms 定时器驱动，而不是挂在 `updateProximity` 上——那个回调只在玩家移动时触发，
- * 玩家站住不动小怪就不会动，无法验证。
- */
-/**
  * Boss 动作状态机：待机 / 靠近时挥砍（两套轮换）/ 被击中时受击 / 血量归零死亡。
  * 不造成伤害——游戏里没有"玩家血量"状态，`config.playerHp` 无人消费，
  * 所以这里先把可见的威胁做出来；等血量系统落地时，`onAttack` 是唯一要接伤害的地方。
@@ -212,12 +207,141 @@ function tickBoss() {
   bossStateMachine()?.tick({ hp, distance: Math.max(0, distance), wasHit });
 }
 // Boss 状态机由 100ms 定时器驱动：玩家站住不动时 Boss 仍然要反应。
+// 部分普通怪物会主动追击玩家：地龙、蜥蜴女猎手、刀螳。它们只在主世界跑动，
+// 进入攻击距离后会停下并播放 Attack1；玩家没有数值血量，因此这里先做可见的
+// 追击与攻击表现，不扣血。
+const MONSTER_AI_ROLES = new Set(['monster-wyvern', 'monster-lizardf', 'monster-mantis']);
+const MONSTER_AI = Object.freeze({
+  detectRange: 20,
+  attackRange: 2.8,
+  speed: 1.8,
+  attackCooldownMs: 2400,
+  attackHoldMs: 700,
+  stepSeconds: 0.1,
+});
+const monsterAi = new Map();
+const playerHitPulse = ref(0);
+function monsterState(entry) {
+  if (!entry?.actor?.geometry?.position) return null;
+  let state = monsterAi.get(entry.id);
+  if (!state) {
+    state = { position: [...entry.actor.geometry.position], clip: null,
+      lastAttackAt: -Infinity, attackUntil: 0, moving: false };
+    monsterAi.set(entry.id, state);
+  }
+  return state;
+}
+function setMonsterClip(entry, state, clip) {
+  if (!entry?.actor?.actor_guid || state.clip === clip) return;
+  state.clip = clip;
+  Promise.resolve()
+    .then(() => editorApi.sceneTools.setActorAnimation(sceneId, entry.actor.actor_guid, clip, 0.2))
+    .catch(() => { state.clip = null; });
+}
+function shiftMonsterBounds(entry, dx, dz) {
+  const bounds = entry.bounds;
+  if (!Array.isArray(bounds) || bounds.length < 6) return;
+  bounds[0] += dx; bounds[3] += dx;
+  bounds[2] += dz; bounds[5] += dz;
+}
+function faceMonster(entry, state, yaw) {
+  if (!entry?.actor?.actor_guid || state.moving) return;
+  const last = Number.isFinite(state.facing) ? state.facing : 0;
+  if (Math.abs(last - yaw) < 0.08) return;
+  state.facing = yaw;
+  Promise.resolve()
+    .then(() => editorApi.scene.setActorTransform(sceneId, entry.actor.actor_guid, {
+      position: [...state.position],
+      rotation: [0, yaw, 0],
+      scale: [...(entry.actor.geometry?.scale || [1, 1, 1])],
+    }))
+    .then(response => {
+      const actor = unwrap(response)?.actor;
+      if (actor) { entry.actor = actor; entry.bounds = worldBounds(actor); }
+    })
+    .catch(() => { state.facing = null; });
+}
+function moveMonster(entry, state, next) {
+  const [x, y, z] = next;
+  if (state.moving) return;
+  const dx = x - state.position[0];
+  const dz = z - state.position[2];
+  if (Math.hypot(dx, dz) < 1e-4) return;
+  const from = [...state.position];
+  const yaw = Math.atan2(dx, dz);
+  state.position = [x, y, z];
+  state.facing = yaw;
+  shiftMonsterBounds(entry, dx, dz);
+  state.moving = true;
+  Promise.resolve()
+    .then(() => editorApi.scene.setActorTransform(sceneId, entry.actor.actor_guid, {
+      position: [x, y, z],
+      rotation: [0, yaw, 0],
+      scale: [...(entry.actor.geometry?.scale || [1, 1, 1])],
+    }))
+    .then(response => {
+      const actor = unwrap(response)?.actor;
+      if (actor) { entry.actor = actor; entry.bounds = worldBounds(actor); }
+    })
+    .catch(error => {
+      // A failed write must not teleport the monster on the next tick.
+      state.position = from;
+      shiftMonsterBounds(entry, -dx, -dz);
+      if (current()) gameplayError.value = `怪物移动失败：${error.message}`;
+    })
+    .finally(() => { state.moving = false; });
+}
+function tickMonsters() {
+  if (!current() || !cameraReady || roleRef.value !== 'main') return;
+  const data = gameplayState.value;
+  if (!data || inventoryOpen.value || dialogueOpen.value || adjustMode.value) return;
+  const player = camera.snapshotPlayer();
+  if (!player?.position) return;
+  const now = performance.now();
+  for (const entry of monsterActors) {
+    if (!MONSTER_AI_ROLES.has(entry.id) || !entry.actor?.geometry) continue;
+    if ((data.state.monsters?.[entry.id]?.hp ?? 1) <= 0) continue;
+    const state = monsterState(entry);
+    if (!state) continue;
+    const dx = player.position[0] - state.position[0];
+    const dz = player.position[2] - state.position[2];
+    const distance = Math.hypot(dx, dz);
+    if (!Number.isFinite(distance) || distance > MONSTER_AI.detectRange) {
+      setMonsterClip(entry, state, 'Idle');
+      continue;
+    }
+    const yaw = Math.atan2(dx, dz);
+    if (distance > MONSTER_AI.attackRange) {
+      const step = Math.min(MONSTER_AI.speed * MONSTER_AI.stepSeconds,
+        distance - MONSTER_AI.attackRange);
+      const nx = state.position[0] + (dx / distance) * step;
+      const nz = state.position[2] + (dz / distance) * step;
+      const oldGround = groundYAt(state.position[0], state.position[2]);
+      const nextGround = groundYAt(nx, nz);
+      const ny = Number.isFinite(nextGround) && Number.isFinite(oldGround)
+        ? state.position[1] + (nextGround - oldGround)
+        : state.position[1];
+      moveMonster(entry, state, [nx, ny, nz]);
+      if (now >= state.attackUntil) setMonsterClip(entry, state, 'Walk');
+    } else {
+      if (now - state.lastAttackAt >= MONSTER_AI.attackCooldownMs) {
+        state.lastAttackAt = now;
+        state.attackUntil = now + MONSTER_AI.attackHoldMs;
+        setMonsterClip(entry, state, 'Attack1');
+        playerHitPulse.value++;
+      } else if (now >= state.attackUntil) {
+        setMonsterClip(entry, state, 'Idle');
+      }
+      faceMonster(entry, state, yaw);
+    }
+  }
+}
 let actorTimer = null;
 function startActorTicker() {
   if (actorTimer || typeof window === 'undefined') return;
   actorTimer = window.setInterval(() => {
     if (!current() || !cameraReady) return;
-    try { tickBoss(); } catch (error) { if (current()) gameplayError.value = error.message; }
+    try { tickBoss(); tickMonsters(); } catch (error) { if (current()) gameplayError.value = error.message; }
   }, 100);
 }
 function updateProximity() {
@@ -1507,8 +1631,8 @@ function cycleView() {
   keepChildPlayerHidden();
   showToast(`视角：${label} → ${viewLabel()}（V 键切换）`);
 }
-function openDialogue() {
-  if (currentInteraction().kind !== 'prophet' || dialogueOpen.value) return;
+function openDialogue(force = false) {
+  if (dialogueOpen.value || (!force && currentInteraction().kind !== 'prophet')) return;
   camera.resetInput();
   dialogueLine.value = 0;
   dialogueOpen.value = true;
@@ -1662,7 +1786,7 @@ function rememberCube(actor) {
   cubeTransform = cubeTransformOf(cubeActor);
   return cubeTransform;
 }
-// ---- 小世界模型裁剪（场景只保留玩家（隐形）、先知与地形）----------------------
+// ---- 小世界模型裁剪（场景只保留玩家（隐形）与地形）----------------------
 // 角色可见性的权威处理在 game/frontend/storyActors.mjs（只读不改）：它把小世界里的
 // Boss、商人、小怪与红球设为不可见。这里在进入小世界时把它们从场景中**移除**——
 // 隐藏只是改可见性，模型仍占着场景；移除只针对快照中真实存在的 actor，重复进入幂等。
@@ -1671,9 +1795,9 @@ async function cullChildWorld(snapshot, gameplay) {
   // 只对快照中真实存在的 actor 发起移除：重复进入小世界时场景里已没有它们，返回空列表。
   const present = new Set((Array.isArray(snapshot?.actors) ? snapshot.actors : [])
     .map(actor => actor?.actor_guid).filter(Boolean));
-  const keepRoles = new Set(['player', 'prophet']);
+  const keepRoles = new Set(['player']);
   const list = [...STORY_CHARACTERS.filter(character => !keepRoles.has(character.role))
-    .map(character => character.guid), FRAGMENT_GUID]
+    .map(character => character.guid), FRAGMENT_GUID, CUBE_GUID]
     .filter(guid => present.has(guid));
   for (const guid of list) {
     try {
@@ -1763,12 +1887,14 @@ async function runProphetAction(chosen) {
   const target = adjustSelection.value?.actor || cubeActor;
   const current = cubeTransformOf(target)
     || (adjustSelection.value ? adjustSelection.value.transform : cubeTransform);
-  if (!target || !current || !prophetActor || !playerActor) {
+  // 先知的模型已从场景移除，摆位参考退回玩家自身：调整物体仍然可用。
+  const reference = prophetActor || playerActor;
+  if (!target || !current || !reference || !playerActor) {
     actionFeedback.value = '物体尚未就绪，请先从列表中选择一个物体';
     return;
   }
   await runAction(async () => {
-    const next = nextObjectTransform(chosen.id, { current, reference: prophetActor,
+    const next = nextObjectTransform(chosen.id, { current, reference,
       facingYaw: playerFacingYaw(playerActor) });
     if (!next) return;
     // The light path: the setter does not re-import the resource, so it cannot add mesh work
@@ -1789,7 +1915,7 @@ async function runProphetAction(chosen) {
     // only way to separate "the engine refused the write" from "the engine took it but the
     // change is not on screen" — and those two need completely different fixes.
     const kept = (await readBackTransform(target.actor_guid))?.scale?.[0];
-    const summary = adjustFeedback(chosen.id, next, prophetActor);
+    const summary = adjustFeedback(chosen.id, next, reference);
     actionFeedback.value = Number.isFinite(kept) && Math.abs(kept - next.scale[0]) < 1e-3
       ? `${summary}（引擎已接受）`
       : `${summary}｜引擎未保留，实际缩放 ${Number.isFinite(kept) ? kept.toFixed(2) : '读不到'}`;
@@ -2221,8 +2347,9 @@ onMounted(async () => {
             bounds: worldBounds(actor) } : null;
         })
         .filter(Boolean);
-    // 先知只在小世界按需生成，主世界里缺失是正常的：交互保持不可用即可。
-    prophetActor = snapshot.actors?.find(actor => actor.actor_guid === PROPHET_GUID) || null;
+    // 小世界不再生成先知模型：对话入口在 HUD 右下角，由一个按钮承担。
+    prophetActor = loadedGameplay?.role === 'child' ? null
+      : snapshot.actors?.find(actor => actor.actor_guid === PROPHET_GUID) || null;
     playerActor = player;
     // 先知旁的方块，以及这个小世界已经装填的世界规则（李淳珺任务）：
     // 主世界没有先知，方块只隐藏不创建。方块只是摆设：创建失败必须仍能进世界并照常对话，
@@ -2299,6 +2426,7 @@ onUnmounted(() => {
   bossDirector?.dispose();
   bossDirector = null;
   bossLastHp = null;
+  monsterAi.clear();
   camera.dispose();
   saveRegistration.retire();
   resizeObserver?.disconnect();
@@ -2485,7 +2613,21 @@ onUnmounted(() => {
         <strong>{{ worldLabel }}</strong>
         <span>此处为沙盒空间 · 无战斗目标</span>
       </section>
+
+      <!-- 先知不再使用 3D 模型：小世界右下角固定一个对话入口。 -->
+      <button v-if="inSubworld && !inventoryOpen && !dialogueOpen && !adjustMode && !initializing"
+        type="button" class="prophet-fab" aria-label="与先知交谈" @click.stop="openDialogue(true)">
+        <span class="prophet-fab__mark" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><path d="M4 5h16v11H9l-5 4V5Z" /><path d="M8 9h8M8 12h5" /></svg>
+        </span>
+        <span class="prophet-fab__text">
+          <strong>先知</strong>
+          <small>与先知交谈</small>
+        </span>
+      </button>
     </div>
+
+    <div v-if="playerHitPulse" :key="playerHitPulse" class="player-hit-flash" aria-hidden="true"></div>
     <!-- ============ 先知对话 + 调整物体：(F 交谈，Enter 继续，Esc 离开) ============ -->
     <div v-if="dialogueOpen || adjustMode" class="dialogue-overlay"
       :class="{ 'dialogue-overlay-passive': adjustMode }"
@@ -3020,7 +3162,48 @@ onUnmounted(() => {
 }
 .hotbar__tip { color: var(--c-gold-dim); }
 
+/* 小世界右下角：先知的对话入口。先知不再生成 3D 模型，只留这个按钮。 */
+.prophet-fab {
+  position: absolute; right: clamp(16px, 2vw, 28px); bottom: clamp(16px, 2vh, 24px);
+  z-index: 13; display: flex; align-items: center; gap: 10px;
+  padding: 9px 16px 9px 10px; cursor: pointer; pointer-events: auto;
+  color: var(--c-paper); background: linear-gradient(135deg, rgba(31, 44, 35, .94), rgba(13, 20, 16, .96));
+  border: 1px solid var(--c-gold-dim); border-left: 3px solid var(--c-gold-bright);
+  clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 0 100%);
+  box-shadow: 0 10px 26px rgba(0, 0, 0, .5), 0 0 18px rgba(179, 153, 93, .12);
+  transition: border-color .18s ease, background .18s ease, transform .18s ease;
+}
+.prophet-fab:hover {
+  transform: translateY(-2px); border-color: var(--c-gold-bright);
+  background: linear-gradient(135deg, rgba(40, 55, 43, .98), rgba(17, 26, 20, .98));
+}
+.prophet-fab__mark {
+  width: 30px; height: 30px; flex: 0 0 auto; display: grid; place-items: center;
+  border: 1px solid rgba(179, 153, 93, .5); background: rgba(179, 153, 93, .1);
+  transform: rotate(45deg);
+}
+.prophet-fab__mark svg {
+  width: 18px; height: 18px; transform: rotate(-45deg);
+  fill: none; stroke: var(--c-gold-bright); stroke-width: 1.4; stroke-linejoin: round;
+}
+.prophet-fab__text { display: grid; gap: 2px; text-align: left; }
+.prophet-fab__text strong { font-size: 13px; font-weight: 600; letter-spacing: 2px; color: var(--c-gold-bright); }
+.prophet-fab__text small { font-size: 10px; letter-spacing: 1px; color: var(--c-paper-dim); }
+
+/* 怪物攻击到玩家时的一层短暂红光：没有数值血量，先用可见反馈表示“被打了”。 */
+.player-hit-flash {
+  position: absolute; inset: 0; z-index: 30; pointer-events: none;
+  background: radial-gradient(ellipse at center, transparent 35%, rgba(180, 30, 30, .38) 100%);
+  animation: player-hit .42s ease-out both;
+}
+@keyframes player-hit {
+  0% { opacity: 0; }
+  18% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
 @media (max-width: 800px) {
   .world-indicator { top: 18px; right: 12px; font-size: 11px; letter-spacing: 1px; }
+  .prophet-fab { right: 12px; bottom: 14px; padding: 7px 12px 7px 8px; }
 }
 </style>
