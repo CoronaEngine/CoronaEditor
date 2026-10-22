@@ -8,7 +8,7 @@ from ..contracts import SceneScriptTarget
 
 class SceneScript(ScriptBase):
     """
-    场景脚本：存放当前场景数据，在项目加载时初始化
+    场景脚本：存放场景数据，在切换场景时初始化
     生命周期：场景加载 -> 场景卸载
     作用范围：当前场景
     """

@@ -1,22 +1,25 @@
 # `ProjectLauncher` 插件边界
 
-一个项目就是一个场景目录，唯一档案入口是目录中的 `scene.ini`。
-`project.*` native aggregate 是创建、打开、校验、资源导入和最近项目的 canonical owner；
-`main.py` 只将 Python service 请求转发到 `CoronaEditorApi.project`。
+`ProjectLauncher` 是项目流程编排的 canonical owner，负责项目创建、打开、复制和迁移
+流程的 UI/宿主编排。当前 Vue/C++ 主流程使用 `project.*` native aggregate；Python
+`ProjectLauncher` service 位于 `main.py`，仅作为显式旧宿主 adapter。项目公共语义
+归 `project.*` manifest；项目模板和路径 helper 分别归 `runtime.project_templates`
+与 `config`，本插件不拥有第二套项目 schema。
 
 ## 子目录职责
 
 | 路径 | 负责内容 | 不负责 |
 |---|---|---|
 | `main.py` | 旧宿主 service adapter；将历史项目操作转发到 `CoronaEditorApi.project` | 不直接创建 C++ Scene/Actor，不定义第二套公共契约；不作为 Vue/native 启动入口 |
-| `runtime/project_templates.py` | 独立 `.actor` 模板与 Actor 文件创建 | 不维护项目或场景模板 |
-| `project.importVisionScene` | 显式将 Vision JSON 导入新目录，写入 `scene.ini`、资产清单与 `Assets/` | 不读取或迁移旧 Corona 档案 |
-| `project.openProject` | 打开目录或其中的 `scene.ini`，建立唯一当前场景 | 不维护场景列表或入口场景 |
+| `runtime/project_templates.py` | 项目模板复制、路径规范化和 INI 初始化 helper owner | 不维护新的项目生命周期或公共 schema |
+| `project.copyExistingToData` | native aggregate；C++ handler 负责已有项目复制、重名、路径规范化和失败回滚 | 不暴露 Engine 对象，不在 Python 重建复制实现 |
+| `editor/data/` | native 项目复制的 runtime data 目标目录 | 不作为模板 source 或 native 项目状态 owner |
 
 项目创建、打开和场景初始化的权威状态由 C++/runtime host 管理；Python 只负责请求
-转换与编排。不得直接导入 `CoronaCore` 或 `backend`。
+转换、模板 helper 和兼容编排。不得直接导入 `CoronaCore` 或 `backend`。
 
 ## 删除条件
 
-不提供旧 `.scene`、`project.ini` 的读取、复制导入或迁移，不维护场景列表、
-入口场景、场景切换或项目模板。不得重新增加 Python 复制或兼容实现。
+`ProjectLauncher` service 和 ProjectCopy 已完成 owner 迁移；旧 service 专用 shim 与
+`runtime/legacy_project_copy.py` 均已删除。后续旧宿主应迁移到
+`project.copyExistingToData`，不得重新增加 Python 复制实现。

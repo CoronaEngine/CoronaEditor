@@ -357,12 +357,7 @@ export function createWorldRuleRunner({ bridge = null, rules = [], targets = [],
    * meaning is unchanged — they apply to every eligible object. Order is the installed order,
    * so a rule set behaves the same way it always did.
    */
-  const rulesFor = target => installedRules.filter(rule => {
-    if (rule.target) return rule.target === target.guid;
-    // 同一块碎片一旦有了定向记录，就只按定向记录生效；旧版留下的无 target 记录
-    // 不能继续把这块碎片放大成「作用于整个小世界」。
-    return !installedRules.some(other => other?.fragmentId === rule.fragmentId && other.target);
-  });
+  const rulesFor = target => installedRules.filter(rule => !rule.target || rule.target === target.guid);
 
   function recomputeAnimated() {
     animated = currentTargets.filter(target => rulesFor(target).length > 0);

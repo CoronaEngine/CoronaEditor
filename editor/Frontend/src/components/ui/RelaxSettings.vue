@@ -56,10 +56,10 @@ fieldset { margin: 10px 0; padding: 8px; border: 1px solid #4d4434; border-radiu
 legend { color: #dbc48d; padding: 0 4px; }
 label { margin: 6px 0; }
 input[type=number] { width: 78px; padding: 3px 5px; color: #f2eee5; background: #161614; border: 1px solid #62563e; border-radius: 3px; }
-input[type=checkbox] { accent-color: #b3995d; }
+input[type=checkbox] { accent-color: #d8b86c; }
 .hint { color: #bdb6a7; font-size: 11px; margin: 7px 0; }
 .error { color: #f9a5a5; }
 .reconstruction button { padding: 3px 6px; }
-.reconstruction button[aria-pressed=true] { background: #6a552b; border-color: #b3995d; }
+.reconstruction button[aria-pressed=true] { background: #6a552b; border-color: #d8b86c; }
 footer { position: sticky; bottom: -12px; background: #24221e; padding: 8px 0; }
 </style>

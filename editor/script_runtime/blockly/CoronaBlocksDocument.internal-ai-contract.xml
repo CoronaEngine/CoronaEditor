@@ -219,7 +219,7 @@
     "globalVariablesWorkspace": {}
   }
 }</ExampleResult>
-  <Catalog generatedFrom="editor/Frontend/src/blockly/configs/toolboxConfig.js and registered Blockly definitions" blockCount="260" locked="true">
+  <Catalog generatedFrom="editor/Frontend/src/blockly/configs/toolboxConfig.js and registered Blockly definitions" blockCount="262" locked="true">
     <CatalogRules>
       <Rule>AI must preserve this Catalog and may use only listed Block type, Field name, Input name, check type, and dropdown value combinations.</Rule>
       <Rule>projectUsage=project-safe means suitable for the unbound project graph. projectUsage=actor-context means the block expects a current actor context and should normally be avoided here.</Rule>
@@ -320,6 +320,10 @@
         <Field name="x" kind="string" defaultJson="&quot;&quot;" inputOwner="" />
       </Block>
       <Block type="control_cloneDEL" category="控制" shape="terminal" projectUsage="actor-context" recommended="false" outputCheck="" dynamic="false" label="删除此克隆体" />
+      <Block type="control_senceSet" category="控制" shape="statement" projectUsage="project-safe" recommended="false" outputCheck="" dynamic="false" label="换成  场景">
+        <Field name="x" kind="string" defaultJson="&quot;&quot;" inputOwner="" />
+      </Block>
+      <Block type="control_nextSence" category="控制" shape="statement" projectUsage="project-safe" recommended="false" outputCheck="" dynamic="false" label="下一个场景" />
       <Block type="control_restart_level" category="控制" shape="terminal" projectUsage="project-safe" recommended="false" outputCheck="" dynamic="false" label="重新开始当前关卡" />
       <Block type="control_cooldown_ready" category="控制" shape="output" projectUsage="project-safe" recommended="true" outputCheck="Boolean" dynamic="false" label="冷却 … 间隔秒数 0 … 就绪？ true 立即消耗" capabilities="timer">
         <Input name="NAME" kind="value" check="String" />

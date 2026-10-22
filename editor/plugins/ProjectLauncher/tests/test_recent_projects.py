@@ -33,8 +33,8 @@ class RecentProjectSettingsTests(unittest.TestCase):
             root = Path(temp_dir)
             project = root / 'creative_world_1'
             project.mkdir()
-            (project / 'scene.ini').write_text(
-                '[format]\ntype = corona_scene_folder\nversion = 1\n[scene]\nname = ????_1\nlast_opened = 2026-07-23 10:00:00\n',
+            (project / 'project.ini').write_text(
+                '[Project]\nname = ????_1\nlast_opened = 2026-07-23 10:00:00\n',
                 encoding='utf-8',
             )
             config_path = root / 'CoronaEditor.ini'

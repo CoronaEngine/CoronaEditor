@@ -57,6 +57,11 @@ class ScriptRuntimeSceneAdapter:
     def __init__(self, invoke_manifest):
         self._invoke_manifest = invoke_manifest
 
+    def list_routes(self):
+        return self._invoke_manifest("scene.list_routes", [])
+
+    def switch(self, route):
+        return self._invoke_manifest("scene.switch", [route])
 
     def get_snapshot(self, scene_name=""):
         return self._invoke_manifest("scene.get_snapshot", [scene_name])

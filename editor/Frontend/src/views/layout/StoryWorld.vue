@@ -4,11 +4,8 @@ import { useRouter, onBeforeRouteLeave } from 'vue-router';
 import { editorApi } from '@/api/editorApi.js';
 import { worldModeState, normalizeProjectPath } from '@/services/worldModeService.js';
 import { createStoryCameraController } from '@/utils/viewportStoryCamera.js';
-import { createStoryWorldControls, SMALL_WORLD_VIEW_LABELS } from '@/utils/viewportStoryWorldCamera.js';
-import { routeStoryKeydown } from '@/utils/storyKeyRouter.js';
 import { projectLauncherService, cancelPendingProjectOpen, getProjectSelectionVersion } from '@/services/projectLauncherService.js';
-import { trackWorldSessionWork, notifyWorldError, registerWorldSessionSave,
-  runStorySwitchWithRetry } from '@/services/worldSessionLifecycle.js';
+import { trackWorldSessionWork, notifyWorldError, registerWorldSessionSave } from '@/services/worldSessionLifecycle.js';
 import { createStoryNavigationController, NAVIGATION_KEY } from '../../../../game/frontend/storyNavigation.mjs';
 // 剧情 HUD 样式：复刻 ui2.html《自然荒野 · 战术协同系统 HUD》
 import './StoryWorld.hud.css';
@@ -18,22 +15,24 @@ import HERO_FIGURE from '@/assets/hero-figure.png';
 import './StoryWorld.bag.css';
 
 import { ensureStoryCharacters, syncPlacementActors } from '../../../../game/frontend/storyActors.mjs';
-import { createPlayerAnimationSwitcher, PLAYER_ATTACK_CLIP, PLAYER_SKILL_CLIP } from '../../../../game/frontend/storyPlayerAnimation.mjs';
+import { createPlayerAnimationSwitcher, PLAYER_ATTACK_CLIP, PLAYER_SKILL_CLIP }
+  from '../../../../game/frontend/storyPlayerAnimation.mjs';
 import { createBossDirector } from '../../../../game/frontend/storyBossAi.mjs';
+import { createMonsterDirector, stunSecondsFor } from '../../../../game/frontend/storyMonsterAi.mjs';
 import { createPlayerController, VIEW_LABELS } from '../../../../game/frontend/playerController.mjs';
 import { createPlayerSave } from '../../../../game/frontend/playerSave.mjs';
 import { createStoryGameplay, worldBounds, distanceToBounds, pickupDistance,
   contextualInteraction, FRAGMENT_GUID } from '../../../../game/frontend/storyGameplay.mjs';
-import { STORY_CHARACTERS, PROPHET_GUID, PLAYER_MODEL_YAW_OFFSET, isMonsterRole,
-  resolveStoryAssetPath, sceneSnapshot } from '../../../../game/frontend/storyCharacters.mjs';
+import { STORY_CHARACTERS, PROPHET_GUID, isMonsterRole, resolveStoryAssetPath,
+  sceneSnapshot } from '../../../../game/frontend/storyCharacters.mjs';
 import { MAX_PLACEMENTS, PLACED_BLOCK_REACH, PLACEMENT_DISTANCE, blockSpawnTransform, cycleSlot, findProp,
   hotbarSlots as hotbarSlotsFor, nearestPlacedBlock, nextPlacementIndex, placementGuid,
   removePlacement, sanitizePlacements } from '../../../../game/frontend/storyProps.mjs';
 import { PROPHET_INTERACTION, prophetAvailable, prophetDistance,
   normalizeDialogue } from '../../../../game/frontend/prophetDialogue.mjs';
-import { ensureStoryCube, cubeTransformOf, playerFacingYaw, CUBE_GUID } from '../../../../game/frontend/storyCube.mjs';
+import { ensureStoryCube, cubeTransformOf, playerFacingYaw } from '../../../../game/frontend/storyCube.mjs';
 import { MONSTER_EQUIPMENT } from '../../../../game/frontend/storyLoot.mjs';
-import { ensureStoryMap, MAP_PLACEMENT, SUBWORLD_MAP_PLACEMENT } from '../../../../game/frontend/storyMap.mjs';
+import { ensureStoryMap } from '../../../../game/frontend/storyMap.mjs';
 import { heightAt } from '../../../../game/frontend/storyMapHeight.mjs';
 import { loadStoryMapHeight, mapHeightUrl } from '../../../../game/frontend/storyMapHeightLoader.mjs';
 import { collectSwayTargets, createWorldRuleRunner,
@@ -41,7 +40,7 @@ import { collectSwayTargets, createWorldRuleRunner,
 import { ADJUST_ACTIONS, FRAGMENT_ADJUST_ACTIONS, PROPHET_SCREENS, adjustFeedback,
   adjustFragmentRule, fragmentAdjustPanel, fragmentPanel,
   nextObjectTransform, objectLabel, prophetKeyAction, selectableObjects,
-  toggleFragmentTargets, rememberFragmentTuning } from '../../../../game/frontend/storyProphetActions.mjs';
+  toggleFragment } from '../../../../game/frontend/storyProphetActions.mjs';
 
 
 const router = useRouter();
@@ -109,9 +108,6 @@ let resizeObserver = null;
 let leaving = false;
 let dpiQuery = null;
 let focused = document.hasFocus();
-// 每次「离开世界」都把代数 +1：正在退避等待的切换重试据此立刻停手，避免取消之后又去
-// 复制一遍子世界（那次复制没人会用到）。
-let switchGeneration = 0;
 const current = () => !disposed && !leaving && worldModeState.status === 'ready'
   && worldModeState.mode === 'story' && worldModeState.revision === revision;
 /**
@@ -121,10 +117,11 @@ const current = () => !disposed && !leaving && worldModeState.status === 'ready'
  */
 const groundYAt = (x, z) => heightAt(x, z);
 const camera = createStoryCameraController({
-  createControls: options => createStoryWorldControls({
-    ...options, createThirdPerson: createPlayerController, role: () => roleRef.value,
-    getGroundY: groundYAt, modelYawOffset: PLAYER_MODEL_YAW_OFFSET,
-  }),
+  createControls: createPlayerController,
+  // 玩家的地面线：地图是 phantom（引擎不为它建碰撞体），脚下多高只能由烘好的高度网格回答。
+  // `heightAt` 在没有网格时返回 null，控制器便退回原来的固定地板——这条绑定必须在
+  // createStoryCameraController 里继续往下传，否则控制器收不到它（这正是之前的原因）。
+  getGroundY: groundYAt,
   onError: error => {
     if (current()) gameplayError.value = error.message;
     notifyWorldError(error);
@@ -134,9 +131,6 @@ const camera = createStoryCameraController({
   isInputLocked: () => initializing.value || !focused || document.hidden || navigation.busy || savingPlayer || inventoryOpen.value || dialogueOpen.value,
   onPlayerChanged: updateProximity,
   getRect: () => surface.value?.getBoundingClientRect(),
-  // 自由视角的裸鼠标转向：指针锁定之后视口坐标不再有意义，判定改由「是否锁定」回答。
-  // 拿不到锁定的页面（或浏览器）这里恒为 false，转向照旧由裸鼠标事件驱动。
-  isPointerLocked: () => Boolean(surface.value) && document.pointerLockElement === surface.value,
   getPixelRatio: () => window.devicePixelRatio,
 });
 const unwrap = (response) => response?.data ?? response;
@@ -158,6 +152,11 @@ function playerAnimationSwitcher() {
   }
   return playerAnimation;
 }
+/**
+ * 小怪简易版：让一只小怪发现玩家后走过去、进入范围就挥砍。
+ * 用 100ms 定时器驱动，而不是挂在 `updateProximity` 上——那个回调只在玩家移动时触发，
+ * 玩家站住不动小怪就不会动，无法验证。
+ */
 /**
  * Boss 动作状态机：待机 / 靠近时挥砍（两套轮换）/ 被击中时受击 / 血量归零死亡。
  * 不造成伤害——游戏里没有"玩家血量"状态，`config.playerHp` 无人消费，
@@ -198,142 +197,104 @@ function tickBoss() {
   bossLastHp = hp;
   bossStateMachine()?.tick({ hp, distance: Math.max(0, distance), wasHit });
 }
-// Boss 状态机由 100ms 定时器驱动：玩家站住不动时 Boss 仍然要反应。
-// 部分普通怪物会主动追击玩家：地龙、蜥蜴女猎手、刀螳。它们只在主世界跑动，
-// 进入攻击距离后会停下并播放 Attack1；玩家没有数值血量，因此这里先做可见的
-// 追击与攻击表现，不扣血。
-const MONSTER_AI_ROLES = new Set(['monster-wyvern', 'monster-lizardf', 'monster-mantis']);
-const MONSTER_AI = Object.freeze({
-  detectRange: 20,
-  attackRange: 2.8,
-  speed: 1.8,
-  attackCooldownMs: 2400,
-  attackHoldMs: 700,
-  stepSeconds: 0.1,
-});
-const monsterAi = new Map();
-const playerHitPulse = ref(0);
-function monsterState(entry) {
-  if (!entry?.actor?.geometry?.position) return null;
-  let state = monsterAi.get(entry.id);
-  if (!state) {
-    state = { position: [...entry.actor.geometry.position], clip: null,
-      lastAttackAt: -Infinity, attackUntil: 0, moving: false };
-    monsterAi.set(entry.id, state);
+// 小怪共用同一个 100ms 心跳：各自动作由自己的状态机推进（追击 → 挥砍 → 连击 → 僵直 → 死亡）。
+// hp 目前来自 gameplay.state.monsters（Python 侧还没有这一项时按 1 处理，即永不死亡）。
+// 玩家生命值：Python 玩法状态里目前没有这一项（`config.playerHp` 只当上限显示），
+// 所以战斗反馈用的血条由页面维护：怪物命中就扣，归零后停在 0（死亡流程另做）。
+// 小怪血量归零后保留 1.5 s，让它把 Die 播完再消失（Die 约 1.9 s，取其八成）。
+// 自愈：旧存档里被写坏过落点的小怪（Y = 0，陷进地面）直接删掉，
+// 下一次角色校验会按人物表重建它，重建走的是引擎的落地计算，Y 就正确了。
+async function repairSunkMonsterActors(actors) {
+  if (!sceneId) return;
+  const sunk = (Array.isArray(actors) ? actors : []).filter(entry =>
+    entry?.actor?.geometry?.position && Math.abs(entry.actor.geometry.position[1]) < 0.02);
+  for (const entry of sunk) {
+    try {
+      await editorApi.sceneTools.removeActor(sceneId, entry.actor.name);
+      if (current()) gameplayError.value = `${entry.name} 落点异常，已重建`;
+    } catch (error) {
+      if (current()) gameplayError.value = `${entry.name} 重建失败: ${error.message}`;
+    }
   }
-  return state;
 }
-function setMonsterClip(entry, state, clip) {
-  if (!entry?.actor?.actor_guid || state.clip === clip) return;
-  state.clip = clip;
-  Promise.resolve()
-    .then(() => editorApi.sceneTools.setActorAnimation(sceneId, entry.actor.actor_guid, clip, 0.2))
-    .catch(() => { state.clip = null; });
+const MONSTER_DEATH_GRACE_MS = 1500;
+const monsterDying = new Map();
+function dyingMonsterRoles() {
+  const at = Date.now();
+  const roles = [];
+  for (const [role, until] of monsterDying) {
+    if (until > at) roles.push(role);
+    else monsterDying.delete(role);
+  }
+  return roles;
 }
-function shiftMonsterBounds(entry, dx, dz) {
-  const bounds = entry.bounds;
-  if (!Array.isArray(bounds) || bounds.length < 6) return;
-  bounds[0] += dx; bounds[3] += dx;
-  bounds[2] += dz; bounds[5] += dz;
+const playerVitality = ref(0);
+const playerMaxVitality = computed(() => gameplayState.value?.config?.playerHp || 100);
+let lastPlayerHitAt = 0;
+function playerHpRatio() {
+  const max = playerMaxVitality.value || 1;
+  return Math.max(0, Math.min(1, playerVitality.value / max));
 }
-function faceMonster(entry, state, yaw) {
-  if (!entry?.actor?.actor_guid || state.moving) return;
-  const last = Number.isFinite(state.facing) ? state.facing : 0;
-  if (Math.abs(last - yaw) < 0.08) return;
-  state.facing = yaw;
-  Promise.resolve()
-    .then(() => editorApi.scene.setActorTransform(sceneId, entry.actor.actor_guid, {
-      position: [...state.position],
-      rotation: [0, yaw, 0],
-      scale: [...(entry.actor.geometry?.scale || [1, 1, 1])],
-    }))
-    .then(response => {
-      const actor = unwrap(response)?.actor;
-      if (actor) { entry.actor = actor; entry.bounds = worldBounds(actor); }
-    })
-    .catch(() => { state.facing = null; });
+/** 怪物打中玩家：扣血 + 播受击动作；0.45 s 冷却，避免一次挥砍按帧重复结算。 */
+function applyMonsterHit(entry) {
+  const data = gameplayState.value;
+  const player = camera.snapshotPlayer();
+  if (!data || data.role !== 'main' || !player?.position) return;
+  const at = Date.now();
+  if (at - lastPlayerHitAt < 450) return;
+  const spot = monsterDirectors.get(entry.role)?.position?.();
+  if (!spot) return;
+  const distance = Math.hypot(player.position[0] - spot[0], player.position[2] - spot[2]);
+  if (distance > (data.config?.meleeRange ?? 2.5) + 1.2) return;
+  lastPlayerHitAt = at;
+  playerVitality.value = Math.max(0, playerVitality.value - (data.config?.monsterDamage ?? 8));
+  playerAnimationSwitcher()?.hurt();
 }
-function moveMonster(entry, state, next) {
-  const [x, y, z] = next;
-  if (state.moving) return;
-  const dx = x - state.position[0];
-  const dz = z - state.position[2];
-  if (Math.hypot(dx, dz) < 1e-4) return;
-  const from = [...state.position];
-  const yaw = Math.atan2(dx, dz);
-  state.position = [x, y, z];
-  state.facing = yaw;
-  shiftMonsterBounds(entry, dx, dz);
-  state.moving = true;
-  Promise.resolve()
-    .then(() => editorApi.scene.setActorTransform(sceneId, entry.actor.actor_guid, {
-      position: [x, y, z],
-      rotation: [0, yaw, 0],
-      scale: [...(entry.actor.geometry?.scale || [1, 1, 1])],
-    }))
-    .then(response => {
-      const actor = unwrap(response)?.actor;
-      if (actor) { entry.actor = actor; entry.bounds = worldBounds(actor); }
-    })
-    .catch(error => {
-      // A failed write must not teleport the monster on the next tick.
-      state.position = from;
-      shiftMonsterBounds(entry, -dx, -dz);
-      if (current()) gameplayError.value = `怪物移动失败：${error.message}`;
-    })
-    .finally(() => { state.moving = false; });
+const monsterDirectors = new Map();
+const monsterLastHp = new Map();
+function monsterDirectorFor(entry) {
+  let director = monsterDirectors.get(entry.role);
+  if (director) return director;
+  // 可用动作就是 animation_sources 里声明的那些文件名（去掉目录与扩展名）。
+  const available = (entry.animation_sources || [])
+    .map(source => source.split('/').pop().replace(/\.fbx$/i, ''));
+  try {
+    director = createMonsterDirector({
+      api: editorApi, sceneId, character: entry, position: [entry.x, 0, entry.z],
+      available,
+      onAttack: () => applyMonsterHit(entry),
+      onError: (error) => { if (current()) gameplayError.value = `${entry.name} 动作: ${error.message}`; },
+    });
+    monsterDirectors.set(entry.role, director);
+  } catch (error) {
+    if (current()) gameplayError.value = error.message;
+    return null;
+  }
+  return director;
 }
 function tickMonsters() {
-  if (!current() || !cameraReady || roleRef.value !== 'main') return;
   const data = gameplayState.value;
-  if (!data || inventoryOpen.value || dialogueOpen.value || adjustMode.value) return;
+  if (!data || data.role !== 'main') return;
   const player = camera.snapshotPlayer();
   if (!player?.position) return;
-  const now = performance.now();
-  for (const entry of monsterActors) {
-    if (!MONSTER_AI_ROLES.has(entry.id) || !entry.actor?.geometry) continue;
-    if ((data.state.monsters?.[entry.id]?.hp ?? 1) <= 0) continue;
-    const state = monsterState(entry);
-    if (!state) continue;
-    const dx = player.position[0] - state.position[0];
-    const dz = player.position[2] - state.position[2];
-    const distance = Math.hypot(dx, dz);
-    if (!Number.isFinite(distance) || distance > MONSTER_AI.detectRange) {
-      setMonsterClip(entry, state, 'Idle');
-      continue;
-    }
-    const yaw = Math.atan2(dx, dz);
-    if (distance > MONSTER_AI.attackRange) {
-      const step = Math.min(MONSTER_AI.speed * MONSTER_AI.stepSeconds,
-        distance - MONSTER_AI.attackRange);
-      const nx = state.position[0] + (dx / distance) * step;
-      const nz = state.position[2] + (dz / distance) * step;
-      const oldGround = groundYAt(state.position[0], state.position[2]);
-      const nextGround = groundYAt(nx, nz);
-      const ny = Number.isFinite(nextGround) && Number.isFinite(oldGround)
-        ? state.position[1] + (nextGround - oldGround)
-        : state.position[1];
-      moveMonster(entry, state, [nx, ny, nz]);
-      if (now >= state.attackUntil) setMonsterClip(entry, state, 'Walk');
-    } else {
-      if (now - state.lastAttackAt >= MONSTER_AI.attackCooldownMs) {
-        state.lastAttackAt = now;
-        state.attackUntil = now + MONSTER_AI.attackHoldMs;
-        setMonsterClip(entry, state, 'Attack1');
-        playerHitPulse.value++;
-      } else if (now >= state.attackUntil) {
-        setMonsterClip(entry, state, 'Idle');
-      }
-      faceMonster(entry, state, yaw);
-    }
+  for (const entry of STORY_CHARACTERS) {
+    if (!isMonsterRole(entry.role)) continue;
+    const hp = data.state.monsters?.[entry.role]?.hp ?? 1;
+    const previous = monsterLastHp.get(entry.role);
+    const wasHit = previous !== undefined && hp < previous;
+    if (hp <= 0 && previous !== undefined && previous > 0) monsterDying.set(entry.role, Date.now() + MONSTER_DEATH_GRACE_MS);
+    monsterLastHp.set(entry.role, hp);
+    monsterDirectorFor(entry)?.tick({ player, hp, wasHit });
   }
 }
+// Boss 状态机由 100ms 定时器驱动：玩家站住不动时 Boss 仍然要反应。
 let actorTimer = null;
 function startActorTicker() {
   if (actorTimer || typeof window === 'undefined') return;
   actorTimer = window.setInterval(() => {
     if (!current() || !cameraReady) return;
-    try { tickBoss(); tickMonsters(); } catch (error) { if (current()) gameplayError.value = error.message; }
+    try { tickBoss(); } catch (error) { if (current()) gameplayError.value = error.message; }
+    try { tickMonsters(); } catch (error) { if (current()) gameplayError.value = error.message; }
   }, 100);
 }
 function updateProximity() {
@@ -468,6 +429,7 @@ const gameplay = createStoryGameplay({
     roleRef.value = data.role;
     if (current()) {
       gameplayState.value = data;
+      playerVitality.value = playerMaxVitality.value;
       // 存档 → 行囊：Boss 兵甲只发一次，怪物装备按件数补齐（丢弃/披挂会同步扣账）。
       syncBossLoot(data);
       syncMonsterGear(data);
@@ -480,7 +442,9 @@ const gameplay = createStoryGameplay({
     if (next === visualSignature && nextPlacements === visualPlacements) return;
     if (next !== visualSignature) {
       await ensureStoryCharacters({ api: editorApi, sceneId, frontendUrl: window.location.href,
-        gameplay: data, combatOnly: true, assertSource, projectPath });
+        gameplay: data, combatOnly: true, assertSource, projectPath,
+               dyingRoles: dyingMonsterRoles });
+             void repairSunkMonsterActors(monsterActors);
       visualSignature = next;
     }
     // 布局是权威来源：被撤回的陈列物在此退场。中途换世界会抛出中止，那不是存档失败。
@@ -614,8 +578,8 @@ const SLOT_BY_ID = {};
 GEAR_SLOTS.forEach(slot => { SLOT_BY_ID[slot.id] = slot; });
 const BAG_TABS = [
   { id: 'all', name: '全部' },
-  { id: 'equip', name: '装备' },
-  { id: 'usable', name: '治疗物品' },
+  { id: 'equip', name: '兵甲' },
+  { id: 'usable', name: '丹散' },
   { id: 'mat', name: '材料' },
 ];
 /* 界面自带的器物表；其中「世界碎片」一格接真实存档数量 */
@@ -662,13 +626,13 @@ const BAG_ITEMS = [
   { u: 'chest-2', name: '素麻战衣', type: '轻甲', cat: 'equip', slot: 'chest', rarity: 'fine', glyph: 'g-chest-l',
     stats: [['护体', '+71'], ['回气', '+4/s']],
     flavor: '洗得发白的粗麻，针脚却密得看不出线头。' },
-  { u: 'use-1', name: '回春丹', type: '治疗物品', cat: 'usable', rarity: 'fine', glyph: 'g-pill', qty: 12,
+  { u: 'use-1', name: '回春丹', type: '丹散', cat: 'usable', rarity: 'fine', glyph: 'g-pill', qty: 12,
     stats: [['回复生命', '240'], ['念咒时长', '1.2s']],
     flavor: '入口先苦后甘，苦的那口才是药。' },
-  { u: 'use-2', name: '凝神散', type: '治疗物品', cat: 'usable', rarity: 'fine', glyph: 'g-pill', qty: 8,
+  { u: 'use-2', name: '凝神散', type: '丹散', cat: 'usable', rarity: 'fine', glyph: 'g-pill', qty: 8,
     stats: [['回复法力', '180'], ['念咒时长', '1.0s']],
     flavor: '化在舌下，像咽了一口山里的凉雾。' },
-  { u: 'use-3', name: '青铜小还丹', type: '治疗物品', cat: 'usable', rarity: 'rare', glyph: 'g-elixir', qty: 3,
+  { u: 'use-3', name: '青铜小还丹', type: '丹散', cat: 'usable', rarity: 'rare', glyph: 'g-elixir', qty: 3,
     stats: [['回复生命', '520'], ['回复法力', '260'], ['念咒时长', '1.8s']],
     flavor: '丹衣上浮着铜绿，老药师说这是它睡醒的样子。' },
   { u: 'use-4', name: '朱砂符纸', type: '符纸', cat: 'usable', rarity: 'fine', glyph: 'g-scroll', qty: 5,
@@ -1337,7 +1301,7 @@ function bagDropItem(uid) {
   if (found.from === 'gear') bag.gear[found.slot] = null;
   else bag.cells[found.idx] = null;
   bag.sel = null;
-  bagToast(`${found.item.cat === 'equip' ? '售卖' : '丢弃'} · ${found.item.name}`);
+  bagToast(`${found.item.cat === 'equip' ? '熔去' : '弃之'} · ${found.item.name}`);
   // 弃置要落在存档里，否则重进世界会按计数把这件东西补回来。
   adjustGearLedger(found.item.u, -1);
   gameplay.discardItem(found.item.u).catch(() => {});
@@ -1528,7 +1492,7 @@ const bagDetailInfo = computed(() => {
   } else if (item.cat === 'usable') {
     actions.push({ act: 'use', label: '服用' });
   }
-  actions.push({ act: 'drop', label: item.cat === 'equip' ? '售卖' : '丢弃', ghost: true });
+  actions.push({ act: 'drop', label: item.cat === 'equip' ? '熔去' : '弃之', ghost: true });
   return {
     item,
     uid: item.uid,
@@ -1570,37 +1534,24 @@ const monsterBars = computed(() => {
 // 屏幕只显示这一条：靠近时是哪只怪物，它就换成哪只，位置不移动。
 const nearbyMonsterBar = computed(() =>
   monsterBars.value.find(entry => entry.id === nearbyMonsterId.value) || null);
-// 视角名按世界取：主世界是「第三人称 / 降临 / 俯视建筑」，小世界是「自由视角 / 俯视视角」。
-// 两个表都含 `top`，因此必须按世界选表而不是合并——否则主世界的「俯视建筑」会被改名。
 function viewLabel() {
   void viewTick.value;
   const mode = camera.viewMode?.();
-  const labels = inSubworld.value ? SMALL_WORLD_VIEW_LABELS : VIEW_LABELS;
-  return (mode && labels?.[mode]) || (inSubworld.value ? '自由视角' : '第三人称');
+  return (mode && VIEW_LABELS?.[mode]) || '第三人称';
 }
 // 操作提示按世界过滤：先知的 F 与碎片的 F 分属两个世界，天然互斥。
 // F 这一行只由 fKeyAction 决定（同一个裁决也驱动 F 键），因此提示与实际动作不会分歧。
-const controlHints = computed(() => {
-  // 视角切换会改变「转向」那一行（自由视角裸鼠标 / 俯视右键），所以这里也读一次 viewTick：
-  // 否则按 V 之后提示会停在上一格，和真实输入对不上。
-  void viewTick.value;
-  return [
-    // 小世界里内部主角不显示，相机就是那双眼睛：滚轮留给物品栏换格，缩放挪到 Ctrl+滚轮。
-    // 自由视角不按键也能转向（`viewportStoryWorldCamera` 的裸鼠标）；单击只是把鼠标锁进视口，
-    // Esc 第一下放开它。俯视视角仍然只有右键拖动改朝向，提示因此分开写。
-    ...(inSubworld.value
-      ? [['WASD', '移动 · Q/E/空格 升降'],
-        [camera.isLookActive?.() ? '鼠标' : '鼠标右键',
-          camera.isLookActive?.() ? '移动转向 · 单击锁定 · Esc 放开' : '转向'],
-        ['Ctrl+滚轮', '缩放']]
-      : [['WASD', '移动'], ['鼠标', '转向 · 滚轮缩放'], ['Space', '跳远'], ['Shift', '长按跑步 · 点按闪避']]),
-    ...(showCombatHud.value ? [['左键', '攻击'], ['E / R', '技能']] : []),
-    ...(fKeyAction.value.prompt ? [['F', fKeyAction.value.prompt]] : []),
-    ['V', `视角 · ${viewLabel()}`],
-    ['Tab', '背包'],
-    ['Esc', inSubworld.value ? '保存离开' : '保存退出'],
-  ];
-});
+const controlHints = computed(() => [
+  ['WASD', '移动'],
+  ['鼠标', '转向 · 滚轮缩放'],
+  ['Space', '跳远'],
+  ['Shift', '长按跑步 · 点按闪避'],
+  ...(showCombatHud.value ? [['左键', '攻击'], ['E / R', '技能']] : []),
+  ...(fKeyAction.value.prompt ? [['F', fKeyAction.value.prompt]] : []),
+  ['V', `视角 · ${viewLabel()}`],
+  ['Tab', '背包'],
+  ['Esc', inSubworld.value ? '保存离开' : '保存退出'],
+]);
 const hotbarSlots = computed(() => {
   void viewTick.value;
   return hotbarSlotsFor(gameplayState.value?.state?.inventory, placements.value);
@@ -1623,8 +1574,8 @@ function cycleView() {
   keepChildPlayerHidden();
   showToast(`视角：${label} → ${viewLabel()}（V 键切换）`);
 }
-function openDialogue(force = false) {
-  if (dialogueOpen.value || (!force && currentInteraction().kind !== 'prophet')) return;
+function openDialogue() {
+  if (currentInteraction().kind !== 'prophet' || dialogueOpen.value) return;
   camera.resetInput();
   dialogueLine.value = 0;
   dialogueOpen.value = true;
@@ -1665,8 +1616,6 @@ function interact() {
 // modules, so this page only wires them up: it renders the menu and applies what the
 // pure functions return.
 const installedRules = ref([]);
-// 碎片的「调参记忆」：规则拆下后仍保留，重新装填沿用最后调好的数字。
-const fragmentTuning = ref([]);
 const actionFeedback = ref('');
 // The saved records only say which fragments are installed; the semantics come from the
 // catalogue, so a rewrite of a rule never invalidates an existing world. The numbers are the
@@ -1677,10 +1626,6 @@ const resolvedRules = computed(() => installedRules.value
     const rule = findFragment(record?.fragmentId)?.rule;
     if (!rule) return null;
     return { ...rule,
-      // 关键：把记录上的 target 和 axis 带进运行规则。只展开目录里的 rule 会把 target
-      // 悄悄丢掉，规则于是退回「作用于整个小世界」——这正是选中部分物体却全都动的原因。
-      target: record.target,
-      axis: typeof record.axis === 'string' ? record.axis : rule.axis,
       amplitude: typeof record.amplitude === 'number' ? record.amplitude : rule.amplitude,
       periodMs: typeof record.periodMs === 'number' ? record.periodMs : rule.periodMs };
   }).filter(Boolean));
@@ -1693,9 +1638,12 @@ const previousViewMode = ref(null);
 const adjustSelection = ref(null);
 // Which fragment the «调整碎片» sub-screen is editing; null whenever that screen is closed.
 const adjustFragmentId = ref(null);
+const fragmentList = computed(() => fragmentPanel(installedRules.value));
+const fragmentAdjust = computed(() => fragmentAdjustPanel(installedRules.value,
+  adjustFragmentId.value));
 const adjustHint = computed(() => (adjustSelection.value
-  ? `已选中：${adjustSelection.value.name} · WASD 移动视角，1-6 调整物体`
-  : '俯瞰视角：WASD 移动视角，点击物体选中它，再用下面的按钮调整'));
+  ? `已选中：${adjustSelection.value.name}`
+  : '俯瞰视角：点击物体选中它，再用下面的按钮调整'));
 function enterAdjustMode() {
   actionFeedback.value = '';
   prophetScreen.value = null;
@@ -1714,40 +1662,6 @@ function enterAdjustMode() {
 // The list is the reliable way to choose an object: clicking a name cannot miss, while
 // clicking a pixel depends on the engine's readback settling.
 const selectableList = ref([]);
-// 每块碎片各自记住自己选中的作用对象：{ [fragmentId]: guid[] }。
-const fragmentTargets = reactive({});
-const fragmentAdjustTarget = ref(null);
-const fragmentNames = computed(() => Object.fromEntries(
-  selectableList.value.map(entry => [entry.guid, entry.name])));
-const fragmentList = computed(() => fragmentPanel(installedRules.value,
-  fragmentNames.value, fragmentTuning.value));
-const fragmentAdjust = computed(() => fragmentAdjustPanel(installedRules.value,
-  adjustFragmentId.value, { target: fragmentAdjustTarget.value,
-    label: fragmentNames.value[fragmentAdjustTarget.value] || null,
-    tuning: fragmentTuning.value }));
-const fragmentAdjustTargets = computed(() => {
-  const entry = fragmentList.value.find(item => item.id === adjustFragmentId.value);
-  return Array.isArray(entry?.targets) ? entry.targets : [];
-});
-const targetsFor = fragmentId => (Array.isArray(fragmentTargets[fragmentId])
-  ? fragmentTargets[fragmentId] : []);
-const isFragmentTarget = (fragmentId, entry) => targetsFor(fragmentId).includes(entry?.guid);
-function toggleFragmentTarget(fragmentId, entry) {
-  if (!fragmentId || !entry?.guid) return;
-  const list = [...targetsFor(fragmentId)];
-  const index = list.indexOf(entry.guid);
-  if (index >= 0) list.splice(index, 1);
-  else list.push(entry.guid);
-  fragmentTargets[fragmentId] = list;
-}
-function selectAllFragmentTargets(fragmentId) {
-  if (!fragmentId) return;
-  fragmentTargets[fragmentId] = selectableList.value.map(entry => entry.guid);
-}
-function clearFragmentTargets(fragmentId) {
-  if (!fragmentId) return;
-  fragmentTargets[fragmentId] = [];
-}
 const isSelected = entry => Boolean(adjustSelection.value
   && adjustSelection.value.guid === entry?.guid);
 async function loadSelectableObjects() {
@@ -1786,16 +1700,11 @@ function openProphetScreen(id) {
   actionFeedback.value = '';
   adjustFragmentId.value = null;
   prophetScreen.value = id;
-  if (id === 'fragments') void loadSelectableObjects();
 }
 // 「调整」在碎片行上：进子屏，记下改的是哪一块。没装填的碎片也进得去，子屏会说明要先装填，
 // 这样按 1-4 得到的反馈与点击一致，而不是一个没有反应的按钮。
 function openFragmentAdjust(entry) {
   adjustFragmentId.value = entry?.id || null;
-  const ownTargets = targetsFor(entry?.id);
-  const selected = ownTargets.find(guid => entry?.targets?.includes(guid));
-  fragmentAdjustTarget.value = selected || entry?.targets?.[0]
-    || ownTargets[0] || entry?.target || null;
   prophetScreen.value = 'fragment-adjust';
   actionFeedback.value = entry?.installed ? '' : '先装填该碎片再调整';
 }
@@ -1803,7 +1712,6 @@ function openFragmentAdjust(entry) {
 function leaveProphetScreen() {
   if (prophetScreen.value === 'fragment-adjust') {
     adjustFragmentId.value = null;
-    fragmentAdjustTarget.value = null;
     actionFeedback.value = '';
     prophetScreen.value = 'fragments';
     return;
@@ -1821,7 +1729,7 @@ function rememberCube(actor) {
   cubeTransform = cubeTransformOf(cubeActor);
   return cubeTransform;
 }
-// ---- 小世界模型裁剪（场景只保留玩家（隐形）与地形）----------------------
+// ---- 小世界模型裁剪（场景只保留玩家（隐形）、先知与地形）----------------------
 // 角色可见性的权威处理在 game/frontend/storyActors.mjs（只读不改）：它把小世界里的
 // Boss、商人、小怪与红球设为不可见。这里在进入小世界时把它们从场景中**移除**——
 // 隐藏只是改可见性，模型仍占着场景；移除只针对快照中真实存在的 actor，重复进入幂等。
@@ -1830,9 +1738,9 @@ async function cullChildWorld(snapshot, gameplay) {
   // 只对快照中真实存在的 actor 发起移除：重复进入小世界时场景里已没有它们，返回空列表。
   const present = new Set((Array.isArray(snapshot?.actors) ? snapshot.actors : [])
     .map(actor => actor?.actor_guid).filter(Boolean));
-  const keepRoles = new Set(['player']);
+  const keepRoles = new Set(['player', 'prophet']);
   const list = [...STORY_CHARACTERS.filter(character => !keepRoles.has(character.role))
-    .map(character => character.guid), FRAGMENT_GUID, CUBE_GUID]
+    .map(character => character.guid), FRAGMENT_GUID]
     .filter(guid => present.has(guid));
   for (const guid of list) {
     try {
@@ -1846,21 +1754,15 @@ async function cullChildWorld(snapshot, gameplay) {
   }
 }
 // 小世界的玩家不渲染模型：玩法（移动、跳跃、摆放、存档）仍然对着它，只是不再画出角色。
-// 玩家 actor 由 `storyActors` 在小世界里建成时就是隐藏的（`visible: false`），但页面自己还要
-// 再确认一次：V 切视角、调整模式的俯瞰往返都可能把模型翻回可见，最终落在场景里的必须是不可见。
-// 这里走编辑侧的 `sceneTools.setActorState`（异步的 CEF API，**不是** bridge 方法——bridge 上
-// 没有这个名字，用 bridge 调只会静默什么都不做）。只写 `visible`，不删 actor，所以交互、
-// 拾取与存档都照旧。并发重复请求合并成一次；落定之后可以再写，于是 V 之后仍然会被改回隐藏。
-let childPlayerHidePending = null;
+// 相机控制器在绑定与切换视角时会尝试恢复可见性（V 循环、调整模式的俯瞰视角），
+// 这里在同一 tick 内把它改回隐藏——引擎读到的最终值就是不可见。
 function keepChildPlayerHidden() {
-  if (!inSubworld.value || !sceneId || !playerActor?.actor_guid || !current()) return false;
-  if (childPlayerHidePending) return false;
-  const guid = playerActor.actor_guid;
-  childPlayerHidePending = Promise.resolve()
-    .then(() => editorApi.sceneTools.setActorState(sceneId, guid, { visible: false }))
-    .catch(error => { if (current()) gameplayError.value = error.message || '隐藏小世界主角失败'; })
-    .finally(() => { childPlayerHidePending = null; });
-  return true;
+  if (!inSubworld.value || !playerActor?.handle) return;
+  const bridge = current() ? window.coronaBridge : null;
+  if (typeof bridge?.setActorState !== 'function') return;
+  try {
+    bridge.setActorState(playerActor.handle, { visible: false });
+  } catch (error) { if (current()) gameplayError.value = error.message; }
 }
 // Rebuild the animated set from a fresh snapshot: reading the scene is an asynchronous
 // CEF round trip, so the frame loop only replays the handles captured here. Passing no
@@ -1887,17 +1789,10 @@ async function runProphetAction(chosen) {
   if (chosen.type === 'open-screen') { openProphetScreen(chosen.screen); return; }
   actionFeedback.value = '';
   if (chosen.type === 'toggle-fragment') {
-    const targets = Array.isArray(chosen.targets) ? chosen.targets : [];
-    if (!targets.length) {
-      actionFeedback.value = '请先在该碎片下方选择作用对象（可多选）';
-      return;
-    }
     await runAction(async () => {
-      const result = toggleFragmentTargets(installedRules.value, chosen.fragmentId,
-        targets, fragmentNames.value, fragmentTuning.value);
-      const saved = await gameplay.saveWorldRules(result.rules, result.tuning);
+      const result = toggleFragment(installedRules.value, chosen.fragmentId);
+      const saved = await gameplay.saveWorldRules(result.rules);
       installedRules.value = Array.isArray(saved?.rules) ? saved.rules : result.rules;
-      fragmentTuning.value = Array.isArray(saved?.tuning) ? saved.tuning : result.tuning;
       actionFeedback.value = result.feedback;
       // A snapshot is what teaches the rule which objects to animate.
       applyWorldRules(await editorApi.scene.getSnapshot(sceneId));
@@ -1908,24 +1803,18 @@ async function runProphetAction(chosen) {
   // 再用新快照重启规则引擎，改完立刻在场景里看得到。
   if (chosen.type === 'adjust-fragment') {
     const fragmentId = chosen.fragmentId || adjustFragmentId.value;
-    const target = chosen.target || fragmentAdjustTarget.value || null;
-    const label = fragmentNames.value[target] || null;
     // 纯函数先判一次：未装填、已到边界、未知动作都只改提示、一个字节也不写盘。放在
     // runAction 之外，是为了让这句话不受「必须有焦点」的限制，玩家一定看得到。
-    const preview = adjustFragmentRule(installedRules.value, fragmentId, chosen.id, { target, label });
+    const preview = adjustFragmentRule(installedRules.value, fragmentId, chosen.id);
     if (!preview.changed) {
       actionFeedback.value = preview.feedback;
       return;
     }
     await runAction(async () => {
-      const result = adjustFragmentRule(installedRules.value, fragmentId, chosen.id, { target, label });
+      const result = adjustFragmentRule(installedRules.value, fragmentId, chosen.id);
       if (!result.changed) { actionFeedback.value = result.feedback; return; }
-      const adjusted = result.rules.find(record => record?.fragmentId === fragmentId
-        && (record.target || null) === (target || null));
-      if (adjusted) fragmentTuning.value = rememberFragmentTuning(fragmentTuning.value, fragmentId, adjusted);
-      const saved = await gameplay.saveWorldRules(result.rules, fragmentTuning.value);
+      const saved = await gameplay.saveWorldRules(result.rules);
       installedRules.value = Array.isArray(saved?.rules) ? saved.rules : result.rules;
-      fragmentTuning.value = Array.isArray(saved?.tuning) ? saved.tuning : fragmentTuning.value;
       actionFeedback.value = result.feedback;
       applyWorldRules(await editorApi.scene.getSnapshot(sceneId));
     });
@@ -1935,14 +1824,12 @@ async function runProphetAction(chosen) {
   const target = adjustSelection.value?.actor || cubeActor;
   const current = cubeTransformOf(target)
     || (adjustSelection.value ? adjustSelection.value.transform : cubeTransform);
-  // 先知的模型已从场景移除，摆位参考退回玩家自身：调整物体仍然可用。
-  const reference = prophetActor || playerActor;
-  if (!target || !current || !reference || !playerActor) {
+  if (!target || !current || !prophetActor || !playerActor) {
     actionFeedback.value = '物体尚未就绪，请先从列表中选择一个物体';
     return;
   }
   await runAction(async () => {
-    const next = nextObjectTransform(chosen.id, { current, reference,
+    const next = nextObjectTransform(chosen.id, { current, reference: prophetActor,
       facingYaw: playerFacingYaw(playerActor) });
     if (!next) return;
     // The light path: the setter does not re-import the resource, so it cannot add mesh work
@@ -1963,7 +1850,7 @@ async function runProphetAction(chosen) {
     // only way to separate "the engine refused the write" from "the engine took it but the
     // change is not on screen" — and those two need completely different fixes.
     const kept = (await readBackTransform(target.actor_guid))?.scale?.[0];
-    const summary = adjustFeedback(chosen.id, next, reference);
+    const summary = adjustFeedback(chosen.id, next, prophetActor);
     actionFeedback.value = Number.isFinite(kept) && Math.abs(kept - next.scale[0]) < 1e-3
       ? `${summary}（引擎已接受）`
       : `${summary}｜引擎未保留，实际缩放 ${Number.isFinite(kept) ? kept.toFixed(2) : '读不到'}`;
@@ -1993,14 +1880,10 @@ function cycleHotbar(delta) {
   return true;
 }
 /**
- * 视口滚轮有两个入口，但只有一个裁决：
- *   - Ctrl+滚轮 = 缩放。只有小世界的自由/俯视相机有 `zoom`（改 fov）；主世界没有，于是
- *     `zoom` 返回 false，滚轮继续走改动前那条路（相机拉近/推远），行为不变。
- *   - 其余情况：物品栏可见时换格，否则交给相机。
- * preventDefault 已由模板上的 @wheel.prevent 完成，这里不再重复。
+ * 视口滚轮只有一个入口：物品栏可见时换格且不缩放相机，其余情况（主世界、任何面板打开）
+ * 仍交给相机缩放。preventDefault 已由模板上的 @wheel.prevent 完成，这里不再重复。
  */
 function onSurfaceWheel(event) {
-  if (event.ctrlKey && camera.zoom?.(event)) return true;
   if (!hotbarVisible.value) return camera.wheel(event);
   if (focused && !document.hidden) cycleHotbar(event.deltaY);
   return true;
@@ -2125,7 +2008,6 @@ async function saveBeforeLeave() {
 }
 onBeforeRouteLeave(saveBeforeLeave);
 async function exitStory() {
-  switchGeneration++;
   navigation.interrupt();
   if (!await saveBeforeLeave()) return;
   navigation.cancel();
@@ -2146,16 +2028,7 @@ const navigation = createStoryNavigationController({
     const result = unwrap(await editorApi.viewport.setCameraPose(pose.sceneId, pose.cameraName, pose.camera));
     if (result?.status !== 'success') throw new Error(result?.message || '保存相机视角失败');
   },
-  // 准备阶段的 rename 常被编辑器自己打开的世界文件挡住（WinError 5 拒绝访问），
-  // 且失败时运行时已回滚干净，所以按 150/250/400ms 退避重放同一次准备（共 4 次），
-  // 最后一次仍失败才把 Python 返回的原文交给 notify 上报。取消/卸载后不再重试。
-  prepare: direction => {
-    const generation = switchGeneration;
-    return runStorySwitchWithRetry(
-      () => editorApi.scratch.sendKeyEvent(NAVIGATION_KEY, '', JSON.stringify({ projectPath, direction })),
-      { aborted: () => !current() || switchGeneration !== generation },
-    );
-  },
+  prepare: direction => editorApi.scratch.sendKeyEvent(NAVIGATION_KEY, '', JSON.stringify({ projectPath, direction })),
   trackPreparation: trackWorldSessionWork,
   openProject: path => projectLauncherService.openProject(path),
   cancelProjectOpen: cancelPendingProjectOpen,
@@ -2163,25 +2036,10 @@ const navigation = createStoryNavigationController({
   notify: error => { if (current()) gameplayError.value = error.message; notifyWorldError(error); },
 });
 function onKeyDown(event) {
-  // 键盘路由抽到 `storyKeyRouter.js`，这一层只执行对应分支的副作用。路由是纯函数，测试才能
-  // 走「页面根 → 路由裁决 → 相机」的完整链路，而不是只把事件直接塞给相机。
-  // 小世界的分界也在这里：Space 在主世界是跳跃（动作/保存进行中必须被吞），在小世界是相机
-  // 升降；E/R 技能只属于主世界，小世界的 E 留给相机。
-  const route = routeStoryKeydown(event, {
-    current: current(),
-    adjustMode: adjustMode.value,
-    dialogueOpen: dialogueOpen.value,
-    inSubworld: inSubworld.value,
-    inventoryOpen: inventoryOpen.value,
-    actionBusy: actionBusy.value,
-    busy: gameplay.busy,
-    needsSave: gameplay.needsSave,
-  });
-
-  if (route === 'ignore') return;
+  if (!current()) return;
   // The adjustment mode owns the keyboard outright: only the adjustment steps and the way out
   // get through, so a stray key cannot cast a skill or swing while the player is arranging.
-  if (route === 'adjust') {
+  if (adjustMode.value) {
     event.preventDefault();
     event.stopPropagation();
     if (event.code === 'Escape' || event.key === 'Escape') {
@@ -2195,7 +2053,7 @@ function onKeyDown(event) {
     return;
   }
   // 对话面板打开时独占键盘：Esc 不再退出世界，F/Space 也不会漏给相机或其它交互。
-  if (route === 'dialogue') {
+  if (dialogueOpen.value) {
     event.preventDefault();
     event.stopPropagation();
     if (event.code === 'Escape' || event.key === 'Escape') {
@@ -2217,20 +2075,20 @@ function onKeyDown(event) {
   }
   // 物品栏：调整模式与对话（上面两个分支）已经吃掉数字键，因此这里只在
   // 小世界、面板关闭时接管数字键与 B。主世界里这套键完全不生效。
-  if (route === 'hotbar-slot') {
-    event.preventDefault(); event.stopPropagation();
-    if (!event.repeat) selectHotbarSlot(Number(event.key) - 1);
-    return;
+  if (inSubworld.value && !inventoryOpen.value && !event.ctrlKey && !event.altKey
+    && !event.metaKey && !event.isComposing) {
+    if (/^[1-9]$/.test(event.key || '')) {
+      event.preventDefault(); event.stopPropagation();
+      if (!event.repeat) selectHotbarSlot(Number(event.key) - 1);
+      return;
+    }
+    if (event.code === 'KeyB' || event.key?.toLowerCase() === 'b') {
+      event.preventDefault(); event.stopPropagation();
+      if (!event.repeat) void placeSelectedItem();
+      return;
+    }
   }
-  if (route === 'place-item') {
-    event.preventDefault(); event.stopPropagation();
-    if (!event.repeat) void placeSelectedItem();
-    return;
-  }
-  if (route === 'escape') {
-    // 第一次 Esc 只把鼠标还给页面：自由视角锁定指针之后，玩家按 Esc 想的是「放开鼠标」，
-    // 而不是「存档离开」。没有锁定时这一层不生效，Esc 的含义与改动前一模一样。
-    if (releaseMouseLook()) { event.preventDefault(); event.stopPropagation(); return; }
+  if (event.code === 'Escape' || event.key === 'Escape') {
     event.preventDefault();
     event.stopPropagation();
     if (navigation.busy) { if (!event.repeat) void exitStory(); }
@@ -2238,38 +2096,37 @@ function onKeyDown(event) {
     else if (!event.repeat) void exitStory();
     return;
   }
-  if (route === 'tab') {
+  if (event.ctrlKey || event.altKey || event.metaKey || event.isComposing) return;
+  if (event.code === 'Tab' || event.key === 'Tab') {
     event.preventDefault(); event.stopPropagation();
     if (!event.repeat && focused && !document.hidden && cameraReady && !navigation.busy && !savingPlayer) toggleInventory();
     return;
   }
-  if (route === 'inventory') {
+  if (inventoryOpen.value) {
     if (!['Enter', 'Space'].includes(event.code)) event.preventDefault();
     event.stopPropagation(); return;
   }
-  if (route === 'cycle-view') {
+  if (event.code === 'KeyV' || event.key?.toLowerCase() === 'v') {
     event.preventDefault(); event.stopPropagation();
     if (!event.repeat) cycleView();
     return;
   }
-  if (route === 'interact') {
+  if (event.code === 'KeyF' || event.key?.toLowerCase() === 'f') {
     event.preventDefault(); event.stopPropagation();
     if (!event.repeat && focused) interact();
     return;
   }
-  if (route === 'space-busy') {
+  if ((event.code === 'Space' || event.key === ' ' || event.key === 'Spacebar')
+    && (actionBusy.value || gameplay.busy || gameplay.needsSave)) {
     event.preventDefault(); event.stopPropagation(); return;
   }
-  if (route === 'skill') {
+  if (event.code === 'KeyE' || event.code === 'KeyR' || ['e', 'r'].includes(event.key?.toLowerCase())) {
     event.preventDefault(); event.stopPropagation();
     const skill = event.code === 'KeyE' || event.key?.toLowerCase() === 'e' ? 'heavy' : 'sweep';
     if (!event.repeat && focused) void runAction(() => gameplay.castSkill(skill), PLAYER_SKILL_CLIP);
     return;
   }
-  if (route === 'camera') {
-    if (focused && camera.keyDown(event)) event.stopPropagation?.();
-    return;
-  }
+  if (focused && camera.keyDown(event)) event.stopPropagation?.();
 }
 function onBlur() { focused = false; camera.resetInput(); }
 function onFocus() { focused = !document.hidden; }
@@ -2283,32 +2140,6 @@ function watchDpi() {
   dpiQuery?.addEventListener('change', onDpiChanged);
 }
 function onDpiChanged() { camera.syncViewport(); watchDpi(); }
-/**
- * 自由视角把鼠标交给相机：点击视口时请求指针锁定（可选的增强）。
- *
- * 浏览器只在用户手势里允许 requestPointerLock，所以请求挂在点击上。但**转向不依赖它**：
- * 拿不到锁定（CEF 宿主、被拒绝、测试环境里没有这个 API）时，裸鼠标移动照样转向，见
- * viewportStoryWorldCamera.js 的 pointerMove。所以这里只做「能锁就锁」，不把任何行为挂在
- * 它成功之上。点到 HUD/按钮上不抢鼠标——那些控件还要用光标点。
- */
-function captureMouseLook(event) {
-  if (!inSubworld.value || camera.viewMode?.() !== 'free') return false;
-  if (event?.target?.closest?.('button, input, select, textarea, [contenteditable="true"]')) return false;
-  const element = surface.value;
-  if (!element || typeof element.requestPointerLock !== 'function') return false;
-  if (document.pointerLockElement === element) return true;
-  try {
-    // Chrome 返回 Promise；被拒绝只是「没有锁定」，不该留下未处理的 rejection。
-    element.requestPointerLock()?.catch?.(() => false);
-    return true;
-  } catch { return false; }
-}
-/** Esc 的第一层含义：把鼠标还给页面（指针锁定），而不是直接存档离开。 */
-function releaseMouseLook() {
-  if (!document.pointerLockElement) return false;
-  try { document.exitPointerLock?.(); } catch { /* 已经释放 */ }
-  return true;
-}
 function onPointerDown(event) {
   if (inventoryOpen.value) return;
   surface.value?.focus();
@@ -2319,9 +2150,22 @@ function onPointerDown(event) {
   // Adjusting is label-driven: the left button neither attacks nor picks an object, it only
   // focuses the viewport so dragging and the wheel still let the player look at the object.
   if (adjustMode.value) return;
-  // 小世界的自由视角：这一下点击顺便把鼠标交给相机（Esc 归还）。
-  captureMouseLook(event);
-  void runAction(gameplay.attack, PLAYER_ATTACK_CLIP);
+  // 连击：动画端按窗口推进 A→B→C，命中判定仍由 gameplay.attack 负责。
+  playerAnimationSwitcher()?.combo();
+  // 命中才让小怪僵直（时长由玩家血量决定）；落空则攻击后摇照常走完，不打断。
+  const monstersBefore = gameplayState.value?.state?.monsters;
+  const hpBefore = monstersBefore
+    ? Object.fromEntries(Object.entries(monstersBefore).map(([role, state]) => [role, state.hp]))
+    : null;
+  const playerAt = camera.snapshotPlayer()?.position;
+  void runAction(gameplay.attack, null).then(() => {
+    const monstersAfter = gameplayState.value?.state?.monsters;
+    if (!hpBefore || !monstersAfter) return;
+    for (const [role, before] of Object.entries(hpBefore)) {
+      if (typeof before !== 'number' || !(monstersAfter[role]?.hp < before)) continue;
+      monsterDirectors.get(role)?.stun(stunSecondsFor(playerHpRatio()), playerAt);
+    }
+  });
 }
 
 onMounted(async () => {
@@ -2336,7 +2180,9 @@ onMounted(async () => {
   initialization = trackWorldSessionWork((async () => {
     const init = unwrap(await editorApi.main.onInit());
     if (!current()) return;
-    sceneId = init?.scene?.path;
+    const scenes = init?.scenes || [];
+    const index = Math.min(Math.max(Number(init?.active_index) || 0, 0), Math.max(0, scenes.length - 1));
+    sceneId = scenes[index]?.path || init?.path;
     if (!sceneId) throw new Error('当前世界没有可用场景');
     // 原生三角面移动的结果必须回送控制器：没有这条登记，按键只会更新输入状态，
     // 移动请求一直挂在 pendingMove 上等回调，角色永远不动（15 秒后还会报超时）。
@@ -2373,7 +2219,6 @@ onMounted(async () => {
     try {
       await ensureStoryMap({
         api: editorApi, sceneId, frontendUrl: window.location.href, resolveAsset: resolveStoryAssetPath,
-        placement: loadedGameplay?.role === 'child' ? SUBWORLD_MAP_PLACEMENT : MAP_PLACEMENT,
       });
     } catch (error) {
       actionFeedback.value = `地图未能就位：${error.message}`;
@@ -2395,9 +2240,8 @@ onMounted(async () => {
             bounds: worldBounds(actor) } : null;
         })
         .filter(Boolean);
-    // 小世界不再生成先知模型：对话入口在 HUD 右下角，由一个按钮承担。
-    prophetActor = loadedGameplay?.role === 'child' ? null
-      : snapshot.actors?.find(actor => actor.actor_guid === PROPHET_GUID) || null;
+    // 先知只在小世界按需生成，主世界里缺失是正常的：交互保持不可用即可。
+    prophetActor = snapshot.actors?.find(actor => actor.actor_guid === PROPHET_GUID) || null;
     playerActor = player;
     // 先知旁的方块，以及这个小世界已经装填的世界规则（李淳珺任务）：
     // 主世界没有先知，方块只隐藏不创建。方块只是摆设：创建失败必须仍能进世界并照常对话，
@@ -2414,7 +2258,6 @@ onMounted(async () => {
       actionFeedback.value = `物体未能创建：${error.message}`;
     }
     installedRules.value = Array.isArray(gameplay.worldRules?.rules) ? gameplay.worldRules.rules : [];
-    fragmentTuning.value = Array.isArray(gameplay.worldRules?.tuning) ? gameplay.worldRules.tuning : [];
     // 浮动需要重新读一次场景，才能把刚创建的方块也纳入；规则起不来同样不致命。
     try {
       applyWorldRules(installedRules.value.length && inSubworld.value
@@ -2474,8 +2317,10 @@ onUnmounted(() => {
   if (actorTimer !== null) { clearInterval(actorTimer); actorTimer = null; }
   bossDirector?.dispose();
   bossDirector = null;
+  for (const director of monsterDirectors.values()) director.dispose();
+  monsterDirectors.clear();
+  monsterLastHp.clear();
   bossLastHp = null;
-  monsterAi.clear();
   camera.dispose();
   saveRegistration.retire();
   resizeObserver?.disconnect();
@@ -2559,12 +2404,12 @@ onUnmounted(() => {
         <div class="vitals-bars">
           <div class="meter-row">
             <div class="meter-track meter-hp" role="progressbar" aria-label="生命"
-              :aria-valuenow="gameplayState.config.playerHp" :aria-valuemax="gameplayState.config.playerHp" aria-valuemin="0">
-              <div class="meter-lag" style="width:100%"></div>
-              <div class="meter-fill" style="width:100%"></div>
+              :aria-valuenow="playerVitality" :aria-valuemax="playerMaxVitality" aria-valuemin="0">
+              <div class="meter-lag" :style="{ width: playerHpRatio() * 100 + '%' }"></div>
+              <div class="meter-fill" :style="{ width: playerHpRatio() * 100 + '%' }"></div>
             </div>
             <span class="meter-label">HP</span>
-            <span class="meter-val">{{ gameplayState.config.playerHp }}</span>
+            <span class="meter-val">{{ Math.round(playerVitality) }}</span>
           </div>
           <div class="meter-row">
             <div class="meter-track meter-sp" role="progressbar" aria-label="怒气"
@@ -2588,6 +2433,15 @@ onUnmounted(() => {
         </div>
       </div>
 
+      <!-- 左下：操作提示 -->
+      <aside v-if="!inventoryOpen" class="action-tips" aria-label="操作提示">
+        <p>
+          <template v-for="([key, text], index) in controlHints" :key="key">
+            <template v-if="index"> · </template>{{ text }} <kbd>{{ key }}</kbd>
+          </template>
+        </p>
+      </aside>
+
       <!-- 右下：气刃槽 + 战技群 -->
       <div v-if="!inventoryOpen && showCombatHud" class="action-cluster">
         <div class="focus-system">
@@ -2608,6 +2462,7 @@ onUnmounted(() => {
               <polygon points="24,10 32,28 16,28" fill="rgba(230,213,167,.4)" />
               <polygon points="24,10 32,28 16,28" />
             </svg>
+            <span class="key-tag">{{ heavySkill.key }}</span>
             <span class="ui-tooltip" role="tooltip">{{ heavySkill.name }} · {{ heavySkill.rageCost }} 怒气</span>
           </button>
         </div>
@@ -2624,8 +2479,10 @@ onUnmounted(() => {
               <svg class="spell-icon" viewBox="0 0 48 48" v-html="skillIconInner(id)" />
               <div class="spell-cd-overlay"></div>
               <span class="spell-cd-num">{{ cooldownSeconds(id) }}</span>
+              <span class="spell-key">{{ skill.key }}</span>
               <span class="ui-tooltip" role="tooltip">{{ skill.name }} · {{ skill.rageCost }} 怒气</span>
             </button>
+            <span class="spell-name">{{ skill.name }}</span>
           </div>
         </div>
       </div>
@@ -2655,6 +2512,11 @@ onUnmounted(() => {
               <span v-if="!entry.empty" class="hotbar__count" aria-hidden="true">{{ entry.available }}</span>
             </button>
           </div>
+          <p class="hotbar__hint">
+            <span v-if="hotbarSelected && !hotbarSelected.empty">已选：{{ hotbarSelected.name }}</span>
+            <span v-else>第 {{ (hotbarSelected?.slot ?? 0) + 1 }} 格是空的</span>
+            <span class="hotbar__tip">滚轮换格 · 数字键 1 - {{ hotbarSlots.length }} · B 在身前放置 · F 取回身边的方块 · 共 {{ placements.length }} / {{ MAX_PLACEMENTS }}</span>
+          </p>
         </section>
       </div>
       <!-- 小世界状态：顶部中央（顶部中央只在小世界空闲，主世界归 Boss 血条） -->
@@ -2662,21 +2524,7 @@ onUnmounted(() => {
         <strong>{{ worldLabel }}</strong>
         <span>此处为沙盒空间 · 无战斗目标</span>
       </section>
-
-      <!-- 先知不再使用 3D 模型：小世界右下角固定一个对话入口。 -->
-      <button v-if="inSubworld && !inventoryOpen && !dialogueOpen && !adjustMode && !initializing"
-        type="button" class="prophet-fab" aria-label="与先知交谈" @click.stop="openDialogue(true)">
-        <span class="prophet-fab__mark" aria-hidden="true">
-          <svg viewBox="0 0 24 24"><path d="M4 5h16v11H9l-5 4V5Z" /><path d="M8 9h8M8 12h5" /></svg>
-        </span>
-        <span class="prophet-fab__text">
-          <strong>先知</strong>
-          <small>与先知交谈</small>
-        </span>
-      </button>
     </div>
-
-    <div v-if="playerHitPulse" :key="playerHitPulse" class="player-hit-flash" aria-hidden="true"></div>
     <!-- ============ 先知对话 + 调整物体：(F 交谈，Enter 继续，Esc 离开) ============ -->
     <div v-if="dialogueOpen || adjustMode" class="dialogue-overlay"
       :class="{ 'dialogue-overlay-passive': adjustMode }"
@@ -2702,64 +2550,29 @@ onUnmounted(() => {
             </button>
           </template>
 
-          <!-- 「碎片」屏：每块碎片各有自己的作用对象，可多选；点主按钮批量装/拆。 -->
+          <!-- 「碎片」屏：点整行装填/拆下，行尾的「调整」进子屏改数字 -->
           <template v-else-if="prophetScreen === 'fragments'">
-            <div v-for="(entry, index) in fragmentList" :key="entry.id" class="fragment-card"
+            <div v-for="(entry, index) in fragmentList" :key="entry.id" class="prophet-row"
               :data-prophet-row="entry.id">
-              <div class="prophet-row">
-                <button class="prophet-action prophet-row-main"
-                  :data-prophet-fragment="entry.id" :disabled="!entry.owned"
-                  @click="runProphetAction({ type: 'toggle-fragment', fragmentId: entry.id, targets: targetsFor(entry.id) })">
-                  <span class="prophet-action-key">{{ index + 1 }}</span>
-                  <span class="prophet-action-label">{{ entry.name }}</span>
-                  <span class="prophet-action-state" :data-state="entry.state">{{ entry.stateLabel }}</span>
-                  <span class="prophet-action-detail">{{ entry.description }} · {{ entry.details }}<template v-if="entry.targetLabel"> · 作用于：{{ entry.targetLabel }}</template></span>
-                </button>
-                <button class="prophet-action prophet-row-adjust"
-                  :data-prophet-adjust="entry.id" @click="openFragmentAdjust(entry)">
-                  <span class="prophet-action-label">调整</span>
-                </button>
-              </div>
-
-              <div class="fragment-targets fragment-targets--row">
-                <div class="fragment-targets__head">
-                  <span>作用对象</span>
-                  <small>已选 {{ targetsFor(entry.id).length }}</small>
-                  <button type="button" class="fragment-targets__act" @click.stop="selectAllFragmentTargets(entry.id)">全选</button>
-                  <button type="button" class="fragment-targets__act" @click.stop="clearFragmentTargets(entry.id)">清空</button>
-                </div>
-                <div class="fragment-targets__list">
-                  <button v-for="object in selectableList" :key="object.guid" type="button"
-                    class="fragment-target-chip" :class="{ 'is-on': isFragmentTarget(entry.id, object) }"
-                    :data-fragment-target="object.guid" @click.stop="toggleFragmentTarget(entry.id, object)">
-                    {{ object.name }}
-                  </button>
-                  <span v-if="!selectableList.length" class="fragment-targets__empty">
-                    暂无可作用物体，点“刷新列表”重试
-                  </span>
-                </div>
-              </div>
+              <button class="prophet-action prophet-row-main"
+                :data-prophet-fragment="entry.id" :disabled="!entry.owned"
+                @click="runProphetAction({ type: 'toggle-fragment', fragmentId: entry.id })">
+                <span class="prophet-action-key">{{ index + 1 }}</span>
+                <span class="prophet-action-label">{{ entry.name }}</span>
+                <span class="prophet-action-state" :data-state="entry.state">{{ entry.stateLabel }}</span>
+                <span class="prophet-action-detail">{{ entry.description }} · {{ entry.details }}</span>
+              </button>
+              <button class="prophet-action prophet-row-adjust"
+                :data-prophet-adjust="entry.id" @click="openFragmentAdjust(entry)">
+                <span class="prophet-action-label">调整</span>
+              </button>
             </div>
-            <button class="prophet-action" data-fragment-refresh @click="loadSelectableObjects">
-              <span class="prophet-action-label">刷新物体列表</span>
-            </button>
           </template>
 
           <!-- 「调整碎片」子屏：只改选中碎片的幅度与周期，改完即落盘并重启规则 -->
           <template v-else>
-            <div v-if="fragmentAdjustTargets.length" class="fragment-targets__list fragment-targets__list--adjust">
-              <span class="fragment-targets__label">调整对象</span>
-              <button v-for="guid in fragmentAdjustTargets" :key="guid" type="button"
-                class="fragment-target-chip" :class="{ 'is-on': fragmentAdjustTarget === guid }"
-                @click="fragmentAdjustTarget = guid">
-                {{ fragmentNames[guid] || guid }}
-              </button>
-            </div>
             <p class="prophet-action-detail" data-fragment-adjust-title>
               {{ fragmentAdjust.known ? `${fragmentAdjust.name} · ${fragmentAdjust.details}` : fragmentAdjust.name }}
-            </p>
-            <p class="prophet-action-detail" data-fragment-adjust-target>
-              作用：{{ fragmentAdjust.targetLabel }}
             </p>
             <p class="prophet-action-detail" data-fragment-adjust-values>
               当前：{{ fragmentAdjust.amplitudeLabel }} · {{ fragmentAdjust.periodLabel }}
@@ -2769,7 +2582,7 @@ onUnmounted(() => {
             </p>
             <button v-for="action in FRAGMENT_ADJUST_ACTIONS" :key="action.id" class="prophet-action"
               :data-fragment-action="action.id"
-              @click="runProphetAction({ type: 'adjust-fragment', id: action.id, fragmentId: fragmentAdjust.id, target: fragmentAdjustTarget })">
+              @click="runProphetAction({ type: 'adjust-fragment', id: action.id, fragmentId: fragmentAdjust.id })">
               <span class="prophet-action-key">{{ action.key }}</span>
               <span class="prophet-action-group">{{ action.group }}</span>
               <span class="prophet-action-label">{{ action.label }}</span>
@@ -2838,7 +2651,8 @@ onUnmounted(() => {
                 <svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2"/><circle cx="12" cy="12" r="4"/></svg>
               </div>
               <div class="bag__title-wrap">
-                <h1 class="bag__title">背包</h1>
+                <h1 class="bag__title">战术编成 // 收纳库</h1>
+                <span class="bag__sub">TACTICAL LOADOUT &amp; SECURE INVENTORY</span>
               </div>
               <div class="bag__headline"></div>
               <div class="purse" title="荒野代币">
@@ -2854,6 +2668,13 @@ onUnmounted(() => {
 
               <!-- 左上：武装编成与人偶 -->
               <div class="colL">
+                <div class="secHead">
+                  <span class="secHead__dot"></span>
+                  <span class="secHead__txt">现役武装编成</span>
+                  <div class="secHead__line"></div>
+                  <span class="secHead__meta">{{ bagGearMetaText }}</span>
+                </div>
+
               <div class="dollWrap">
                 <div class="doll">
                   <div class="figure" title="机体投影">
@@ -2864,17 +2685,19 @@ onUnmounted(() => {
                     :data-slot="slot.id" :title="slot.name"
                     :class="{ has: Boolean(bag.gear[slot.id]), 'is-sel': bag.gear[slot.id] && bag.gear[slot.id].uid === bag.sel, ['r-' + (bag.gear[slot.id]?.rarity || 'common')]: true }"
                     :aria-label="bag.gear[slot.id] ? `${slot.name}：${bag.gear[slot.id].name}` : `${slot.name}（空）`"
-                    @click="bagSelectGear(slot.id)" @dblclick="bagUnequip(slot.id)">
+                    @click="bagSelectGear(slot.id)" @dblclick="bagUnequip(slot.id)"
+                    @pointerenter="bag.gear[slot.id] && bagShowTip(bag.gear[slot.id], $event)"
+                    @pointermove="bagMoveTip($event)" @pointerleave="bagHideTip">
                     <span class="eslot__ph">{{ slot.name }}</span>
                     <span v-if="bag.gear[slot.id]" class="icon" aria-hidden="true" v-html="bagIconHTML(bag.gear[slot.id])" />
                   </button>
                 </div>
 
                 <div class="hero-stats">
-                  <div class="hstat"><span class="hstat-name">战力值</span><span class="hstat-val">{{ bagHeroStats.atk }}</span></div>
-                  <div class="hstat"><span class="hstat-name">防御值</span><span class="hstat-val">{{ bagHeroStats.def }}</span></div>
-                  <div class="hstat"><span class="hstat-name">暴击率</span><span class="hstat-val">{{ bagHeroStats.crit }}%</span></div>
-                  <div class="hstat"><span class="hstat-name">耐久值</span><span class="hstat-val">{{ bagHeroStats.hp }}</span></div>
+                  <div class="hstat"><span class="hstat-name">物理强度</span><span class="hstat-val">{{ bagHeroStats.atk }}</span></div>
+                  <div class="hstat"><span class="hstat-name">护甲防御</span><span class="hstat-val">{{ bagHeroStats.def }}</span></div>
+                  <div class="hstat"><span class="hstat-name">暴击共鸣</span><span class="hstat-val">{{ bagHeroStats.crit }}%</span></div>
+                  <div class="hstat"><span class="hstat-name">耐久上限</span><span class="hstat-val">{{ bagHeroStats.hp }}</span></div>
                 </div>
               </div>
               </div>
@@ -2896,7 +2719,9 @@ onUnmounted(() => {
                       :disabled="!cell.filled" :tabindex="cell.filled && selectedSlot === cell.index ? 0 : -1"
                       :aria-label="cell.item ? `${cell.item.name}，数量 ${cell.item.qty}` : `空格 ${cell.index + 1}`"
                       @click="bagSelectSlot(cell.index)" @dblclick="bagDoubleAct({ index: cell.index })"
-                      @focus="selectedSlot = cell.index">
+                      @focus="selectedSlot = cell.index"
+                      @pointerenter="cell.item && bagShowTip(cell.item, $event)"
+                      @pointermove="bagMoveTip($event)" @pointerleave="bagHideTip">
                       <span v-if="cell.item" class="icon" aria-hidden="true" v-html="bagIconHTML(cell.item)" />
                       <span v-if="cell.item && cell.item.qty > 1" class="qty">{{ cell.item.qty }}</span>
                     </button>
@@ -2909,7 +2734,7 @@ onUnmounted(() => {
                 <div class="sector__body">
                   <header class="sector__head">
                     <span class="secHead__dot"></span>
-                    <span class="sector__title">当前世界 // WORLDS</span>
+                    <span class="sector__title">世界坐标 // WORLDS</span>
                   </header>
                   <div class="sector__row">
                     <div class="sector__art" :aria-label="bagWorld ? `${bagWorld.name}：${bagWorld.tier}` : '未有界'" v-html="bagWorldScene"></div>
@@ -2956,6 +2781,7 @@ onUnmounted(() => {
                     </div>
                   </div>
                 </div>
+                <p v-else class="detail__empty">点击对应资源块以加载结构图谱</p>
               </div>
 
             </div>
@@ -2966,10 +2792,30 @@ onUnmounted(() => {
                 <span>收纳空间利用率：</span>
                 <b>{{ bagFootInfo.capText }}</b>
               </div>
+              <div class="hints">
+                <span>单击选择检视</span>
+                <span><kbd>双击 / 装配</kbd> 极速换装</span>
+                <span><kbd>Esc</kbd> 退出终端</span>
+              </div>
             </footer>
 
           </div>
         </section>
+      </div>
+
+      <!-- 跟随光标的浮签 -->
+      <div ref="bagTip" class="tip" role="tooltip" :class="{ 'is-on': bag.tipOn }"
+        :aria-hidden="bag.tipOn ? 'false' : 'true'" :style="bag.tipStyle">
+        <p v-if="bag.tipItem" class="tip__name">{{ bag.tipItem.name }}
+          <span class="tip__rarity" :class="`r-${bag.tipItem.rarity}`">{{ RARITY[bag.tipItem.rarity].label }}</span>
+          <span v-if="bag.tipItem.qty > 1" class="tip__rarity">× {{ bag.tipItem.qty }}</span>
+        </p>
+        <p v-if="bag.tipItem" class="tip__type">{{ bagTypeLine(bag.tipItem) }}</p>
+        <div v-if="bag.tipItem" class="tip__stats">
+          <div v-for="pair in (bag.tipItem.stats || [])" :key="pair[0]"><span>{{ pair[0] }}</span><b>{{ pair[1] }}</b></div>
+        </div>
+        <p v-if="bag.tipItem" class="tip__flavor">{{ bag.tipItem.flavor }}</p>
+        <p v-if="bag.tipItem" class="tip__foot">{{ bagTipFoot(bag.tipItem) }}</p>
       </div>
 
       <!-- 提示语 -->
@@ -2989,21 +2835,21 @@ onUnmounted(() => {
    ========================================================= */
 .story-world-viewport {
   /* —— 颜色 —— */
-  --c-paper: #e8ede3;
-  --c-paper-dim: #8d9e85;
-  --c-gold: #b3995d;
-  --c-gold-dim: #4d4024;
-  --c-gold-bright: #e6d5a7;
-  --c-cinnabar: #c24133;
+  --c-paper: #e9e0cc;
+  --c-paper-dim: #bdb298;
+  --c-gold: #c8a659;
+  --c-gold-dim: #8a7038;
+  --c-gold-bright: #f0d68f;
+  --c-cinnabar: #b3382a;
   --c-cinnabar-bright: #e0523b;
-  --c-bronze: #689f38;
+  --c-bronze: #5f8a72;
   --c-bronze-dim: #2c4a3c;
 
   /* —— 结构 —— */
-  --gold-line: rgba(179, 153, 93, .42);
-  --gold-line-soft: rgba(179, 153, 93, .22);
+  --gold-line: rgba(200, 166, 89, .42);
+  --gold-line-soft: rgba(200, 166, 89, .22);
   --panel-a: .88;
-  --pattern: rgba(232, 237, 227, .08);
+  --pattern: rgba(233, 224, 204, .08);
   --haze: .12;
   --cut: 14px;
   --edge: 2px;
@@ -3030,11 +2876,11 @@ onUnmounted(() => {
   padding: var(--edge);
   clip-path: var(--shape);
   background-image:
-    repeating-linear-gradient(58deg, rgba(230, 213, 167, .16) 0 1px, transparent 1px 4px),
+    repeating-linear-gradient(58deg, rgba(255, 242, 210, .18) 0 1px, transparent 1px 4px),
     linear-gradient(148deg,
-      rgba(230, 213, 167, .92) 0%, rgba(179, 153, 93, .74) 18%,
-      rgba(77, 64, 36, .48) 40%, rgba(58, 48, 28, .58) 60%,
-      rgba(179, 153, 93, .80) 84%, rgba(230, 213, 167, .90) 100%);
+      rgba(250, 232, 182, .95) 0%, rgba(200, 168, 98, .78) 16%,
+      rgba(122, 98, 52, .46) 38%, rgba(96, 78, 42, .58) 58%,
+      rgba(208, 176, 106, .82) 82%, rgba(250, 232, 182, .92) 100%);
   filter: drop-shadow(0 10px 24px rgba(0, 0, 0, .62));
 }
 
@@ -3042,16 +2888,16 @@ onUnmounted(() => {
   position: relative;
   height: 100%;
   clip-path: var(--shape);
-  background-color: rgba(18, 26, 20, .94);
+  background-color: rgba(26, 23, 18, .94);
   background-image:
     repeating-linear-gradient(90deg, var(--pattern) 0 1px, transparent 1px 9px),
-    repeating-linear-gradient(90deg, rgba(232, 237, 227, .05) 0 2px, transparent 2px 16px),
-    repeating-linear-gradient(58deg, rgba(232, 237, 227, .03) 0 1px, transparent 1px 13px),
-    repeating-linear-gradient(-58deg, rgba(232, 237, 227, .022) 0 1px, transparent 1px 17px),
-    repeating-linear-gradient(114deg, rgba(232, 237, 227, .035) 0 1px, transparent 1px 6px),
-    radial-gradient(120% 92% at 8% 0%, rgba(232, 237, 227, .10), transparent 62%),
-    radial-gradient(92% 120% at 100% 112%, rgba(194, 65, 51, .11), transparent 62%),
-    linear-gradient(180deg, rgba(24, 34, 26, .70), rgba(12, 18, 14, .94));
+    repeating-linear-gradient(90deg, rgba(233, 224, 204, .05) 0 2px, transparent 2px 16px),
+    repeating-linear-gradient(58deg, rgba(233, 224, 204, .03) 0 1px, transparent 1px 13px),
+    repeating-linear-gradient(-58deg, rgba(233, 224, 204, .022) 0 1px, transparent 1px 17px),
+    repeating-linear-gradient(114deg, rgba(233, 224, 204, .035) 0 1px, transparent 1px 6px),
+    radial-gradient(120% 92% at 8% 0%, rgba(233, 224, 204, .10), transparent 62%),
+    radial-gradient(92% 120% at 100% 112%, rgba(179, 56, 42, .11), transparent 62%),
+    linear-gradient(180deg, rgba(70, 61, 48, .70), rgba(25, 22, 18, .94));
   background-size: 100% 5px, 100% 3px, auto, auto, auto, auto, auto, auto;
   background-position: left top, left bottom, 0 0, 0 0, 0 0, 0 0, 0 0, 0 0;
   background-repeat: no-repeat, no-repeat, repeat, repeat, repeat, no-repeat, no-repeat, no-repeat;
@@ -3143,9 +2989,7 @@ onUnmounted(() => {
 }
 /* 小世界状态：顶部中央。放到这里的唯一原因是物品栏要占用底部中央（Minecraft 位置），
    而顶部中央在小世界是空的（图例左上、世界铭牌右上、小世界没有首领血条）。 */
-/* 顶部中央的小世界状态条已隐藏：只保留右上角的世界指示器。 */
 .subworld-notice {
-  display: none;
   position: absolute; top: 18px; left: 50%; transform: translateX(-50%);
   display: grid; gap: 5px; justify-items: center; padding: 4px 12px; text-align: center; z-index: 3;
   background: rgba(16, 14, 12, .82); border: 1px solid var(--gold-line);
@@ -3215,10 +3059,10 @@ onUnmounted(() => {
 .hotbar {
   position: static; display: grid; gap: 4px; justify-items: center;
 }
-.hotbar__slots { display: flex; gap: 8px; }
+.hotbar__slots { display: flex; gap: 6px; }
 .hotbar__slot {
   position: relative; display: grid; place-items: center; gap: 1px;
-  width: clamp(50px, 5vw, 62px); height: clamp(50px, 5vw, 62px);
+  width: clamp(44px, 4.4vw, 54px); height: clamp(44px, 4.4vw, 54px);
   padding: 3px; box-sizing: border-box; cursor: pointer;
   background: rgba(11, 17, 15, .78); border: 1px solid var(--c-stone);
   color: var(--c-paper);
@@ -3231,155 +3075,22 @@ onUnmounted(() => {
 }
 .hotbar__slot.is-empty { opacity: .55; }
 .hotbar__key {
-  position: absolute; top: 1px; left: 3px; font-size: 11px; line-height: 1;
+  position: absolute; top: 1px; left: 3px; font-size: 10px; line-height: 1;
   color: var(--c-gold-dim); font-variant-numeric: tabular-nums;
 }
-.hotbar__name { font-size: 12px; font-weight: 500; line-height: 1.2; text-align: center; color: var(--c-paper); }
+.hotbar__name { font-size: 11px; font-weight: 500; line-height: 1.2; text-align: center; color: var(--c-paper); }
 .hotbar__count {
-  position: absolute; right: 3px; bottom: 1px; font-size: 12px; line-height: 1;
+  position: absolute; right: 3px; bottom: 1px; font-size: 11px; line-height: 1;
   color: var(--c-gold-bright); text-shadow: 0 1px 2px #000;
   font-variant-numeric: tabular-nums;
 }
 .hotbar__hint {
-  display: flex; gap: 10px; margin: 0; padding: 3px 9px; font-size: 11.5px; line-height: 1.5;
+  display: flex; gap: 10px; margin: 0; padding: 2px 8px; font-size: 10.5px; line-height: 1.5;
   color: var(--c-paper-dim); background: rgba(11, 17, 15, .6); border: 1px solid var(--c-stone);
 }
 .hotbar__tip { color: var(--c-gold-dim); }
 
-/* 小世界右下角：先知的对话入口。先知不再生成 3D 模型，只留这个按钮。 */
-.prophet-fab {
-  position: absolute; right: clamp(16px, 2vw, 28px); bottom: clamp(16px, 2vh, 24px);
-  z-index: 13; display: flex; align-items: center; gap: 10px;
-  padding: 9px 16px 9px 10px; cursor: pointer; pointer-events: auto;
-  color: var(--c-paper); background: linear-gradient(135deg, rgba(31, 44, 35, .94), rgba(13, 20, 16, .96));
-  border: 1px solid var(--c-gold-dim); border-left: 3px solid var(--c-gold-bright);
-  clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 0 100%);
-  box-shadow: 0 10px 26px rgba(0, 0, 0, .5), 0 0 18px rgba(179, 153, 93, .12);
-  transition: border-color .18s ease, background .18s ease, transform .18s ease;
-}
-.prophet-fab:hover {
-  transform: translateY(-2px); border-color: var(--c-gold-bright);
-  background: linear-gradient(135deg, rgba(40, 55, 43, .98), rgba(17, 26, 20, .98));
-}
-.prophet-fab__mark {
-  width: 30px; height: 30px; flex: 0 0 auto; display: grid; place-items: center;
-  border: 1px solid rgba(179, 153, 93, .5); background: rgba(179, 153, 93, .1);
-  transform: rotate(45deg);
-}
-.prophet-fab__mark svg {
-  width: 18px; height: 18px; transform: rotate(-45deg);
-  fill: none; stroke: var(--c-gold-bright); stroke-width: 1.4; stroke-linejoin: round;
-}
-.prophet-fab__text { display: grid; gap: 2px; text-align: left; }
-.prophet-fab__text strong { font-size: 13px; font-weight: 600; letter-spacing: 2px; color: var(--c-gold-bright); }
-.prophet-fab__text small { font-size: 10px; letter-spacing: 1px; color: var(--c-paper-dim); }
-
-/* 怪物攻击到玩家时的一层短暂红光：没有数值血量，先用可见反馈表示“被打了”。 */
-.player-hit-flash {
-  position: absolute; inset: 0; z-index: 30; pointer-events: none;
-  background: radial-gradient(ellipse at center, transparent 35%, rgba(180, 30, 30, .38) 100%);
-  animation: player-hit .42s ease-out both;
-}
-@keyframes player-hit {
-  0% { opacity: 0; }
-  18% { opacity: 1; }
-  100% { opacity: 0; }
-}
-
 @media (max-width: 800px) {
   .world-indicator { top: 18px; right: 12px; font-size: 11px; letter-spacing: 1px; }
-  .prophet-fab { right: 12px; bottom: 14px; padding: 7px 12px 7px 8px; }
-}
-
-/* 先知窗口：和 HUD/背包共用林间金边语言，但比原来的默认面板更宽松、更好读。 */
-.dialogue-panel {
-  width: min(680px, calc(100vw - 32px));
-  padding: 20px 24px 18px;
-  background:
-    radial-gradient(ellipse at 12% 0%, rgba(104, 159, 56, .12), transparent 55%),
-    linear-gradient(145deg, rgba(30, 39, 30, .97), rgba(12, 18, 15, .98));
-  border: 1px solid rgba(179, 153, 93, .55);
-  border-left: 3px solid var(--c-gold-bright);
-  clip-path: polygon(0 0, calc(100% - 16px) 0, 100% 16px, 100% 100%, 0 100%);
-  box-shadow: 0 22px 70px rgba(0, 0, 0, .68), 0 0 26px rgba(179, 153, 93, .08);
-}
-.dialogue-header {
-  padding-bottom: 12px;
-  border-bottom: 1px solid rgba(179, 153, 93, .32);
-}
-.dialogue-header strong { font-size: 17px; letter-spacing: 4px; }
-.dialogue-header span { font-size: 11px; letter-spacing: 1px; }
-.dialogue-line { margin-top: 16px; font-size: 14px; line-height: 1.95; color: var(--c-paper); }
-.dialogue-closing { margin-top: 10px; font-size: 12.5px; color: var(--c-gold-bright); }
-.prophet-actions { gap: 8px; margin-top: 14px; }
-.prophet-action {
-  padding: 7px 11px;
-  border: 1px solid rgba(179, 153, 93, .24);
-  background: rgba(18, 26, 20, .72);
-  transition: border-color .16s ease, background .16s ease, transform .16s ease;
-}
-.prophet-action:hover:not(:disabled) {
-  transform: translateY(-1px);
-  border-color: rgba(230, 213, 167, .65);
-  background: rgba(43, 56, 40, .92);
-}
-.prophet-action-key {
-  border-color: rgba(179, 153, 93, .5);
-  color: var(--c-gold-bright);
-}
-.prophet-action-state[data-state="installed"] { border-color: #7f9a5c; color: #d7e8b8; }
-.prophet-action-state[data-state="owned"] { border-color: rgba(179, 153, 93, .5); color: var(--c-gold-bright); }
-.prophet-row { gap: 7px; }
-.prophet-row-main { flex: 1 1 auto; }
-.prophet-row-adjust { align-self: stretch; padding: 7px 14px; }
-.fragment-targets {
-  flex-basis: 100%;
-  padding: 10px 12px;
-  border: 1px solid rgba(179, 153, 93, .28);
-  background: rgba(8, 13, 10, .55);
-  clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 0 100%);
-}
-.fragment-card { flex-basis: 100%; display: flex; flex-direction: column; gap: 6px; }
-.fragment-card .prophet-row { width: 100%; }
-.fragment-targets--row { padding: 7px 9px; background: rgba(8, 13, 10, .38); }
-.fragment-targets--row .fragment-targets__head { margin-bottom: 6px; font-size: 11px; }
-.fragment-targets__head {
-  display: flex; align-items: center; gap: 8px; margin-bottom: 8px;
-  font-size: 12px; letter-spacing: 1px; color: var(--c-gold-bright);
-}
-.fragment-targets__head small {
-  font-size: 10px; letter-spacing: 0; color: var(--c-paper-dim);
-}
-.fragment-targets__act {
-  margin-left: auto; padding: 2px 7px; cursor: pointer;
-  border: 1px solid rgba(179, 153, 93, .35); background: rgba(179, 153, 93, .08);
-  color: var(--c-paper-dim); font-size: 10px;
-}
-.fragment-targets__act:hover { color: var(--c-gold-bright); border-color: var(--c-gold-bright); }
-.fragment-targets__list { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
-.fragment-targets__label { font-size: 11px; color: var(--c-paper-dim); margin-right: 2px; }
-.fragment-targets__list--adjust {
-  flex-basis: 100%; padding: 8px 10px; margin-top: 10px;
-  border: 1px solid rgba(179, 153, 93, .2); background: rgba(8, 13, 10, .45);
-}
-.fragment-target-chip {
-  padding: 3px 9px; cursor: pointer;
-  border: 1px solid rgba(179, 153, 93, .3); border-radius: 999px;
-  background: rgba(18, 26, 20, .8); color: var(--c-paper-dim); font-size: 11px;
-  transition: .16s ease;
-}
-.fragment-target-chip:hover { color: var(--c-paper); border-color: rgba(230, 213, 167, .6); }
-.fragment-target-chip.is-on {
-  color: #1a2117; border-color: var(--c-gold-bright); background: var(--c-gold-bright);
-  box-shadow: 0 0 12px rgba(179, 153, 93, .28);
-}
-.fragment-targets__empty { font-size: 11px; color: var(--c-paper-dim); }
-.dialogue-footer {
-  margin-top: 16px; padding-top: 13px;
-  border-top: 1px solid rgba(179, 153, 93, .25);
-}
-.dialogue-next {
-  padding: 7px 18px;
-  clip-path: polygon(7px 0, 100% 0, calc(100% - 7px) 100%, 0 100%);
 }
 </style>

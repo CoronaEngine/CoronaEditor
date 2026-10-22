@@ -374,9 +374,6 @@ export function createStoryWorldControls({
     setSpeed: value => call('setSpeed', [value]),
     // 绑定按「世界角色」路由，不看就绪标记：正是这次绑定让另一台控制器变得可用。
     bindPlayer: (actor, offset) => (childWorld() ? small : third).bindPlayer(actor, offset),
-    // Native replies belong to the controller that submitted the move, including
-    // a late reply while navigation is waiting to save its final pose.
-    acceptMeshMove: event => third.acceptMeshMove?.(event) ?? false,
     onCameraBound: () => call('onCameraBound', []),
     snapshotPlayer: () => call('snapshotPlayer', []),
     acknowledgePlayerSave: pose => call('acknowledgePlayerSave', [pose]),
@@ -384,11 +381,7 @@ export function createStoryWorldControls({
     setViewMode: next => call('setViewMode', [next]),
     cycleViewMode: () => call('cycleViewMode', []),
     // 输入复位与释放对两个控制器都做：切世界之后另一个手里的按键不能留在按下状态。
-    resetInput() {
-      const settled = third.resetInput();
-      small.resetInput();
-      return settled;
-    },
+    resetInput() { third.resetInput(); small.resetInput(); },
     dispose() { third.dispose(); small.dispose(); },
   };
 }

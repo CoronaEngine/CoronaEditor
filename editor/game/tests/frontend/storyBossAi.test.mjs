@@ -35,11 +35,11 @@ test('a hit makes the boss flinch before it swings', () => {
 });
 
 test('the boss swings inside range on cooldown and idles outside it', () => {
-  assert.equal(nextBossState({ state: 'idle', hp: 100, distance: 5, cooldownReady: true, wasHit: false }).state, 'attack1');
-  assert.equal(nextBossState({ state: 'attack1', hp: 100, distance: 5, cooldownReady: true, wasHit: false }).state, 'attack2',
+  assert.equal(nextBossState({ state: 'idle', hp: 100, distance: 5, cooldownReady: true, wasHit: false, aggro: true }).state, 'attack1');
+  assert.equal(nextBossState({ state: 'attack1', hp: 100, distance: 5, cooldownReady: true, wasHit: false, aggro: true }).state, 'attack2',
     'a second swing alternates, so the fight does not read as one repeated animation');
   assert.equal(nextBossState({ state: 'idle', hp: 100, distance: 30, cooldownReady: true, wasHit: false }).state, 'idle');
-  assert.equal(nextBossState({ state: 'idle', hp: 100, distance: 5, cooldownReady: false, wasHit: false }).state, 'idle',
+  assert.equal(nextBossState({ state: 'idle', hp: 100, distance: 5, cooldownReady: false, wasHit: false, aggro: true }).state, 'idle',
     'a cooling-down boss waits inside range rather than spamming');
 });
 
@@ -49,12 +49,16 @@ test('the director plays idle, swings when the player closes in, and alternates'
   assert.equal(f.state(), 'idle');
   assert.deepEqual(f.calls, [BOSS_CLIPS.idle]);
 
-  await f.director.tick({ hp: 200, distance: 6 });
+  // Boss 是被动开战：先打它一下，它才会还手。
+  await f.director.tick({ hp: 190, distance: 30, wasHit: true });
+  assert.equal(f.state(), 'hurt');
+  f.advance(BOSS_TUNING.hurtSeconds * 1000 + 50);
+  await f.director.tick({ hp: 190, distance: 6 });
   assert.equal(f.state(), 'attack1');
   assert.deepEqual(f.attacks, [BOSS_CLIPS.attack1]);
 
   f.advance(BOSS_TUNING.attackCooldownSeconds * 1000 + 50);
-  await f.director.tick({ hp: 200, distance: 6 });
+  await f.director.tick({ hp: 190, distance: 6 });
   assert.equal(f.state(), 'attack2', 'the follow-up uses the other attack clip');
   assert.deepEqual(f.attacks, [BOSS_CLIPS.attack1, BOSS_CLIPS.attack2]);
   f.director.dispose();
@@ -99,4 +103,36 @@ test('the constructor refuses an engine without the animation route', () => {
     /scene id/);
   assert.throws(() => createBossDirector({ api: { sceneTools: { setActorAnimation() {} } }, sceneId: 's', guid: '' }),
     /actor guid/);
+});
+
+test('a boss that has not been hit stays idle even when the player is in reach', () => {
+  const passive = nextBossState({ state: 'idle', hp: 200, distance: 1, cooldownReady: true, wasHit: false, aggro: false });
+  assert.equal(passive.state, 'idle', 'no aggro means no swing');
+  assert.equal(passive.clip, 'Idle');
+  const engaged = nextBossState({ state: 'idle', hp: 200, distance: 1, cooldownReady: true, wasHit: false, aggro: true });
+  assert.equal(engaged.state, 'attack1');
+});
+
+test('a landed hit puts the boss on the offensive, and the aggression expires', async () => {
+  const calls = [];
+  let clock = 0;
+  const director = createBossDirector({
+    api: { sceneTools: { setActorAnimation: async (scene, guid, clip) => { calls.push(clip); } } },
+    sceneId: 'scene.ini', guid: 'boss', now: () => clock,
+  });
+  await director.tick({ hp: 200, distance: 2 });
+  assert.equal(director.state(), 'idle', 'standing next to an untouched boss is safe');
+
+  await director.tick({ hp: 190, distance: 2, wasHit: true });
+  assert.equal(director.state(), 'hurt');
+
+  clock += BOSS_TUNING.hurtSeconds * 1000 + 100;
+  await director.tick({ hp: 190, distance: 2 });
+  assert.equal(director.state(), 'attack1', 'after the flinch it fights back');
+
+  // Long after the last hit it calms down again.
+  clock += (BOSS_TUNING.aggroSeconds + BOSS_TUNING.attackCooldownSeconds + 1) * 1000;
+  await director.tick({ hp: 190, distance: 2 });
+  assert.equal(director.state(), 'idle');
+  director.dispose();
 });

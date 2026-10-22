@@ -171,7 +171,31 @@ export const defineControlBlocks = () => {
     },
   };
 
+  Blockly.Blocks['control_senceSet'] = {
+    init: function () {
+      this.appendDummyInput()
+        .appendField('换成')
+        .appendField(new Blockly.FieldTextInput(''), 'x')
+        .appendField('场景');
+      this.setInputsInline(true);
+      this.setPreviousStatement(true, null);
+      this.setNextStatement(true, null);
+      this.setStyle('control_blocks');
+      this.setTooltip('切换到指定场景');
+      this.setHelpUrl('');
+    },
+  };
 
+  Blockly.Blocks['control_nextSence'] = {
+    init: function () {
+      this.appendDummyInput().appendField('下一个场景');
+      this.setInputsInline(true);
+      this.setPreviousStatement(true, null);
+      this.setNextStatement(true, null);
+      this.setStyle('control_blocks');
+      this.setHelpUrl('');
+    },
+  };
   Blockly.Blocks['control_restart_level'] = {
     init: function () {
       this.appendDummyInput().appendField('重新开始当前关卡');

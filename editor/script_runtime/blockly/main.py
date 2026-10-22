@@ -19,6 +19,7 @@ from runtime.project_context import get_active_project_path
 from runtime.scene_support import (
     cancel_pending_auto_saves,
     flush_pending_auto_saves,
+    get_project_scenes,
 )
 from config.paths_config import get_default_paths
 from config.project_state import settings_manager
@@ -72,6 +73,7 @@ class ScratchTool:
         "resolvedSceneName": "",
         "resolvedActorName": "",
         "bindingMode": "",
+        "pythonScenes": [],
         "nativeScene": "",
         "actorCandidates": [],
         "currentNodeId": "",
@@ -133,7 +135,7 @@ class ScratchTool:
                 current = settings_manager.active_project_path
                 current_path = Path(current).resolve() if current else None
                 if (
-                    settings_manager._project_config_path(str(latest_path))
+                    (latest_path / "project.ini").is_file()
                     and current_path != latest_path
                 ):
                     settings_manager.set_active_project(str(latest_path))
@@ -443,6 +445,7 @@ class ScratchTool:
             return {"status": "error", "message": str(exc)}
 
 
+
     # ------------------------------------------------------------------
     # Legacy single-code execution
     # ------------------------------------------------------------------
@@ -568,6 +571,7 @@ class ScratchTool:
                     resolvedSceneName="",
                     resolvedActorName="",
                     bindingMode=resolved.get("binding_mode", ""),
+                    pythonScenes=resolved.get("python_scenes", []),
                     nativeScene=resolved.get("native_scene", ""),
                     actorCandidates=resolved.get("actor_candidates", []),
                     currentNodeId="",
@@ -580,6 +584,7 @@ class ScratchTool:
                 return {
                     "status": "error", "message": message, "outcome": "binding_error",
                     "requestedScene": requested_scene, "requestedActor": requested_actor,
+                    "pythonScenes": resolved.get("python_scenes", []),
                     "nativeScene": resolved.get("native_scene", ""),
                     "actorCandidates": resolved.get("actor_candidates", []),
                     "bindingMode": resolved.get("binding_mode", ""),
@@ -674,6 +679,7 @@ class ScratchTool:
                 resolvedSceneName=scene_name,
                 resolvedActorName=actor_name,
                 bindingMode=resolved.get("binding_mode", ""),
+                pythonScenes=resolved.get("python_scenes", []),
                 nativeScene=resolved.get("native_scene", ""),
                 actorCandidates=resolved.get("actor_candidates", []),
                 currentNodeId="",
@@ -1546,28 +1552,24 @@ class ScratchTool:
             ))
         snapshot: dict[str, Any] = {"kind": "runtime", "scope": scope, "snapshots": snapshots}
         if scope == "project" and any(item.get("target_type") == "project" for item in targets):
-            snapshot["project_scene"] = cls._create_preview_state_snapshot(project_path)
+            snapshot["project_scenes"] = cls._create_preview_state_snapshot(project_path)
         return snapshot
 
     @classmethod
     def _create_preview_state_snapshot(
         cls, project_path: Optional[Path] = None
     ) -> dict[str, Any]:
-        from api.editor_api import get_script_runtime_editor_api
+        snapshot: dict[str, Any] = {"scenes": {}}
+        for route in cls._project_scene_routes(project_path):
+            native_state = cls._create_native_preview_scene_state(route)
+            if native_state is not None:
+                snapshot["scenes"][route] = native_state
+                continue
 
-        current = cls._manifest_payload(get_script_runtime_editor_api().scene.get_snapshot())
-        if not current or not current.get("project_path"):
-            raise RuntimeError("Current scene is unavailable for preview")
-        current_root = Path(current["project_path"]).resolve()
-        if project_path is not None and current_root != Path(project_path).resolve():
-            raise RuntimeError("Current scene belongs to a different project")
-        # Pin the snapshot to its project. A later restore must fail if another
-        # project has replaced the current scene, even though both use scene.ini.
-        route = str(current_root / "scene.ini")
-        native_state = cls._create_native_preview_scene_state(route, current)
-        if native_state is None:
             raise RuntimeError(f"native preview snapshot unavailable for {route}")
-        return {"route": route, "state": native_state}
+
+        logger.info("[ScratchTool] preview state snapshot captured: %d scenes", len(snapshot["scenes"]))
+        return snapshot
 
     @staticmethod
     def _manifest_payload(result: Any) -> dict[str, Any] | None:
@@ -1578,14 +1580,13 @@ class ScratchTool:
 
     @classmethod
     def _create_native_preview_scene_state(
-        cls, route: str, scene_payload: dict[str, Any] | None = None
+        cls, route: str
     ) -> dict[str, Any] | None:
         try:
             from api.editor_api import get_script_runtime_editor_api
 
             scene_api = get_script_runtime_editor_api().scene
-            if scene_payload is None:
-                scene_payload = cls._manifest_payload(scene_api.get_snapshot(route))
+            scene_payload = cls._manifest_payload(scene_api.get_snapshot(route))
             environment_payload = cls._manifest_payload(scene_api.get_environment(route))
             if scene_payload is None or environment_payload is None:
                 return None
@@ -1643,26 +1644,27 @@ class ScratchTool:
 
         try:
             cancel_pending_auto_saves()
+            restored_scenes: set[str] = set()
             if snapshot.get("kind") == "runtime":
                 from script_runtime.engine import corona_engine as corona_engine_scratch
                 for runtime_snapshot in snapshot.get("snapshots") or []:
                     corona_engine_scratch.restore_runtime_scene_state(runtime_snapshot)
-                project_scene = snapshot.get("project_scene") or {}
+                    restored_scenes.add(str(runtime_snapshot.get("scene_name") or ""))
+                project_scenes = snapshot.get("project_scenes") or {}
             else:
-                project_scene = snapshot
+                project_scenes = snapshot
 
-            if project_scene:
-                route = project_scene["route"]
-                scene_state = project_scene["state"]
+            for route, scene_state in (project_scenes.get("scenes") or {}).items():
                 if scene_state.get("binding_mode") != "native_editor":
                     raise RuntimeError(f"non-native preview snapshot is unsupported: {route}")
                 cls._restore_native_preview_scene_state(route, scene_state)
+                restored_scenes.add(route)
 
-            cls._notify_preview_state_restored()
+            cls._notify_preview_state_restored({item for item in restored_scenes if item})
             if clear_snapshot:
                 with cls._preview_lock:
                     cls._preview_state_snapshot = None
-            logger.info("[ScratchTool] current scene preview state restored")
+            logger.info("[ScratchTool] preview state restored: %d scenes", len(restored_scenes))
             return True, None
         except Exception as exc:
             logger.exception("[ScratchTool] preview state restore failed")
@@ -1706,10 +1708,11 @@ class ScratchTool:
                     raise RuntimeError(f"native actor restore failed: {route}/{actor_name}")
 
     @staticmethod
-    def _notify_preview_state_restored() -> None:
+    def _notify_preview_state_restored(scene_routes: set[str]) -> None:
         try:
             selected_scene, selected_actor = get_editor_selection()
-            emit_editor_event("scene-tree-changed", ["scene.ini"])
+            for route in scene_routes or {selected_scene or ""}:
+                emit_editor_event("scene-tree-changed", [route])
             if selected_scene and selected_actor:
                 emit_editor_event("actor-change", ["actor", selected_scene, selected_actor])
             elif selected_scene:
@@ -1717,6 +1720,28 @@ class ScratchTool:
         except Exception:
             logger.exception("[ScratchTool] failed to notify frontend after preview state restore")
 
+    @classmethod
+    def _project_scene_routes(
+        cls, project_path: Optional[Path] = None
+    ) -> list[str]:
+        project_path = (project_path or cls._active_project_path()).resolve()
+        ini_path = project_path / "project.ini"
+        scenes = get_project_scenes(str(ini_path)) if ini_path.exists() else []
+        if not scenes and (project_path / "Scene").is_dir():
+            scenes = [
+                f"Scene/{path.name}"
+                for path in sorted((project_path / "Scene").iterdir())
+                if path.suffix == ".scene"
+            ]
+        entrance = ""
+        try:
+            if settings_manager.active_project_config:
+                entrance = settings_manager.active_project_config["Project"].get("entrance_scene", "")
+        except Exception:
+            entrance = ""
+        if entrance and entrance not in scenes:
+            scenes.insert(0, entrance)
+        return scenes
 
     @classmethod
     def _run_preview_target(cls, code_path: Path, target: dict) -> None:

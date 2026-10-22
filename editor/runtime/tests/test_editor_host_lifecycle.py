@@ -6,10 +6,6 @@ from types import ModuleType, SimpleNamespace
 from unittest.mock import patch
 
 
-EDITOR_ROOT = Path(__file__).resolve().parents[2]
-ENGINE_ROOT = EDITOR_ROOT.parent.parent
-
-
 class CoronaEditorLifecycleTests(unittest.TestCase):
     def _load_editor(self):
         engine = SimpleNamespace()
@@ -61,14 +57,16 @@ class CoronaEditorLifecycleTests(unittest.TestCase):
         self.assertEqual(editor._runtime_state, "stopped")
 
     def test_cpp_python_owner_does_not_use_global_initialized_state_for_concurrency(self):
+        repo_root = Path(__file__).resolve().parents[3]
         source = (
-            ENGINE_ROOT / "src" / "systems" / "script" / "python" / "python_api.cpp"
+            repo_root / "src" / "systems" / "script" / "python" / "python_api.cpp"
         ).read_text(encoding="utf-8")
         self.assertNotIn("Py_IsInitialized()", source)
 
     def test_cpp_shutdown_receipt_outlives_python_service_deadline(self):
+        repo_root = Path(__file__).resolve().parents[3]
         source = (
-            ENGINE_ROOT / "src" / "systems" / "script" / "python" / "python_api.cpp"
+            repo_root / "src" / "systems" / "script" / "python" / "python_api.cpp"
         ).read_text(encoding="utf-8")
         shutdown_start = source.index("void PythonAPI::begin_shutdown()")
         shutdown_end = source.index("PythonLifecycleSnapshot", shutdown_start)
@@ -77,8 +75,9 @@ class CoronaEditorLifecycleTests(unittest.TestCase):
         self.assertNotIn("milliseconds(1500)", shutdown_body)
 
     def test_runtime_update_has_native_phase_markers_and_stack_watchdog(self):
+        repo_root = Path(__file__).resolve().parents[3]
         source = (
-            EDITOR_ROOT / "runtime" / "editor_host.py"
+            repo_root / "editor" / "runtime" / "editor_host.py"
         ).read_text(encoding="utf-8")
         update_start = source.index("    def _set_native_runtime_phase(cls, phase):")
         update_end = source.index("\n    def show_log_on_js", update_start)
@@ -106,7 +105,7 @@ class CoronaEditorLifecycleTests(unittest.TestCase):
         self.assertIn("cls._cancel_runtime_watchdog()", shutdown_body)
 
         cpp_source = (
-            ENGINE_ROOT / "src" / "systems" / "script" / "python" / "python_api.cpp"
+            repo_root / "src" / "systems" / "script" / "python" / "python_api.cpp"
         ).read_text(encoding="utf-8")
         invoke_start = cpp_source.index("void PythonAPI::invokeEntry")
         invoke_end = cpp_source.index("void PythonAPI::sendMessage", invoke_start)

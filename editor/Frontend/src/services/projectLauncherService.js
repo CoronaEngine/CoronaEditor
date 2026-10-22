@@ -1,4 +1,4 @@
-/** Single-scene project creation, opening, and Vision import facade. */
+/** Project creation, opening, and legacy migration facade. */
 
 import { nextTick } from 'vue';
 import { appService } from './appService.js';
@@ -70,11 +70,20 @@ export async function stopWorldRuntimeBeforeOpen(api, {
 export const projectLauncherService = {
   getDefaultProjectPath: () => editorApi.project.getDefaultProjectPath(),
   browseFolder: (default_path) => editorApi.project.browseFolder(default_path),
+  choosePortableSceneTarget: () => editorApi.project.choosePortableSceneTarget(),
   validatePortableScene: (payload = {}) => editorApi.project.validatePortableScene(payload),
   importPortableAsset: (payload = {}) => editorApi.project.importPortableAsset(payload),
   cleanupPortableSceneAssets: (payload = {}) =>
     editorApi.project.cleanupPortableSceneAssets(payload),
-  importVisionScene: (path) => editorApi.project.importVisionScene(path),
+  migrateLegacyScene: (payload) =>
+    editorApi.project.migrateLegacyScene(payload).then((result) => {
+      const migrated = result?.data ?? result;
+      if (migrated?.ok && migrated?.path) {
+        window.localStorage?.setItem('corona.activeProjectPath', migrated.path);
+        window.localStorage?.setItem('corona.activeProjectLegacy', 'false');
+      }
+      return result;
+    }),
   openProjectFile: () => editorApi.project.openProjectFile(),
   createProject: (projectData) => editorApi.project.createProject(projectData),
   createWorldProject: (worldData) => editorApi.project.createWorldProject(worldData),
@@ -121,6 +130,7 @@ export const projectLauncherService = {
         const session = await worldModeService.resolve(activeProjectPath, { force: true });
         if (!current() || !session) return superseded();
         window.localStorage?.setItem('corona.activeProjectPath', activeProjectPath);
+        window.localStorage?.setItem('corona.activeProjectLegacy', opened?.legacy ? 'true' : 'false');
         window.dispatchEvent(new CustomEvent('corona-active-project-changed', {
           detail: { projectPath: activeProjectPath },
         }));
@@ -136,6 +146,7 @@ export const projectLauncherService = {
     projectOpenQueue = operation;
     return operation;
   },
+  setProjectMode: (mode, settings) => editorApi.project.setProjectMode(mode, settings),
   getAppVersion: () => editorApi.project.getAppVersion(),
   getProjectLoadStatus: () => editorApi.project.getProjectLoadStatus(),
   getRecentProjects: () => editorApi.project.getRecentProjects(),

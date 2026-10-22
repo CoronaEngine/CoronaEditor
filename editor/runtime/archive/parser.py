@@ -58,19 +58,86 @@ def _read_ini(path: Path) -> configparser.ConfigParser:
     return config
 
 
-def _resolve_source(source: Path) -> tuple[Path, configparser.ConfigParser]:
-    selected = source / "scene.ini" if source.is_dir() else source
-    if selected.name != "scene.ini":
-        raise ArchiveParseError(
-            "UNSUPPORTED_ARCHIVE_TYPE", "Expected a scene directory or scene.ini", path=str(selected)
+def _legacy_project_root(scene_file: Path) -> Path:
+    candidate = scene_file.parent
+    while candidate != candidate.parent:
+        if (candidate / "project.ini").is_file():
+            return candidate
+        candidate = candidate.parent
+    raise ArchiveParseError(
+        "LEGACY_PROJECT_NOT_FOUND",
+        f"Legacy scene has no owning project.ini: {scene_file}",
+        path=str(scene_file),
+    )
+
+
+def _resolve_source(source: Path) -> tuple[str, Path, Path, str, configparser.ConfigParser]:
+    selected = source
+    if source.is_dir():
+        selected = source / "scene.ini" if (source / "scene.ini").is_file() else source / "project.ini"
+
+    if selected.name.lower() == "scene.ini":
+        scene_config = _read_ini(selected)
+        format_type = scene_config.get("format", "type", fallback="")
+        version = scene_config.getint("format", "version", fallback=0)
+        if format_type != "corona_scene_folder" or version != 1:
+            raise ArchiveParseError(
+                "UNSUPPORTED_ARCHIVE_VERSION",
+                f"Unsupported portable scene format: {format_type or '<missing>'} v{version}",
+                path=str(selected),
+            )
+        return "portable_scene", selected.parent, selected, "scene.ini", scene_config
+
+    if selected.name.lower() == "project.ini":
+        project_config = _read_ini(selected)
+        route = project_config.get("Project", "entrance_scene", fallback="").strip().replace("\\", "/")
+        if not route:
+            routes = [item.strip().replace("\\", "/") for item in project_config.get("Project", "scenes", fallback="").split(",") if item.strip()]
+            route = routes[0] if routes else ""
+        if not route:
+            raise ArchiveParseError(
+                "ENTRANCE_SCENE_NOT_FOUND", "Legacy project has no entrance scene", path=str(selected)
+            )
+        scene_file = (selected.parent / route).resolve()
+        return "legacy_project", selected.parent, scene_file, route, _read_ini(scene_file)
+
+    if selected.suffix.lower() == ".scene":
+        root = _legacy_project_root(selected)
+        return (
+            "legacy_project",
+            root,
+            selected,
+            selected.relative_to(root).as_posix(),
+            _read_ini(selected),
         )
-    config = _read_ini(selected)
-    if (config.get("format", "type", fallback="") != "corona_scene_folder"
-            or config.getint("format", "version", fallback=0) != 1):
-        raise ArchiveParseError(
-            "UNSUPPORTED_ARCHIVE_VERSION", "Expected corona_scene_folder version 1", path=str(selected)
-        )
-    return selected, config
+
+    if selected.suffix.lower() == ".json":
+        try:
+            document = json.loads(selected.read_text(encoding="utf-8-sig"))
+        except (OSError, json.JSONDecodeError) as exc:
+            raise ArchiveParseError(
+                "VISION_JSON_PARSE_FAILED", f"Unable to parse Vision JSON: {exc}", path=str(selected)
+            ) from exc
+        if not isinstance(document, dict):
+            raise ArchiveParseError(
+                "VISION_JSON_STRUCTURE_INVALID",
+                "Vision JSON root must be an object",
+                path=str(selected),
+            )
+        config = configparser.ConfigParser()
+        config["scene"] = {"name": str(document.get("name") or selected.stem)}
+        config["vision"] = {"storage": "source_json", "source_path": str(selected)}
+        config["vision_document"] = {
+            "version": str(document.get("version") or "1"),
+            "encoding": "json",
+            "data": json.dumps(document, ensure_ascii=False, separators=(",", ":")),
+            "asset_root": str(selected.parent),
+        }
+        return "vision_json", selected.parent, selected, selected.name, config
+
+    raise ArchiveParseError(
+        "UNSUPPORTED_ARCHIVE_TYPE", f"Unsupported archive path: {selected}", path=str(selected)
+    )
 
 
 def _parse_actor(
@@ -78,11 +145,12 @@ def _parse_actor(
     key: str,
     project_root: Path,
     *,
+    require_project_relative: bool,
     persisted_fields: dict[str, str],
 ) -> dict[str, Any]:
     route = section.get(f"{key}.route", "").strip().replace("\\", "/")
     asset_path = (project_root / route).resolve() if route else project_root.resolve()
-    if route and not _is_relative_to(asset_path, project_root.resolve()):
+    if route and require_project_relative and not _is_relative_to(asset_path, project_root.resolve()):
         raise ArchiveParseError(
             "RESOURCE_PATH_OUTSIDE_PROJECT",
             f"Actor resource escapes the portable scene root: {route}",
@@ -154,7 +222,7 @@ def _parse_actor(
     if texture:
         optics["texture"] = texture
         texture_asset_path = (project_root / texture).resolve()
-        if not _is_relative_to(
+        if require_project_relative and not _is_relative_to(
             texture_asset_path, project_root.resolve()
         ):
             raise ArchiveParseError(
@@ -189,12 +257,13 @@ def _parse_actor(
             "INVALID_ANIMATION_SOURCES", f"Invalid animation configuration for {key}: {exc}",
             details={"actor_name": section.get(f"{key}.name", key)},
         ) from exc
-    for source in animation_sources:
-        if not _is_relative_to((project_root / source).resolve(), project_root.resolve()):
-            raise ArchiveParseError(
-                "RESOURCE_PATH_OUTSIDE_PROJECT", f"Animation source escapes the portable scene root: {source}",
-                details={"actor_name": section.get(f"{key}.name", key)},
-            )
+    if require_project_relative:
+        for source in animation_sources:
+            if not _is_relative_to((project_root / source).resolve(), project_root.resolve()):
+                raise ArchiveParseError(
+                    "RESOURCE_PATH_OUTSIDE_PROJECT", f"Animation source escapes the portable scene root: {source}",
+                    details={"actor_name": section.get(f"{key}.name", key)},
+                )
     try:
         model_node_overrides = json.loads(section.get(f"{key}.model.node_overrides", fallback="[]"))
         if not isinstance(model_node_overrides, list) or any(
@@ -343,10 +412,10 @@ def _finite_number(value: str, field: str) -> float:
 
 def _parse_archive_impl(input_path: str) -> dict[str, Any]:
     source = Path(input_path).expanduser().resolve()
-    scene_file, config = _resolve_source(source)
-    root = scene_file.parent
-    scene_route = "scene.ini"
-    scene_section = config["scene"] if config.has_section("scene") else {}
+    archive_type, root, scene_file, scene_route, config = _resolve_source(source)
+    legacy = archive_type == "legacy_project"
+    metadata_section = "base" if legacy else "scene"
+    scene_section = config[metadata_section] if config.has_section(metadata_section) else {}
     actors_section = config["actors"] if config.has_section("actors") else None
     actor_fields = _actor_fields(actors_section) if actors_section else {}
     actors = (
@@ -355,6 +424,7 @@ def _parse_archive_impl(input_path: str) -> dict[str, Any]:
                 actors_section,
                 key,
                 root,
+                require_project_relative=archive_type == "portable_scene",
                 persisted_fields=actor_fields[key],
             )
             for key in sorted(actor_fields)
@@ -438,12 +508,17 @@ def _parse_archive_impl(input_path: str) -> dict[str, Any]:
                     "resource_path": texture,
                 }
             )
-    project_name = scene_section.get("name", root.name)
+    project_name = root.name
+    if legacy:
+        project_config = _read_ini(root / "project.ini")
+        project_name = project_config.get("Project", "name", fallback=root.name)
+    else:
+        project_name = scene_section.get("name", root.name)
     return {
         "schema_version": 1,
-        "archive_type": "portable_scene",
+        "archive_type": archive_type,
         "project_root": str(root.resolve()),
-        "project": {"name": project_name},
+        "project": {"name": project_name, "legacy": legacy, "entry_scene": scene_route},
         "scene": {
             "route": scene_route,
             "name": scene_section.get("name", scene_file.stem),
@@ -490,9 +565,6 @@ def _parse_archive_impl(input_path: str) -> dict[str, Any]:
 def parse_archive(input_path: str) -> dict[str, Any]:
     """Parse an archive without creating engine or Python scene entities."""
     try:
-        if Path(input_path).suffix.lower() in {".xml", ".pbrt"}:
-            from .external_scene import parse_external_scene
-            return parse_external_scene(input_path)
         return _parse_archive_impl(input_path)
     except ArchiveParseError:
         raise

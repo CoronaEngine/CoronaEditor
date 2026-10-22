@@ -1,10 +1,10 @@
 from pathlib import Path
 
 
-EDITOR_ROOT = Path(__file__).resolve().parents[1]
-ENGINE_ROOT = EDITOR_ROOT.parent.parent
+REPO_ROOT = Path(__file__).resolve().parents[1]
 HANDLERS = (
-    ENGINE_ROOT
+    REPO_ROOT
+    / ".."
     / "src"
     / "systems"
     / "ui"
@@ -12,7 +12,7 @@ HANDLERS = (
     / "cef_editor_native_api_handlers.cpp"
 ).resolve()
 FILE_MANAGER = (
-    EDITOR_ROOT / "plugins" / "FileManager" / "main.py"
+    REPO_ROOT / "plugins" / "FileManager" / "main.py"
 )
 
 
@@ -48,5 +48,5 @@ def test_file_manager_python_is_reduced_to_public_adapter():
     assert "os.remove(" not in source
     assert "legacy_file_scene_adapter" not in source
     assert not (
-        EDITOR_ROOT / "plugins" / "FileManager" / "compat" / "legacy_file_manager.py"
+        REPO_ROOT / "plugins" / "FileManager" / "compat" / "legacy_file_manager.py"
     ).exists()

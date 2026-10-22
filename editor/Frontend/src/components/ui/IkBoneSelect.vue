@@ -188,17 +188,17 @@ onBeforeUnmount(() => close());
 
 <style scoped>
 .ik-bone-select { min-width: 0; width: 100%; }
-.bone-trigger { display: flex; align-items: center; justify-content: space-between; gap: 6px; width: 100%; min-width: 0; padding: 5px 6px; border: 1px solid rgba(179, 153, 93,.22); border-radius: 4px; background: #0c120e; color: #e8ede3; font-size: 11px; text-align: left; cursor: pointer; }
+.bone-trigger { display: flex; align-items: center; justify-content: space-between; gap: 6px; width: 100%; min-width: 0; padding: 5px 6px; border: 1px solid rgba(216,184,108,.22); border-radius: 4px; background: #0f0e0a; color: #f2ead5; font-size: 11px; text-align: left; cursor: pointer; }
 .bone-trigger span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .bone-trigger.invalid { border-color: #e2a45e; }
-.bone-trigger:focus-visible, .bone-search:focus { outline: 1px solid #b3995d; }
+.bone-trigger:focus-visible, .bone-search:focus { outline: 1px solid #d8b86c; }
 .bone-picker { margin-top: 4px; padding: 5px; border: 1px solid #6c5933; border-radius: 4px; background: #17140e; }
-.bone-search { box-sizing: border-box; width: 100%; min-width: 0; padding: 5px 6px; border: 1px solid #6c5933; border-radius: 3px; background: #0c120e; color: #e8ede3; font-size: 11px; }
-.bone-count { margin: 5px 0; color: #8d9e85; font-size: 10px; }
+.bone-search { box-sizing: border-box; width: 100%; min-width: 0; padding: 5px 6px; border: 1px solid #6c5933; border-radius: 3px; background: #0f0e0a; color: #f2ead5; font-size: 11px; }
+.bone-count { margin: 5px 0; color: #b9ad8f; font-size: 10px; }
 .bone-list { overflow-y: auto; overflow-x: hidden; overscroll-behavior: contain; scrollbar-gutter: stable; }
 .bone-spacer { position: relative; }
-.bone-option { position: absolute; left: 0; right: 0; box-sizing: border-box; display: flex; align-items: center; padding: 0 6px; color: #e8ede3; font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; }
+.bone-option { position: absolute; left: 0; right: 0; box-sizing: border-box; display: flex; align-items: center; padding: 0 6px; color: #e9dfc5; font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; }
 .bone-option.active, .bone-option:hover { background: #3c321e; }
 .bone-option.selected { color: #ffdc83; }
-.bone-empty { margin: 5px; color: #8d9e85; font-size: 11px; }
+.bone-empty { margin: 5px; color: #b9ad8f; font-size: 11px; }
 </style>

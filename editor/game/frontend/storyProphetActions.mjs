@@ -249,23 +249,18 @@ export function isLegacyRule(record) {
  * `names` maps guid → display name so the row can say 作用于：方块（放置物） instead of a guid;
  * it is optional, and a missing name falls back to the guid rather than hiding the target.
  */
-export function fragmentPanel(installedRules = [], names = {}, tuning = []) {
+export function fragmentPanel(installedRules = [], names = {}) {
   const records = Array.isArray(installedRules) ? installedRules : [];
-  const recordsFor = fragmentId => records.filter(rule => rule?.fragmentId === fragmentId);
+  const installed = new Map(records.filter(rule => rule?.fragmentId)
+    .map(rule => [rule.fragmentId, rule]));
   const owned = new Set(ownedFragmentIds());
   const nameOf = guid => (guid ? names?.[guid] || null : null);
   return FRAGMENTS.map(fragment => {
-    const installed = recordsFor(fragment.id);
-    const record = installed[0] || null;
-    const remembered = fragmentTuningOf(tuning, fragment.id);
-    const targets = [...new Set(installed.map(recordTarget).filter(Boolean))];
+    const record = installed.get(fragment.id) || null;
     const state = record ? RULE_STATE.installed
       : owned.has(fragment.id) ? RULE_STATE.owned : RULE_STATE.locked;
-    const numbers = fragmentNumbers(fragment, record || remembered);
+    const numbers = fragmentNumbers(fragment, record);
     const target = recordTarget(record);
-    const targetLabel = installed.length
-      ? (targets.length ? targets.map(guid => nameOf(guid) || guid).join('、') : '整个小世界')
-      : null;
     return {
       id: fragment.id,
       name: fragment.name,
@@ -277,12 +272,10 @@ export function fragmentPanel(installedRules = [], names = {}, tuning = []) {
       owned: state.id !== 'locked',
       amplitude: numbers.amplitude,
       periodMs: numbers.periodMs,
-      // 作用对象：guid 是身份，label 只用来显示；targets 是这块碎片当前作用的全部物体。
+      // 作用对象：null = 旧规则（整个小世界）。guid 是身份，label 只用来显示。
       target,
-      targets,
-      targetCount: targets.length,
-      targetLabel,
-      legacy: installed.some(isLegacyRule),
+      targetLabel: record ? targetLabelOf(target, nameOf(target)) : null,
+      legacy: isLegacyRule(record),
       amplitudeUnit: fragmentRuleBounds(fragment).amplitude.unit,
       periodUnit: fragmentRuleBounds(fragment).periodMs.unit,
       details: ruleDetails({ ...fragment.rule, ...numbers }),
@@ -378,79 +371,6 @@ export function toggleFragment(installedRules = [], fragmentId, { target = null,
   return { action: 'installed', fragmentId, target: guid, label: targetLabelOf(guid, label),
     rules: [...records, record],
     feedback: `已装填：${catalogue.name}${guid ? `（作用于 ${targetLabelOf(guid, label)}）` : ''}` };
-}
-
-/** 每块碎片最近一次调整过的数字；拆下后仍保留，下次装填直接沿用。 */
-export function fragmentTuningOf(tuning = [], fragmentId) {
-  const list = Array.isArray(tuning) ? tuning : [];
-  return list.find(entry => entry?.fragmentId === fragmentId) || null;
-}
-
-/** 把一条规则的数字写进「调参记忆」，同一块碎片只留最新一条。 */
-export function rememberFragmentTuning(tuning = [], fragmentId, record) {
-  const list = Array.isArray(tuning) ? tuning : [];
-  if (!record) return list;
-  const next = { fragmentId, type: record.type, axis: record.axis,
-    amplitude: record.amplitude, periodMs: record.periodMs };
-  return [...list.filter(entry => entry?.fragmentId !== fragmentId), next];
-}
-
-/**
- * 把一块碎片一次装到多个选中物体上，或从这些物体上拆下。
- *
- * 每条记录仍然是「一块碎片 × 一个目标」；多选只是在同一次操作里逐目标装/拆，最后由调用方
- * 一次性落盘。拆下时把当前数字写进 `tuning`，所以再次装填不会退回目录默认值。
- */
-export function toggleFragmentTargets(installedRules = [], fragmentId, targets = [],
-  names = {}, tuning = []) {
-  const records = Array.isArray(installedRules) ? installedRules : [];
-  const guids = [...new Set((Array.isArray(targets) ? targets : [])
-    .map(readTarget).filter(Boolean))];
-  const catalogue = findFragment(fragmentId);
-  if (!catalogue) throw new Error(`未知碎片：${String(fragmentId)}`);
-  if (!guids.length) {
-    return { rules: records, tuning, fragmentId, targetCount: 0,
-      feedback: '请先在作用对象里选择至少一个物体（可多选）' };
-  }
-  // 旧规则（没有 target）默认作用于整个世界。玩家第一次给这块碎片指定物体时，
-  // 旧规则必须退场，否则同一条碎片会同时保留「整个世界」和「指定物体」两套语义。
-  let rules = records.filter(record => !(record?.fragmentId === fragmentId
-    && recordTarget(record) === null));
-  let memory = Array.isArray(tuning) ? [...tuning] : [];
-  let installed = 0;
-  let removed = 0;
-  for (const guid of guids) {
-    const at = rules.findIndex(record => record?.fragmentId === fragmentId
-      && recordTarget(record) === guid);
-    if (at >= 0) {
-      memory = rememberFragmentTuning(memory, fragmentId, rules[at]);
-      rules = rules.filter((record, index) => index !== at);
-      removed += 1;
-      continue;
-    }
-    if (!ownedFragmentIds().includes(fragmentId) && !fragmentTuningOf(memory, fragmentId)) {
-      throw new Error(`尚未获得碎片：${catalogue.name}`);
-    }
-    const remembered = fragmentTuningOf(memory, fragmentId);
-    const source = remembered || rules.find(record => record?.fragmentId === fragmentId)
-      || catalogue.rule;
-    const record = {
-      fragmentId, type: source.type, axis: source.axis,
-      amplitude: source.amplitude, periodMs: source.periodMs, target: guid,
-    };
-    memory = rememberFragmentTuning(memory, fragmentId, record);
-    rules = [...rules, record];
-    installed += 1;
-  }
-  const total = new Set(rules.filter(record => record?.fragmentId === fragmentId)
-    .map(recordTarget).filter(Boolean)).size;
-  return {
-    rules,
-    tuning: memory,
-    fragmentId,
-    targetCount: total,
-    feedback: `已更新${catalogue.name}：本次装填 ${installed} 个、拆下 ${removed} 个，当前作用于 ${total} 个物体`,
-  };
 }
 
 /**
@@ -570,7 +490,7 @@ export function adjustFragmentRule(installedRules = [], fragmentId, actionId,
  * the adjustment steps. A fragment that is not installed is still describable (catalogue
  * defaults) so the sub-screen can explain itself instead of rendering blank.
  */
-export function fragmentAdjustPanel(installedRules = [], fragmentId, { target = null, label = null, tuning = [] } = {}) {
+export function fragmentAdjustPanel(installedRules = [], fragmentId, { target = null, label = null } = {}) {
   const guid = readTarget(target);
   const record = fragmentRuleOf(installedRules, fragmentId, { target: guid });
   const catalogue = findFragment(fragmentId);
@@ -583,12 +503,10 @@ export function fragmentAdjustPanel(installedRules = [], fragmentId, { target = 
       amplitudeLabel: '幅度 —', periodLabel: '周期 —', details: '未知碎片，无法调整',
       hint: '先装填该碎片再调整', actions: FRAGMENT_ADJUST_ACTIONS };
   }
-  const remembered = fragmentTuningOf(tuning, fragmentId);
-  const numbers = fragmentNumbers(catalogue, record || remembered);
+  const numbers = fragmentNumbers(catalogue, record);
   const unitOf = field => fragmentRuleBounds(catalogue)[field].unit;
   const axes = RULE_AXES[catalogue.rule.type] || [];
-  const axis = record && axes.includes(record.axis) ? record.axis
-    : remembered && axes.includes(remembered.axis) ? remembered.axis : catalogue.rule.axis;
+  const axis = record && axes.includes(record.axis) ? record.axis : catalogue.rule.axis;
   return {
     id: catalogue.id,
     name: catalogue.name,

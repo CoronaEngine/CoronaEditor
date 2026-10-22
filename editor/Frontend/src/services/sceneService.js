@@ -6,6 +6,7 @@ export const sceneService = {
   removeActor: (sceneName, actorName) => editorApi.sceneTools.removeActor(sceneName, actorName),
   renameActor: (sceneName, actorName, name) =>
     editorApi.sceneTools.renameActor(sceneName, actorName, name),
+  createScene: (sceneName) => editorApi.main.createScene(sceneName),
   sunDirection: (sceneName, enable, direction) =>
     editorApi.sceneTools.sunDirection(sceneName, enable, direction),
   floorGrid: (sceneName, enabled) => editorApi.sceneTools.floorGrid(sceneName, enabled),

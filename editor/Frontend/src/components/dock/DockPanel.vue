@@ -200,11 +200,9 @@ async function handlePopOut() {
   overflow: hidden;
   flex: 1;
   min-height: 0;
-  border: 1px solid rgba(179, 153, 93, 0.32);
-  background: rgba(12, 18, 14, 0.78);
-  box-shadow:
-    inset 0 0 24px rgba(0, 0, 0, 0.45),
-    0 12px 32px rgba(0, 0, 0, 0.32);
+  border: 1px solid #30281c;
+  background: rgba(17, 16, 13, 0.72);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.32);
   contain: layout style;
 }
 .dock-panel-header {
@@ -213,8 +211,8 @@ async function handlePopOut() {
   justify-content: space-between;
   min-height: 30px;
   padding: 3px 7px 3px 9px;
-  background: linear-gradient(180deg, rgba(24, 34, 26, 0.96) 0%, rgba(12, 18, 14, 0.9) 100%);
-  border-bottom: 1px solid rgba(179, 153, 93, 0.32);
+  background: linear-gradient(180deg, rgba(33, 29, 18, 0.9) 0%, rgba(21, 19, 13, 0.84) 100%);
+  border-bottom: 1px solid #4a3d1d;
   flex-shrink: 0;
   user-select: none;
 }
@@ -223,11 +221,9 @@ async function handlePopOut() {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  color: #e6d5a7;
-  font-family: var(--ce-font-display);
+  color: #f2ead5;
   font-size: 12px;
   font-weight: 600;
-  letter-spacing: 0.08em;
 }
 .dock-panel-actions {
   display: flex;
@@ -236,7 +232,7 @@ async function handlePopOut() {
 .dock-action-btn {
   background: transparent;
   border: none;
-  color: #8d9e85;
+  color: #b9ad8f;
   cursor: pointer;
   font-size: 14px;
   padding: 0 4px;
@@ -244,7 +240,7 @@ async function handlePopOut() {
   line-height: 1;
 }
 .dock-action-btn:hover {
-  background: #1d2820;
+  background: #3f3018;
   color: #fff4cd;
 }
 .dock-action-close:hover {

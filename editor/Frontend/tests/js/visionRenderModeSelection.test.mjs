@@ -62,10 +62,10 @@ function mainHost({ fail = false, pending = false, denoiseFail = false, denoiseR
   };
   const host = new Function('ref', 'computed', 'visionModes', 'editorApi', `
     const { visionRenderModes, normalizeVisionRenderMode, visionDenoiseFromCamera, visionAccumulationFromCamera, visionStablePlanesFromCamera, visionDenoiserFromCamera } = visionModes;
-    const currentSceneId = ref('scene.ini'), activeMenu = ref(null);
-    const cameraBindingState = ref({ sceneId: 'scene.ini', cameraId: 'camera-2' });
+    const tabs = ref([{ id: 'test.scene' }]), activeTab = ref(0), activeMenu = ref(null);
+    const cameraBindingState = ref({ sceneId: 'test.scene', cameraId: 'camera-2' });
     const mainRenderBackend = ref('native'), mainVisionRenderMode = ref('path_tracing');
-    const DEFAULT_SCENE_NAME = 'scene.ini';
+    const DEFAULT_SCENE_NAME = 'default.scene';
     const unwrapBridgeData = value => value?.data ?? value;
     const syncSceneCameraBinding = async () => {}, logError = () => {};
     const resetRealtimeCameraInput = () => {}, scheduleCameraViewportSync = () => {};
@@ -76,7 +76,7 @@ function mainHost({ fail = false, pending = false, denoiseFail = false, denoiseR
     let actorPickIndex, lastCameraViewportSignature;
     ${source}
     return { selectMainRenderMode, mainRenderModeOptions, mainRenderModeLabel,
-      mainRenderBackend, mainVisionRenderMode, cameraBindingState, currentSceneId, applySceneSnapshot,
+      mainRenderBackend, mainVisionRenderMode, cameraBindingState, tabs, applySceneSnapshot,
       mainVisionStablePlanes: typeof mainVisionStablePlanes === 'undefined' ? undefined : mainVisionStablePlanes,
       mainVisionStablePlanesError: typeof mainVisionStablePlanesError === 'undefined' ? undefined : mainVisionStablePlanesError,
       toggleMainVisionStablePlanes: typeof toggleMainVisionStablePlanes === 'undefined' ? undefined : toggleMainVisionStablePlanes,
@@ -95,9 +95,9 @@ test('main menu selects ReSTIR on the current camera using the Vision backend', 
   assert.equal(option.backend, 'vision');
   assert.equal(await host.selectMainRenderMode(option.value), true);
   assert.deepEqual(host.calls, [
-    ['mode', 'scene.ini', 'camera-2', 'restir'],
-    ['output', 'scene.ini', 'camera-2', 'final_color'],
-    ['backend', 'vision', 'scene.ini', 'camera-2'],
+    ['mode', 'test.scene', 'camera-2', 'restir'],
+    ['output', 'test.scene', 'camera-2', 'final_color'],
+    ['backend', 'vision', 'test.scene', 'camera-2'],
   ]);
   assert.equal(host.mainVisionRenderMode.value, 'restir');
   assert.match(host.mainRenderModeLabel.value, /ReSTIR/);
@@ -125,7 +125,7 @@ test('detached camera selects ReSTIR and stores the returned camera mode', async
   const source = declarations('../../src/views/tools/CameraView.vue', ['selectVisionRenderMode']);
   const calls = [];
   const host = new Function('ref', 'editorApi', `
-    const sceneId = 'scene.ini', cameraId = 'camera-3';
+    const sceneId = 'test.scene', cameraId = 'camera-3';
     const visionModeMenuOpen = ref(true), denoiserMenuOpen = ref(false), visionRenderMode = ref('path_tracing');
     const backend = ref('vision'), outputMode = ref('final_color'), errorText = ref('');
     const camera = ref({ vision_render_mode: 'path_tracing' });
@@ -136,14 +136,14 @@ test('detached camera selects ReSTIR and stores the returned camera mode', async
     calls.push(args); return { data: { mode: 'path_tracing', pending: true } };
   } } });
   await host.selectVisionRenderMode('restir');
-  assert.deepEqual(calls, [['scene.ini', 'camera-3', 'restir']]);
+  assert.deepEqual(calls, [['test.scene', 'camera-3', 'restir']]);
   assert.equal(host.camera.value.vision_render_mode, 'restir');
   assert.equal(host.visionRenderMode.value, 'restir');
   assert.equal(host.visionModeMenuOpen.value, false);
 });
 
 const cameraSnapshot = (fields = {}, cameraId = 'camera-2') => ({
-  scene_id: 'scene.ini', active_camera_name: cameraId,
+  scene_id: 'test.scene', active_camera_name: cameraId,
   cameras: [{ camera_id: cameraId, name: cameraId, handle: cameraId === 'camera-2' ? 2 : 3,
     render_backend: 'vision', vision_render_mode: 'path_tracing', ...fields }],
 });
@@ -161,7 +161,7 @@ function detachedHost({ fields = {}, fail = false, pending = false, accumulation
   ]);
   const host = new Function('ref', 'visionModes', 'editorApi', `
     const { normalizeVisionRenderMode, visionDenoiseFromCamera, visionAccumulationFromCamera, visionStablePlanesFromCamera, visionDenoiserFromCamera } = visionModes;
-    const sceneId = 'scene.ini', cameraId = 'camera-3', unwrap = value => value?.data ?? value;
+    const sceneId = 'test.scene', cameraId = 'camera-3', unwrap = value => value?.data ?? value;
     ${source}
     return { loadCamera, selectVisionRenderMode, camera, backend, visionRenderMode, errorText,
       visionStablePlanes: typeof visionStablePlanes === 'undefined' ? undefined : visionStablePlanes,
@@ -201,7 +201,7 @@ function detachedHost({ fields = {}, fail = false, pending = false, accumulation
 for (const [fields, type] of [[{}, 'scene'], [{ vision_denoiser: 'SVGF' }, 'svgf'], [{ vision_denoiser: 'ReBLUR' }, 'reblur'], [{ vision_denoiser: 'ReLAX' }, 'relax']]) {
   test(`both views load denoiser ${type}`, async () => {
     const main = mainHost();
-    main.applySceneSnapshot('scene.ini', cameraSnapshot(fields));
+    main.applySceneSnapshot('test.scene', cameraSnapshot(fields));
     const detached = detachedHost({ fields });
     await detached.loadCamera();
     assert.equal(main.mainVisionDenoiser.value, type);
@@ -212,14 +212,14 @@ for (const [fields, type] of [[{}, 'scene'], [{ vision_denoiser: 'SVGF' }, 'svgf
 test('denoiser selection persists over stale snapshots without enabling denoising', async () => {
   const fields = { vision_denoise: false, vision_denoiser: 'svgf' };
   const main = mainHost({ pending: true });
-  main.applySceneSnapshot('scene.ini', cameraSnapshot(fields));
+  main.applySceneSnapshot('test.scene', cameraSnapshot(fields));
   const detached = detachedHost({ fields, pending: true });
   await detached.loadCamera();
   assert.equal(await main.selectMainVisionDenoiser('reblur'), true);
   assert.equal(await detached.selectVisionDenoiser('reblur'), true);
-  assert.deepEqual(main.calls, [['denoiser', 'scene.ini', 'camera-2', 'reblur']]);
-  assert.deepEqual(detached.calls, [['denoiser', 'scene.ini', 'camera-3', 'reblur']]);
-  main.applySceneSnapshot('scene.ini', cameraSnapshot(fields));
+  assert.deepEqual(main.calls, [['denoiser', 'test.scene', 'camera-2', 'reblur']]);
+  assert.deepEqual(detached.calls, [['denoiser', 'test.scene', 'camera-3', 'reblur']]);
+  main.applySceneSnapshot('test.scene', cameraSnapshot(fields));
   await detached.loadCamera();
   assert.equal(main.mainVisionDenoiser.value, 'reblur');
   assert.equal(detached.visionDenoiser.value, 'reblur');
@@ -228,10 +228,10 @@ test('denoiser selection persists over stale snapshots without enabling denoisin
   assert.equal(main.mainVisionDenoise.value, false);
   assert.equal(detached.visionDenoise.value, false);
   fields.vision_denoiser = 'reblur';
-  main.applySceneSnapshot('scene.ini', cameraSnapshot(fields));
+  main.applySceneSnapshot('test.scene', cameraSnapshot(fields));
   await detached.loadCamera();
   fields.vision_denoiser = 'scene';
-  main.applySceneSnapshot('scene.ini', cameraSnapshot(fields));
+  main.applySceneSnapshot('test.scene', cameraSnapshot(fields));
   await detached.loadCamera();
   assert.equal(main.mainVisionDenoiser.value, 'scene');
   assert.equal(detached.visionDenoiser.value, 'scene');
@@ -240,7 +240,7 @@ test('denoiser selection persists over stale snapshots without enabling denoisin
 test('failed denoiser changes restore both views and report the error', async () => {
   const fields = { vision_denoiser: 'svgf', vision_denoise: true };
   const main = mainHost({ denoiserFail: true });
-  main.applySceneSnapshot('scene.ini', cameraSnapshot(fields));
+  main.applySceneSnapshot('test.scene', cameraSnapshot(fields));
   const detached = detachedHost({ fields, denoiserFail: true });
   await detached.loadCamera();
   assert.equal(await main.selectMainVisionDenoiser('reblur'), false);
@@ -256,7 +256,7 @@ test('failed denoiser changes restore both views and report the error', async ()
 for (const fields of [{ render_backend: 'native' }, { vision_render_mode: 'ssat' }]) {
   test(`denoiser changes are disabled for ${JSON.stringify(fields)}`, async () => {
     const main = mainHost();
-    main.applySceneSnapshot('scene.ini', cameraSnapshot(fields));
+    main.applySceneSnapshot('test.scene', cameraSnapshot(fields));
     const detached = detachedHost({ fields });
     await detached.loadCamera();
     assert.equal(await main.selectMainVisionDenoiser('reblur'), false);
@@ -270,10 +270,10 @@ for (const fail of [false, true]) {
   test(`late denoiser ${fail ? 'error' : 'response'} preserves the newly bound camera`, async () => {
     let resolve, reject;
     const main = mainHost({ denoiserReply: () => new Promise((yes, no) => { resolve = yes; reject = no; }) });
-    main.applySceneSnapshot('scene.ini', cameraSnapshot());
+    main.applySceneSnapshot('test.scene', cameraSnapshot());
     const request = main.selectMainVisionDenoiser('reblur');
     assert.equal(await main.selectMainVisionDenoiser('svgf'), false);
-    main.applySceneSnapshot('scene.ini', cameraSnapshot({ vision_denoiser: 'svgf' }, 'camera-3'));
+    main.applySceneSnapshot('test.scene', cameraSnapshot({ vision_denoiser: 'svgf' }, 'camera-3'));
     if (fail) reject(new Error('old camera error'));
     else resolve({ type: 'reblur', pending: true });
     assert.equal(await request, !fail);
@@ -302,7 +302,7 @@ for (const [name, fields, mode, enabled] of [
 ]) {
   test(`main and detached cameras read ${name}`, async () => {
     const main = mainHost();
-    main.applySceneSnapshot('scene.ini', cameraSnapshot(fields));
+    main.applySceneSnapshot('test.scene', cameraSnapshot(fields));
     const detached = detachedHost({ fields });
     await detached.loadCamera();
     assert.equal(main.mainVisionRenderMode.value, mode);
@@ -314,14 +314,14 @@ for (const [name, fields, mode, enabled] of [
 
 test('main denoise toggles the bound camera and survives queued snapshots and algorithm changes', async () => {
   const host = mainHost({ pending: true });
-  host.applySceneSnapshot('scene.ini', cameraSnapshot());
-  host.currentSceneId.value = 'stale-project/scene.ini';
+  host.applySceneSnapshot('test.scene', cameraSnapshot());
+  host.tabs.value = [{ id: 'stale-tab.scene' }];
   assert.equal(typeof host.toggleMainVisionDenoise, 'function');
   assert.equal(await host.toggleMainVisionDenoise(), true);
-  assert.deepEqual(host.calls, [['denoise', 'scene.ini', 'camera-2', true]]);
+  assert.deepEqual(host.calls, [['denoise', 'test.scene', 'camera-2', true]]);
   assert.equal(host.mainVisionDenoise.value, true);
   assert.equal(host.currentMainCamera.value.vision_denoise, true);
-  host.applySceneSnapshot('scene.ini', cameraSnapshot({ vision_denoise: false }));
+  host.applySceneSnapshot('test.scene', cameraSnapshot({ vision_denoise: false }));
   assert.equal(host.mainVisionDenoise.value, true);
   for (const mode of ['restir', 'path_tracing', 'ssat']) {
     await host.selectMainRenderMode(mode);
@@ -329,14 +329,14 @@ test('main denoise toggles the bound camera and survives queued snapshots and al
   }
   assert.equal(await host.toggleMainVisionDenoise(), false);
   assert.equal(host.calls.filter(call => call[0] === 'denoise').length, 1);
-  host.applySceneSnapshot('scene.ini', cameraSnapshot({ vision_render_mode: 'restir', vision_denoise: false }, 'camera-3'));
+  host.applySceneSnapshot('test.scene', cameraSnapshot({ vision_render_mode: 'restir', vision_denoise: false }, 'camera-3'));
   assert.equal(host.mainVisionRenderMode.value, 'restir');
   assert.equal(host.mainVisionDenoise.value, false);
 });
 
 test('main denoise failure restores its snapshot and displays the error', async () => {
   const host = mainHost({ denoiseFail: true });
-  host.applySceneSnapshot('scene.ini', cameraSnapshot({ vision_denoise: false }));
+  host.applySceneSnapshot('test.scene', cameraSnapshot({ vision_denoise: false }));
   assert.equal(typeof host.toggleMainVisionDenoise, 'function');
   assert.equal(await host.toggleMainVisionDenoise(), false);
   assert.equal(host.mainVisionDenoise.value, false);
@@ -346,7 +346,7 @@ test('main denoise failure restores its snapshot and displays the error', async 
 
 test('native cameras cannot implicitly enable Vision by toggling denoise', async () => {
   const main = mainHost();
-  main.applySceneSnapshot('scene.ini', cameraSnapshot({ render_backend: 'native' }));
+  main.applySceneSnapshot('test.scene', cameraSnapshot({ render_backend: 'native' }));
   const detached = detachedHost({ fields: { render_backend: 'native' } });
   await detached.loadCamera();
   assert.equal(typeof main.toggleMainVisionDenoise, 'function');
@@ -364,7 +364,7 @@ test('detached denoise is retained across PT, ReSTIR and SSAT and accepts queued
   await host.loadCamera();
   assert.equal(typeof host.toggleVisionDenoise, 'function');
   assert.equal(await host.toggleVisionDenoise(), true);
-  assert.deepEqual(host.calls[0], ['denoise', 'scene.ini', 'camera-3', true]);
+  assert.deepEqual(host.calls[0], ['denoise', 'test.scene', 'camera-3', true]);
   assert.equal(host.visionDenoise.value, true);
   assert.equal(host.camera.value.vision_denoise, true);
   for (const mode of ['restir', 'path_tracing', 'ssat']) {
@@ -389,7 +389,7 @@ test('detached denoise failure restores the old value and reports the error', as
 test('progressive PT allows SVGF on and off in both viewports', async () => {
   const fields = { vision_render_mode: 'progressive_path_tracing' };
   const main = mainHost();
-  main.applySceneSnapshot('scene.ini', cameraSnapshot(fields));
+  main.applySceneSnapshot('test.scene', cameraSnapshot(fields));
   const detached = detachedHost({ fields });
   await detached.loadCamera();
   for (const enabled of [true, false]) {
@@ -403,11 +403,11 @@ test('progressive PT allows SVGF on and off in both viewports', async () => {
 test('a late main denoise response cannot modify the newly bound camera', async () => {
   let reply;
   const host = mainHost({ denoiseReply: () => new Promise(resolve => { reply = resolve; }) });
-  host.applySceneSnapshot('scene.ini', cameraSnapshot());
+  host.applySceneSnapshot('test.scene', cameraSnapshot());
   const request = host.toggleMainVisionDenoise();
   assert.equal(host.mainVisionDenoise.value, true);
   assert.equal(await host.toggleMainVisionDenoise(), false);
-  host.applySceneSnapshot('scene.ini', cameraSnapshot({ vision_denoise: false }, 'camera-3'));
+  host.applySceneSnapshot('test.scene', cameraSnapshot({ vision_denoise: false }, 'camera-3'));
   reply({ enabled: true, pending: true });
   assert.equal(await request, true);
   assert.equal(host.mainVisionDenoise.value, false);
@@ -427,7 +427,7 @@ for (const [name, fields, mode, enabled] of [
 ]) {
   test(`main and detached cameras read accumulation: ${name}`, async () => {
     const main = mainHost();
-    main.applySceneSnapshot('scene.ini', cameraSnapshot(fields));
+    main.applySceneSnapshot('test.scene', cameraSnapshot(fields));
     const detached = detachedHost({ fields });
     await detached.loadCamera();
     assert.equal(main.mainVisionRenderMode.value, mode);
@@ -441,8 +441,8 @@ for (const [name, fields, mode, enabled] of [
 
 test('both viewports independently toggle accumulation and SVGF in PT and ReSTIR', async () => {
   const main = mainHost({ pending: true });
-  main.applySceneSnapshot('scene.ini', cameraSnapshot());
-  main.currentSceneId.value = 'stale-project/scene.ini';
+  main.applySceneSnapshot('test.scene', cameraSnapshot());
+  main.tabs.value = [{ id: 'stale-tab.scene' }];
   const detached = detachedHost({ pending: true });
   await detached.loadCamera();
   assert.equal(typeof main.toggleMainVisionAccumulation, 'function');
@@ -468,21 +468,21 @@ test('both viewports independently toggle accumulation and SVGF in PT and ReSTIR
     await detached.toggleVisionDenoise();
   }
   assert.deepEqual(main.calls.filter(call => call[0] === 'accumulation'), [
-    ['accumulation', 'scene.ini', 'camera-2', true], ['accumulation', 'scene.ini', 'camera-2', false],
-    ['accumulation', 'scene.ini', 'camera-2', true], ['accumulation', 'scene.ini', 'camera-2', false],
+    ['accumulation', 'test.scene', 'camera-2', true], ['accumulation', 'test.scene', 'camera-2', false],
+    ['accumulation', 'test.scene', 'camera-2', true], ['accumulation', 'test.scene', 'camera-2', false],
   ]);
   assert.deepEqual(detached.calls.filter(call => call[0] === 'accumulation'), [
-    ['accumulation', 'scene.ini', 'camera-3', true], ['accumulation', 'scene.ini', 'camera-3', false],
-    ['accumulation', 'scene.ini', 'camera-3', true], ['accumulation', 'scene.ini', 'camera-3', false],
+    ['accumulation', 'test.scene', 'camera-3', true], ['accumulation', 'test.scene', 'camera-3', false],
+    ['accumulation', 'test.scene', 'camera-3', true], ['accumulation', 'test.scene', 'camera-3', false],
   ]);
 });
 
 test('main accumulation survives queued snapshots, mode changes and preserves camera scope', async () => {
   const host = mainHost({ pending: true });
-  host.applySceneSnapshot('scene.ini', cameraSnapshot({ vision_denoise: true }));
+  host.applySceneSnapshot('test.scene', cameraSnapshot({ vision_denoise: true }));
   assert.equal(typeof host.toggleMainVisionAccumulation, 'function');
   await host.toggleMainVisionAccumulation();
-  host.applySceneSnapshot('scene.ini', cameraSnapshot({ vision_accumulation: false, vision_denoise: true }));
+  host.applySceneSnapshot('test.scene', cameraSnapshot({ vision_accumulation: false, vision_denoise: true }));
   assert.equal(host.mainVisionAccumulation.value, true);
   for (const mode of ['restir', 'path_tracing', 'ssat', 'native']) {
     await host.selectMainRenderMode(mode);
@@ -490,7 +490,7 @@ test('main accumulation survives queued snapshots, mode changes and preserves ca
     assert.equal(host.mainVisionDenoise.value, true);
     if (mode === 'ssat' || mode === 'native') assert.equal(await host.toggleMainVisionAccumulation(), false);
   }
-  host.applySceneSnapshot('scene.ini', cameraSnapshot({ vision_render_mode: 'restir', vision_accumulation: false }, 'camera-3'));
+  host.applySceneSnapshot('test.scene', cameraSnapshot({ vision_render_mode: 'restir', vision_accumulation: false }, 'camera-3'));
   assert.equal(host.mainVisionAccumulation.value, false);
   assert.equal(host.mainVisionDenoise.value, false);
 });
@@ -499,7 +499,7 @@ for (const fields of [{ render_backend: 'native' }, { vision_render_mode: 'ssat'
   test(`both toggles are disabled but preserved for ${fields.render_backend || fields.vision_render_mode}`, async () => {
     const settings = { ...fields, vision_accumulation: true, vision_denoise: true };
     const main = mainHost();
-    main.applySceneSnapshot('scene.ini', cameraSnapshot(settings));
+    main.applySceneSnapshot('test.scene', cameraSnapshot(settings));
     const detached = detachedHost({ fields: settings });
     await detached.loadCamera();
     assert.equal(typeof main.toggleMainVisionAccumulation, 'function');
@@ -520,7 +520,7 @@ for (const fields of [{ render_backend: 'native' }, { vision_render_mode: 'ssat'
 test('failed accumulation changes restore each camera value and show the error', async () => {
   const fields = { vision_accumulation: true, vision_denoise: true };
   const main = mainHost({ accumulationFail: true });
-  main.applySceneSnapshot('scene.ini', cameraSnapshot(fields));
+  main.applySceneSnapshot('test.scene', cameraSnapshot(fields));
   const detached = detachedHost({ fields, accumulationFail: true });
   await detached.loadCamera();
   assert.equal(typeof main.toggleMainVisionAccumulation, 'function');
@@ -538,12 +538,12 @@ test('failed accumulation changes restore each camera value and show the error',
 test('a late accumulation response cannot modify the newly bound camera', async () => {
   let reply;
   const host = mainHost({ accumulationReply: () => new Promise(resolve => { reply = resolve; }) });
-  host.applySceneSnapshot('scene.ini', cameraSnapshot());
+  host.applySceneSnapshot('test.scene', cameraSnapshot());
   assert.equal(typeof host.toggleMainVisionAccumulation, 'function');
   const request = host.toggleMainVisionAccumulation();
   assert.equal(host.mainVisionAccumulation.value, true);
   assert.equal(await host.toggleMainVisionAccumulation(), false);
-  host.applySceneSnapshot('scene.ini', cameraSnapshot({ vision_accumulation: false }, 'camera-3'));
+  host.applySceneSnapshot('test.scene', cameraSnapshot({ vision_accumulation: false }, 'camera-3'));
   reply({ enabled: true, pending: true });
   assert.equal(await request, true);
   assert.equal(host.mainVisionAccumulation.value, false);
@@ -557,7 +557,7 @@ for (const [fields, enabled] of [
 ]) {
   test(`both views load stable planes ${JSON.stringify(fields)}`, async () => {
     const main = mainHost();
-    main.applySceneSnapshot('scene.ini', cameraSnapshot(fields));
+    main.applySceneSnapshot('test.scene', cameraSnapshot(fields));
     const detached = detachedHost({ fields });
     await detached.loadCamera();
     assert.equal(main.mainVisionStablePlanes?.value, enabled);
@@ -570,17 +570,17 @@ for (const [fields, enabled] of [
 test('stable planes toggle per camera and retain pending selections over stale snapshots', async () => {
   const fields = { vision_render_mode: 'restir' };
   const main = mainHost({ pending: true });
-  main.applySceneSnapshot('scene.ini', cameraSnapshot(fields));
-  main.currentSceneId.value = 'stale-project/scene.ini';
+  main.applySceneSnapshot('test.scene', cameraSnapshot(fields));
+  main.tabs.value = [{ id: 'stale-tab.scene' }];
   const detached = detachedHost({ fields, pending: true });
   await detached.loadCamera();
   assert.equal(typeof main.toggleMainVisionStablePlanes, 'function');
   assert.equal(typeof detached.toggleVisionStablePlanes, 'function');
   assert.equal(await main.toggleMainVisionStablePlanes(), true);
   assert.equal(await detached.toggleVisionStablePlanes(), true);
-  assert.deepEqual(main.calls, [['stablePlanes', 'scene.ini', 'camera-2', false]]);
-  assert.deepEqual(detached.calls, [['stablePlanes', 'scene.ini', 'camera-3', false]]);
-  main.applySceneSnapshot('scene.ini', cameraSnapshot(fields));
+  assert.deepEqual(main.calls, [['stablePlanes', 'test.scene', 'camera-2', false]]);
+  assert.deepEqual(detached.calls, [['stablePlanes', 'test.scene', 'camera-3', false]]);
+  main.applySceneSnapshot('test.scene', cameraSnapshot(fields));
   await detached.loadCamera();
   assert.equal(main.mainVisionStablePlanes.value, false);
   assert.equal(detached.visionStablePlanes.value, false);
@@ -588,8 +588,8 @@ test('stable planes toggle per camera and retain pending selections over stale s
   assert.equal(detached.camera.value.vision_stable_planes, false);
   assert.equal(main.mainVisionAccumulation.value, false);
   assert.equal(main.mainVisionDenoise.value, false);
-  main.applySceneSnapshot('scene.ini', cameraSnapshot({ ...fields, vision_stable_planes: false }));
-  main.applySceneSnapshot('scene.ini', cameraSnapshot({ ...fields, vision_stable_planes: true }));
+  main.applySceneSnapshot('test.scene', cameraSnapshot({ ...fields, vision_stable_planes: false }));
+  main.applySceneSnapshot('test.scene', cameraSnapshot({ ...fields, vision_stable_planes: true }));
   assert.equal(main.mainVisionStablePlanes.value, true);
 });
 
@@ -597,7 +597,7 @@ for (const fields of [{ render_backend: 'native', vision_render_mode: 'restir' }
   { vision_render_mode: 'path_tracing' }, { vision_render_mode: 'ssat' }]) {
   test(`stable planes stay disabled in ${JSON.stringify(fields)}`, async () => {
     const main = mainHost();
-    main.applySceneSnapshot('scene.ini', cameraSnapshot(fields));
+    main.applySceneSnapshot('test.scene', cameraSnapshot(fields));
     const detached = detachedHost({ fields });
     await detached.loadCamera();
     assert.equal(typeof main.toggleMainVisionStablePlanes, 'function');
@@ -614,7 +614,7 @@ for (const fields of [{ render_backend: 'native', vision_render_mode: 'restir' }
 test('stable planes reject missing cameras and restore failed changes with visible errors', async () => {
   const fields = { vision_render_mode: 'restir' };
   const main = mainHost({ stablePlanesFail: true });
-  main.applySceneSnapshot('scene.ini', cameraSnapshot(fields));
+  main.applySceneSnapshot('test.scene', cameraSnapshot(fields));
   const detached = detachedHost({ fields, stablePlanesFail: true });
   await detached.loadCamera();
   assert.equal(typeof main.toggleMainVisionStablePlanes, 'function');
@@ -625,7 +625,7 @@ test('stable planes reject missing cameras and restore failed changes with visib
   assert.equal(detached.camera.value.vision_stable_planes, true);
   assert.match(main.mainVisionStablePlanesError.value, /stable planes unavailable/);
   assert.match(detached.errorText.value, /stable planes unavailable/);
-  main.applySceneSnapshot('scene.ini', null);
+  main.applySceneSnapshot('test.scene', null);
   detached.camera.value = null;
   assert.equal(await main.toggleMainVisionStablePlanes(), false);
   assert.equal(await detached.toggleVisionStablePlanes(), false);
@@ -637,12 +637,12 @@ for (const fail of [false, true]) {
   test(`late stable planes ${fail ? 'error' : 'response'} cannot overwrite a different camera`, async () => {
     let resolve, reject;
     const main = mainHost({ stablePlanesReply: () => new Promise((yes, no) => { resolve = yes; reject = no; }) });
-    main.applySceneSnapshot('scene.ini', cameraSnapshot({ vision_render_mode: 'restir' }));
+    main.applySceneSnapshot('test.scene', cameraSnapshot({ vision_render_mode: 'restir' }));
     assert.equal(typeof main.toggleMainVisionStablePlanes, 'function');
     const request = main.toggleMainVisionStablePlanes();
     assert.equal(main.mainVisionStablePlanes.value, false);
     assert.equal(await main.toggleMainVisionStablePlanes(), false);
-    main.applySceneSnapshot('scene.ini', cameraSnapshot({ vision_render_mode: 'restir' }, 'camera-3'));
+    main.applySceneSnapshot('test.scene', cameraSnapshot({ vision_render_mode: 'restir' }, 'camera-3'));
     if (fail) reject(new Error('old camera error'));
     else resolve({ enabled: false, pending: true });
     assert.equal(await request, !fail);

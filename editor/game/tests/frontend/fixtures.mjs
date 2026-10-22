@@ -14,12 +14,16 @@ export function actorFixture(character = STORY_CHARACTERS[0]) {
   // this marker explicitly, which is what `a legacy boss is replaced...` does.
   const marker = character.role === 'player' ? PLAYER_MODEL_REF
     : character.role === 'prophet' ? PROPHET_MODEL_REF
-      : character.role === 'boss' ? BOSS_MODEL_REF : null;
+    : character.role === 'boss' ? BOSS_MODEL_REF : (character.model_ref || null);
   // A stable positive handle derived from the guid, never the table index: a character a
   // test builds by hand is not in the table (`indexOf` answers -1), and `loaded()` in
   // storyActors.mjs only trusts a positive handle.
   const handle = 100 + [...character.guid].reduce((sum, ch) => sum + ch.charCodeAt(0), 0) % 900;
-  return { ...(marker ? { model_ref: marker } : {}), name: character.name, actor_guid: character.guid, handle,
+  // 引擎把动作源写在 actor 上（animation_sources）。夹具也照做，否则 storyActors 会把每只怪物
+  // 都当成「没有动作源的老存档」而反复重建。
+  const sources = character.animation_sources || [];
+  return { ...(marker ? { model_ref: marker } : {}), animation_sources: [...sources],
+    name: character.name, actor_guid: character.guid, handle,
     load_status: 'loaded', render_ready: true, gpu_build_state: 'Ready',
     local_aabb, geometry: characterTransform(character, local_aabb),
     mechanics: { physics_enabled: false }, visible: true, follow_camera: false, camera_lock: { enabled: false } };
@@ -35,7 +39,7 @@ export function apiFixture({ actors = [], wrapped = true } = {}) {
   const get = guid => state.actors.find(a => a.actor_guid === guid);
   const mutate = (op, guid, fn) => { calls.push([op, guid]); const actor = get(guid); fn(actor); return wrap({ status: 'success', actor: structuredClone(actor) }); };
   const api = {
-    main: { onInit: async () => wrap({ scene: { path: 'scene.ini' } }) },
+    main: { onInit: async () => wrap({ scenes: [{ path: 'scene.ini' }] }) },
     scene: {
       getSnapshot: async () => wrap(structuredClone(state)),
       setActorTransform: async (scene, guid, transform) => mutate('transform', guid, a => {

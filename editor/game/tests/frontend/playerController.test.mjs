@@ -21,14 +21,16 @@ export function controlFixture(options = {}) {
 const key = code => ({ code, preventDefault() {} });
 const near = (a,b) => assert.ok(Math.abs(a-b) < 1e-8, `${a} != ${b}`);
 const length = value => Math.hypot(...value);
+// 一步位移由速度推导：测试断言的是「一次 maxDelta 帧走了多少」，不该写死具体米数。
+const STEP_DISTANCE = PLAYER_CONTROLS.speed * PLAYER_CONTROLS.maxDelta;
 test('third-person starts behind player and movement/facing is camera relative', () => {
   const f = controlFixture();
   assert.ok(f.pose.position[2] < 0); assert.ok(f.pose.position[1] > f.actor.geometry.position[1]);
   f.controller.keyDown(key('KeyW')); f.step(50);
-  const p = f.controller.snapshotPlayer(); near(p.position[2], 0.15); near(p.rotation[1], PLAYER_MODEL_YAW_OFFSET); near(p.facingYaw, 0); assert.equal(p.grounded, true);
+  const p = f.controller.snapshotPlayer(); near(p.position[2], STEP_DISTANCE); near(p.rotation[1], PLAYER_MODEL_YAW_OFFSET); near(p.facingYaw, 0); assert.equal(p.grounded, true);
   near(p.position[1], f.actor.geometry.position[1]);
   assert.equal(f.calls.filter(c => c[0] === 'actor').length, 2);
-  near(f.pose.position[2], 0.15 - Math.cos(PLAYER_CONTROLS.pitch) * 4.5);
+  near(f.pose.position[2], STEP_DISTANCE - Math.cos(PLAYER_CONTROLS.pitch) * 4.5);
   f.controller.dispose(); assert.equal(f.frames.size, 0);
 });
 test('releasing the last movement key reports idle, which is what stops the walk clip', () => {
@@ -43,7 +45,7 @@ test('releasing the last movement key reports idle, which is what stops the walk
 
 test('diagonal movement is normalized and a stalled frame does not teleport', () => {
   const f = controlFixture(); f.controller.keyDown(key('KeyW')); f.controller.keyDown(key('KeyD'));
-  f.step(5000); const p = f.controller.snapshotPlayer(); near(Math.hypot(p.position[0],p.position[2]), 0.15);
+  f.step(5000); const p = f.controller.snapshotPlayer(); near(Math.hypot(p.position[0],p.position[2]), STEP_DISTANCE);
   near(p.rotation[1], PLAYER_MODEL_YAW_OFFSET + Math.PI/4); near(p.facingYaw, Math.PI/4); f.controller.dispose();
 });
 test('right drag rotates the camera, clamps pitch, and determines WASD direction', () => {
@@ -53,7 +55,7 @@ test('right drag rotates the camera, clamps pitch, and determines WASD direction
   f.controller.pointerMove({ pointerId: 1, buttons: 2, clientX: Math.PI / 2 / 0.005, clientY: 10000 });
   f.step(16); near(f.pose.forward[1], -Math.sin(PLAYER_CONTROLS.maxPitch));
   f.controller.pointerUp({ pointerId: 1 }); f.controller.keyDown(key('KeyW')); f.step(50);
-  const p = f.controller.snapshotPlayer(); near(p.position[0],0.15); near(p.position[2],0);
+  const p = f.controller.snapshotPlayer(); near(p.position[0],STEP_DISTANCE); near(p.position[2],0);
   f.controller.dispose();
 });
 test('wheel distance clamps without moving the actor', () => {
@@ -89,7 +91,7 @@ test('movement uses no persistent API; save after disposal persists only final p
   await saver.save(); assert.equal(api.calls.length,0);
   f.controller.keyDown(key('KeyD')); f.step(50); f.controller.dispose();
   assert.equal(api.calls.length,0); await saver.save(); await saver.save();
-  assert.equal(api.calls.length,1); near(api.state.actors[0].geometry.position[0],0.15);
+  assert.equal(api.calls.length,1); near(api.state.actors[0].geometry.position[0],STEP_DISTANCE);
 });
 test('failed save remains dirty; concurrent save calls share an in-flight write', async () => {
   const f=controlFixture(); f.controller.keyDown(key('KeyW')); f.step(50);
@@ -106,14 +108,14 @@ test('a partially accepted movement frame remains saveable when rotation fails',
   const f = controlFixture();
   f.bridge.actorTransform = (_handle, operation) => operation === 0;
   f.controller.keyDown(key('KeyD')); f.step(50);
-  near(f.controller.snapshotPlayer().position[0], 0.15);
+  near(f.controller.snapshotPlayer().position[0], STEP_DISTANCE);
   assert.equal(f.controller.snapshotPlayer().version, 1);
   assert.equal(f.frames.size, 0); assert.equal(f.errors.length, 1);
   const writes = [];
   const saver = createPlayerSave({ api: { scene: { setActorTransform: async (...args) => {
     writes.push(args); return { status: 'success' };
   } } }, sceneId: 'old.ini', readPlayer: f.controller.snapshotPlayer, stopInput: f.controller.resetInput });
-  await saver.save(); near(writes[0][2].position[0], 0.15);
+  await saver.save(); near(writes[0][2].position[0], STEP_DISTANCE);
 });
 
 test('mouse turns without buttons; first sample and reset never jump', () => {

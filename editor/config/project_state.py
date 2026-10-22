@@ -53,16 +53,16 @@ class CoronaSettings:
     @staticmethod
     def _project_config_path(project_path):
         scene_ini = os.path.join(project_path, "scene.ini")
-        try:
-            if os.path.isfile(scene_ini):
-                config = configparser.ConfigParser()
-                config.read(scene_ini, encoding="utf-8-sig")
-                if (config.get("format", "type", fallback="") == "corona_scene_folder"
-                        and config.get("format", "version", fallback="") == "1"):
-                    return scene_ini
-        except (OSError, UnicodeError, configparser.Error) as exc:
-            logger.error("Unable to read scene.ini: %s", exc)
-        return ""
+        if os.path.isfile(scene_ini):
+            config = configparser.ConfigParser()
+            config.read(scene_ini, encoding="utf-8")
+            if (
+                config.get("format", "type", fallback="") == "corona_scene_folder"
+                and config.getint("format", "version", fallback=0) == 1
+            ):
+                return scene_ini
+        project_ini = os.path.join(project_path, "project.ini")
+        return project_ini if os.path.isfile(project_ini) else ""
 
     def _ensure_file_exists(self):
         if not os.path.exists(self.config_path):
@@ -167,7 +167,8 @@ class CoronaSettings:
                 try:
                     proj_cfg = configparser.ConfigParser()
                     proj_cfg.read(ini_path, encoding="utf-8")
-                    section = "scene"
+                    portable = os.path.basename(ini_path).lower() == "scene.ini"
+                    section = "scene" if portable else "Project"
                     project_name = proj_cfg.get(section, "name", fallback=project_name)
                     last_edited = proj_cfg.get(section, "last_opened", fallback="")
                 except Exception as exc:
@@ -185,6 +186,7 @@ class CoronaSettings:
                         "name": project_name,
                         "path": raw_path,
                         "if_exists": True,
+                        "legacy": not portable,
                         "last_edited": last_edited,
                     }
                 )
@@ -194,6 +196,7 @@ class CoronaSettings:
                         "name": project_name,
                         "path": raw_path,
                         "if_exists": False,
+                        "legacy": False,
                         "last_edited": "-",
                     }
                 )
@@ -236,7 +239,7 @@ class CoronaSettings:
 
         ini_path = self._project_config_path(project_path)
         if not ini_path:
-            logger.error("No valid scene.ini found in %s", project_path)
+            logger.error("No project.ini or portable scene.ini found in %s", project_path)
             return False
 
         try:
@@ -278,9 +281,13 @@ class CoronaSettings:
         if not ini_path:
             logger.error("活动存档配置文件不存在")
             return False
-        self.config.set("General", "last_project", self.active_project_path)
-        self.save()
-        return True
+        portable = os.path.basename(ini_path).lower() == "scene.ini"
+        if portable:
+            self.config.set("General", "last_project", self.active_project_path)
+            self.save()
+            return True
+        logger.warning("Legacy projects are read-only; migrate before saving project metadata")
+        return False
 
 
 settings_manager = CoronaSettings()

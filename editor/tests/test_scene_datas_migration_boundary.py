@@ -2,7 +2,6 @@ from pathlib import Path
 
 
 EDITOR_ROOT = Path(__file__).resolve().parents[1]
-ENGINE_ROOT = EDITOR_ROOT.parent.parent
 
 
 def test_scene_datas_compatibility_plugin_is_removed_after_object_panel_migration():
@@ -41,7 +40,8 @@ def test_object_panel_uses_a_vue_identity_separate_from_legacy_scene_datas_servi
 
 def test_scene_datas_cpp_compatibility_module_is_removed_after_native_facade_migration():
     api_source = (
-        ENGINE_ROOT
+        EDITOR_ROOT
+        / ".."
         / "src"
         / "systems"
         / "ui"
@@ -49,7 +49,8 @@ def test_scene_datas_cpp_compatibility_module_is_removed_after_native_facade_mig
         / "cef_editor_api.cpp"
     ).read_text(encoding="utf-8")
     handler_source = (
-        ENGINE_ROOT
+        EDITOR_ROOT
+        / ".."
         / "src"
         / "systems"
         / "ui"
@@ -57,7 +58,8 @@ def test_scene_datas_cpp_compatibility_module_is_removed_after_native_facade_mig
         / "cef_editor_native_api_handlers.cpp"
     ).read_text(encoding="utf-8")
     registry_source = (
-        ENGINE_ROOT
+        EDITOR_ROOT
+        / ".."
         / "src"
         / "systems"
         / "ui"

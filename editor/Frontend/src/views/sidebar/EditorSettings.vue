@@ -592,8 +592,8 @@ function goHome() {
 
 .viewport-mode-option.active {
   color: #f4f7ef;
-  background: rgba(179, 153, 93, 0.32);
-  box-shadow: inset 0 0 0 1px rgba(179, 153, 93, 0.35);
+  background: rgba(216, 184, 108, 0.32);
+  box-shadow: inset 0 0 0 1px rgba(216, 184, 108, 0.35);
 }
 
 .viewport-mode-option:disabled {
@@ -684,8 +684,8 @@ function goHome() {
 
 .locale-option.active {
   color: #f4f7ef;
-  background: rgba(179, 153, 93, 0.32);
-  box-shadow: inset 0 0 0 1px rgba(179, 153, 93, 0.35);
+  background: rgba(216, 184, 108, 0.32);
+  box-shadow: inset 0 0 0 1px rgba(216, 184, 108, 0.35);
 }
 
 .button-grid {

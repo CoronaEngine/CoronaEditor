@@ -581,13 +581,11 @@ onBeforeUnmount(() => {
 <style scoped>
 .cabbage-chat-shell {
   z-index: 2147483200;
-  color: #e8ede3;
-  background: linear-gradient(180deg, rgba(18, 26, 20, 0.98), rgba(10, 15, 12, 0.96));
-  border: 1px solid rgba(179, 153, 93, 0.35);
-  border-radius: 4px;
-  box-shadow:
-    inset 0 0 24px rgba(0, 0, 0, 0.45),
-    0 18px 42px rgba(0, 0, 0, 0.34);
+  color: #f2ead5;
+  background: linear-gradient(180deg, rgba(21, 19, 13, 0.98), rgba(17, 16, 13, 0.96));
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  box-shadow: 0 18px 42px rgba(0, 0, 0, 0.34);
 }
 
 .cabbage-chat-shell.resident {
@@ -601,13 +599,11 @@ onBeforeUnmount(() => {
   justify-content: space-between;
   gap: 8px;
   padding: 0 7px 0 12px;
-  border-bottom: 1px solid rgba(179, 153, 93, 0.3);
-  background: linear-gradient(180deg, rgba(24, 34, 26, 0.96), rgba(12, 18, 14, 0.92));
-  color: #e6d5a7;
-  font-family: var(--ce-font-display);
+  border-bottom: 1px solid rgba(216, 184, 108, 0.22);
+  background: linear-gradient(180deg, rgba(39, 32, 18, 0.96), rgba(25, 23, 17, 0.92));
+  color: #f0d58c;
   font-size: 13px;
-  font-weight: 600;
-  letter-spacing: 0.1em;
+  font-weight: 700;
 }
 
 .resident-float-button {
@@ -620,7 +616,7 @@ onBeforeUnmount(() => {
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 4px;
   background: rgba(255, 255, 255, 0.06);
-  color: #c9d2c2;
+  color: #d7cba9;
   font-size: 14px;
   line-height: 1;
   transition:
@@ -630,8 +626,8 @@ onBeforeUnmount(() => {
 }
 
 .resident-float-button:hover:not(:disabled) {
-  border-color: rgba(179, 153, 93, 0.36);
-  background: rgba(179, 153, 93, 0.18);
+  border-color: rgba(216, 184, 108, 0.36);
+  background: rgba(216, 184, 108, 0.18);
   color: #ffffff;
 }
 
@@ -647,11 +643,11 @@ onBeforeUnmount(() => {
   min-height: 44px;
   padding: 7px 10px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.07);
-  background: linear-gradient(180deg, rgba(18, 26, 20, 0.9), rgba(18, 26, 20, 0.84));
+  background: linear-gradient(180deg, rgba(25, 23, 17, 0.9), rgba(25, 23, 17, 0.84));
 }
 
 .context-title {
-  color: #8d9e85;
+  color: #c9bea0;
   font-size: 11px;
   font-weight: 600;
   white-space: nowrap;
@@ -663,24 +659,24 @@ onBeforeUnmount(() => {
   height: 28px;
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 5px;
-  background: rgba(10, 15, 12, 0.78);
-  color: #e8ede3;
+  background: rgba(17, 16, 13, 0.78);
+  color: #f2ead5;
   padding: 0 8px;
   font-size: 11px;
   outline: none;
 }
 
 .context-select:hover:not(:disabled) {
-  border-color: rgba(179, 153, 93, 0.42);
+  border-color: rgba(216, 184, 108, 0.42);
 }
 
 .context-select:focus {
-  border-color: #b3995d;
-  box-shadow: 0 0 0 2px rgba(179, 153, 93, 0.13);
+  border-color: #d8b86c;
+  box-shadow: 0 0 0 2px rgba(216, 184, 108, 0.13);
 }
 
 .context-select:disabled {
-  color: #8d9e85;
+  color: #a99c7d;
   cursor: default;
 }
 
@@ -689,10 +685,10 @@ onBeforeUnmount(() => {
   height: 23px;
   display: grid;
   place-items: center;
-  border: 1px solid rgba(179, 153, 93, 0.28);
+  border: 1px solid rgba(216, 184, 108, 0.28);
   border-radius: 999px;
-  background: rgba(179, 153, 93, 0.13);
-  color: #e8ede3;
+  background: rgba(216, 184, 108, 0.13);
+  color: #e9dfc5;
   font-size: 10px;
   font-weight: 700;
 }
@@ -706,9 +702,9 @@ onBeforeUnmount(() => {
   flex-direction: column;
   gap: 11px;
   background:
-    radial-gradient(circle at 50% 0%, rgba(179, 153, 93, 0.06), transparent 38%),
-    rgba(18, 26, 20, 0.52);
-  scrollbar-color: rgba(179, 153, 93, 0.48) transparent;
+    radial-gradient(circle at 50% 0%, rgba(216, 184, 108, 0.06), transparent 38%),
+    rgba(25, 23, 17, 0.52);
+  scrollbar-color: rgba(216, 184, 108, 0.48) transparent;
   scrollbar-width: thin;
 }
 
@@ -722,7 +718,7 @@ onBeforeUnmount(() => {
 
 .chat-history::-webkit-scrollbar-thumb {
   border-radius: 999px;
-  background: rgba(179, 153, 93, 0.42);
+  background: rgba(216, 184, 108, 0.42);
 }
 
 .chat-empty {
@@ -730,7 +726,7 @@ onBeforeUnmount(() => {
   max-width: 300px;
   padding: 14px 18px;
   text-align: center;
-  color: #8d9e85;
+  color: #b9ad8f;
   font-size: 12px;
   line-height: 1.7;
 }
@@ -738,11 +734,9 @@ onBeforeUnmount(() => {
 
 .chat-empty strong {
   display: block;
-  color: #e6d5a7;
-  font-family: var(--ce-font-display);
+  color: #fff7dc;
   font-size: 14px;
   font-weight: 600;
-  letter-spacing: 0.08em;
 }
 
 .chat-empty p {
@@ -759,7 +753,7 @@ onBeforeUnmount(() => {
 
 .chat-role {
   margin: 0 5px 4px;
-  color: #8d9e85;
+  color: #9d9278;
   font-size: 10px;
   font-weight: 600;
 }
@@ -771,31 +765,31 @@ onBeforeUnmount(() => {
 .chat-content {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
-  border: 1px solid rgba(179, 153, 93, 0.22);
-  border-radius: 3px 3px 3px 0;
-  background: linear-gradient(180deg, rgba(24, 34, 26, 0.94), rgba(18, 26, 20, 0.94));
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px 8px 8px 3px;
+  background: linear-gradient(180deg, rgba(63, 48, 24, 0.94), rgba(36, 32, 22, 0.94));
   box-shadow: 0 5px 16px rgba(0, 0, 0, 0.14);
   padding: 9px 11px;
-  color: #e8ede3;
+  color: #f2ead5;
   font-size: 12px;
   line-height: 1.65;
 }
 
 .chat-message.user .chat-content {
-  border-color: rgba(179, 153, 93, 0.32);
+  border-color: rgba(216, 184, 108, 0.32);
   border-radius: 8px 8px 3px 8px;
-  background: linear-gradient(180deg, rgba(77, 64, 36, 0.94), rgba(58, 48, 28, 0.96));
+  background: linear-gradient(180deg, rgba(112, 84, 35, 0.94), rgba(75, 57, 28, 0.96));
   color: #ffffff;
 }
 
 .chat-message.streaming .chat-content {
-  border-color: rgba(179, 153, 93, 0.38);
+  border-color: rgba(216, 184, 108, 0.38);
 }
 
 .guidance-steps {
   margin: 9px 0 0;
   padding-left: 21px;
-  color: #e8ede3;
+  color: #e9dfc5;
 }
 
 .guidance-steps li + li {
@@ -805,18 +799,18 @@ onBeforeUnmount(() => {
 .message-showcase {
   display: block;
   margin: 10px 0 0 auto;
-  border: 1px solid rgba(179, 153, 93, 0.48);
+  border: 1px solid rgba(216, 184, 108, 0.48);
   border-radius: 5px;
-  background: #8a7440;
-  color: #e6d5a7;
+  background: #6d5226;
+  color: #fff7dc;
   padding: 5px 11px;
   font-size: 11px;
   font-weight: 600;
 }
 
 .message-showcase:hover {
-  border-color: #b3995d;
-  background: #4d4024;
+  border-color: #d8b86c;
+  background: #8c6f36;
 }
 
 .chat-pending {
@@ -824,7 +818,7 @@ onBeforeUnmount(() => {
   align-items: center;
   align-self: flex-start;
   gap: 7px;
-  color: #8d9e85;
+  color: #c9bea0;
   font-size: 11px;
 }
 
@@ -832,8 +826,8 @@ onBeforeUnmount(() => {
   width: 7px;
   height: 7px;
   border-radius: 50%;
-  background: #b3995d;
-  box-shadow: 0 0 0 4px rgba(179, 153, 93, 0.1);
+  background: #d8b86c;
+  box-shadow: 0 0 0 4px rgba(216, 184, 108, 0.1);
   content: '';
   animation: cabbage-pulse 1.1s ease-in-out infinite;
 }
@@ -851,7 +845,7 @@ onBeforeUnmount(() => {
 
 .chat-composer {
   border-top: 1px solid rgba(255, 255, 255, 0.07);
-  background: linear-gradient(180deg, rgba(18, 26, 20, 0.92), rgba(10, 15, 12, 0.96));
+  background: linear-gradient(180deg, rgba(25, 23, 17, 0.92), rgba(17, 16, 13, 0.96));
   padding: 10px;
 }
 
@@ -873,12 +867,12 @@ onBeforeUnmount(() => {
 }
 
 .chat-composer textarea:hover {
-  background: rgba(18, 26, 20, 0.9);
+  background: rgba(25, 23, 17, 0.9);
 }
 
 .chat-composer textarea:focus {
-  border-color: #b3995d;
-  box-shadow: 0 0 0 2px rgba(179, 153, 93, 0.13);
+  border-color: #d8b86c;
+  box-shadow: 0 0 0 2px rgba(216, 184, 108, 0.13);
 }
 
 .composer-actions {
@@ -893,7 +887,7 @@ onBeforeUnmount(() => {
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 5px;
   padding: 5px 11px;
-  color: #e8ede3;
+  color: #e9dfc5;
   font-size: 11px;
   font-weight: 600;
   transition:
@@ -913,13 +907,13 @@ onBeforeUnmount(() => {
 }
 
 .primary {
-  border-color: rgba(179, 153, 93, 0.52) !important;
-  background: #4d4024;
+  border-color: rgba(216, 184, 108, 0.52) !important;
+  background: #8c6f36;
   color: #ffffff !important;
 }
 
 .primary:hover:not(:disabled) {
-  background: #b3995d;
+  background: #b8924a;
 }
 
 .secondary {
@@ -927,8 +921,8 @@ onBeforeUnmount(() => {
 }
 
 .secondary:hover:not(:disabled) {
-  border-color: rgba(179, 153, 93, 0.38);
-  background: rgba(179, 153, 93, 0.12);
+  border-color: rgba(216, 184, 108, 0.38);
+  background: rgba(216, 184, 108, 0.12);
   color: #ffffff;
 }
 

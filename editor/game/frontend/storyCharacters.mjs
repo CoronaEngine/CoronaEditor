@@ -112,17 +112,35 @@ const MONSTERS = Object.freeze([
   //
   // size = 目标身高 ÷ 该模型的 Y 归一化占比，因此渲染高度可控。
   { role: 'monster-wyvern', name: '地龙', guid: 'f9f5c8b0-7324-4b6c-a011-000000000021',
-    asset: 'monster/landwyvern.fbx', x: -9, z: -5, size: 3.0, rotation: [0, 0, 0] },   // 高 3.0 m
+    model_ref: 'story.monster-wyvern.v1',
+    asset: 'monster/landwyvern.fbx',
+    animation_sources: ['monster/anim/landwyvern/Idle.glb', 'monster/anim/landwyvern/Walk.glb', 'monster/anim/landwyvern/Run.glb', 'monster/anim/landwyvern/Attack1.glb', 'monster/anim/landwyvern/Die.glb'], x: -9, z: -5, size: 3.0, rotation: [0, 0, 0] },   // 高 3.0 m
   { role: 'monster-lizardf', name: '蜥蜴女猎手', guid: 'f9f5c8b0-7324-4b6c-a011-000000000023',
-    asset: 'monster/lizardf.fbx', x: -7, z: 8, size: 3.5, rotation: [0, 0, 0] },   // 高 2.2 m
+    model_ref: 'story.monster-lizardf.v1',
+    asset: 'monster/lizardf.fbx',
+    animation_sources: ['monster/anim/lizardf/Idle.glb', 'monster/anim/lizardf/Walk.glb', 'monster/anim/lizardf/Run.glb', 'monster/anim/lizardf/Attack1.glb', 'monster/anim/lizardf/Attack2.glb', 'monster/anim/lizardf/Die.glb'], x: -7, z: 8, size: 3.5, rotation: [0, 0, 0] },   // 高 2.2 m
   { role: 'monster-lizardm', name: '蜥蜴战士', guid: 'f9f5c8b0-7324-4b6c-a011-000000000024',
-    asset: 'monster/lizardm.fbx', x: 10, z: 6, size: 3.1, rotation: [0, 0, 0] },   // 高 2.0 m
+    model_ref: 'story.monster-lizardm.v1',
+    asset: 'monster/lizardm.fbx',
+    animation_sources: ['monster/anim/lizardm/Idle.glb', 'monster/anim/lizardm/Walk.glb',
+      'monster/anim/lizardm/Run.glb', 'monster/anim/lizardm/Attack1.glb',
+      'monster/anim/lizardm/Die.glb'],
+    x: 10, z: 6, size: 3.1, rotation: [0, 0, 0] },   // 高 2.0 m
   { role: 'monster-lion', name: '荒原狮兽', guid: 'f9f5c8b0-7324-4b6c-a011-000000000025',
-    asset: 'monster/lion.fbx', x: 0, z: -12, size: 3.7, rotation: [0, 0, 0] },   // 高 1.6 m
+    model_ref: 'story.monster-lion.v1',
+    asset: 'monster/lion.fbx',
+    animation_sources: ['monster/anim/lion/Idle.glb', 'monster/anim/lion/Walk.glb', 'monster/anim/lion/Run.glb', 'monster/anim/lion/Attack1.glb', 'monster/anim/lion/Die.glb'], x: 0, z: -12, size: 3.7, rotation: [0, 0, 0] },   // 高 1.6 m
   { role: 'monster-mantis', name: '刀螳', guid: 'f9f5c8b0-7324-4b6c-a011-000000000026',
-    asset: 'monster/mantis.fbx', x: -12, z: 2, size: 2.3, rotation: [0, 0, 0] },   // 高 2.2 m
+    model_ref: 'story.monster-mantis.v1',
+    asset: 'monster/mantis.fbx',
+    animation_sources: ['monster/anim/mantis/Idle.glb', 'monster/anim/mantis/Walk.glb',
+      'monster/anim/mantis/Run.glb', 'monster/anim/mantis/Attack1.glb',
+      'monster/anim/mantis/Die.glb'],
+    x: -12, z: 2, size: 2.3, rotation: [0, 0, 0] },   // 高 2.2 m
   { role: 'monster-larva', name: '沙原幼虫', guid: 'f9f5c8b0-7324-4b6c-a011-000000000027',
-    asset: 'monster/larva.fbx', x: 6, z: -11, size: 2.4, rotation: [0, 0, 0] },   // 高 0.8 m
+    model_ref: 'story.monster-larva.v1',
+    asset: 'monster/larva.fbx',
+    animation_sources: ['monster/anim/larva/Idle.glb', 'monster/anim/larva/Walk.glb', 'monster/anim/larva/Run.glb', 'monster/anim/larva/Attack1.glb', 'monster/anim/larva/Die.glb'], x: 6, z: -11, size: 2.4, rotation: [0, 0, 0] },   // 高 0.8 m
 ]);
 
 export const STORY_CHARACTERS = Object.freeze([

@@ -1,11 +1,45 @@
-"""Debounced save support for the current scene."""
+"""Runtime support for scene manifests and legacy scene auto-save.
 
+This module owns scene persistence helpers used by the embedded script runtime.
+The project support module re-exports these names for older import paths.
+"""
+
+import configparser
 import logging
 import threading
 from functools import wraps
 from typing import Any, Callable, Dict, Tuple
 
 logger = logging.getLogger(__name__)
+
+
+def get_project_scenes(ini_path: str) -> list[str]:
+    """Read the ordered scene routes from a project's ``scenes`` field."""
+    config = configparser.ConfigParser()
+    config.read(ini_path, encoding="utf-8")
+    raw = config.get("Project", "scenes", fallback="").strip()
+    if not raw:
+        return []
+    return [scene.strip() for scene in raw.split(",") if scene.strip()]
+
+
+def set_project_scenes(ini_path: str, scenes: list[str]) -> None:
+    """Write the ordered scene routes to a project's ``scenes`` field."""
+    config = configparser.ConfigParser()
+    config.read(ini_path, encoding="utf-8")
+    if "Project" not in config:
+        config["Project"] = {}
+    config["Project"]["scenes"] = ",".join(scenes)
+    with open(ini_path, "w", encoding="utf-8") as handle:
+        config.write(handle)
+
+
+def append_project_scene(ini_path: str, scene_route: str) -> None:
+    """Append a scene route unless it is already present."""
+    scenes = get_project_scenes(ini_path)
+    if scene_route not in scenes:
+        scenes.append(scene_route)
+        set_project_scenes(ini_path, scenes)
 
 
 _save_timers: Dict[int, Tuple[threading.Timer, Any]] = {}

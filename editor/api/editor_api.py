@@ -366,10 +366,11 @@ class _ProjectApi(_DynamicApiNamespace):
             "project.create_multiplayer_project", [project_data or {}]
         )
 
-
     @staticmethod
-    def import_vision_scene(path):
-        return _invoke_manifest_cpp_api("project.import_vision_scene", [path])
+    def copy_existing_to_data(payload):
+        return _invoke_manifest_cpp_api(
+            "project.copy_existing_to_data", [payload or {}]
+        )
 
     @staticmethod
     def open_project(project_path, options=None):
@@ -380,6 +381,10 @@ class _ProjectApi(_DynamicApiNamespace):
     @staticmethod
     def open_project_file():
         return _invoke_manifest_cpp_api("project.open_project_file", [])
+
+    @staticmethod
+    def set_project_mode(mode_data):
+        return _invoke_manifest_cpp_api("project.set_project_mode", [mode_data or {}])
 
 
 class _FilesApi(_DynamicApiNamespace):
@@ -439,6 +444,10 @@ class _ProjectSettingsApi(_DynamicApiNamespace):
         return _invoke_manifest_cpp_api(
             "project_settings.save_active_project_info", [settings or {}]
         )
+
+    @staticmethod
+    def browse_scene_file():
+        return _invoke_manifest_cpp_api("project_settings.browse_scene_file", [])
 
 
 class _EditorApi(_DynamicApiNamespace):
@@ -721,6 +730,11 @@ class _SceneToolsApi(_DynamicApiNamespace):
     def __init__(self):
         super().__init__("scene_tools")
 
+    @staticmethod
+    def create_scene(scene_name):
+        return _invoke_manifest_cpp_api(
+            "scene_tools.create_scene", [scene_name]
+        )
 
     @staticmethod
     def reload_scene(scene_name, project_path=""):
@@ -1119,6 +1133,9 @@ class _MainApi(_DynamicApiNamespace):
     def on_init(project_path=""):
         return _invoke_manifest_cpp_api("main.on_init", [project_path])
 
+    @staticmethod
+    def create_scene(scene_name):
+        return _invoke_manifest_cpp_api("main.create_scene", [scene_name])
 
     @staticmethod
     def scene_save(scene_name, snapshot=None):
@@ -1126,6 +1143,10 @@ class _MainApi(_DynamicApiNamespace):
         if snapshot is not None:
             args.append(snapshot)
         return _invoke_manifest_cpp_api("main.scene_save", args)
+
+    @staticmethod
+    def remove_scene(scene_name):
+        return _invoke_manifest_cpp_api("main.remove_scene", [scene_name])
 
 
 class CoronaEditorApi(metaclass=_CoronaEditorApiMeta):

@@ -28,18 +28,19 @@ export const STORY_PROPS = Object.freeze([
     placeable: false,
   }),
   Object.freeze({
-    // 小世界的基础摆放件：一块可落地的山石。它沿用旧的 `block` 计数器，
-    // 因此主世界 Boss 已经发过的搭建件会直接变成石头，不需要改存档。
-    id: 'rock1', name: '山石', itemKey: 'block',
-    asset: 'props/rock1.obj', description: '从山门带回的石头，可在小世界里叠成坡地或围墙。',
-    height: 1.6, yaw: 0,
+    // The art a world yields goes straight into the small world: the block stack the bag
+    // starts with. It reuses the prophet's cube art, so no new model has to be authored.
+    id: 'block', name: '方块', itemKey: 'block',
+    asset: 'cube/cube.obj', description: '主世界带回的方块，可直接在小世界中摆放。',
+    height: 0.5, yaw: 0,
     placeable: true,
   }),
   Object.freeze({
-    // 第二件基础摆放件：一座小石亭，沿用旧的 `ball` 计数器。
-    id: 'shrine1', name: '石亭', itemKey: 'ball',
-    asset: 'props/shrine1.obj', description: '一座可摆放的石亭，给空旷的小世界一个落脚处。',
-    height: 4.2, yaw: 0,
+    // Monster loot: the same ball art the world fragment used before the reward moved
+    // into the bag, now a placeable model in its own right.
+    id: 'ball', name: '球', itemKey: 'ball',
+    asset: 'fragment/Ball.obj', description: '击败怪物得到的球，可在小世界中摆放。',
+    height: 0.5, yaw: 0,
     placeable: true,
   }),
   // 主世界怪物掉落的植被模型：树与草丛，进背包后可在小世界里摆出来。
@@ -146,7 +147,7 @@ export const PLACED_BLOCK_REACH = 2.5;
  * inventory count is treated as a ball instead. Keeping the alias here means old saves
  * open without losing their objects, and the next save writes the canonical id.
  */
-export const PROP_ALIASES = Object.freeze({ pillar: 'shrine1' });
+export const PROP_ALIASES = Object.freeze({ pillar: 'ball' });
 
 export const canonicalPropId = id => PROP_ALIASES[id] || id;
 

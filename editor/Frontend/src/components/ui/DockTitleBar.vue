@@ -178,9 +178,9 @@ function onClose() {
   width: 100%;
   min-height: 32px;
   padding: 0 6px 0 10px;
-  border-bottom: 1px solid rgba(179, 153, 93, 0.28);
+  border-bottom: 1px solid rgba(216, 184, 108, 0.28);
   background: linear-gradient(180deg, rgba(35, 30, 17, 0.98) 0%, rgba(14, 13, 9, 0.98) 100%);
-  color: #e8ede3;
+  color: #f2ead5;
   cursor: default;
   user-select: none;
 }
@@ -190,8 +190,8 @@ function onClose() {
   height: 16px;
   margin-right: 8px;
   border-radius: 999px;
-  background: #b3995d;
-  box-shadow: 0 0 10px rgba(179, 153, 93, 0.28);
+  background: #d8b86c;
+  box-shadow: 0 0 10px rgba(216, 184, 108, 0.28);
   flex: 0 0 auto;
 }
 
@@ -223,7 +223,7 @@ function onClose() {
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 4px;
   background: rgba(255, 255, 255, 0.06);
-  color: #c9d2c2;
+  color: #d7cba9;
   font-size: 13px;
   line-height: 1;
   transition:
@@ -234,8 +234,8 @@ function onClose() {
 }
 
 .titlebar-button:hover {
-  background: rgba(179, 153, 93, 0.18);
-  border-color: rgba(179, 153, 93, 0.36);
+  background: rgba(216, 184, 108, 0.18);
+  border-color: rgba(216, 184, 108, 0.36);
   color: #ffffff;
 }
 
@@ -244,7 +244,7 @@ function onClose() {
 }
 
 .titlebar-button:focus-visible {
-  outline: 2px solid rgba(179, 153, 93, 0.7);
+  outline: 2px solid rgba(216, 184, 108, 0.7);
   outline-offset: 1px;
 }
 

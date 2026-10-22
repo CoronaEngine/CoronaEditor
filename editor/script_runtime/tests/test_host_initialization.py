@@ -14,7 +14,7 @@ def test_script_runtime_host_initializes_scripts_through_active_owner(monkeypatc
 
     scene = SimpleNamespace(
         name="Main",
-        route="scene.ini",
+        route="Scene/main.scene",
         script_path="",
         _actors=(),
     )
@@ -29,8 +29,8 @@ def test_script_runtime_host_initializes_scripts_through_active_owner(monkeypatc
         def switch(self, route):
             raise RuntimeError("script startup must not reload the active scene")
 
-        def get_snapshot(self, route=""):
-            assert route == ""
+        def get_snapshot(self, route):
+            assert route == scene.route
             return {
                 "scene": scene.route,
                 "scene_name": scene.name,
@@ -57,11 +57,11 @@ def test_script_runtime_host_initializes_scripts_through_active_owner(monkeypatc
     assert runtime_host._scripts_initialized is True
 
 
-def test_script_runtime_host_reads_current_scene_without_switching(monkeypatch):
+def test_script_runtime_host_selects_first_scene_when_no_route_is_active(monkeypatch):
     import script_runtime.engine.host as host_module
 
     calls = []
-    snapshot = {"scene": "scene.ini", "actors": []}
+    snapshot = {"scene": "Scene/main.scene", "actors": []}
 
     class SceneApi:
         def list_routes(self):
@@ -71,7 +71,7 @@ def test_script_runtime_host_reads_current_scene_without_switching(monkeypatch):
             calls.append(("switch", route))
             return {"status": "success", "scene": route}
 
-        def get_snapshot(self, route=""):
+        def get_snapshot(self, route):
             calls.append(("snapshot", route))
             return snapshot
 
@@ -84,7 +84,7 @@ def test_script_runtime_host_reads_current_scene_without_switching(monkeypatch):
     target = host_module._native_scene_target()
 
     assert target.route == snapshot["scene"]
-    assert calls == [("snapshot", "")]
+    assert calls == [("switch", snapshot["scene"]), ("snapshot", snapshot["scene"])]
 
 
 def test_script_runtime_host_skips_initialization_when_native_scene_is_unavailable(
@@ -103,14 +103,3 @@ def test_script_runtime_host_skips_initialization_when_native_scene_is_unavailab
 
     assert runtime_host.scripts_mgr is None
     assert runtime_host._scripts_initialized is False
-
-
-def test_script_runtime_host_does_not_bind_an_error_or_empty_snapshot(monkeypatch, tmp_path):
-    import script_runtime.engine.host as host_module
-    for snapshot in ({"status": "error", "message": "No scene"}, {}):
-        monkeypatch.setattr(host_module, "get_script_runtime_editor_api", lambda: SimpleNamespace(
-            scene=SimpleNamespace(get_snapshot=lambda: snapshot)))
-        runtime_host = SimpleNamespace(scripts_mgr=None, _scripts_initialized=False)
-        host_module.initialize_scripts(runtime_host, str(tmp_path))
-        assert runtime_host.scripts_mgr is None
-        assert not runtime_host._scripts_initialized

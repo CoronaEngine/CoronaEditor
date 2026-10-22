@@ -100,7 +100,9 @@ const TRANSIENT_SCENE_WRITE_ATTEMPTS = 6;
 
 async function initializeStoryCharacters({ api, sceneId, frontendUrl, isCurrent = () => true,
   wait = ms => new Promise(resolve => setTimeout(resolve, ms)), renderAttempts = 150,
-  gameplay = null, combatOnly = false, assertSource = async () => {} }) {
+  gameplay = null, combatOnly = false, assertSource = async () => {},
+  // 正在播死亡动作的角色：血量归零后仍要留一小段时间，否则 Die 会被"立刻隐藏"打断。
+  dyingRoles = () => [] }) {
   const check = () => { if (!isCurrent()) throw canceled(); };
   const call = async (operation, invoke) => {
     for (let attempt = 1; ; attempt++) {
@@ -150,7 +152,7 @@ async function initializeStoryCharacters({ api, sceneId, frontendUrl, isCurrent 
   }
   // Creatures belong to the main world and are NOT gated on `boss.hp`, unlike the boss: they
   // are the arena's other monsters, so killing the boss must not empty the arena. The small
-  // world keeps only the player, which is why this branch names 'main'.
+  // world keeps its own cast (player + prophet), which is why this branch names 'main'.
   const visibleCharacters = STORY_CHARACTERS.filter(character => !gameplay
     ? !isMonsterRole(character.role)
     : character.role === 'player'
@@ -158,7 +160,9 @@ async function initializeStoryCharacters({ api, sceneId, frontendUrl, isCurrent 
       // A monster stays in the arena until its own health reaches zero; the boss's health
       // has no effect on them. A save that predates the roster has no entry and stays alive.
       || (gameplay.role === 'main' && isMonsterRole(character.role)
-          && ((gameplay.state.monsters?.[character.role]?.hp ?? 1) > 0)));
+          && ((gameplay.state.monsters?.[character.role]?.hp ?? 1) > 0
+          || dyingRoles().includes(character.role)))
+      || (gameplay.role === 'child' && character.role === 'prophet'));
   if (gameplay) {
     const visibleGuids = new Set(visibleCharacters.map(character => character.guid));
     // Only manage game-owned actors; scenery and user-authored models stay untouched.
@@ -203,7 +207,8 @@ async function initializeStoryCharacters({ api, sceneId, frontendUrl, isCurrent 
           // path never persisted the marker, so the world failed to load forever.
           ...(character.role === 'player' ? { model_ref: PLAYER_MODEL_REF }
             : character.role === 'prophet' ? { model_ref: PROPHET_MODEL_REF }
-            : character.role === 'boss' ? { model_ref: BOSS_MODEL_REF } : {}),
+            : character.role === 'boss' ? { model_ref: BOSS_MODEL_REF }
+            : character.model_ref ? { model_ref: character.model_ref } : {}),
           position: [character.x, 0, character.z], rotation: character.rotation, scale: [1, 1, 1],
           follow_camera: false, physics_enabled: false,
         }));
@@ -258,6 +263,13 @@ async function initializeStoryCharacters({ api, sceneId, frontendUrl, isCurrent 
       const initializedBoss = wasPresent && character.role === 'boss'
         && actor.model_ref === BOSS_MODEL_REF;
       const legacyBoss = character.role === 'boss' && actor.model_ref !== BOSS_MODEL_REF;
+      // 小怪在动画源落地之前创建过：存档里没有 `animation.sources`，引擎因此没给它们加载任何 clip，
+      // 表现就是"站着一动不动"。它们同样需要按名册重建，否则永远不会自己恢复。
+      const staleMonster = isMonsterRole(character.role) && wasPresent && character.model_ref
+        && (actor.model_ref !== character.model_ref
+          // 老存档里的怪物虽然已经写进了标记，但引擎没给它们挂上动作源（`animation_sources` 为空），
+          // 表现就是站着不动；这条条件让它自我修复一次。
+          || !(Array.isArray(actor.animation_sources) ? actor.animation_sources.length : 0));
       let savedGeometry = initializedPlayer || initializedProphet ? actor.geometry : null;
       if (legacyPlayer && savedGeometry) {
         savedGeometry = { ...savedGeometry, rotation: [...savedGeometry.rotation] };
@@ -325,25 +337,43 @@ async function initializeStoryCharacters({ api, sceneId, frontendUrl, isCurrent 
           const unconfirmed = actor?.model_ref !== modelRef ? `摆位标记 ${modelRef}` : '朝向';
           throw new Error(`${character.name}摆位未被引擎确认（${unconfirmed}），请重试进入世界`);
         }
-      } else if (legacyBoss) {
+      } else if (legacyBoss || staleMonster) {
         // Replacement, not repair: this is the one path on which the engine imports a route.
         // The guid is stamped on the creation below, so the rebuilt actor keeps its identity
         // and no second boss can appear.
-        const route = source || resolveStoryAssetPath(frontendUrl, character.asset);
+        // 重建只为补上动作源：模型已经导入过，沿用它的资源路由，不必再从前端取美术。
+        let route = actor.route || source;
+        if (!route) {
+          try {
+            route = resolveStoryAssetPath(frontendUrl, character.asset);
+          } catch (error) {
+            throw new Error(`${character.name}无法定位模型资源：${error.message}`);
+          }
+        }
+        // 动作源同理：能解析就传绝对路径，解析不了就原样交给引擎，让它报自己的错，
+        // 而不是在这里把整个世界的加载打断（测试里用的就是不可用的前端地址）。
+        const rebuildSources = character.animation_sources
+          ? character.animation_sources.map(path => {
+            try {
+              return resolveStoryAssetPath(frontendUrl, path);
+            } catch (error) {
+              return path;
+            }
+          })
+          : null;
         await removeActorForRebuild(api, sceneId, actor, `替换${character.name}模型`, call);
         check();
         const created = await call(`创建${character.name}`, () => api.sceneTools.createActor(sceneId, route, 'model', {
-      ...(character.animation_sources
-        ? { animation_sources: character.animation_sources.map(resolveStoryAssetPath) }
-        : {}),
+      ...(rebuildSources ? { animation_sources: rebuildSources } : {}),
           name: character.name, actor_guid: character.guid, semantic_role: character.role,
           entity_id: `story.${character.role}`, entity_type: 'story_character',
-          model_ref: BOSS_MODEL_REF,
+          model_ref: staleMonster ? character.model_ref : BOSS_MODEL_REF,
           position: [character.x, 0, character.z], rotation: character.rotation, scale: [1, 1, 1],
           follow_camera: false, physics_enabled: false,
         }));
         actor = created.actor;
-        if (actor?.model_ref !== BOSS_MODEL_REF || !sameVector(actor.geometry?.rotation, character.rotation)) {
+        const wantedRef = staleMonster ? character.model_ref : BOSS_MODEL_REF;
+        if (actor?.model_ref !== wantedRef || !sameVector(actor.geometry?.rotation, character.rotation)) {
           throw new Error(`${character.name}模型未被引擎确认，请重试进入世界`);
         }
       } else if (Object.entries(transform).some(([key, value]) => !sameVector(actor.geometry?.[key], value))) {

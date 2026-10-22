@@ -11,7 +11,7 @@ def test_project_archive_has_a_local_boundary_document():
     assert boundary.is_file()
     source = boundary.read_text(encoding="utf-8")
     assert "runtime.archive" in source
-    assert "project.openProject" in source
+    assert "project.migrateLegacyScene" in source
     assert "main.py" in source
     assert "load_policy" in source
     assert "canonical owner" in source

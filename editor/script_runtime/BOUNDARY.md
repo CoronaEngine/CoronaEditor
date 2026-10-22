@@ -27,10 +27,14 @@ runtime 或 C++ 原生对象的直接导出层。
   `config.paths_config.get_repository_assets_dir()` 读取，不得把生成资源写入仓库目录；
 - `manifest_adapter.py` 是脚本访问编辑器聚合语义的唯一显式 adapter，保持
   `ScriptRuntime` caller 通道和权限边界；
-- 一个项目只有一个当前场景；host 通过 `scene.get_snapshot` 绑定当前运行态，不重新加载磁盘；
-- `setScene`、`nextScene`、`scene.list_routes` 和 `scene.switch` 已删除，无兼容入口；
+- `scene.list_routes` 和 `scene.switch` 只返回/接收结构化 route 值，不暴露
+  Python Scene、Actor 或 manager；`corona_engine.setScene` 默认使用 native route
+  且失败闭合；旧 Python Scene Store 不再属于 Script Runtime 运行时路径，host 初始化
+  不得回退到 Python Scene；
 - `scene.get_environment` 和 `scene.set_environment` 只传递 sun、grid、physics 值对象；
-  Blockly 项目预览只捕获当前场景，单场景快照存储在 `project_scene`，恢复失败必须保留快照并报错；
+  Blockly 预览快照、环境恢复、相机姿态和 Actor transform 优先走 native contract，
+  当前项目级快照存储在 `project_scenes`，旧 Scene adapter 仅处理显式旧模式和未覆盖的
+  历史快照；
 - `engine.corona_engine.resolve_runtime_target` 对项目和 Actor 目标均先解析 native
   scene/value object；默认调用失败闭合，不得隐式进入旧 Python Scene。只有 Blockly
   native 场景存在但目标不存在时直接返回错误，不得用旧 Scene 补出结果；

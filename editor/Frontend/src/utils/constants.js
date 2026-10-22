@@ -3,4 +3,4 @@
  */
 
 // 默认场景名称
-export const DEFAULT_SCENE_NAME = 'scene.ini';
+export const DEFAULT_SCENE_NAME = '场景1';

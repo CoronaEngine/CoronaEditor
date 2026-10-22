@@ -2,43 +2,17 @@
 @tailwind components;
 @tailwind utilities;
 
-/* ==============================================================================
-   自然荒野 · 统一设计令牌
-   森林绿底 / 古黄铜描边 / 藤蔓绿与雾蓝作状态色。
-   仅承载视觉变量与基础外观，不改变任何交互逻辑。
-   ============================================================================== */
 :root {
-  --ce-bg-void: #0c120e;
-  --ce-bg-panel: rgba(18, 26, 20, 0.92);
-  --ce-bg-card: rgba(24, 34, 26, 0.75);
-
-  --ce-gold-primary: #b3995d;
-  --ce-gold-bright: #e6d5a7;
-  --ce-gold-muted: #4d4024;
-  --ce-gold-border: rgba(179, 153, 93, 0.42);
-  --ce-gold-line-soft: rgba(179, 153, 93, 0.22);
-  --ce-gold-glow: rgba(179, 153, 93, 0.25);
-
-  --ce-blue: #4a808f;
-  --ce-blue-bright: #9ecbd6;
-
-  --ce-red: #c24133;
-  --ce-red-bright: #e0523b;
-  --ce-green: #689f38;
-
-  --ce-text-primary: #e8ede3;
-  --ce-text-secondary: #8d9e85;
-  --ce-text-dim: #6f7f69;
-
-  /* 兼容旧令牌名 */
-  --ce-black-0: #0c120e;
-  --ce-black-1: #101711;
-  --ce-black-2: #121a14;
-  --ce-black-3: #18221a;
-
-  --ce-font-display: "Cinzel", "Noto Serif SC", "Songti SC", "STSong", "SimSun", serif;
-  --ce-font-sans: "Segoe UI", "Microsoft YaHei UI", "Microsoft YaHei", "Noto Sans SC", sans-serif;
-  --ce-font-mono: "DIN Alternate", "Cascadia Code", Consolas, monospace;
+  --ce-gold-primary: #d8b86c;
+  --ce-gold-bright: #e5c77f;
+  --ce-gold-muted: #8c6f36;
+  --ce-gold-border: rgba(216, 184, 108, 0.42);
+  --ce-black-0: #080806;
+  --ce-black-1: #11100d;
+  --ce-black-2: #191711;
+  --ce-black-3: #242016;
+  --ce-text-primary: #f2ead5;
+  --ce-text-secondary: #b9ad8f;
 }
 
 html,
@@ -53,8 +27,12 @@ body,
 
 body {
   overflow: hidden;
-  color: var(--ce-text-primary);
-  font-family: var(--ce-font-sans);
+  font-family:
+    "Segoe UI",
+    "Microsoft YaHei UI",
+    "Microsoft YaHei",
+    "Noto Sans SC",
+    sans-serif;
   line-height: 1.4;
 }
 
@@ -77,151 +55,8 @@ input[type='range'] {
 }
 
 ::selection {
-  background: rgba(179, 153, 93, 0.32);
+  background: rgba(216, 184, 108, 0.32);
   color: var(--ce-text-primary);
-}
-
-/* 统一的细黄铜滚动条 */
-::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
-}
-::-webkit-scrollbar-track {
-  background: transparent;
-}
-::-webkit-scrollbar-thumb {
-  background: rgba(179, 153, 93, 0.35);
-  border-radius: 3px;
-}
-::-webkit-scrollbar-thumb:hover {
-  background: rgba(230, 213, 167, 0.6);
-}
-* {
-  scrollbar-width: thin;
-  scrollbar-color: rgba(179, 153, 93, 0.35) transparent;
-}
-
-/* 键盘聚焦统一为黄铜色，不改变任何点击行为 */
-button:focus-visible,
-input:focus-visible,
-select:focus-visible,
-textarea:focus-visible,
-[tabindex]:focus-visible {
-  outline: 1px solid var(--ce-gold-primary);
-  outline-offset: 2px;
-}
-
-/* 标题字体工具类 */
-.ce-display {
-  font-family: var(--ce-font-display);
-  letter-spacing: 0.08em;
-}
-
-/* ------------------------------------------------------------------------------
-   统一的可复用外观（只影响视觉，不改变布局语义）
-   ------------------------------------------------------------------------------ */
-.tac-title {
-  font-family: var(--ce-font-display);
-  color: var(--ce-gold-bright);
-  letter-spacing: 0.12em;
-}
-
-.tac-panel {
-  background: var(--ce-bg-panel);
-  border: 1px solid var(--ce-gold-border);
-  border-radius: 4px;
-  box-shadow: inset 0 0 24px rgba(0, 0, 0, 0.6);
-}
-
-.tac-panel-cut {
-  clip-path: polygon(14px 0, 100% 0, 100% calc(100% - 14px), calc(100% - 14px) 100%, 0 100%, 0 14px);
-}
-
-.tac-btn {
-  background: var(--ce-gold-primary);
-  color: var(--ce-bg-void);
-  border: 1px solid var(--ce-gold-bright);
-  border-radius: 2px;
-  letter-spacing: 0.06em;
-  transition: background 0.2s ease, box-shadow 0.2s ease, color 0.2s ease;
-}
-
-.tac-btn:hover {
-  background: var(--ce-gold-bright);
-  box-shadow: 0 0 18px var(--ce-gold-glow);
-}
-
-.tac-btn:disabled {
-  background: #2b362d;
-  color: #6f7f69;
-  border-color: transparent;
-  box-shadow: none;
-  cursor: not-allowed;
-}
-
-.tac-btn-ghost {
-  background: transparent;
-  color: var(--ce-text-secondary);
-  border: 1px solid var(--ce-gold-line-soft);
-  border-radius: 2px;
-  transition: color 0.2s ease, border-color 0.2s ease, background 0.2s ease;
-}
-
-.tac-btn-ghost:hover {
-  color: var(--ce-gold-bright);
-  border-color: var(--ce-gold-border);
-  background: rgba(179, 153, 93, 0.08);
-}
-
-.tac-input {
-  background: rgba(12, 18, 14, 0.85);
-  border: 1px solid var(--ce-gold-line-soft);
-  border-radius: 2px;
-  color: var(--ce-text-primary);
-}
-
-.tac-input:focus {
-  border-color: var(--ce-gold-primary);
-  box-shadow: 0 0 0 1px rgba(179, 153, 93, 0.25);
-  outline: none;
-}
-
-/* 自然荒野面板：切角、金边、四角菱形与内阴影 */
-.symphony-panel {
-  position: relative;
-  background: var(--ce-bg-panel);
-  border: 1px solid var(--ce-gold-border);
-  border-radius: 4px;
-  box-shadow:
-    inset 0 0 24px rgba(0, 0, 0, 0.8),
-    0 16px 40px rgba(0, 0, 0, 0.9),
-    0 0 20px rgba(104, 159, 56, 0.06);
-  backdrop-filter: blur(18px);
-}
-.symphony-panel::before,
-.symphony-panel::after {
-  content: "";
-  position: absolute;
-  width: 6px;
-  height: 6px;
-  background: var(--ce-gold-bright);
-  pointer-events: none;
-  transform: rotate(45deg);
-}
-.symphony-panel::before {
-  top: -3px;
-  left: -3px;
-  box-shadow: 0 0 8px var(--ce-gold-primary);
-}
-.symphony-panel::after {
-  bottom: -3px;
-  right: -3px;
-  box-shadow: 0 0 8px var(--ce-gold-primary);
-}
-
-/* Tailwind preflight 对 SVG 的 display:block 会覆盖 Blockly 的隐藏机制 */
-svg[display="none"] {
-  display: none;
 }
 
 .i18n-nowrap-safe {
@@ -231,11 +66,19 @@ svg[display="none"] {
   white-space: nowrap;
 }
 
+/* Blockly 与 TailwindCSS 兼容修复：Tailwind preflight 对 SVG 设置 display: block
+   会覆盖 Blockly 通过 display="none" 属性隐藏滚动条的机制
+   参考：https://github.com/RaspberryPiFoundation/blockly/issues/5840 */
+svg[display="none"] {
+  display: none;
+}
+
+/* Hide scrollbars but keep scrolling */
 .no-scrollbar {
-  -ms-overflow-style: none;
-  scrollbar-width: none;
+  -ms-overflow-style: none; /* IE and Edge */
+  scrollbar-width: none; /* Firefox */
 }
 
 .no-scrollbar::-webkit-scrollbar {
-  display: none;
+  display: none; /* Chrome, Safari, Opera */
 }

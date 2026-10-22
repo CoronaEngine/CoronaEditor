@@ -17,6 +17,8 @@ export const BOSS_TUNING = Object.freeze({
   attackRange: 6,
   attackCooldownSeconds: 4,
   hurtSeconds: 0.9,
+  // 被打过之后才还手：玩家只是路过时 Boss 保持待机，不会站着隔空挥砍。
+  aggroSeconds: 10,
 });
 
 /** Clips by state. The two attacks alternate so a fight does not read as one repeated swing. */
@@ -43,10 +45,12 @@ export const BOSS_CLIP_SECONDS = Object.freeze({
  * then idle. `hurt` is a one-shot the caller owns for `hurtSeconds`; while it runs no swing starts.
  */
 export function nextBossState({ state, hp, distance, cooldownReady, wasHit, hurtReady = true,
-  tuning = BOSS_TUNING }) {
+  aggro = false, tuning = BOSS_TUNING }) {
   if (hp <= 0) return { state: 'dead', clip: BOSS_CLIPS.dead, once: true };
   if (wasHit && hurtReady && state !== 'hurt') return { state: 'hurt', clip: BOSS_CLIPS.hurt, once: true };
   if (!Number.isFinite(distance)) return { state: 'idle', clip: BOSS_CLIPS.idle, once: false };
+  // 没被打过就待机：Boss 不主动开战。
+  if (!aggro) return { state: 'idle', clip: BOSS_CLIPS.idle, once: false };
   if (distance <= tuning.attackRange && cooldownReady) {
     const clip = state === 'attack1' ? BOSS_CLIPS.attack2 : BOSS_CLIPS.attack1;
     return { state: clip === BOSS_CLIPS.attack1 ? 'attack1' : 'attack2', clip, once: true };
@@ -71,6 +75,7 @@ export function createBossDirector({
   let state = 'idle';
   let currentClip = null;
   let lastAttackAt = -Infinity;
+  let lastHitAt = -Infinity;
   let hurtUntil = 0;
   let dead = false;
   let disposed = false;
@@ -88,6 +93,7 @@ export function createBossDirector({
     tick({ hp, distance, wasHit = false }) {
       if (disposed) return;
       const at = now();
+      if (wasHit) lastHitAt = at;
 
       if (dead) { switchTo(BOSS_CLIPS.dead); return; }
       if (hp <= 0) {
@@ -106,10 +112,12 @@ export function createBossDirector({
         wasHit,
         cooldownReady: at - lastAttackAt >= tuning.attackCooldownSeconds * 1000,
         hurtReady: state !== 'hurt',
+        aggro: at - lastHitAt <= tuning.aggroSeconds * 1000,
         tuning,
       });
 
       if (decision.state === 'hurt') {
+        lastHitAt = at;
         state = 'hurt';
         hurtUntil = at + tuning.hurtSeconds * 1000;
         switchTo(decision.clip, true);
