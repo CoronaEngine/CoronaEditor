@@ -23,9 +23,9 @@
     >
       <path d="M4 4h28l-2.5 25H6.5L4 4Z" fill="#888" />
       <rect x="2" y="1" width="32" height="4" rx="1" fill="#999" />
-      <line x1="10" y1="10" x2="10" y2="24" stroke="#666" stroke-width="1.5" stroke-linecap="round" />
-      <line x1="18" y1="10" x2="18" y2="24" stroke="#666" stroke-width="1.5" stroke-linecap="round" />
-      <line x1="26" y1="10" x2="26" y2="24" stroke="#666" stroke-width="1.5" stroke-linecap="round" />
+      <line x1="10" y1="10" x2="10" y2="24" stroke="#6f7f69" stroke-width="1.5" stroke-linecap="round" />
+      <line x1="18" y1="10" x2="18" y2="24" stroke="#6f7f69" stroke-width="1.5" stroke-linecap="round" />
+      <line x1="26" y1="10" x2="26" y2="24" stroke="#6f7f69" stroke-width="1.5" stroke-linecap="round" />
     </svg>
     <div
       ref="labelRef"

@@ -1,16 +1,16 @@
 <template>
   <div
-    class="flex-1 min-h-0 w-full rounded-lg overflow-hidden relative bg-[#282828]/90 flex flex-col text-white font-sans"
+    class="flex-1 min-h-0 w-full rounded-lg overflow-hidden relative bg-[#1b241d]/90 flex flex-col text-white font-sans"
   >
     <DockTitleBar
       v-if="!isDocked"
       :title="t('projectSettings.title')"
-      extraClass="bg-[#D8B86C]"
+      extraClass="bg-[#b3995d]"
       routePath="/ProjectSettings"
       @close="closeFloat"
     />
 
-    <div v-if="loading" class="flex-1 flex items-center justify-center text-[#d8b86c] text-sm">
+    <div v-if="loading" class="flex-1 flex items-center justify-center text-[#b3995d] text-sm">
       {{ t('common.loading') }}
     </div>
 
@@ -25,7 +25,7 @@
         <input
           v-model="form.name"
           type="text"
-          class="bg-[#1a1a1a] border border-[#333] rounded px-2 py-1.5 text-white focus:border-[#d8b86c] outline-none"
+          class="bg-[#18221a] border border-[#2b362d] rounded px-2 py-1.5 text-white focus:border-[#b3995d] outline-none"
           :placeholder="t('projectSettings.projectName')"
         />
       </div>
@@ -36,13 +36,13 @@
         <input
           v-model="form.core_version"
           type="text"
-          class="bg-[#1a1a1a] border border-[#333] rounded px-2 py-1.5 text-white focus:border-[#d8b86c] outline-none"
+          class="bg-[#18221a] border border-[#2b362d] rounded px-2 py-1.5 text-white focus:border-[#b3995d] outline-none"
           placeholder="1.0.0"
         />
       </div>
 
       <!-- 只读信息 -->
-      <div class="grid grid-cols-2 gap-3 pt-2 border-t border-[#333]">
+      <div class="grid grid-cols-2 gap-3 pt-2 border-t border-[#2b362d]">
         <div class="flex flex-col gap-1">
           <label class="text-gray-400">{{ t('projectSettings.createdAt') }}</label>
           <div class="text-gray-300 truncate">{{ form.create_time || '-' }}</div>
@@ -54,7 +54,7 @@
       </div>
 
       <!-- 提示信息 -->
-      <div v-if="statusMsg" :class="['text-xs', statusOk ? 'text-[#d8b86c]' : 'text-red-400']">
+      <div v-if="statusMsg" :class="['text-xs', statusOk ? 'text-[#b3995d]' : 'text-red-400']">
         {{ statusMsg }}
       </div>
     </div>
@@ -62,17 +62,17 @@
     <!-- 底部操作栏 -->
     <div
       v-if="!loading && !errorMsg"
-      class="flex justify-end gap-2 p-3 border-t border-[#333] bg-[#1a1a1a]/50"
+      class="flex justify-end gap-2 p-3 border-t border-[#2b362d] bg-[#18221a]/50"
     >
       <button
-        class="px-4 py-1.5 bg-[#333] hover:bg-[#444] rounded text-xs text-white"
+        class="px-4 py-1.5 bg-[#2b362d] hover:bg-[#3a4a3c] rounded text-xs text-white"
         :disabled="saving"
         @click="loadSettings"
       >
         {{ t('common.reset') }}
       </button>
       <button
-        class="px-4 py-1.5 bg-[#d8b86c] hover:bg-[#6f8d4b] rounded text-xs text-white disabled:opacity-50"
+        class="px-4 py-1.5 bg-[#b3995d] hover:bg-[#6f8d4b] rounded text-xs text-white disabled:opacity-50"
         :disabled="saving"
         @click="handleSave"
       >
@@ -169,10 +169,10 @@ onMounted(loadSettings);
   width: 6px;
 }
 .custom-scrollbar::-webkit-scrollbar-thumb {
-  background: #444;
+  background: #3a4a3c;
   border-radius: 3px;
 }
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: #d8b86c;
+  background: #b3995d;
 }
 </style>

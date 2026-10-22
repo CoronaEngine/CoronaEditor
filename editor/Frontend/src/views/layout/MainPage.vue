@@ -3,39 +3,39 @@
     <!-- 顶部菜单栏 -->
     <div
       v-if="false"
-      class="w-full bg-[#2d2d2d] text-gray-200 border-b border-gray-700 h-10 flex items-center px-4 space-x-6 text-sm shadow-md"
+      class="w-full bg-[#202b22] text-gray-200 border-b border-gray-700 h-10 flex items-center px-4 space-x-6 text-sm shadow-md"
     >
       <!-- 项目菜单 -->
       <div class="relative">
         <button
-          class="hover:bg-[#3d3d3d] px-3 py-1.5 rounded transition-colors duration-200"
-          :class="{ 'bg-[#3d3d3d]': activeMenu === 'project' }"
+          class="hover:bg-[#354236] px-3 py-1.5 rounded transition-colors duration-200"
+          :class="{ 'bg-[#354236]': activeMenu === 'project' }"
           @click="toggleMenu('project')"
         >
           项目
         </button>
         <div
           v-if="activeMenu === 'project'"
-          class="absolute top-full left-0 mt-1 w-48 bg-[#2d2d2d] border border-gray-700 rounded shadow-lg z-50"
+          class="absolute top-full left-0 mt-1 w-48 bg-[#202b22] border border-gray-700 rounded shadow-lg z-50"
         >
           <div class="py-1">
             <a
               href="#"
-              class="block px-4 py-2 hover:bg-[#3d3d3d] transition-colors duration-200"
+              class="block px-4 py-2 hover:bg-[#354236] transition-colors duration-200"
               @click.prevent="handleNewProject"
             >
               新建项目
             </a>
             <a
               href="#"
-              class="block px-4 py-2 hover:bg-[#3d3d3d] transition-colors duration-200"
+              class="block px-4 py-2 hover:bg-[#354236] transition-colors duration-200"
               @click.prevent="handleOpenProject"
             >
               打开项目
             </a>
             <a
               href="#"
-              class="block px-4 py-2 hover:bg-[#3d3d3d] transition-colors duration-200"
+              class="block px-4 py-2 hover:bg-[#354236] transition-colors duration-200"
               @click.prevent="handleProjectSettings"
             >
               项目设置
@@ -43,7 +43,7 @@
             <hr class="border-gray-700 my-1" />
             <a
               href="#"
-              class="block px-4 py-2 hover:bg-[#3d3d3d] transition-colors duration-200"
+              class="block px-4 py-2 hover:bg-[#354236] transition-colors duration-200"
               @click.prevent="handleSaveProject"
             >
               保存项目
@@ -55,22 +55,22 @@
       <!-- 视图菜单 - 修改为动态渲染 -->
       <div class="relative">
         <button
-          class="hover:bg-[#3d3d3d] px-3 py-1.5 rounded transition-colors duration-200"
-          :class="{ 'bg-[#3d3d3d]': activeMenu === 'view' }"
+          class="hover:bg-[#354236] px-3 py-1.5 rounded transition-colors duration-200"
+          :class="{ 'bg-[#354236]': activeMenu === 'view' }"
           @click="toggleMenu('view')"
         >
           视图
         </button>
         <div
           v-if="activeMenu === 'view'"
-          class="absolute top-full left-0 mt-1 w-56 bg-[#2d2d2d] border border-gray-700 rounded shadow-lg z-50"
+          class="absolute top-full left-0 mt-1 w-56 bg-[#202b22] border border-gray-700 rounded shadow-lg z-50"
         >
           <div class="py-1">
             <a
               v-for="tool in viewStates"
               :key="tool.id"
               href="#"
-              class="flex items-center justify-between px-4 py-2 hover:bg-[#3d3d3d] transition-colors duration-200"
+              class="flex items-center justify-between px-4 py-2 hover:bg-[#354236] transition-colors duration-200"
               @click.prevent="toggleViewTool(tool)"
             >
               <span>{{ tool.name }}</span>
@@ -85,15 +85,15 @@
       <!-- 物理参数菜单 -->
       <div class="relative">
         <button
-          class="hover:bg-[#3d3d3d] px-3 py-1.5 rounded transition-colors duration-200"
-          :class="{ 'bg-[#3d3d3d]': activeMenu === 'physics' }"
+          class="hover:bg-[#354236] px-3 py-1.5 rounded transition-colors duration-200"
+          :class="{ 'bg-[#354236]': activeMenu === 'physics' }"
           @click="toggleMenu('physics')"
         >
           物理
         </button>
         <div
           v-if="activeMenu === 'physics'"
-          class="absolute top-full left-0 mt-1 w-72 bg-[#2d2d2d] border border-gray-700 rounded shadow-lg z-50 p-3 space-y-3"
+          class="absolute top-full left-0 mt-1 w-72 bg-[#202b22] border border-gray-700 rounded shadow-lg z-50 p-3 space-y-3"
           @click.stop
         >
           <!-- 重力 -->
@@ -104,21 +104,21 @@
                 v-model.number="physicsParams.gravityX"
                 type="number"
                 step="0.1"
-                class="w-1/3 bg-[#1e1e1e] border border-gray-600 rounded px-2 py-1 text-xs text-white"
+                class="w-1/3 bg-[#121a14] border border-gray-600 rounded px-2 py-1 text-xs text-white"
                 placeholder="X"
               />
               <input
                 v-model.number="physicsParams.gravityY"
                 type="number"
                 step="0.1"
-                class="w-1/3 bg-[#1e1e1e] border border-gray-600 rounded px-2 py-1 text-xs text-white"
+                class="w-1/3 bg-[#121a14] border border-gray-600 rounded px-2 py-1 text-xs text-white"
                 placeholder="Y"
               />
               <input
                 v-model.number="physicsParams.gravityZ"
                 type="number"
                 step="0.1"
-                class="w-1/3 bg-[#1e1e1e] border border-gray-600 rounded px-2 py-1 text-xs text-white"
+                class="w-1/3 bg-[#121a14] border border-gray-600 rounded px-2 py-1 text-xs text-white"
                 placeholder="Z"
               />
             </div>
@@ -130,7 +130,7 @@
               v-model.number="physicsParams.floorY"
               type="number"
               step="0.1"
-              class="w-full bg-[#1e1e1e] border border-gray-600 rounded px-2 py-1 text-xs text-white"
+              class="w-full bg-[#121a14] border border-gray-600 rounded px-2 py-1 text-xs text-white"
             />
           </div>
           <!-- 地面弹性 -->
@@ -142,7 +142,7 @@
               step="0.05"
               min="0"
               max="1"
-              class="w-full bg-[#1e1e1e] border border-gray-600 rounded px-2 py-1 text-xs text-white"
+              class="w-full bg-[#121a14] border border-gray-600 rounded px-2 py-1 text-xs text-white"
             />
           </div>
           <!-- 时间步长 -->
@@ -153,12 +153,12 @@
               type="number"
               step="0.001"
               min="0.001"
-              class="w-full bg-[#1e1e1e] border border-gray-600 rounded px-2 py-1 text-xs text-white"
+              class="w-full bg-[#121a14] border border-gray-600 rounded px-2 py-1 text-xs text-white"
             />
           </div>
           <!-- 应用按钮 -->
           <button
-            class="w-full bg-[#d8b86c] hover:bg-[#aa8727] text-white text-xs py-1.5 rounded transition-colors duration-200"
+            class="w-full bg-[#b3995d] hover:bg-[#aa8727] text-white text-xs py-1.5 rounded transition-colors duration-200"
             @click="handleApplyPhysics"
           >
             应用物理参数
@@ -169,22 +169,22 @@
       <!-- 插件菜单 - 修改为动态渲染 -->
       <div class="relative">
         <button
-          class="hover:bg-[#3d3d3d] px-3 py-1.5 rounded transition-colors duration-200"
-          :class="{ 'bg-[#3d3d3d]': activeMenu === 'plugin' }"
+          class="hover:bg-[#354236] px-3 py-1.5 rounded transition-colors duration-200"
+          :class="{ 'bg-[#354236]': activeMenu === 'plugin' }"
           @click="toggleMenu('plugin')"
         >
           插件
         </button>
         <div
           v-if="activeMenu === 'plugin'"
-          class="absolute top-full left-0 mt-1 w-48 bg-[#2d2d2d] border border-gray-700 rounded shadow-lg z-50"
+          class="absolute top-full left-0 mt-1 w-48 bg-[#202b22] border border-gray-700 rounded shadow-lg z-50"
         >
           <div class="py-1">
             <a
               v-for="plugin in pluginStates"
               :key="plugin.id"
               href="#"
-              class="flex items-center justify-between px-4 py-2 hover:bg-[#3d3d3d] transition-colors duration-200"
+              class="flex items-center justify-between px-4 py-2 hover:bg-[#354236] transition-colors duration-200"
               @click.prevent="toggleViewTool(plugin)"
             >
               <span>{{ plugin.name }}</span>
@@ -199,27 +199,27 @@
       <!-- 运行菜单 -->
       <div class="relative">
         <button
-          class="hover:bg-[#3d3d3d] px-3 py-1.5 rounded transition-colors duration-200"
-          :class="{ 'bg-[#3d3d3d]': activeMenu === 'run' }"
+          class="hover:bg-[#354236] px-3 py-1.5 rounded transition-colors duration-200"
+          :class="{ 'bg-[#354236]': activeMenu === 'run' }"
           @click="toggleMenu('run')"
         >
           运行
         </button>
         <div
           v-if="activeMenu === 'run'"
-          class="absolute top-full left-0 mt-1 w-48 bg-[#2d2d2d] border border-gray-700 rounded shadow-lg z-50"
+          class="absolute top-full left-0 mt-1 w-48 bg-[#202b22] border border-gray-700 rounded shadow-lg z-50"
         >
           <div class="py-1">
             <a
               href="#"
-              class="block px-4 py-2 hover:bg-[#3d3d3d] transition-colors duration-200"
+              class="block px-4 py-2 hover:bg-[#354236] transition-colors duration-200"
               @click.prevent="handleRunProject"
             >
               运行项目
             </a>
             <a
               href="#"
-              class="block px-4 py-2 hover:bg-[#3d3d3d] transition-colors duration-200"
+              class="block px-4 py-2 hover:bg-[#354236] transition-colors duration-200"
               @click.prevent="handleRunCurrentScene"
             >
               运行当前场景
@@ -231,27 +231,27 @@
       <!-- 帮助菜单 -->
       <div class="relative">
         <button
-          class="hover:bg-[#3d3d3d] px-3 py-1.5 rounded transition-colors duration-200"
-          :class="{ 'bg-[#3d3d3d]': activeMenu === 'help' }"
+          class="hover:bg-[#354236] px-3 py-1.5 rounded transition-colors duration-200"
+          :class="{ 'bg-[#354236]': activeMenu === 'help' }"
           @click="toggleMenu('help')"
         >
           帮助
         </button>
         <div
           v-if="activeMenu === 'help'"
-          class="absolute top-full left-0 mt-1 w-48 bg-[#2d2d2d] border border-gray-700 rounded shadow-lg z-50"
+          class="absolute top-full left-0 mt-1 w-48 bg-[#202b22] border border-gray-700 rounded shadow-lg z-50"
         >
           <div class="py-1">
             <a
               href="#"
-              class="block px-4 py-2 hover:bg-[#3d3d3d] transition-colors duration-200"
+              class="block px-4 py-2 hover:bg-[#354236] transition-colors duration-200"
               @click.prevent="handleHelpDocs"
             >
               帮助文档
             </a>
             <a
               href="#"
-              class="block px-4 py-2 hover:bg-[#3d3d3d] transition-colors duration-200"
+              class="block px-4 py-2 hover:bg-[#354236] transition-colors duration-200"
               @click.prevent="handleAbout"
             >
               关于
@@ -491,7 +491,7 @@
 
     <div
       v-if="projectResourceLoadStatus?.loading"
-      class="fixed left-1/2 top-14 z-[90] w-[360px] max-w-[calc(100vw-2rem)] -translate-x-1/2 pointer-events-none rounded-lg border border-[#84a65b]/40 bg-[#151a16]/90 px-4 py-3 shadow-xl backdrop-blur-sm"
+      class="fixed left-1/2 top-14 z-[90] w-[360px] max-w-[calc(100vw-2rem)] -translate-x-1/2 pointer-events-none rounded-lg border border-[#8a7440]/40 bg-[#151a16]/90 px-4 py-3 shadow-xl backdrop-blur-sm"
     >
       <div class="flex items-center justify-between gap-3 text-xs">
         <span class="text-[#d9e6cf]">场景已打开，资源后台加载中</span>
@@ -501,7 +501,7 @@
       </div>
       <div class="mt-2 h-1.5 overflow-hidden rounded-full bg-black/40">
         <div
-          class="h-full rounded-full bg-[#84a65b] transition-all duration-300"
+          class="h-full rounded-full bg-[#8a7440] transition-all duration-300"
           :style="{ width: `${projectResourceLoadStatus.progress || 0}%` }"
         ></div>
       </div>
@@ -515,11 +515,11 @@
       v-if="showLocalModal"
       class="fixed inset-0 bg-black/70 flex items-center justify-center z-[9999]"
     >
-      <div class="bg-[#2a2a2a] rounded-lg p-6 min-w-[300px] border border-[#d8b86c]/30 shadow-2xl">
+      <div class="bg-[#263126] rounded-lg p-6 min-w-[300px] border border-[#b3995d]/30 shadow-2xl">
         <div class="flex items-center gap-3 mb-4">
           <div class="w-6 h-6 animate-spin">
             <svg
-              class="w-full h-full text-[#d8b86c]"
+              class="w-full h-full text-[#b3995d]"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -532,16 +532,16 @@
               ></path>
             </svg>
           </div>
-          <span class="text-[#e0e0e0] font-medium">{{ localModalTitle }}</span>
+          <span class="text-[#e8ede3] font-medium">{{ localModalTitle }}</span>
         </div>
-        <div class="text-sm text-[#909090] mb-2">{{ localModalMessage }}</div>
-        <div v-if="localModalProgress > 0" class="w-full bg-[#1a1a1a] rounded-full h-2 mt-4">
+        <div class="text-sm text-[#8d9e85] mb-2">{{ localModalMessage }}</div>
+        <div v-if="localModalProgress > 0" class="w-full bg-[#18221a] rounded-full h-2 mt-4">
           <div
-            class="bg-[#d8b86c] h-full rounded-full transition-all duration-300"
+            class="bg-[#b3995d] h-full rounded-full transition-all duration-300"
             :style="{ width: localModalProgress + '%' }"
           ></div>
         </div>
-        <div v-if="localModalProgress > 0" class="text-xs text-[#d8b86c] text-center mt-2">
+        <div v-if="localModalProgress > 0" class="text-xs text-[#b3995d] text-center mt-2">
           {{ Math.round(localModalProgress) }}%
         </div>
       </div>
@@ -1677,7 +1677,7 @@ const handleClickOutside = (event) => {
     if (!event.target.closest('.scene-quick-render-menu')) activeMenu.value = null;
     return;
   }
-  const menuBar = document.querySelector('.bg-\\[\\#2d2d2d\\]');
+  const menuBar = document.querySelector('.bg-\\[\\#202b22\\]');
   if (menuBar && !menuBar.contains(event.target)) {
     activeMenu.value = null;
   }
@@ -3357,19 +3357,23 @@ onUnmounted(() => {
   z-index: 2147483000;
   width: min(356px, calc(100% - 24px));
   padding: 9px;
-  border: 1px solid rgba(216, 184, 108, 0.48);
-  border-radius: 9px;
-  background: rgba(13, 12, 8, 0.94);
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+  border: 1px solid rgba(179, 153, 93, 0.42);
+  border-radius: 4px;
+  background: rgba(12, 18, 14, 0.94);
+  box-shadow:
+    inset 0 0 24px rgba(0, 0, 0, 0.55),
+    0 10px 30px rgba(0, 0, 0, 0.45),
+    0 0 18px rgba(179, 153, 93, 0.06);
   backdrop-filter: blur(8px);
-  color: #e9dfc5;
+  color: #e8ede3;
+  clip-path: polygon(12px 0, 100% 0, 100% calc(100% - 12px), calc(100% - 12px) 100%, 0 100%, 0 12px);
   pointer-events: auto;
 }
 
 .scene-quick-render {
   padding-bottom: 9px;
   margin-bottom: 9px;
-  border-bottom: 1px solid #55431f;
+  border-bottom: 1px solid #4d4024;
   font-size: 11px;
 }
 
@@ -3383,7 +3387,10 @@ onUnmounted(() => {
 
 .scene-quick-render-mode {
   justify-content: space-between;
-  font-weight: 700;
+  font-family: var(--ce-font-display);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  color: #e6d5a7;
 }
 
 .scene-quick-render-menu {
@@ -3398,10 +3405,10 @@ onUnmounted(() => {
   justify-content: space-between;
   width: 100%;
   padding: 4px 6px;
-  border: 1px solid #55431f;
-  border-radius: 4px;
-  background: #0f0e0a;
-  color: #e5e7eb;
+  border: 1px solid #4d4024;
+  border-radius: 2px;
+  background: #101711;
+  color: #e8ede3;
 }
 
 .scene-quick-render-dropdown {
@@ -3411,9 +3418,9 @@ onUnmounted(() => {
   right: 0;
   z-index: 1;
   padding: 4px;
-  border: 1px solid #77602e;
-  border-radius: 5px;
-  background: #17140d;
+  border: 1px solid #8a7440;
+  border-radius: 2px;
+  background: #101711;
   box-shadow: 0 8px 18px rgba(0, 0, 0, 0.6);
 }
 
@@ -3426,14 +3433,14 @@ onUnmounted(() => {
 }
 
 .scene-quick-render-dropdown button[aria-checked='true'] {
-  color: #f1ce78;
-  background: #3b3019;
+  color: #e6d5a7;
+  background: #1d2820;
 }
 
 .scene-quick-render-dropdown button:not(:disabled):hover,
 .scene-quick-render-dropdown button:not(:disabled):focus-visible {
-  background: #5a4521;
-  color: #fff2cd;
+  background: #2b362d;
+  color: #e6d5a7;
 }
 
 .scene-quick-render-options {
@@ -3442,7 +3449,7 @@ onUnmounted(() => {
 }
 
 .scene-quick-render-options input {
-  accent-color: #d8b86c;
+  accent-color: #b3995d;
 }
 
 .scene-quick-render input:disabled,
@@ -3457,7 +3464,7 @@ onUnmounted(() => {
   gap: 7px;
   padding-bottom: 9px;
   margin-bottom: 9px;
-  border-bottom: 1px solid #55431f;
+  border-bottom: 1px solid #4d4024;
   font-size: 11px;
 }
 
@@ -3468,12 +3475,12 @@ onUnmounted(() => {
 .scene-quick-camera-speed input {
   flex: 1;
   min-width: 0;
-  accent-color: #d8b86c;
+  accent-color: #b3995d;
   cursor: pointer;
 }
 
 .scene-quick-camera-speed input:focus-visible {
-  outline: 2px solid #d8b86c;
+  outline: 2px solid #b3995d;
   outline-offset: 3px;
 }
 
@@ -3510,7 +3517,7 @@ onUnmounted(() => {
 }
 
 .scene-quick-light-toggle input {
-  accent-color: #d8b86c;
+  accent-color: #b3995d;
 }
 
 .scene-quick-direction {
@@ -3542,22 +3549,22 @@ onUnmounted(() => {
   width: 100%;
   min-width: 0;
   padding: 4px 5px;
-  border: 1px solid #55431f;
+  border: 1px solid #4d4024;
   border-radius: 4px;
   outline: none;
-  background: #0f0e0a;
-  color: #e5e7eb;
+  background: #0c120e;
+  color: #e8ede3;
   font-size: 10px;
 }
 
 .scene-quick-direction input:focus {
-  border-color: #d8b86c;
+  border-color: #b3995d;
 }
 
 .dock-shortcut-bar {
   position: absolute; right: 16px; bottom: 16px; z-index: 2147483000;
   display: flex; align-items: center; gap: 7px; padding: 7px;
-  border: 1px solid rgba(216, 184, 108, .48); border-radius: 9px;
+  border: 1px solid rgba(179, 153, 93, .48); border-radius: 9px;
   background: rgba(13, 12, 8, .96); box-shadow: 0 10px 30px rgba(0, 0, 0, .45);
   backdrop-filter: blur(8px);
 }
@@ -3567,7 +3574,7 @@ onUnmounted(() => {
   font-size: 12px; line-height: 1; transition: border-color .15s ease, background .15s ease, color .15s ease;
 }
 .dock-shortcut-button:hover { border-color: #b79232; color: #fff4cd; }
-.dock-shortcut-button.active { border-color: #d8b86c; background: #332712; color: #fff4cd; box-shadow: inset 0 0 0 1px rgba(216, 184, 108, .18); }
+.dock-shortcut-button.active { border-color: #b3995d; background: #332712; color: #fff4cd; box-shadow: inset 0 0 0 1px rgba(179, 153, 93, .18); }
 .dock-shortcut-button.pending { cursor: progress; border-color: #9f8132; }
 .dock-shortcut-button.pending .dock-shortcut-icon { animation: dock-shortcut-pulse .7s ease-in-out infinite alternate; }
 @keyframes dock-shortcut-pulse { from { opacity: .48; } to { opacity: 1; } }

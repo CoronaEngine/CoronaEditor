@@ -1,18 +1,18 @@
 <template>
   <div
-    class="flex-1 min-h-0 w-full rounded-lg overflow-hidden relative bg-[#282828]/90 flex flex-col text-white font-sans"
+    class="flex-1 min-h-0 w-full rounded-lg overflow-hidden relative bg-[#1b241d]/90 flex flex-col text-white font-sans"
   >
     <DockTitleBar
       v-if="!isDocked"
       title="文件管理"
-      extraClass="bg-[#D8B86C]"
+      extraClass="bg-[#b3995d]"
       routePath="/FileManager"
       @close="closeFloat"
     />
 
-    <div class="flex items-center gap-2 p-2 bg-[#1a1a1a]/50 border-b border-[#333]">
+    <div class="flex items-center gap-2 p-2 bg-[#18221a]/50 border-b border-[#2b362d]">
       <div class="text-[10px] text-gray-400 truncate flex-1">
-        <span class="text-[#d8b86c] font-bold">{{ projectName }}</span>
+        <span class="text-[#b3995d] font-bold">{{ projectName }}</span>
       </div>
     </div>
 
@@ -28,7 +28,7 @@
       />
 
       <div v-else-if="loading" class="flex justify-center items-center h-32">
-        <div class="text-[#d8b86c]">加载中...</div>
+        <div class="text-[#b3995d]">加载中...</div>
       </div>
 
       <div
@@ -44,18 +44,18 @@
     <div
       v-if="contextMenu.show"
       :style="{ left: contextMenu.x + 'px', top: contextMenu.y + 'px' }"
-      class="fixed z-[100] bg-[#1e1e1e] border border-[#444] shadow-xl py-1 min-w-[150px] text-xs"
+      class="fixed z-[100] bg-[#121a14] border border-[#3a4a3c] shadow-xl py-1 min-w-[150px] text-xs"
     >
       <!-- 文件夹特有菜单 -->
       <template v-if="contextMenu.item?.isDirectory">
-        <div class="px-4 py-2 hover:bg-[#d8b86c] cursor-pointer" @click="handleNewFolder">
+        <div class="px-4 py-2 hover:bg-[#b3995d] cursor-pointer" @click="handleNewFolder">
           新建文件夹
         </div>
-        <div class="px-4 py-2 hover:bg-[#d8b86c] cursor-pointer" @click="handleNewActor">
+        <div class="px-4 py-2 hover:bg-[#b3995d] cursor-pointer" @click="handleNewActor">
           新建单位
         </div>
-        <div class="h-[1px] bg-[#333] my-1"></div>
-        <div v-if="contextMenu.item?.name !== 'scene.ini'" class="px-4 py-2 hover:bg-[#d8b86c] cursor-pointer" @click="handleRename">重命名</div>
+        <div class="h-[1px] bg-[#2b362d] my-1"></div>
+        <div v-if="contextMenu.item?.name !== 'scene.ini'" class="px-4 py-2 hover:bg-[#b3995d] cursor-pointer" @click="handleRename">重命名</div>
         <div
           class="px-4 py-2 hover:bg-red-600 cursor-pointer text-red-400 hover:text-white"
           v-if="contextMenu.item?.name !== 'scene.ini'"
@@ -67,9 +67,9 @@
 
       <!-- 文件特有菜单 -->
       <template v-else-if="contextMenu.item">
-        <div class="px-4 py-2 hover:bg-[#d8b86c] cursor-pointer" @click="handleOpenFile">打开</div>
-        <div class="h-[1px] bg-[#333] my-1"></div>
-        <div v-if="contextMenu.item?.name !== 'scene.ini'" class="px-4 py-2 hover:bg-[#d8b86c] cursor-pointer" @click="handleRename">重命名</div>
+        <div class="px-4 py-2 hover:bg-[#b3995d] cursor-pointer" @click="handleOpenFile">打开</div>
+        <div class="h-[1px] bg-[#2b362d] my-1"></div>
+        <div v-if="contextMenu.item?.name !== 'scene.ini'" class="px-4 py-2 hover:bg-[#b3995d] cursor-pointer" @click="handleRename">重命名</div>
         <div
           class="px-4 py-2 hover:bg-red-600 cursor-pointer text-red-400 hover:text-white"
           v-if="contextMenu.item?.name !== 'scene.ini'"
@@ -81,10 +81,10 @@
 
       <!-- 空白区域菜单 -->
       <template v-else>
-        <div class="px-4 py-2 hover:bg-[#d8b86c] cursor-pointer" @click="handleNewFolder">
+        <div class="px-4 py-2 hover:bg-[#b3995d] cursor-pointer" @click="handleNewFolder">
           新建文件夹
         </div>
-        <div class="px-4 py-2 hover:bg-[#d8b86c] cursor-pointer" @click="handleNewActor">
+        <div class="px-4 py-2 hover:bg-[#b3995d] cursor-pointer" @click="handleNewActor">
           新建单位
         </div>
       </template>
@@ -95,24 +95,24 @@
       v-if="dialog.show"
       class="fixed inset-0 bg-black/50 flex items-center justify-center z-[200]"
     >
-      <div class="bg-[#1e1e1e] border border-[#444] p-4 rounded w-80">
-        <div class="text-[#d8b86c] font-bold mb-3">{{ dialog.title }}</div>
+      <div class="bg-[#121a14] border border-[#3a4a3c] p-4 rounded w-80">
+        <div class="text-[#b3995d] font-bold mb-3">{{ dialog.title }}</div>
         <input
           v-model="dialog.value"
           type="text"
-          class="w-full bg-[#333] border border-[#555] px-3 py-2 text-sm text-white rounded outline-none focus:border-[#d8b86c]"
+          class="w-full bg-[#2b362d] border border-[#555] px-3 py-2 text-sm text-white rounded outline-none focus:border-[#b3995d]"
           :placeholder="dialog.placeholder"
           @keyup.enter="handleDialogConfirm"
         />
         <div class="flex justify-end gap-2 mt-4">
           <button
-            class="px-3 py-1 text-sm bg-[#333] hover:bg-[#444] rounded"
+            class="px-3 py-1 text-sm bg-[#2b362d] hover:bg-[#3a4a3c] rounded"
             @click="dialog.show = false"
           >
             取消
           </button>
           <button
-            class="px-3 py-1 text-sm bg-[#d8b86c] hover:bg-[#6b8a4a] rounded"
+            class="px-3 py-1 text-sm bg-[#b3995d] hover:bg-[#6b8a4a] rounded"
             @click="handleDialogConfirm"
           >
             确认
@@ -327,10 +327,10 @@ onMounted(() => {
   background: transparent;
 }
 .custom-scrollbar::-webkit-scrollbar-thumb {
-  background: #444;
+  background: #3a4a3c;
   border-radius: 10px;
 }
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: #d8b86c;
+  background: #b3995d;
 }
 </style>

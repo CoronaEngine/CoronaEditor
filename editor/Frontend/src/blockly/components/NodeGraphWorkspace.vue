@@ -106,7 +106,7 @@
               orient="auto"
               markerUnits="strokeWidth"
             >
-              <path d="M0,0 L0,6 L9,3 z" fill="#d8b86c" />
+              <path d="M0,0 L0,6 L9,3 z" fill="#b3995d" />
             </marker>
           </defs>
           <path
@@ -3497,9 +3497,9 @@ onBeforeUnmount(() => {
   flex-direction: column;
   overflow: hidden;
   font-size: 17px;
-  color: #f2ead5;
-  background: radial-gradient(circle at 28% 0, #2b230f 0, #15130d 42%, #080806 100%);
-  border: 1px solid #30281c;
+  color: #e8ede3;
+  background: radial-gradient(circle at 28% 0, #2b230f 0, #101711 42%, #080806 100%);
+  border: 1px solid #1b241d;
   border-radius: 12px;
 }
 .node-graph-workspace.fullscreen {
@@ -3528,7 +3528,7 @@ onBeforeUnmount(() => {
   justify-content: space-between;
   gap: 12px;
   padding: 0 10px;
-  border-bottom: 1px solid #30281c;
+  border-bottom: 1px solid #1b241d;
   background: rgba(25, 23, 17, 0.96);
 }
 .ng-title {
@@ -3541,7 +3541,7 @@ onBeforeUnmount(() => {
 .ng-badge {
   padding: 4px 9px;
   border-radius: 999px;
-  background: #8c6f36;
+  background: #4d4024;
   color: #fff;
   font-weight: 800;
 }
@@ -3557,15 +3557,15 @@ onBeforeUnmount(() => {
   height: 28px;
   min-width: 58px;
   padding: 0 13px;
-  border: 1px solid #d8b86c;
+  border: 1px solid #b3995d;
   border-radius: 8px;
-  background: #665025;
-  color: #fff7dc;
+  background: #4d4024;
+  color: #e6d5a7;
   font-weight: 800;
   cursor: pointer;
 }
 .ng-run:hover:not(:disabled) {
-  background: #8c6f36;
+  background: #4d4024;
 }
 .ng-run.running {
   border-color: #fb7185;
@@ -3578,7 +3578,7 @@ onBeforeUnmount(() => {
 .ng-run-status {
   max-width: 240px;
   overflow: hidden;
-  color: #e9dfc5;
+  color: #e8ede3;
   font-size: 12px;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -3588,14 +3588,14 @@ onBeforeUnmount(() => {
   padding: 0 12px;
   border-radius: 8px;
   border: 1px solid #4a3d1d;
-  background: #15130d;
-  color: #e9dfc5;
+  background: #101711;
+  color: #e8ede3;
   cursor: pointer;
   font-size: 13px;
 }
 .ng-mode.active {
-  background: #8c6f36;
-  border-color: #d8b86c;
+  background: #4d4024;
+  border-color: #b3995d;
   color: #fff;
 }
 .ng-mode.delete.active {
@@ -3606,7 +3606,7 @@ onBeforeUnmount(() => {
   height: 100%;
   display: grid;
   place-items: center;
-  color: #b9ad8f;
+  color: #8d9e85;
   font-size: 13px;
 }
 .ng-body {
@@ -3680,7 +3680,7 @@ onBeforeUnmount(() => {
 }
 .ng-panel {
   min-height: 0;
-  border: 1px solid #30281c;
+  border: 1px solid #1b241d;
   background: rgba(21, 19, 13, 0.96);
   border-radius: 12px;
   overflow: hidden;
@@ -3701,7 +3701,7 @@ onBeforeUnmount(() => {
   align-items: center;
   justify-content: space-between;
   margin: 2px 0 8px;
-  color: #fff7dc;
+  color: #e6d5a7;
   font-size: 14px;
   font-weight: 800;
 }
@@ -3709,7 +3709,7 @@ onBeforeUnmount(() => {
   margin-top: 14px;
 }
 .ng-section-title small {
-  color: #b9ad8f;
+  color: #8d9e85;
   font-size: 11px;
   font-weight: 500;
 }
@@ -3720,12 +3720,12 @@ onBeforeUnmount(() => {
   padding: 9px;
   margin-bottom: 8px;
   border-radius: 10px;
-  border: 1px solid #3f3018;
+  border: 1px solid #1d2820;
   background: #191711;
   cursor: grab;
 }
 .ng-tool-card.macro {
-  border-color: rgba(216, 184, 108, 0.55);
+  border-color: rgba(179, 153, 93, 0.55);
 }
 .ng-tool-icon,
 .ng-mini {
@@ -3734,7 +3734,7 @@ onBeforeUnmount(() => {
   flex: 0 0 auto;
   color: #fff;
   font-weight: 900;
-  background: #8c6f36;
+  background: #4d4024;
 }
 .ng-tool-icon {
   width: auto;
@@ -3750,7 +3750,7 @@ onBeforeUnmount(() => {
 .ng-tool-name {
   font-size: 14px;
   font-weight: 800;
-  color: #fff7dc;
+  color: #e6d5a7;
 }
 .ng-tool-name,
 .ng-tool-desc {
@@ -3760,14 +3760,14 @@ onBeforeUnmount(() => {
   margin-top: 3px;
   font-size: 12px;
   line-height: 1.35;
-  color: #b9ad8f;
+  color: #8d9e85;
 }
 .ng-cat {
   margin-bottom: 7px;
-  border: 1px solid #30281c;
+  border: 1px solid #1b241d;
   border-radius: 10px;
   overflow: hidden;
-  background: #15130d;
+  background: #101711;
 }
 .ng-cat summary {
   display: flex;
@@ -3786,11 +3786,11 @@ onBeforeUnmount(() => {
   width: 9px;
   height: 9px;
   border-radius: 50%;
-  background: #d8b86c;
+  background: #b3995d;
 }
 .ng-count {
   margin-left: auto;
-  color: #b9ad8f;
+  color: #8d9e85;
   font-size: 11px;
 }
 .ng-block-list {
@@ -3805,7 +3805,7 @@ onBeforeUnmount(() => {
   align-items: center;
   text-align: left;
   border: 1px solid #4a3d1d;
-  background: #211d12;
+  background: #121a14;
   color: #fff3c8;
   border-radius: 9px;
   padding: 6px;
@@ -3816,7 +3816,7 @@ onBeforeUnmount(() => {
   height: 24px;
   border-radius: 7px;
   font-size: 12px;
-  background: #9d9278;
+  background: #8d9e85;
 }
 .ng-block-chip b {
   display: block;
@@ -3826,7 +3826,7 @@ onBeforeUnmount(() => {
 .ng-block-chip small {
   display: block;
   margin-top: 1px;
-  color: #b9ad8f;
+  color: #8d9e85;
   font-size: 10px;
   word-break: break-all;
 }
@@ -3834,7 +3834,7 @@ onBeforeUnmount(() => {
   position: relative;
   overflow: hidden;
   cursor: grab;
-  background: #0b0a08;
+  background: #0c120e;
   transition: box-shadow 120ms ease, border-color 120ms ease;
 }
 .ng-canvas.panning {
@@ -3842,8 +3842,8 @@ onBeforeUnmount(() => {
   user-select: none;
 }
 .ng-canvas.drop-active {
-  border-color: #d8b86c;
-  box-shadow: inset 0 0 0 3px rgba(216, 184, 108, 0.25);
+  border-color: #b3995d;
+  box-shadow: inset 0 0 0 3px rgba(179, 153, 93, 0.25);
 }
 .ng-drag-ghost {
   position: fixed;
@@ -3854,7 +3854,7 @@ onBeforeUnmount(() => {
   border-radius: 9px;
   background: rgba(75, 57, 28, 0.92);
   box-shadow: 0 10px 24px rgba(0, 0, 0, 0.35);
-  color: #fff7dc;
+  color: #e6d5a7;
   font-size: 13px;
   font-weight: 800;
   pointer-events: none;
@@ -3870,8 +3870,8 @@ onBeforeUnmount(() => {
   inset: 0;
   pointer-events: none;
   background-image:
-    linear-gradient(rgba(216, 184, 108, 0.08) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(216, 184, 108, 0.08) 1px, transparent 1px);
+    linear-gradient(rgba(179, 153, 93, 0.08) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(179, 153, 93, 0.08) 1px, transparent 1px);
   background-size: 24px 24px;
 }
 .ng-canvas-head {
@@ -3891,14 +3891,14 @@ onBeforeUnmount(() => {
 }
 .ng-canvas-head span {
   display: block;
-  color: #b9ad8f;
+  color: #8d9e85;
   font-size: 12px;
   margin-top: 2px;
 }
 .ng-canvas-hint {
   display: block;
   margin-top: 3px;
-  color: #a99c7d;
+  color: #8d9e85;
   font-size: 12px;
   font-weight: 500;
 }
@@ -3917,7 +3917,7 @@ onBeforeUnmount(() => {
 .ng-zoom-reset {
   height: 26px;
   padding: 0 9px;
-  border: 1px solid #665025;
+  border: 1px solid #4d4024;
   border-radius: 7px;
   background: #191711;
   color: #fff3c8;
@@ -3925,7 +3925,7 @@ onBeforeUnmount(() => {
   cursor: pointer;
 }
 .ng-zoom-reset:hover {
-  border-color: #d8b86c;
+  border-color: #b3995d;
 }
 .ng-edges {
   position: absolute;
@@ -3942,9 +3942,9 @@ onBeforeUnmount(() => {
 }
 .ng-edge-line {
   fill: none;
-  stroke: #d8b86c;
+  stroke: #b3995d;
   stroke-width: 2.4;
-  filter: drop-shadow(0 0 5px rgba(216, 184, 108, 0.55));
+  filter: drop-shadow(0 0 5px rgba(179, 153, 93, 0.55));
   pointer-events: none;
 }
 .ng-edge-line.selected {
@@ -3953,7 +3953,7 @@ onBeforeUnmount(() => {
   filter: drop-shadow(0 0 4px rgba(250, 204, 21, 0.45));
 }
 .ng-edge-hit:hover + .ng-edge-line {
-  stroke: #e9dfc5;
+  stroke: #e8ede3;
   stroke-width: 3;
 }
 .ng-edge-preview {
@@ -3973,7 +3973,7 @@ onBeforeUnmount(() => {
   z-index: 3;
   padding: 10px 11px;
   border-radius: 14px;
-  border: 1px solid #b8924a;
+  border: 1px solid #b3995d;
   background: linear-gradient(180deg, #242016, #11100d);
   box-shadow: 0 12px 22px rgba(0, 0, 0, 0.35);
   cursor: grab;
@@ -3990,7 +3990,7 @@ onBeforeUnmount(() => {
   cursor: not-allowed;
 }
 .ng-node.type-start {
-  border-color: #d8b86c;
+  border-color: #b3995d;
 }
 .ng-node.type-end {
   border-color: #fb7185;
@@ -4004,7 +4004,7 @@ onBeforeUnmount(() => {
   width: 9px;
   height: 9px;
   border-radius: 50%;
-  background: #d8b86c;
+  background: #b3995d;
 }
 .ng-node-type,
 .ng-node-name {
@@ -4012,7 +4012,7 @@ onBeforeUnmount(() => {
   width: 100%;
   border: 1px solid #4a3d1d;
   border-radius: 7px;
-  background: #0f0e0a;
+  background: #0c120e;
   color: #fff3c8;
   font-size: 12px;
   padding: 4px 6px;
@@ -4024,11 +4024,11 @@ onBeforeUnmount(() => {
   margin-top: 8px;
   font-size: 14px;
   font-weight: 900;
-  color: #fff7dc;
+  color: #e6d5a7;
 }
 .ng-node-hint {
   margin-top: 7px;
-  color: #b9ad8f;
+  color: #8d9e85;
   font-size: 11px;
 }
 .ng-node.running {
@@ -4041,18 +4041,18 @@ onBeforeUnmount(() => {
 .ng-node-type-badge {
   flex: 0 0 auto;
   padding: 3px 7px;
-  border: 1px solid rgba(216, 184, 108, 0.48);
+  border: 1px solid rgba(179, 153, 93, 0.48);
   border-radius: 999px;
-  background: rgba(216, 184, 108, 0.16);
-  color: #f2ead5;
+  background: rgba(179, 153, 93, 0.16);
+  color: #e8ede3;
   font-size: 11px;
   font-weight: 800;
   line-height: 1.2;
 }
 .type-start .ng-node-type-badge {
-  border-color: rgba(216, 184, 108, 0.5);
-  background: rgba(216, 184, 108, 0.14);
-  color: #f2ead5;
+  border-color: rgba(179, 153, 93, 0.5);
+  background: rgba(179, 153, 93, 0.14);
+  color: #e8ede3;
 }
 .type-end .ng-node-type-badge {
   border-color: rgba(251, 113, 133, 0.5);
@@ -4063,7 +4063,7 @@ onBeforeUnmount(() => {
   min-width: 0;
   flex: 1 1 auto;
   overflow: hidden;
-  color: #fff7dc;
+  color: #e6d5a7;
   font-size: 14px;
   font-weight: 900;
   line-height: 1.35;
@@ -4088,8 +4088,8 @@ onBeforeUnmount(() => {
   cursor: not-allowed;
 }
 .ng-port.pending {
-  background: #d8b86c;
-  box-shadow: 0 0 0 5px rgba(216, 184, 108, 0.25);
+  background: #b3995d;
+  box-shadow: 0 0 0 5px rgba(179, 153, 93, 0.25);
 }
 .ng-port.connection-target:not(.occupied) {
   animation: ng-port-pulse 1s ease-in-out infinite;
@@ -4167,7 +4167,7 @@ onBeforeUnmount(() => {
   background: rgba(17, 16, 13, 0.88);
 }
 .ng-property-label {
-  color: #e9dfc5;
+  color: #e8ede3;
   font-size: 12px;
   font-weight: 800;
 }
@@ -4180,15 +4180,15 @@ onBeforeUnmount(() => {
   min-width: 0;
   height: 30px;
   padding: 0 5px;
-  border: 1px solid #665025;
+  border: 1px solid #4d4024;
   border-radius: 7px;
   background: #191711;
-  color: #e9dfc5;
+  color: #e8ede3;
   cursor: pointer;
   font-size: 12px;
   font-weight: 700;
 }
-.ng-type-tabs button:hover { border-color: #d8b86c; }
+.ng-type-tabs button:hover { border-color: #b3995d; }
 .ng-type-tabs button.active {
   border-color: #facc15;
   background: rgba(161, 98, 7, 0.34);
@@ -4206,11 +4206,11 @@ onBeforeUnmount(() => {
   width: 100%;
   height: 30px;
   padding: 0 9px;
-  border: 1px solid #665025;
+  border: 1px solid #4d4024;
   border-radius: 7px;
   outline: none;
-  background: #0f0e0a;
-  color: #fff7dc;
+  background: #0c120e;
+  color: #e6d5a7;
   font-size: 13px;
 }
 .ng-name-row input:focus {
@@ -4218,21 +4218,21 @@ onBeforeUnmount(() => {
   box-shadow: 0 0 0 2px rgba(250, 204, 21, 0.12);
 }
 .ng-name-row span {
-  color: #b9ad8f;
+  color: #8d9e85;
   font-size: 11px;
   font-variant-numeric: tabular-nums;
 }
 .ng-edge-meta {
   display: grid;
   gap: 3px;
-  color: #b9ad8f;
+  color: #8d9e85;
   font-size: 11px;
 }
 .ng-condition-note {
   padding: 6px 7px;
   border-radius: 7px;
   background: rgba(36, 32, 22, 0.76);
-  color: #e9dfc5;
+  color: #e8ede3;
   font-size: 11px;
   line-height: 1.4;
 }
@@ -4241,8 +4241,8 @@ onBeforeUnmount(() => {
   display: grid;
   place-items: center;
   border-radius: 10px;
-  border: 1px dashed rgba(216, 184, 108, 0.28);
-  color: #b9ad8f;
+  border: 1px dashed rgba(179, 153, 93, 0.28);
+  color: #8d9e85;
   font-size: 13px;
   text-align: center;
   padding: 16px;
@@ -4258,7 +4258,7 @@ onBeforeUnmount(() => {
 }
 .ng-splitter:hover,
 .ng-splitter:active {
-  background: #d8b86c;
+  background: #b3995d;
 }
 .ng-splitter.vertical {
   cursor: col-resize;
@@ -4281,7 +4281,7 @@ onBeforeUnmount(() => {
   border-radius: 10px;
   background: rgba(8, 8, 6, 0.98);
   box-shadow: 0 16px 35px rgba(0, 0, 0, 0.45);
-  color: #f2ead5;
+  color: #e8ede3;
 }
 .ng-run-detail-head {
   display: flex;
