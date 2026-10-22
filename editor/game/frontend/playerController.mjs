@@ -1,7 +1,10 @@
 /** Kinematic player control with three camera modes. Native animation continues independently. */
 import { PLAYER_GUID, PLAYER_MODEL_YAW_OFFSET, vector3, rotatedBounds } from './storyCharacters.mjs';
 
-export const PLAYER_CONTROLS = Object.freeze({ speed: 3, maxDelta: 0.05, sprintMultiplier: 1.5, sprintThresholdMs: 200,
+// 速度与动作长度绑定：Walk 一个循环（1.5 s）走两步约 1.78 m -> 1.18 m/s；
+// Run 一个循环（0.8 s）约 2.17 m -> 2.7 m/s。取 1.5 m/s 让脚只轻微滑动而手感不过慢，
+// 冲刺 1.8 倍正好落在 Run 的 2.7 m/s 上。
+export const PLAYER_CONTROLS = Object.freeze({ speed: 1.75, maxDelta: 0.05, sprintMultiplier: 1.85, sprintThresholdMs: 200,
   dodgeDistance: 3, dodgeDuration: 0.25, dodgeCooldownMs: 600,
   jumpDistance: 4, jumpDuration: 0.7, jumpHeight: 1.2,
   distance: 4.5, minDistance: 2.5, maxDistance: 10,
@@ -22,6 +25,8 @@ const movementKey = event => {
 const shiftKey = event => ['ShiftLeft', 'ShiftRight'].includes(event.code) ? event.code
   : event.key === 'Shift' ? 'Shift' : '';
 const jumpKey = event => event.code === 'Space' || event.key === ' ' || event.key === 'Spacebar';
+// 蹲下：C 或左 Ctrl。做成切换（按一下蹲、再按一下站），避免按住不放和移动键冲突。
+const crouchKey = event => event.code === 'KeyC' || event.code === 'ControlLeft';
 const editing = event => (event.composedPath?.() || [event.target]).some(target => target?.isContentEditable
   || target?.closest?.('input, textarea, select, [contenteditable]:not([contenteditable="false"]), [role="textbox"]'));
 
@@ -34,7 +39,7 @@ export function createPlayerController({ getPose, setPose, submitPose, getBridge
   now = () => globalThis.performance.now(), config = PLAYER_CONTROLS }) {
   let player = null, targetOffset = 0, yaw = 0, pitch = config.pitch, distance = config.distance;
   let frame = null, epoch = 0, lastTime = null, pointer = null, disposed = false;
-  let jump = null, spaceHeld = false, feetOffset = 0;
+  let jump = null, spaceHeld = false, feetOffset = 0, crouched = false;
   let pendingMove = null, moveSequence = 0, binding = 0;
   const controllerId = ++controllerSequence;
   let view = PLAYER_VIEWS.includes(config.view) ? config.view : 'third';
@@ -69,7 +74,7 @@ export function createPlayerController({ getPose, setPose, submitPose, getBridge
     epoch++;
     if (frame !== null) cancelFrame(frame);
     frame = null; lastTime = null; pointer = null; keys.clear(); shifts.clear();
-    shiftSince = null; dodge = null; spaceHeld = false; jump = null;
+    shiftSince = null; dodge = null; spaceHeld = false; jump = null; crouched = false;
     // Preserve the last accepted pose. A save must wait for an already submitted
     // native move's callback, not manufacture a landing or poll the transform.
     return pendingMove?.settled ?? Promise.resolve();
@@ -197,7 +202,8 @@ export function createPlayerController({ getPose, setPose, submitPose, getBridge
         const direction = movementDirection();
         if (direction) {
           const sprint = shiftSince !== null && time - shiftSince >= config.sprintThresholdMs;
-          const speed = config.speed * (sprint ? config.sprintMultiplier : 1);
+          const crouchFactor = crouched ? 0.5 : 1;
+          const speed = config.speed * (sprint ? config.sprintMultiplier : 1) * crouchFactor;
           vx = direction[0] * speed; vz = direction[1] * speed;
           facing = Math.atan2(direction[0], direction[1]);
         }
@@ -277,7 +283,8 @@ export function createPlayerController({ getPose, setPose, submitPose, getBridge
       return player ? { actorGuid: player.actorGuid, position: [...player.position],
         rotation: [...player.rotation], facingYaw: player.facingYaw, grounded: player.grounded,
         version: player.version, movementState: jump ? 'jumping' : dodge ? 'dodging'
-          : movementDirection() ? (shiftSince !== null && now() - shiftSince >= config.sprintThresholdMs ? 'sprinting' : 'walking') : 'idle' } : null;
+          : movementDirection() ? (shiftSince !== null && now() - shiftSince >= config.sprintThresholdMs ? 'sprinting' : 'walking')
+            : crouched ? 'crouching' : 'idle' } : null;
     },
     acceptMeshMove,
     resume() { if (ready()) schedule(); },
@@ -287,6 +294,10 @@ export function createPlayerController({ getPose, setPose, submitPose, getBridge
       if ((!key && !space && !shift) || event.defaultPrevented || event.ctrlKey || event.altKey || event.metaKey
         || event.isComposing || event.keyCode === 229 || editing(event) || !ready()) return false;
       event.preventDefault?.();
+      if (crouchKey(event)) {
+        if (!event.repeat) { crouched = !crouched; onPlayerChanged(); }
+        return true;
+      }
       if (shift) {
         if (!event.repeat && !shifts.has(shift) && !jump && !dodge) {
           if (!shifts.size) shiftSince = now();

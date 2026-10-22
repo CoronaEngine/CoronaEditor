@@ -2321,7 +2321,9 @@ function onPointerDown(event) {
   if (adjustMode.value) return;
   // 小世界的自由视角：这一下点击顺便把鼠标交给相机（Esc 归还）。
   captureMouseLook(event);
-  void runAction(gameplay.attack, PLAYER_ATTACK_CLIP);
+  // 连击：动画端按窗口推进 AttackA → AttackB，命中判定仍由 gameplay.attack 负责。
+  playerAnimationSwitcher()?.combo();
+  void runAction(gameplay.attack, null);
 }
 
 onMounted(async () => {
