@@ -490,6 +490,9 @@ def _parse_archive_impl(input_path: str) -> dict[str, Any]:
 def parse_archive(input_path: str) -> dict[str, Any]:
     """Parse an archive without creating engine or Python scene entities."""
     try:
+        if Path(input_path).suffix.lower() in {".xml", ".pbrt"}:
+            from .external_scene import parse_external_scene
+            return parse_external_scene(input_path)
         return _parse_archive_impl(input_path)
     except ArchiveParseError:
         raise

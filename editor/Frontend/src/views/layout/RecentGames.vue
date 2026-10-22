@@ -144,9 +144,10 @@ onUnmounted(() => {
 
 const archiveDiagnostics = (result) => (result?.diagnostics || [])
   .map((item) => {
-    const actor = item.actor_name || item.actor_guid || '场景';
+    const actor = item.actor_name || item.actor_guid || item.shape_type || '场景';
     const path = item.resource_path || item.path || '';
-    return `${actor}: ${path}${path ? ' — ' : ''}${item.message || item.code || '加载失败'}`;
+    const count = item.count > 1 ? `（${item.count} 项）` : '';
+    return `${actor}${count}: ${path}${path ? ' — ' : ''}${item.message || item.code || '加载失败'}`;
   })
   .join('\n');
 
@@ -164,7 +165,7 @@ const handleOpenProject = async (path, project = null) => {
     if (opened?.status === 'decision_required') {
       const details = archiveDiagnostics(opened);
       const proceed = window.confirm(
-        `存档中有部分资源无法加载：\n\n${details}\n\n是否保留占位对象并降级打开？`,
+        `场景中有部分资源无法加载：\n\n${details}\n\n是否继续打开可用几何？缺失资源保留占位，不支持的形状将跳过。`,
       );
       if (!proceed) return;
       result = await projectLauncherService.openProject(path, { loadPolicy: 'degraded' });
