@@ -137,9 +137,6 @@ class SceneTools(PluginBase):
                            actor_data=None, notify_frontend: bool = True) -> dict:
         return SceneTools._native_scene_tree_only("_create_actor_impl")
 
-    @staticmethod
-    def create_scene(scene_name: str) -> dict:
-        return SceneTools._native_scene_tree_only("create_scene")
 
     @staticmethod
     def remove_actor(scene_name: str, actor_name: str) -> dict:

@@ -2787,7 +2787,6 @@ function formatRunDetail(status) {
     if (status.requestedScene || status.requestedActor) lines.push(`请求目标：${status.requestedScene || '(空场景)'} / ${status.requestedActor || '(空物体)'}`);
     if (status.resolvedSceneName || status.resolvedActorName) lines.push(`绑定目标：${status.resolvedSceneName || '(空场景)'} / ${status.resolvedActorName || '(空物体)'}`);
     if (status.bindingMode) lines.push(`绑定模式：${status.bindingMode === 'native_editor' ? 'Native Editor' : 'Python Scene'}`);
-    if (Array.isArray(status.pythonScenes)) lines.push(`Python 场景：${status.pythonScenes.join(', ') || '(空)'}`);
     if (status.nativeScene) lines.push(`原生场景：${status.nativeScene}`);
     if (Array.isArray(status.actorCandidates) && status.actorCandidates.length) lines.push(`物体候选：${status.actorCandidates.join(', ')}`);
   }

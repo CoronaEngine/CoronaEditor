@@ -4,6 +4,8 @@ import { useRouter, onBeforeRouteLeave } from 'vue-router';
 import { editorApi } from '@/api/editorApi.js';
 import { worldModeState, normalizeProjectPath } from '@/services/worldModeService.js';
 import { createStoryCameraController } from '@/utils/viewportStoryCamera.js';
+import { createStoryWorldControls, SMALL_WORLD_VIEW_LABELS } from '@/utils/viewportStoryWorldCamera.js';
+import { routeStoryKeydown } from '@/utils/storyKeyRouter.js';
 import { projectLauncherService, cancelPendingProjectOpen, getProjectSelectionVersion } from '@/services/projectLauncherService.js';
 import { trackWorldSessionWork, notifyWorldError, registerWorldSessionSave } from '@/services/worldSessionLifecycle.js';
 import { createStoryNavigationController, NAVIGATION_KEY } from '../../../../game/frontend/storyNavigation.mjs';
@@ -21,7 +23,7 @@ import { createPlayerController, VIEW_LABELS } from '../../../../game/frontend/p
 import { createPlayerSave } from '../../../../game/frontend/playerSave.mjs';
 import { createStoryGameplay, worldBounds, distanceToBounds, pickupDistance,
   contextualInteraction, FRAGMENT_GUID } from '../../../../game/frontend/storyGameplay.mjs';
-import { STORY_CHARACTERS, PROPHET_GUID, isMonsterRole, resolveStoryAssetPath,
+import { STORY_CHARACTERS, PROPHET_GUID, PLAYER_MODEL_YAW_OFFSET, isMonsterRole, resolveStoryAssetPath,
   sceneSnapshot } from '../../../../game/frontend/storyCharacters.mjs';
 import { MAX_PLACEMENTS, PLACED_BLOCK_REACH, PLACEMENT_DISTANCE, blockSpawnTransform, cycleSlot, findProp,
   hotbarSlots as hotbarSlotsFor, nearestPlacedBlock, nextPlacementIndex, placementGuid,
@@ -115,11 +117,10 @@ const current = () => !disposed && !leaving && worldModeState.status === 'ready'
  */
 const groundYAt = (x, z) => heightAt(x, z);
 const camera = createStoryCameraController({
-  createControls: createPlayerController,
-  // 玩家的地面线：地图是 phantom（引擎不为它建碰撞体），脚下多高只能由烘好的高度网格回答。
-  // `heightAt` 在没有网格时返回 null，控制器便退回原来的固定地板——这条绑定必须在
-  // createStoryCameraController 里继续往下传，否则控制器收不到它（这正是之前的原因）。
-  getGroundY: groundYAt,
+  createControls: options => createStoryWorldControls({
+    ...options, createThirdPerson: createPlayerController, role: () => roleRef.value,
+    getGroundY: groundYAt, modelYawOffset: PLAYER_MODEL_YAW_OFFSET,
+  }),
   onError: error => {
     if (current()) gameplayError.value = error.message;
     notifyWorldError(error);
@@ -1441,15 +1442,16 @@ const nearbyMonsterBar = computed(() =>
 function viewLabel() {
   void viewTick.value;
   const mode = camera.viewMode?.();
-  return (mode && VIEW_LABELS?.[mode]) || '第三人称';
+  const labels = inSubworld.value ? SMALL_WORLD_VIEW_LABELS : VIEW_LABELS;
+  return (mode && labels?.[mode]) || '第三人称';
 }
 // 操作提示按世界过滤：先知的 F 与碎片的 F 分属两个世界，天然互斥。
 // F 这一行只由 fKeyAction 决定（同一个裁决也驱动 F 键），因此提示与实际动作不会分歧。
 const controlHints = computed(() => [
   ['WASD', '移动'],
   ['鼠标', '转向 · 滚轮缩放'],
-  ['Space', '跳远'],
-  ['Shift', '长按跑步 · 点按闪避'],
+  ...(inSubworld.value ? [['Space / Q / E', '相机升降']]
+    : [['Space', '跳远'], ['Shift', '长按跑步 · 点按闪避']]),
   ...(showCombatHud.value ? [['左键', '攻击'], ['E / R', '技能']] : []),
   ...(fKeyAction.value.prompt ? [['F', fKeyAction.value.prompt]] : []),
   ['V', `视角 · ${viewLabel()}`],
@@ -1940,10 +1942,15 @@ const navigation = createStoryNavigationController({
   notify: error => { if (current()) gameplayError.value = error.message; notifyWorldError(error); },
 });
 function onKeyDown(event) {
-  if (!current()) return;
+  const route = routeStoryKeydown(event, {
+    current: current(), adjustMode: adjustMode.value, dialogueOpen: dialogueOpen.value,
+    inSubworld: inSubworld.value, inventoryOpen: inventoryOpen.value,
+    actionBusy: actionBusy.value, busy: gameplay.busy, needsSave: gameplay.needsSave,
+  });
+  if (route === 'ignore') return;
   // The adjustment mode owns the keyboard outright: only the adjustment steps and the way out
   // get through, so a stray key cannot cast a skill or swing while the player is arranging.
-  if (adjustMode.value) {
+  if (route === 'adjust') {
     event.preventDefault();
     event.stopPropagation();
     if (event.code === 'Escape' || event.key === 'Escape') {
@@ -1957,7 +1964,7 @@ function onKeyDown(event) {
     return;
   }
   // 对话面板打开时独占键盘：Esc 不再退出世界，F/Space 也不会漏给相机或其它交互。
-  if (dialogueOpen.value) {
+  if (route === 'dialogue') {
     event.preventDefault();
     event.stopPropagation();
     if (event.code === 'Escape' || event.key === 'Escape') {
@@ -1979,20 +1986,17 @@ function onKeyDown(event) {
   }
   // 物品栏：调整模式与对话（上面两个分支）已经吃掉数字键，因此这里只在
   // 小世界、面板关闭时接管数字键与 B。主世界里这套键完全不生效。
-  if (inSubworld.value && !inventoryOpen.value && !event.ctrlKey && !event.altKey
-    && !event.metaKey && !event.isComposing) {
-    if (/^[1-9]$/.test(event.key || '')) {
-      event.preventDefault(); event.stopPropagation();
-      if (!event.repeat) selectHotbarSlot(Number(event.key) - 1);
-      return;
-    }
-    if (event.code === 'KeyB' || event.key?.toLowerCase() === 'b') {
-      event.preventDefault(); event.stopPropagation();
-      if (!event.repeat) void placeSelectedItem();
-      return;
-    }
+  if (route === 'hotbar-slot') {
+    event.preventDefault(); event.stopPropagation();
+    if (!event.repeat) selectHotbarSlot(Number(event.key) - 1);
+    return;
   }
-  if (event.code === 'Escape' || event.key === 'Escape') {
+  if (route === 'place-item') {
+    event.preventDefault(); event.stopPropagation();
+    if (!event.repeat) void placeSelectedItem();
+    return;
+  }
+  if (route === 'escape') {
     event.preventDefault();
     event.stopPropagation();
     if (navigation.busy) { if (!event.repeat) void exitStory(); }
@@ -2000,31 +2004,29 @@ function onKeyDown(event) {
     else if (!event.repeat) void exitStory();
     return;
   }
-  if (event.ctrlKey || event.altKey || event.metaKey || event.isComposing) return;
-  if (event.code === 'Tab' || event.key === 'Tab') {
+  if (route === 'tab') {
     event.preventDefault(); event.stopPropagation();
     if (!event.repeat && focused && !document.hidden && cameraReady && !navigation.busy && !savingPlayer) toggleInventory();
     return;
   }
-  if (inventoryOpen.value) {
+  if (route === 'inventory') {
     if (!['Enter', 'Space'].includes(event.code)) event.preventDefault();
     event.stopPropagation(); return;
   }
-  if (event.code === 'KeyV' || event.key?.toLowerCase() === 'v') {
+  if (route === 'cycle-view') {
     event.preventDefault(); event.stopPropagation();
     if (!event.repeat) cycleView();
     return;
   }
-  if (event.code === 'KeyF' || event.key?.toLowerCase() === 'f') {
+  if (route === 'interact') {
     event.preventDefault(); event.stopPropagation();
     if (!event.repeat && focused) interact();
     return;
   }
-  if ((event.code === 'Space' || event.key === ' ' || event.key === 'Spacebar')
-    && (actionBusy.value || gameplay.busy || gameplay.needsSave)) {
+  if (route === 'space-busy') {
     event.preventDefault(); event.stopPropagation(); return;
   }
-  if (event.code === 'KeyE' || event.code === 'KeyR' || ['e', 'r'].includes(event.key?.toLowerCase())) {
+  if (route === 'skill') {
     event.preventDefault(); event.stopPropagation();
     const skill = event.code === 'KeyE' || event.key?.toLowerCase() === 'e' ? 'heavy' : 'sweep';
     if (!event.repeat && focused) void runAction(() => gameplay.castSkill(skill), PLAYER_SKILL_CLIP);
@@ -2069,9 +2071,7 @@ onMounted(async () => {
   initialization = trackWorldSessionWork((async () => {
     const init = unwrap(await editorApi.main.onInit());
     if (!current()) return;
-    const scenes = init?.scenes || [];
-    const index = Math.min(Math.max(Number(init?.active_index) || 0, 0), Math.max(0, scenes.length - 1));
-    sceneId = scenes[index]?.path || init?.path;
+    sceneId = init?.scene?.path;
     if (!sceneId) throw new Error('当前世界没有可用场景');
     // 原生三角面移动的结果必须回送控制器：没有这条登记，按键只会更新输入状态，
     // 移动请求一直挂在 pendingMove 上等回调，角色永远不动（15 秒后还会报超时）。

@@ -130,13 +130,13 @@ async function loadEditorApi() {
 
 test('model node wrappers preserve actor and numeric node identity in native requests', async () => {
   const { editorApi, host } = await loadEditorApi();
-  await editorApi.sceneTools.getModelNodes('Scene/main.scene', 'Temple', -1, 0, 50);
+  await editorApi.sceneTools.getModelNodes('scene.ini', 'Temple', -1, 0, 50);
   const patch = { visible: false, position: [1, 2, 3] };
-  await editorApi.sceneTools.setModelNodeState('Scene/main.scene', 'Temple', 12, patch);
+  await editorApi.sceneTools.setModelNodeState('scene.ini', 'Temple', 12, patch);
   assert.deepEqual(host.requests.find((item) => item.api === 'SceneTools.get_model_nodes').args,
-    ['Scene/main.scene', 'Temple', -1, 0, 50]);
+    ['scene.ini', 'Temple', -1, 0, 50]);
   assert.deepEqual(host.requests.find((item) => item.api === 'SceneTools.set_model_node_state').args,
-    ['Scene/main.scene', 'Temple', 12, patch]);
+    ['scene.ini', 'Temple', 12, patch]);
 });
 
 // Runs `body` with a short transport wait so timeout behaviour is exercised without
@@ -260,6 +260,20 @@ test('an unknown wrapper path is rejected instead of being sent to native', asyn
     false,
     'an unresolvable wrapper must never reach native'
   );
+});
+
+test('static namespaces resolve manifest methods but reject unknown members before native dispatch', async () => {
+  const { editorApi, host } = await loadEditorApi();
+  const getModelNodes = editorApi.sceneTools.getModelNodes;
+  assert.equal(editorApi.sceneTools.getModelNodes, getModelNodes);
+  assert.equal(editorApi.sceneTools.then, undefined);
+  await getModelNodes('scene.ini', 'Temple');
+  assert.deepEqual(host.requests.find(entry => entry.api === 'SceneTools.get_model_nodes').args,
+    ['scene.ini', 'Temple']);
+
+  const before = host.requests.filter(entry => !entry.api.startsWith('EditorApi.')).length;
+  await assert.rejects(() => editorApi.sceneTools.notARealMethod(), /not defined by C\+\+ manifest/);
+  assert.equal(host.requests.filter(entry => !entry.api.startsWith('EditorApi.')).length, before);
 });
 
 import {

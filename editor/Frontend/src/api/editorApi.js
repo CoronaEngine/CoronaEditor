@@ -435,6 +435,15 @@ const create_dynamic_editor_api_function = (wrapperPath) => async (...args) => {
 };
 
 const create_dynamic_editor_api_namespace = (wrapperPath, target = {}) => {
+  // Static namespaces also contain methods supplied only by the native manifest.
+  // Keep their explicit wrappers (and defaults), while resolving missing members
+  // through the same manifest validation as fully dynamic namespaces.
+  for (const [property, value] of Object.entries(target)) {
+    if (value !== null && typeof value === 'object') {
+      const childPath = wrapperPath ? `${wrapperPath}.${property}` : property;
+      target[property] = create_dynamic_editor_api_namespace(childPath, value);
+    }
+  }
   return new Proxy(target, {
     get(current, property) {
       if (typeof property !== 'string') {
@@ -490,8 +499,6 @@ const editorApiStatic = {
     onNetworkAssetImportCompleted: (callback) => register_manifest_editor_api_callback('events.onNetworkAssetImportCompleted', callback),
     onNetworkFileSyncStatusChanged: (callback) => register_manifest_editor_api_callback('events.onNetworkFileSyncStatusChanged', callback),
     onNetworkSyncPauseRequested: (callback) => register_manifest_editor_api_callback('events.onNetworkSyncPauseRequested', callback),
-    onSceneAdded: (callback) => register_manifest_editor_api_callback('events.onSceneAdded', callback),
-    onSceneRenamed: (callback) => register_manifest_editor_api_callback('events.onSceneRenamed', callback),
     onSceneTreeChanged: (callback) => register_manifest_editor_api_callback('events.onSceneTreeChanged', callback),
     onProjectOpened: (callback) => register_manifest_editor_api_callback('events.onProjectOpened', callback),
     onLanChatEvent: (callback) => register_manifest_editor_api_callback('events.onLanChatEvent', callback),
@@ -618,14 +625,10 @@ const editorApiStatic = {
       call_manifest_editor_api('project.browseFolder', defaultPath ? [defaultPath] : []),
     createMultiplayerProject: (projectData) =>
       call_manifest_editor_api('project.createMultiplayerProject', [projectData || {}]),
-    copyExistingToData: (payload) =>
-      call_manifest_editor_api('project.copyExistingToData', [payload || {}]),
     createProject: (projectData) =>
       call_manifest_editor_api('project.createProject', [projectData || {}]),
     createWorldProject: (worldData) =>
       call_manifest_editor_api('project.createWorldProject', [worldData || {}]),
-    choosePortableSceneTarget: () =>
-      call_manifest_editor_api('project.choosePortableSceneTarget', []),
     validatePortableScene: (payload) =>
       call_manifest_editor_api('project.validatePortableScene', [payload || {}]),
     importPortableAsset: (payload) =>
@@ -636,13 +639,10 @@ const editorApiStatic = {
     getDefaultProjectPath: () => call_manifest_editor_api('project.getDefaultProjectPath', []),
     getProjectLoadStatus: () => call_manifest_editor_api('project.getProjectLoadStatus', []),
     getRecentProjects: () => call_manifest_editor_api('project.getRecentProjects', []),
-    migrateLegacyScene: (payload) =>
-      call_manifest_editor_api('project.migrateLegacyScene', [payload || {}]),
+    importVisionScene: (path) => call_manifest_editor_api('project.importVisionScene', [path]),
     openProject: (projectPath, options = {}) =>
       call_manifest_editor_api('project.openProject', [projectPath, options]),
     openProjectFile: () => call_manifest_editor_api('project.openProjectFile', []),
-    setProjectMode: (mode, settings) =>
-      call_manifest_editor_api('project.setProjectMode', [{ mode, settings }]),
   },
   scene: {
     listActorTree: (sceneName) => call_manifest_editor_api('scene.listActorTree', [sceneName]),
@@ -699,13 +699,10 @@ const editorApiStatic = {
       ]),
   },
   sceneTools: {
-    createScene: (sceneName) => call_manifest_editor_api('sceneTools.createScene', [sceneName]),
     listSceneTree: (sceneName) => call_manifest_editor_api('sceneTools.listSceneTree', [sceneName]),
     getEnvironment: (sceneName) => call_manifest_editor_api('sceneTools.getEnvironment', [sceneName]),
     setEnvironment: (sceneName, state) =>
       call_manifest_editor_api('sceneTools.setEnvironment', [sceneName, state || {}]),
-    listRoutes: () => call_manifest_editor_api('sceneTools.listRoutes', []),
-    switch: (sceneName) => call_manifest_editor_api('sceneTools.switch', [sceneName]),
     reloadScene: (sceneName, projectPath = '') =>
       call_manifest_editor_api('sceneTools.reloadScene', projectPath ? [sceneName, projectPath] : [sceneName]),
     rebindActorResource: (sceneName, actorGuid, path) =>
@@ -831,8 +828,6 @@ const editorApiStatic = {
       call_manifest_editor_api('main.importResourceFile', [sceneName, fileType]),
     onInit: (projectPath = '') =>
       call_manifest_editor_api('main.onInit', projectPath ? [projectPath] : []),
-    createScene: (sceneName) => call_manifest_editor_api('main.createScene', [sceneName]),
-    removeScene: (sceneName) => call_manifest_editor_api('main.removeScene', [sceneName]),
     runProject: (scenePath = '') =>
       call_manifest_editor_api('main.runProject', scenePath ? [scenePath] : []),
     sceneSave: (sceneName) => call_manifest_editor_api('main.sceneSave', [sceneName]),
@@ -843,7 +838,6 @@ const editorApiStatic = {
     getActiveProjectInfo: () => call_manifest_editor_api('projectSettings.getActiveProjectInfo', []),
     saveActiveProjectInfo: (settings) =>
       call_manifest_editor_api('projectSettings.saveActiveProjectInfo', [settings || {}]),
-    browseSceneFile: () => call_manifest_editor_api('projectSettings.browseSceneFile', []),
   },
   resourceSearch: {
     prepareIndex: (caller = CURRENT_CALLER) =>

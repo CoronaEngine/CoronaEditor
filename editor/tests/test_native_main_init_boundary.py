@@ -5,6 +5,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 HANDLER = (
     REPO_ROOT
     / ".."
+    / ".."
     / "src"
     / "systems"
     / "ui"
@@ -17,7 +18,7 @@ MAIN_VIEW = (
 )
 
 
-def test_native_main_init_owns_scene_list_and_active_scene_resolution():
+def test_native_main_init_owns_current_scene_resolution():
     source = HANDLER.read_text(encoding="utf-8")
     start = source.index("void register_main_view_api_handlers")
     end = source.index("void register_project_settings_api_handlers", start)
@@ -27,7 +28,7 @@ def test_native_main_init_owns_scene_list_and_active_scene_resolution():
     assert '{"on_init", []' in main_view
     assert "make_native_main_init_payload" in main_view
     assert "read_ini_file" in source
-    assert "split_csv_routes" in source
+    assert "split_csv_routes" not in source
     assert "reload_native_editor_scene" in source
 
 
@@ -40,7 +41,7 @@ def test_editor_api_exposes_native_main_init():
 def test_main_view_on_init_does_not_create_legacy_python_scenes():
     source = MAIN_VIEW.read_text(encoding="utf-8")
     start = source.index("    def on_init")
-    end = source.index("    def create_new_scene", start)
+    end = source.index("    def scene_save", start)
     init_source = source[start:end]
 
     assert "CoronaEditorApi.main.on_init" in init_source

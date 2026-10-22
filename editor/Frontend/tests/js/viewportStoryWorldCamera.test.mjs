@@ -2,7 +2,8 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createStoryCameraController } from '../../src/utils/viewportStoryCamera.js';
 import { createViewportCameraController } from '../../src/utils/viewportCameraController.js';
-import { createPlayerController } from '../../../../game/frontend/playerController.mjs';
+import { createPlayerController } from '../../../game/frontend/playerController.mjs';
+import { createMeshMoveHost, createPlayerControllerWithHost } from './meshMoveFixture.mjs';
 import { SMALL_WORLD_CAMERA, SMALL_WORLD_VIEW_LABELS, SMALL_WORLD_VIEWS,
   createSmallWorldCamera, createStoryWorldControls } from '../../src/utils/viewportStoryWorldCamera.js';
 
@@ -30,7 +31,45 @@ const cameraPose = (position = [0, 0, 0], forward = [0, 0, 1]) => ({
 });
 const playerActor = (position = [0, 0.9, 0]) => ({ handle: 41,
   actor_guid: 'f9f5c8b0-7324-4b6c-a011-000000000001',
+  local_aabb: [-0.5, -0.9, -0.5, 0.5, 0.9, 0.5],
   geometry: { position: [...position], rotation: [0, -Math.PI / 2, 0], scale: [1, 1, 1] } });
+
+test('native movement replies cross both camera wrappers and settle the save barrier after input stops', async t => {
+  const timer = clock();
+  let role = 'main';
+  const host = createMeshMoveHost({
+    autoReply: false,
+    readActor: () => camera.snapshotPlayer(),
+    onResult: result => assert.equal(camera.acceptMeshMove(result), true),
+  });
+  const camera = createStoryCameraController({
+    getBridge: () => ({ cameraMove: () => true, moveActorMesh: host.moveActorMesh }),
+    getRect: () => ({ left: 0, top: 0, width: 800, height: 600 }),
+    createControls: options => createStoryWorldControls({ ...options, role: () => role,
+      createThirdPerson: createPlayerController }),
+    ...timer,
+  });
+  t.after(() => { host.flush(); camera.dispose(); });
+  camera.bind({ cameras: [cameraPose()] }, 'scene.ini');
+  camera.bindPlayer(playerActor(), 0.45);
+  camera.keyDown(event({ code: 'KeyD' }));
+  timer.step(50);
+  assert.equal(host.pending.length, 1);
+  assert.equal(camera.snapshotPlayer().position[0], 0, 'only native replies may advance the player');
+  const result = host.pending[0];
+  assert.equal(camera.acceptMeshMove({ ...result, requestId: 'unrelated' }), false);
+  let settled = false;
+  const stopped = camera.resetInput().then(() => { settled = true; });
+  await Promise.resolve();
+  assert.equal(settled, false, 'save must wait for the pending native result');
+  role = 'child';
+  host.flush();
+  await stopped;
+  assert.equal(settled, true);
+  near(camera.snapshotPlayer().position[0], 0.15);
+  assert.equal(camera.acceptMeshMove(result), false, 'duplicate replies cannot apply movement twice');
+  assert.equal(timer.frames.size, 0, 'a late reply must not resume stopped input');
+});
 
 /**
  * One small-world camera plus the pose it submits, driven by a manual frame clock (the same
@@ -189,7 +228,7 @@ test('the invisible player is the ground point under the camera, and its pose is
 test('the dispatcher routes each world to its own camera, and zoom only exists in the small world', () => {
   const made = [];
   const createThirdPerson = options => {
-    const controller = createPlayerController(options);
+    const controller = createPlayerControllerWithHost(options);
     made.push(controller);
     return controller;
   };
@@ -301,7 +340,7 @@ test('裸鼠标转向只属于小世界的自由视角：俯视与主世界都�
   const timer = clock();
   let pose = cameraPose();
   const controls = createStoryWorldControls({
-    createThirdPerson: createPlayerController, role: () => 'main',
+    createThirdPerson: createPlayerControllerWithHost, role: () => 'main',
     getBridge: () => ({ cameraMove: () => true, actorTransform: () => true }),
     getPose: () => pose, setPose: next => { pose = next; }, submitPose: () => true, ...timer,
   });
@@ -359,7 +398,7 @@ test('主世界的裸鼠标转向仍然是它自己那一套，没有被小世�
   const timer = clock();
   let pose = cameraPose([0, 0, 0], [0, 0, 1]);
   const controls = createStoryWorldControls({
-    createThirdPerson: createPlayerController, role: () => 'main',
+    createThirdPerson: createPlayerControllerWithHost, role: () => 'main',
     getBridge: () => ({ cameraMove: () => true, actorTransform: () => true }),
     getPose: () => pose, setPose: next => { pose = next; }, submitPose: () => true,
     getRect: () => ({ left: 0, top: 0, width: 800, height: 600 }), ...timer,
@@ -464,12 +503,15 @@ test('主世界的空格仍然是跳跃，只有小世界的相机把它当上�
   const timer = clock();
   let pose = cameraPose();
   const controls = createStoryWorldControls({
-    createThirdPerson: createPlayerController, role: () => 'main',
+    createThirdPerson: createPlayerControllerWithHost, role: () => 'main',
     getBridge: () => ({ cameraMove: () => true, actorTransform: () => true }),
     getPose: () => pose, setPose: next => { pose = next; }, submitPose: () => true, ...timer,
   });
   controls.bindPlayer(playerActor(), 0.45);
   assert.equal(controls.viewMode(), 'third');
+  controls.pointerMove(event({ clientX: 400, clientY: 300 }));
+  timer.step(timer.now() + 16);
+  controls.resetInput();
   const ground = controls.snapshotPlayer().position[1];
   const down = keyEvent({ code: 'Space', key: ' ' });
   assert.equal(controls.keyDown(down), true);

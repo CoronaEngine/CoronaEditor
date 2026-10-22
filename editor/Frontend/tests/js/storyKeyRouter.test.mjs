@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { STORY_KEY_ROUTES, routeStoryKeydown } from '../../src/utils/storyKeyRouter.js';
 import { createViewportCameraController } from '../../src/utils/viewportCameraController.js';
-import { createPlayerController } from '../../../../game/frontend/playerController.mjs';
+import { createPlayerControllerWithHost } from './meshMoveFixture.mjs';
 import { createStoryWorldControls } from '../../src/utils/viewportStoryWorldCamera.js';
 
 const near = (actual, expected, label = '') => assert.ok(Math.abs(actual - expected) < 1e-9,
@@ -38,6 +38,7 @@ const cameraPose = (position = [0, 0, 0], forward = [0, 0, 1]) => ({
 });
 const playerActor = (position = [0, 0.9, 0]) => ({ handle: 41,
   actor_guid: 'f9f5c8b0-7324-4b6c-a011-000000000001',
+  local_aabb: [-0.5, -0.9, -0.5, 0.5, 0.9, 0.5],
   geometry: { position: [...position], rotation: [0, -Math.PI / 2, 0], scale: [1, 1, 1] } });
 
 const baseState = {
@@ -96,7 +97,10 @@ test('小世界里空格一直路由到相机：即使动作/保存进行中也�
 });
 
 test('主世界保持空格=跳跃：动作/保存进行中仍然被页面吞掉', () => {
-  const main = world('main', createPlayerController);
+  const main = world('main', createPlayerControllerWithHost);
+  // Establish grounded state from the native reply before asking to jump.
+  main.controls.pointerMove({ clientX: 400, clientY: 300 }); main.step(16);
+  main.controls.resetInput();
   const ground = main.controls.snapshotPlayer().position[1];
   const state = { ...baseState, inSubworld: false, actionBusy: true, busy: true, needsSave: true };
   const down = keyEvent({ code: 'Space', key: ' ' });

@@ -227,7 +227,7 @@ let networkSyncPauseCallbackToken = null;
 const CONNECT_TIMEOUT_MS = 5000;
 const connectionAttemptStartedAt = ref(0);
 const ownershipClaimTimes = new Map();
-const currentSceneName = ref('Scene/default.scene');
+const currentSceneName = ref('scene.ini');
 const snapshotRequestedScenes = new Set();
 const remoteRegisteredActorIdentities = new Set();
 const lastBroadcastSnapshotHashes = new Map();
@@ -535,7 +535,7 @@ function isActorSyncable(actorData) {
 function rememberSceneName(sceneName) {
   const value = String(sceneName || '').trim();
   if (value) currentSceneName.value = value;
-  return currentSceneName.value || 'Scene/default.scene';
+  return currentSceneName.value || 'scene.ini';
 }
 
 function onSceneTreeChangedEvent(payload) {
@@ -587,7 +587,7 @@ function onNetworkActorSyncBroadcastRequested(actorData = {}) {
   if (!isActorSyncable(actorData)) return;
   const modelPath = actorData.path || actorData.model || '';
   if (!modelPath) return;
-  const sceneName = rememberSceneName(actorData.scene || 'Scene/default.scene');
+  const sceneName = rememberSceneName(actorData.scene || 'scene.ini');
   const actorGuid = String(actorData.actor_guid || '').trim();
   if (!actorGuid) {
     remoteActorLog.value = `Actor has no stable GUID; sync skipped: ${actorData.name || modelPath}`;
@@ -606,7 +606,7 @@ function onNetworkActorTransformSyncBroadcastRequested(actorData = {}) {
   if (!sessionActive.value || !actorData) return;
   const actorGuid = actorData.actor_guid || '';
   if (!actorGuid) return;
-  const sceneName = rememberSceneName(actorData.scene || 'Scene/default.scene');
+  const sceneName = rememberSceneName(actorData.scene || 'scene.ini');
   networkService.broadcastActorTransform(actorGuid, sceneName, actorData).catch(() => {});
 }
 
@@ -615,7 +615,7 @@ function onNetworkActorStateSyncBroadcastRequested(actorData = {}) {
   if (actorData._suppress_network_broadcast) return;
   const actorGuid = actorData.actor_guid || '';
   if (!actorGuid) return;
-  const sceneName = rememberSceneName(actorData.scene || 'Scene/default.scene');
+  const sceneName = rememberSceneName(actorData.scene || 'scene.ini');
   networkService.broadcastActorStateUpdate(actorGuid, sceneName, actorData).catch(() => {});
 }
 
@@ -624,7 +624,7 @@ function onNetworkActorDeleteSyncBroadcastRequested(actorData = {}) {
   const actorGuid = actorData.actor_guid || '';
   const actorName = actorData.actor_name || actorData.name || '';
   if (!actorGuid && !actorName) return;
-  const sceneName = rememberSceneName(actorData.scene || 'Scene/default.scene');
+  const sceneName = rememberSceneName(actorData.scene || 'scene.ini');
   forgetActorCreateBroadcast(sceneName, actorGuid);
   networkService.broadcastActorDelete(actorGuid, sceneName, actorName).catch(() => {});
 }

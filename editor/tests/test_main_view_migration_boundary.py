@@ -9,8 +9,8 @@ def test_main_view_document_records_native_lifecycle_completion_for_repo_callers
     source = (PLUGIN_ROOT / "main.py").read_text(encoding="utf-8")
 
     assert "CoronaEditorApi.main.on_init" in source
-    assert "CoronaEditorApi.main.create_scene" in source
-    assert "CoronaEditorApi.main.remove_scene" in source
+    assert "CoronaEditorApi.main.create_scene" not in source
+    assert "CoronaEditorApi.main.remove_scene" not in source
 
 
 def test_main_view_production_source_does_not_import_legacy_scene_adapter():
@@ -20,6 +20,6 @@ def test_main_view_production_source_does_not_import_legacy_scene_adapter():
 
     assert "legacy_main_view_scene_adapter" not in source
     assert "CoronaEditorApi.main.on_init" in source
-    assert "CoronaEditorApi.main.create_scene" in source
-    assert "CoronaEditorApi.main.remove_scene" in source
-    assert "CoronaEditorApi.scene_tools.reload_scene" in source
+    assert "CoronaEditorApi.main.create_scene" not in source
+    assert "CoronaEditorApi.main.remove_scene" not in source
+    assert "CoronaEditorApi.scene_tools.reload_scene" not in source

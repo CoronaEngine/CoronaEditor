@@ -2,6 +2,8 @@ import { NAVIGATION_KEY } from '../../../game/frontend/storyNavigation.mjs';
 import { actorFixture, gameplayConfig, projectReady } from '../../../game/tests/frontend/fixtures.mjs';
 import * as gameplayModule from '../../../game/frontend/storyGameplay.mjs';
 import * as storyPropsModule from '../../../game/frontend/storyProps.mjs';
+import * as storyPlayerAnimationModule from '../../../game/frontend/storyPlayerAnimation.mjs';
+import * as storyBossAiModule from '../../../game/frontend/storyBossAi.mjs';
 import * as storyLootModule from '../../../game/frontend/storyLoot.mjs';
 import * as prophetDialogueModule from '../../../game/frontend/prophetDialogue.mjs';
 import * as storyCubeModule from '../../../game/frontend/storyCube.mjs';
@@ -25,6 +27,7 @@ import { createPlayerController, VIEW_LABELS } from '../../../game/frontend/play
 import { createPlayerSave } from '../../../game/frontend/playerSave.mjs';
 import { ensureStoryCharacters, syncPlacementActors } from '../../../game/frontend/storyActors.mjs';
 import { sceneFixture } from '../../../game/tests/frontend/fixtures.mjs';
+import { createMeshMoveHost } from './meshMoveFixture.mjs';
 import { registerWorldSessionSave, flushWorldSessionSaves, trackWorldSessionWork } from '../../src/services/worldSessionLifecycle.js';
 import { normalizeVisionRenderMode, visionAccumulationFromCamera, visionDenoiseFromCamera, visionStablePlanesFromCamera, visionDenoiserFromCamera } from '../../src/utils/visionRenderModes.js';
 
@@ -58,7 +61,7 @@ const makeHost = new Function('deps', `
     refreshSceneCameraBinding, syncSceneCameraBinding, broadcastViewportControlsState,
     getEditorControlsState, normalizeVisionRenderMode, visionAccumulationFromCamera, visionDenoiseFromCamera, visionStablePlanesFromCamera, visionDenoiserFromCamera } = deps;
   const DEFAULT_SCENE_NAME = 'scene.ini';
-  const tabs = ref([{id: DEFAULT_SCENE_NAME}]), activeTab = ref(0);
+  const currentSceneId = ref(DEFAULT_SCENE_NAME);
   const getViewportRenderRect = () => ({ left: 0, top: 0, width: 800, height: 600 });
   const indexActorsByHandle = () => new Map();
   const sceneGridEnabled = ref(true), sceneLightSettings = reactive({ direction: {} });
@@ -216,9 +219,10 @@ for (const node of [...imports].reverse()) {
 }
 const makeStory = new Function('modules', 'window', 'document', `${setupSource}; return StoryWorld;`);
 const deferred = () => { let resolve; const promise = new Promise(done => { resolve = done; }); return { promise, resolve }; };
-async function mountStory(t, { pendingInit = null, sceneSnapshot = { data: snapshot() }, role = 'main' } = {}) {
+async function mountStory(t, { pendingInit = null, sceneSnapshot = { data: snapshot() }, role = 'main', expectInitError = false } = {}) {
   const mounted = [], unmounted = [], frames = new Map(), calls = [], routes = [];
   const listeners = new Map(); let id = 0, time = 0;
+  let motionCallback = null;
   // The page drives both combat and exhibits over the same bridge key, so the harness
   // answers by action, and keeps a mutable scene so placement actors can be observed.
   const sceneActors = structuredClone(sceneSnapshot.data?.actors ?? sceneFixture().actors);
@@ -231,15 +235,31 @@ async function mountStory(t, { pendingInit = null, sceneSnapshot = { data: snaps
   });
   const document = { ...dom(), hasFocus: () => true, hidden: false };
   const worldModeState = { mode: 'story', status: 'ready', revision: 1, projectPath: 'world' };
-  const window = { ...dom(), devicePixelRatio: 1, location: { href: 'file:///D:/engine/editor/Frontend/dist/index.html' }, alert: message => calls.push(['alert', message]),
+  const meshHost = createMeshMoveHost({
+    readActor: handle => sceneActors.find(actor => actor.handle === handle),
+    onRequest: (...args) => calls.push(['moveActorMesh', ...args]),
+    onResult: result => {
+      const actor = sceneActors.find(actor => actor.handle === result.actorHandle);
+      actor.geometry.position = [...result.position];
+      actor.geometry.rotation = [...result.rotation];
+      assert.equal(motionCallback(result), true, 'the page must forward native movement replies');
+    },
+  });
+  const window = { ...dom(), setInterval, clearInterval, devicePixelRatio: 1, location: { href: 'file:///D:/engine/editor/Frontend/dist/index.html' }, alert: message => calls.push(['alert', message]),
     coronaBridge: Object.fromEntries(['actorTransform', 'cameraMove', 'setCameraViewport', 'setViewportGizmoTarget', 'setViewportUiMode', 'setViewportSystemCursorHidden']
       .map(name => [name, (...args) => { calls.push([name, ...args]); return true; }])) };
+  window.coronaBridge.moveActorMesh = meshHost.moveActorMesh;
   const component = makeStory({
     vue: { ref, nextTick, watch, reactive, computed, onMounted: fn => mounted.push(fn), onUnmounted: fn => unmounted.push(fn) },
     'vue-router': { onBeforeRouteLeave() {}, useRouter: () => ({ replace: async path => routes.push(path) }) },
     '@/api/editorApi.js': { editorApi: {
+      events: { onMeshMoveResult: async callback => {
+        assert.equal(typeof callback, 'function'); motionCallback = callback; return 1;
+      } },
+      off: async token => { assert.equal(token, 1); motionCallback = null; },
       project: { getProjectLoadStatus: async () => projectReady('world') },
       sceneTools: {
+        setActorAnimation: async () => ({ status: 'success' }),
         setActorState: async (scene, guid, state) => {
           const actor = placementActor(guid);
           Object.assign(actor, state);
@@ -272,7 +292,7 @@ async function mountStory(t, { pendingInit = null, sceneSnapshot = { data: snaps
           state: { version: 2, revision: 0, rage: 0, boss: { hp: 200 }, drop: null, inventory: { worldFragment: 0 } },
           config: gameplayConfig };
       } },
-      main: { onInit: async () => pendingInit ? pendingInit.promise : ({ scenes: [{ path: 'scene.ini' }] }) },
+      main: { onInit: async () => pendingInit ? pendingInit.promise : ({ scene: { path: 'scene.ini' } }) },
       scene: { getSnapshot: async () => ({ ...(sceneSnapshot.data ?? sceneSnapshot), actors: sceneActors }),
         setActorTransform: async (scene, guid, transform) => { calls.push(['playerSave', guid]);
           const actor = placementActor(guid);
@@ -287,6 +307,8 @@ async function mountStory(t, { pendingInit = null, sceneSnapshot = { data: snaps
     '../../../../game/frontend/storyNavigation.mjs': { createStoryNavigationController, NAVIGATION_KEY },
     '../../../../game/frontend/storyActors.mjs': { ensureStoryCharacters, syncPlacementActors },
     '../../../../game/frontend/storyProps.mjs': storyPropsModule,
+    '../../../../game/frontend/storyPlayerAnimation.mjs': storyPlayerAnimationModule,
+    '../../../../game/frontend/storyBossAi.mjs': storyBossAiModule,
     '../../../../game/frontend/storyLoot.mjs': storyLootModule,
     '../../../../game/frontend/prophetDialogue.mjs': prophetDialogueModule,
     '../../../../game/frontend/storyCube.mjs': storyCubeModule,
@@ -322,8 +344,13 @@ async function mountStory(t, { pendingInit = null, sceneSnapshot = { data: snaps
   page.surface.value = { focus() {}, getBoundingClientRect: () => ({ left: 0, top: 0, width: 800, height: 600 }) };
   const mounting = Promise.all(mounted.map(fn => fn()));
   if (!pendingInit) await mounting;
-  const cleanup = async () => { for (const fn of unmounted) fn(); await flushWorldSessionSaves(); assert.equal(listeners.size, 0); assert.equal(frames.size, 0); };
+  const cleanup = async () => { for (const fn of unmounted) fn(); await flushWorldSessionSaves(); assert.equal(listeners.size, 0); assert.equal(frames.size, 0); assert.equal(motionCallback, null); };
   t.after(cleanup);
+  if (!pendingInit && !expectInitError) {
+    assert.deepEqual(calls.filter(call => call[0] === 'alert'), [], 'story initialization must succeed');
+    assert.deepEqual(routes, []);
+    assert.equal(page.initializing.value, false);
+  }
   /**
    * 真机链路：浏览器把 keydown 交给**页面自己注册的那个监听器**
    * （`onMounted` 里的 `document.addEventListener('keydown', onKeyDown)`），而不是测试直接
@@ -349,7 +376,8 @@ async function mountStory(t, { pendingInit = null, sceneSnapshot = { data: snaps
 test('real story page binds player follow and stops on blur, hidden state, exit and revision changes', async t => {
   const h = await mountStory(t), p = h.page;
   p.onKeyDown(input({ code: 'KeyD' })); h.step(50);
-  assert.ok(h.calls.some(call => call[0] === 'actorTransform' && call[2] === 0 && call[3][0] > 0));
+  assert.ok(h.calls.some(call => call[0] === 'moveActorMesh' && call[4][0] > 0));
+  assert.ok(p.camera.snapshotPlayer().position[0] > 0);
   p.onBlur(); assert.equal(h.frames.size, 0);
   const count = h.calls.length;
   p.camera.wheel(input({ deltaY: -1 })); h.step(100); assert.equal(h.calls.length, count);
@@ -367,13 +395,13 @@ test('real story page binds player follow and stops on blur, hidden state, exit 
 test('story Escape works during loading and late initialization cannot bind a camera', async t => {
   const pending = deferred(), h = await mountStory(t, { pendingInit: pending });
   h.page.onKeyDown(input({ code: 'Escape', stopPropagation() {} }));
-  pending.resolve({ scenes: [{ path: 'scene.ini' }] }); await h.mounting;
+  pending.resolve({ scene: { path: 'scene.ini' } }); await h.mounting;
   await new Promise(resolve => setImmediate(resolve));
   assert.deepEqual(h.routes, ['/StartScreen']); assert.equal(h.calls.length, 0);
 });
 
 test('story missing-camera error returns to launcher without editor actions', async t => {
-  const h = await mountStory(t, { sceneSnapshot: { cameras: [] } });
+  const h = await mountStory(t, { sceneSnapshot: { cameras: [] }, expectInitError: true });
   assert.deepEqual(h.routes, ['/StartScreen']);
   assert.deepEqual(h.calls, [['alert', '当前场景没有可用相机']]);
 });

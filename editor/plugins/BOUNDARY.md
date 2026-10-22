@@ -16,9 +16,8 @@ Vue transport、引擎对象或角色脚本运行时的第二个 owner。
 | `AITool/Quasar/` | external submodule | 外部 AI 子模块内容 | 本次迁移不修改；按其自身 upstream 生命周期处理 |
 | `FileManager/` | native aggregate + service facade | `files.*` 负责文件事实和操作；`main.py` 仅转发公共 contract，旧 Scene/Actor 文件绑定 adapter 已删除 | 外部旧宿主应迁移到 `files.*`，不得重新引入文件插件兼容层 |
 | `MainView/` | native lifecycle + service adapter | native `main.*` 负责项目/场景生命周期；`main.py` 只做 service 编排，不持有 Python Scene 生命周期 | 保持 adapter 与 manifest 一致 |
-| `ProjectArchive/` | archive migration facade | `main.py` 负责旧归档请求编排，实际 parser 归 `runtime/archive` | 外部旧宿主迁移且 `project.migrateLegacyScene` 回归通过后删除 facade |
-| `ProjectLauncher/` | native project flow + service adapter | native `project.*` 负责项目生命周期和 ProjectCopy；`main.py` 只做 service 编排 | 保持 adapter 与 manifest 一致 |
-| ProjectLauncher Python ProjectCopy wrapper | removed compatibility code | 已迁移到 `project.copyExistingToData`，插件层不拥有复制实现 | 如发现外部插件 import，按 aggregate contract 迁移 |
+| `ProjectArchive/` | scene.ini loading facade | `main.py` 负责加载策略和诊断，parser 归 `runtime/archive` | 保留按需加载服务，无旧格式迁移 |
+| `ProjectLauncher/` | native project flow + service adapter | native `project.*` 负责单场景项目生命周期与 Vision JSON 显式导入；`main.py` 只做 service 编排 | 保持 adapter 与 manifest 一致 |
 | `ProjectSettings/` | native aggregate + service adapter | native `projectSettings.*` 负责设置事实；`main.py` 只做 service 编排 | 保持 adapter 与 manifest 一致 |
 | `SceneTools/` | native aggregate + service adapter | Vue/C++/Script Runtime 使用 native manifest 聚合接口；Python 只做参数转换和 Vision 编排 | 保持 adapter 与 manifest 一致 |
 | `SceneTools/compat/legacy_vision_import_helper.py` 与旧 Vision adapters | removed compatibility code | 无仓内生产调用；受支持流程由 canonical `SceneTools/vision_import.py` 和 native Vision manifest 负责 | 如发现外部依赖，按 aggregate contract 迁移 |

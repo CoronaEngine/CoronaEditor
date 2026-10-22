@@ -19,32 +19,15 @@ logger = logging.getLogger(__name__)
 
 def _native_scene_target():
     scene_api = get_script_runtime_editor_api().scene
-    route_payload = scene_api.list_routes()
-    scene_items = route_payload.get("scenes") if isinstance(route_payload, dict) else None
-    routes = [
-        str(item.get("path"))
-        for item in scene_items or []
-        if isinstance(item, dict) and item.get("path")
-    ]
-    if not routes:
+    snapshot = scene_api.get_snapshot()
+    if not isinstance(snapshot, dict) or snapshot.get("status") in ("error", "failed"):
         return None
-    active_route = (
-        str(route_payload.get("active_scene") or "")
-        if isinstance(route_payload, dict)
-        else ""
-    )
-    route = active_route if active_route in routes else routes[0]
-    if route != active_route:
-        # Reuse the live active scene to preserve edits and avoid reloading it
-        # through the Python callback queue. Only select a scene on first startup.
-        switched = scene_api.switch(route)
-        if isinstance(switched, dict) and switched.get("status") in ("error", "failed"):
-            return None
-    return scene_target_from_snapshot(scene_api.get_snapshot(route))
+    target = scene_target_from_snapshot(snapshot)
+    return target if target.route else None
 
 
 def initialize_scripts(host: Any, project_path: str) -> None:
-    """Lazily bind the project ScriptsManager to the first available scene."""
+    """Lazily bind the project ScriptsManager to the current scene."""
     if not project_path:
         return
 

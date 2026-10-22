@@ -1,7 +1,7 @@
 from pathlib import Path
 
 
-REPO_ROOT = Path(__file__).resolve().parents[1].parent
+REPO_ROOT = Path(__file__).resolve().parents[3]
 PYTHON_BINDINGS_ROOT = REPO_ROOT / "src" / "systems" / "script" / "python"
 
 

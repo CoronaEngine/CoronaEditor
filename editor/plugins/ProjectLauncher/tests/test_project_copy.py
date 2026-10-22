@@ -11,35 +11,7 @@ from runtime import project_templates as project_utils
 
 
 class ProjectCopyTests(unittest.TestCase):
-    def test_project_template_is_owned_by_project_launcher_and_can_create_project(self):
-        repo_root = Path(__file__).resolve().parents[4]
-        template_root = repo_root / "editor" / "plugins" / "ProjectLauncher" / "templates"
-        self.assertTrue((template_root / "project" / "project.ini").is_file())
-        self.assertTrue((template_root / "scene" / "demo.scene").is_file())
-        self.assertTrue((template_root / "actor" / "demo.actor").is_file())
 
-        with tempfile.TemporaryDirectory() as temp_dir:
-            target = Path(temp_dir) / "created"
-            project_ini = project_utils.create_project_from_template(
-                str(target), "Created Project", "3d"
-            )
-
-            self.assertEqual(Path(project_ini), target / "project.ini")
-            self.assertTrue((target / "Scene" / "default.scene").is_file())
-
-    def test_copy_existing_to_data_uses_native_project_contract(self):
-        payload = {
-            "sourcePath": "D:/legacy/source/project.ini",
-            "dataRoot": "D:/runtime/data",
-        }
-        with patch(
-            "api.editor_api._invoke_manifest_cpp_api",
-            return_value={"ok": True, "name": "source", "path": "D:/runtime/data/source"},
-        ) as invoke:
-            result = CoronaEditorApi.project.copy_existing_to_data(payload)
-
-        self.assertTrue(result["ok"])
-        invoke.assert_called_once_with("project.copy_existing_to_data", [payload])
 
     def test_project_launcher_python_does_not_import_project_copy_or_vision_import(self):
         source = Path(project_launcher.__file__).read_text(encoding="utf-8")
@@ -96,11 +68,11 @@ class ProjectCopyTests(unittest.TestCase):
 
             hydration_errors = [
                 message for message in captured.output
-                if "Failed to hydrate active project from last_project" in message
+                if "Unable to read scene.ini" in message
             ]
             self.assertEqual(len(hydration_errors), 1)
 
-    def test_recent_projects_marks_project_ini_saves_as_legacy(self):
+    def test_recent_projects_rejects_project_ini_only_directory(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
             legacy = root / "Legacy"
@@ -116,7 +88,9 @@ class ProjectCopyTests(unittest.TestCase):
             )
             settings = CoronaSettings(str(config_path))
             recent = settings.get_recent_projects()
-            self.assertTrue(recent[0]["legacy"])
+            self.assertFalse(recent[0]["if_exists"])
+            self.assertFalse(settings.set_active_project(str(legacy)))
+            self.assertIsNone(settings.active_project_path)
 
     def test_portable_settings_save_does_not_modify_scene_ini_or_create_project_ini(self):
         with tempfile.TemporaryDirectory() as temp_dir:

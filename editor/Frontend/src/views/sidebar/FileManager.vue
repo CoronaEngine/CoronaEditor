@@ -14,14 +14,6 @@
       <div class="text-[10px] text-gray-400 truncate flex-1">
         <span class="text-[#d8b86c] font-bold">{{ projectName }}</span>
       </div>
-      <button
-        v-if="legacyProject"
-        class="px-2 py-1 text-[10px] rounded bg-[#84a65b] hover:bg-[#95b86c]"
-        title="另存为便携场景"
-        @click="migrateLegacyScene"
-      >
-        另存为便携场景
-      </button>
     </div>
 
     <div class="flex-1 overflow-y-auto custom-scrollbar p-2">
@@ -59,16 +51,14 @@
         <div class="px-4 py-2 hover:bg-[#d8b86c] cursor-pointer" @click="handleNewFolder">
           新建文件夹
         </div>
-        <div class="px-4 py-2 hover:bg-[#d8b86c] cursor-pointer" @click="handleNewScene">
-          新建场景
-        </div>
         <div class="px-4 py-2 hover:bg-[#d8b86c] cursor-pointer" @click="handleNewActor">
           新建单位
         </div>
         <div class="h-[1px] bg-[#333] my-1"></div>
-        <div class="px-4 py-2 hover:bg-[#d8b86c] cursor-pointer" @click="handleRename">重命名</div>
+        <div v-if="contextMenu.item?.name !== 'scene.ini'" class="px-4 py-2 hover:bg-[#d8b86c] cursor-pointer" @click="handleRename">重命名</div>
         <div
           class="px-4 py-2 hover:bg-red-600 cursor-pointer text-red-400 hover:text-white"
+          v-if="contextMenu.item?.name !== 'scene.ini'"
           @click="handleDelete"
         >
           删除
@@ -79,9 +69,10 @@
       <template v-else-if="contextMenu.item">
         <div class="px-4 py-2 hover:bg-[#d8b86c] cursor-pointer" @click="handleOpenFile">打开</div>
         <div class="h-[1px] bg-[#333] my-1"></div>
-        <div class="px-4 py-2 hover:bg-[#d8b86c] cursor-pointer" @click="handleRename">重命名</div>
+        <div v-if="contextMenu.item?.name !== 'scene.ini'" class="px-4 py-2 hover:bg-[#d8b86c] cursor-pointer" @click="handleRename">重命名</div>
         <div
           class="px-4 py-2 hover:bg-red-600 cursor-pointer text-red-400 hover:text-white"
+          v-if="contextMenu.item?.name !== 'scene.ini'"
           @click="handleDelete"
         >
           删除
@@ -92,9 +83,6 @@
       <template v-else>
         <div class="px-4 py-2 hover:bg-[#d8b86c] cursor-pointer" @click="handleNewFolder">
           新建文件夹
-        </div>
-        <div class="px-4 py-2 hover:bg-[#d8b86c] cursor-pointer" @click="handleNewScene">
-          新建场景
         </div>
         <div class="px-4 py-2 hover:bg-[#d8b86c] cursor-pointer" @click="handleNewActor">
           新建单位
@@ -138,7 +126,6 @@
 <script setup>
 import { ref, onMounted, nextTick } from 'vue';
 import { editorApi } from '@/api/editorApi.js';
-import { projectLauncherService } from '@/services/projectLauncherService.js';
 import { useDockPanel } from '@/composables/useDockPanel.js';
 import DockTitleBar from '@/components/ui/DockTitleBar.vue';
 import FileTreeNode from '@/components/ui/FileTreeNode.vue';
@@ -149,41 +136,16 @@ const { closePanel: closeDockPanel, isDocked } = useDockPanel();
 const projectName = ref('Corona Project');
 const fileTree = ref({ children: [] });
 const loading = ref(false);
-const legacyProject = ref(window.localStorage?.getItem('corona.activeProjectLegacy') === 'true');
 const contextMenu = ref({ show: false, x: 0, y: 0, item: null });
 const dialog = ref({
   show: false,
   title: '',
   placeholder: '',
   value: '',
-  type: '', // 'newFolder', 'newScene', 'newActor', 'rename'
+  type: '', // 'newFolder', 'newActor', 'rename'
   targetPath: '',
 });
 
-const migrateLegacyScene = async () => {
-  const sourcePath = window.localStorage?.getItem('corona.activeProjectPath') || '';
-  if (!sourcePath) return;
-  const selected = await editorApi.project.choosePortableSceneTarget();
-  const targetPath = selected?.data ?? selected;
-  if (!targetPath) return;
-  const result = await projectLauncherService.migrateLegacyScene({
-    sourcePath,
-    targetPath,
-    sceneName: projectName.value || 'PortableScene',
-  });
-  const migrated = result?.data ?? result;
-  if (!migrated?.ok) {
-    const details = (migrated?.diagnostics || [])
-      .map((item) => `${item.actor || 'scene'}: ${item.path} — ${item.message}`)
-      .join('\n');
-    window.alert(`迁移失败：\n${details}`);
-    return;
-  }
-  legacyProject.value = false;
-  window.localStorage?.setItem('corona.activeProjectLegacy', 'false');
-  window.localStorage?.setItem('corona.activeProjectPath', migrated.path);
-  await loadFileTree();
-};
 
 // 加载文件树
 const loadFileTree = async () => {
@@ -216,7 +178,7 @@ const handleNodeClick = (node) => {
 // 处理节点双击（打开文件）
 const handleNodeDblClick = (node) => {
   if (!node.isDirectory) {
-    if (node.name.endsWith('.scene')) {
+    if (node.name === 'scene.ini') {
       editorApi.files.openFile(node.path, 'scene');
     } else if (node.name.endsWith('.actor')) {
       editorApi.files.openFile(node.path, 'actor');
@@ -261,18 +223,6 @@ const handleNewFolder = () => {
   closeContextMenu();
 };
 
-// 打开新建场景对话框
-const handleNewScene = () => {
-  dialog.value = {
-    show: true,
-    title: '新建场景',
-    placeholder: '输入场景名称 (.scene)',
-    value: '',
-    type: 'newScene',
-    targetPath: contextMenu.value.item?.path || '',
-  };
-  closeContextMenu();
-};
 
 // 打开新建单位对话框
 const handleNewActor = () => {
@@ -319,7 +269,7 @@ const handleDelete = async () => {
 // 处理打开文件（从右击调用）
 const handleOpenFile = (node) => {
   if (node && !node.isDirectory) {
-    if (node.name.endsWith('.scene')) {
+    if (node.name === 'scene.ini') {
       editorApi.files.openFile(node.path, 'scene');
     } else if (node.name.endsWith('.actor')) {
       editorApi.files.openFile(node.path, 'actor');
@@ -340,14 +290,6 @@ const handleDialogConfirm = async () => {
   switch (dialog.value.type) {
     case 'newFolder':
       await editorApi.files.createFolder(dialog.value.targetPath, name);
-      break;
-    case 'newScene':
-      // 创建.scene文件
-          await editorApi.files.createFile(
-        dialog.value.targetPath,
-        name.endsWith('.scene') ? name : name + '.scene',
-        'scene'
-      );
       break;
     case 'newActor':
       // 创建.actor文件
