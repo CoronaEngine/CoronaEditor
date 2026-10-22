@@ -40,7 +40,13 @@ export function routeStoryKeydown(event, state) {
   } = state;
 
   if (!current) return 'ignore';
-  if (adjustMode) return 'adjust';
+  if (adjustMode) {
+    // 调整模式只把 WASD 让给俯视相机；数字键、Esc 等仍由调整面板独占。
+    // 这样进入俯瞰后可以挪动视角，又不会让空格/技能键漏到相机或战斗里。
+    const cameraMove = event.code === 'KeyW' || event.code === 'KeyA'
+      || event.code === 'KeyS' || event.code === 'KeyD';
+    return cameraMove ? 'camera' : 'adjust';
+  }
   if (dialogueOpen) return 'dialogue';
   // 物品栏：调整模式与对话（上面两个分支）已经吃掉数字键，因此这里只在
   // 小世界、面板关闭时接管数字键与 B。主世界里这套键完全不生效。

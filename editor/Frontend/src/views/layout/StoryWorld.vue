@@ -41,7 +41,7 @@ import { collectSwayTargets, createWorldRuleRunner,
 import { ADJUST_ACTIONS, FRAGMENT_ADJUST_ACTIONS, PROPHET_SCREENS, adjustFeedback,
   adjustFragmentRule, fragmentAdjustPanel, fragmentPanel,
   nextObjectTransform, objectLabel, prophetKeyAction, selectableObjects,
-  toggleFragment } from '../../../../game/frontend/storyProphetActions.mjs';
+  toggleFragmentTargets, rememberFragmentTuning } from '../../../../game/frontend/storyProphetActions.mjs';
 
 
 const router = useRouter();
@@ -1673,6 +1673,8 @@ function interact() {
 // modules, so this page only wires them up: it renders the menu and applies what the
 // pure functions return.
 const installedRules = ref([]);
+// 碎片的「调参记忆」：规则拆下后仍保留，重新装填沿用最后调好的数字。
+const fragmentTuning = ref([]);
 const actionFeedback = ref('');
 // The saved records only say which fragments are installed; the semantics come from the
 // catalogue, so a rewrite of a rule never invalidates an existing world. The numbers are the
@@ -1683,6 +1685,10 @@ const resolvedRules = computed(() => installedRules.value
     const rule = findFragment(record?.fragmentId)?.rule;
     if (!rule) return null;
     return { ...rule,
+      // 关键：把记录上的 target 和 axis 带进运行规则。只展开目录里的 rule 会把 target
+      // 悄悄丢掉，规则于是退回「作用于整个小世界」——这正是选中部分物体却全都动的原因。
+      target: record.target,
+      axis: typeof record.axis === 'string' ? record.axis : rule.axis,
       amplitude: typeof record.amplitude === 'number' ? record.amplitude : rule.amplitude,
       periodMs: typeof record.periodMs === 'number' ? record.periodMs : rule.periodMs };
   }).filter(Boolean));
@@ -1695,12 +1701,9 @@ const previousViewMode = ref(null);
 const adjustSelection = ref(null);
 // Which fragment the «调整碎片» sub-screen is editing; null whenever that screen is closed.
 const adjustFragmentId = ref(null);
-const fragmentList = computed(() => fragmentPanel(installedRules.value));
-const fragmentAdjust = computed(() => fragmentAdjustPanel(installedRules.value,
-  adjustFragmentId.value));
 const adjustHint = computed(() => (adjustSelection.value
-  ? `已选中：${adjustSelection.value.name}`
-  : '俯瞰视角：点击物体选中它，再用下面的按钮调整'));
+  ? `已选中：${adjustSelection.value.name} · WASD 移动视角，1-6 调整物体`
+  : '俯瞰视角：WASD 移动视角，点击物体选中它，再用下面的按钮调整'));
 function enterAdjustMode() {
   actionFeedback.value = '';
   prophetScreen.value = null;
@@ -1719,6 +1722,40 @@ function enterAdjustMode() {
 // The list is the reliable way to choose an object: clicking a name cannot miss, while
 // clicking a pixel depends on the engine's readback settling.
 const selectableList = ref([]);
+// 每块碎片各自记住自己选中的作用对象：{ [fragmentId]: guid[] }。
+const fragmentTargets = reactive({});
+const fragmentAdjustTarget = ref(null);
+const fragmentNames = computed(() => Object.fromEntries(
+  selectableList.value.map(entry => [entry.guid, entry.name])));
+const fragmentList = computed(() => fragmentPanel(installedRules.value,
+  fragmentNames.value, fragmentTuning.value));
+const fragmentAdjust = computed(() => fragmentAdjustPanel(installedRules.value,
+  adjustFragmentId.value, { target: fragmentAdjustTarget.value,
+    label: fragmentNames.value[fragmentAdjustTarget.value] || null,
+    tuning: fragmentTuning.value }));
+const fragmentAdjustTargets = computed(() => {
+  const entry = fragmentList.value.find(item => item.id === adjustFragmentId.value);
+  return Array.isArray(entry?.targets) ? entry.targets : [];
+});
+const targetsFor = fragmentId => (Array.isArray(fragmentTargets[fragmentId])
+  ? fragmentTargets[fragmentId] : []);
+const isFragmentTarget = (fragmentId, entry) => targetsFor(fragmentId).includes(entry?.guid);
+function toggleFragmentTarget(fragmentId, entry) {
+  if (!fragmentId || !entry?.guid) return;
+  const list = [...targetsFor(fragmentId)];
+  const index = list.indexOf(entry.guid);
+  if (index >= 0) list.splice(index, 1);
+  else list.push(entry.guid);
+  fragmentTargets[fragmentId] = list;
+}
+function selectAllFragmentTargets(fragmentId) {
+  if (!fragmentId) return;
+  fragmentTargets[fragmentId] = selectableList.value.map(entry => entry.guid);
+}
+function clearFragmentTargets(fragmentId) {
+  if (!fragmentId) return;
+  fragmentTargets[fragmentId] = [];
+}
 const isSelected = entry => Boolean(adjustSelection.value
   && adjustSelection.value.guid === entry?.guid);
 async function loadSelectableObjects() {
@@ -1757,11 +1794,16 @@ function openProphetScreen(id) {
   actionFeedback.value = '';
   adjustFragmentId.value = null;
   prophetScreen.value = id;
+  if (id === 'fragments') void loadSelectableObjects();
 }
 // 「调整」在碎片行上：进子屏，记下改的是哪一块。没装填的碎片也进得去，子屏会说明要先装填，
 // 这样按 1-4 得到的反馈与点击一致，而不是一个没有反应的按钮。
 function openFragmentAdjust(entry) {
   adjustFragmentId.value = entry?.id || null;
+  const ownTargets = targetsFor(entry?.id);
+  const selected = ownTargets.find(guid => entry?.targets?.includes(guid));
+  fragmentAdjustTarget.value = selected || entry?.targets?.[0]
+    || ownTargets[0] || entry?.target || null;
   prophetScreen.value = 'fragment-adjust';
   actionFeedback.value = entry?.installed ? '' : '先装填该碎片再调整';
 }
@@ -1769,6 +1811,7 @@ function openFragmentAdjust(entry) {
 function leaveProphetScreen() {
   if (prophetScreen.value === 'fragment-adjust') {
     adjustFragmentId.value = null;
+    fragmentAdjustTarget.value = null;
     actionFeedback.value = '';
     prophetScreen.value = 'fragments';
     return;
@@ -1852,10 +1895,17 @@ async function runProphetAction(chosen) {
   if (chosen.type === 'open-screen') { openProphetScreen(chosen.screen); return; }
   actionFeedback.value = '';
   if (chosen.type === 'toggle-fragment') {
+    const targets = Array.isArray(chosen.targets) ? chosen.targets : [];
+    if (!targets.length) {
+      actionFeedback.value = '请先在该碎片下方选择作用对象（可多选）';
+      return;
+    }
     await runAction(async () => {
-      const result = toggleFragment(installedRules.value, chosen.fragmentId);
-      const saved = await gameplay.saveWorldRules(result.rules);
+      const result = toggleFragmentTargets(installedRules.value, chosen.fragmentId,
+        targets, fragmentNames.value, fragmentTuning.value);
+      const saved = await gameplay.saveWorldRules(result.rules, result.tuning);
       installedRules.value = Array.isArray(saved?.rules) ? saved.rules : result.rules;
+      fragmentTuning.value = Array.isArray(saved?.tuning) ? saved.tuning : result.tuning;
       actionFeedback.value = result.feedback;
       // A snapshot is what teaches the rule which objects to animate.
       applyWorldRules(await editorApi.scene.getSnapshot(sceneId));
@@ -1866,18 +1916,24 @@ async function runProphetAction(chosen) {
   // 再用新快照重启规则引擎，改完立刻在场景里看得到。
   if (chosen.type === 'adjust-fragment') {
     const fragmentId = chosen.fragmentId || adjustFragmentId.value;
+    const target = chosen.target || fragmentAdjustTarget.value || null;
+    const label = fragmentNames.value[target] || null;
     // 纯函数先判一次：未装填、已到边界、未知动作都只改提示、一个字节也不写盘。放在
     // runAction 之外，是为了让这句话不受「必须有焦点」的限制，玩家一定看得到。
-    const preview = adjustFragmentRule(installedRules.value, fragmentId, chosen.id);
+    const preview = adjustFragmentRule(installedRules.value, fragmentId, chosen.id, { target, label });
     if (!preview.changed) {
       actionFeedback.value = preview.feedback;
       return;
     }
     await runAction(async () => {
-      const result = adjustFragmentRule(installedRules.value, fragmentId, chosen.id);
+      const result = adjustFragmentRule(installedRules.value, fragmentId, chosen.id, { target, label });
       if (!result.changed) { actionFeedback.value = result.feedback; return; }
-      const saved = await gameplay.saveWorldRules(result.rules);
+      const adjusted = result.rules.find(record => record?.fragmentId === fragmentId
+        && (record.target || null) === (target || null));
+      if (adjusted) fragmentTuning.value = rememberFragmentTuning(fragmentTuning.value, fragmentId, adjusted);
+      const saved = await gameplay.saveWorldRules(result.rules, fragmentTuning.value);
       installedRules.value = Array.isArray(saved?.rules) ? saved.rules : result.rules;
+      fragmentTuning.value = Array.isArray(saved?.tuning) ? saved.tuning : fragmentTuning.value;
       actionFeedback.value = result.feedback;
       applyWorldRules(await editorApi.scene.getSnapshot(sceneId));
     });
@@ -2366,6 +2422,7 @@ onMounted(async () => {
       actionFeedback.value = `物体未能创建：${error.message}`;
     }
     installedRules.value = Array.isArray(gameplay.worldRules?.rules) ? gameplay.worldRules.rules : [];
+    fragmentTuning.value = Array.isArray(gameplay.worldRules?.tuning) ? gameplay.worldRules.tuning : [];
     // 浮动需要重新读一次场景，才能把刚创建的方块也纳入；规则起不来同样不致命。
     try {
       applyWorldRules(installedRules.value.length && inSubworld.value
@@ -2653,29 +2710,64 @@ onUnmounted(() => {
             </button>
           </template>
 
-          <!-- 「碎片」屏：点整行装填/拆下，行尾的「调整」进子屏改数字 -->
+          <!-- 「碎片」屏：每块碎片各有自己的作用对象，可多选；点主按钮批量装/拆。 -->
           <template v-else-if="prophetScreen === 'fragments'">
-            <div v-for="(entry, index) in fragmentList" :key="entry.id" class="prophet-row"
+            <div v-for="(entry, index) in fragmentList" :key="entry.id" class="fragment-card"
               :data-prophet-row="entry.id">
-              <button class="prophet-action prophet-row-main"
-                :data-prophet-fragment="entry.id" :disabled="!entry.owned"
-                @click="runProphetAction({ type: 'toggle-fragment', fragmentId: entry.id })">
-                <span class="prophet-action-key">{{ index + 1 }}</span>
-                <span class="prophet-action-label">{{ entry.name }}</span>
-                <span class="prophet-action-state" :data-state="entry.state">{{ entry.stateLabel }}</span>
-                <span class="prophet-action-detail">{{ entry.description }} · {{ entry.details }}</span>
-              </button>
-              <button class="prophet-action prophet-row-adjust"
-                :data-prophet-adjust="entry.id" @click="openFragmentAdjust(entry)">
-                <span class="prophet-action-label">调整</span>
-              </button>
+              <div class="prophet-row">
+                <button class="prophet-action prophet-row-main"
+                  :data-prophet-fragment="entry.id" :disabled="!entry.owned"
+                  @click="runProphetAction({ type: 'toggle-fragment', fragmentId: entry.id, targets: targetsFor(entry.id) })">
+                  <span class="prophet-action-key">{{ index + 1 }}</span>
+                  <span class="prophet-action-label">{{ entry.name }}</span>
+                  <span class="prophet-action-state" :data-state="entry.state">{{ entry.stateLabel }}</span>
+                  <span class="prophet-action-detail">{{ entry.description }} · {{ entry.details }}<template v-if="entry.targetLabel"> · 作用于：{{ entry.targetLabel }}</template></span>
+                </button>
+                <button class="prophet-action prophet-row-adjust"
+                  :data-prophet-adjust="entry.id" @click="openFragmentAdjust(entry)">
+                  <span class="prophet-action-label">调整</span>
+                </button>
+              </div>
+
+              <div class="fragment-targets fragment-targets--row">
+                <div class="fragment-targets__head">
+                  <span>作用对象</span>
+                  <small>已选 {{ targetsFor(entry.id).length }}</small>
+                  <button type="button" class="fragment-targets__act" @click.stop="selectAllFragmentTargets(entry.id)">全选</button>
+                  <button type="button" class="fragment-targets__act" @click.stop="clearFragmentTargets(entry.id)">清空</button>
+                </div>
+                <div class="fragment-targets__list">
+                  <button v-for="object in selectableList" :key="object.guid" type="button"
+                    class="fragment-target-chip" :class="{ 'is-on': isFragmentTarget(entry.id, object) }"
+                    :data-fragment-target="object.guid" @click.stop="toggleFragmentTarget(entry.id, object)">
+                    {{ object.name }}
+                  </button>
+                  <span v-if="!selectableList.length" class="fragment-targets__empty">
+                    暂无可作用物体，点“刷新列表”重试
+                  </span>
+                </div>
+              </div>
             </div>
+            <button class="prophet-action" data-fragment-refresh @click="loadSelectableObjects">
+              <span class="prophet-action-label">刷新物体列表</span>
+            </button>
           </template>
 
           <!-- 「调整碎片」子屏：只改选中碎片的幅度与周期，改完即落盘并重启规则 -->
           <template v-else>
+            <div v-if="fragmentAdjustTargets.length" class="fragment-targets__list fragment-targets__list--adjust">
+              <span class="fragment-targets__label">调整对象</span>
+              <button v-for="guid in fragmentAdjustTargets" :key="guid" type="button"
+                class="fragment-target-chip" :class="{ 'is-on': fragmentAdjustTarget === guid }"
+                @click="fragmentAdjustTarget = guid">
+                {{ fragmentNames[guid] || guid }}
+              </button>
+            </div>
             <p class="prophet-action-detail" data-fragment-adjust-title>
               {{ fragmentAdjust.known ? `${fragmentAdjust.name} · ${fragmentAdjust.details}` : fragmentAdjust.name }}
+            </p>
+            <p class="prophet-action-detail" data-fragment-adjust-target>
+              作用：{{ fragmentAdjust.targetLabel }}
             </p>
             <p class="prophet-action-detail" data-fragment-adjust-values>
               当前：{{ fragmentAdjust.amplitudeLabel }} · {{ fragmentAdjust.periodLabel }}
@@ -2685,7 +2777,7 @@ onUnmounted(() => {
             </p>
             <button v-for="action in FRAGMENT_ADJUST_ACTIONS" :key="action.id" class="prophet-action"
               :data-fragment-action="action.id"
-              @click="runProphetAction({ type: 'adjust-fragment', id: action.id, fragmentId: fragmentAdjust.id })">
+              @click="runProphetAction({ type: 'adjust-fragment', id: action.id, fragmentId: fragmentAdjust.id, target: fragmentAdjustTarget })">
               <span class="prophet-action-key">{{ action.key }}</span>
               <span class="prophet-action-group">{{ action.group }}</span>
               <span class="prophet-action-label">{{ action.label }}</span>
@@ -3205,5 +3297,97 @@ onUnmounted(() => {
 @media (max-width: 800px) {
   .world-indicator { top: 18px; right: 12px; font-size: 11px; letter-spacing: 1px; }
   .prophet-fab { right: 12px; bottom: 14px; padding: 7px 12px 7px 8px; }
+}
+
+/* 先知窗口：和 HUD/背包共用林间金边语言，但比原来的默认面板更宽松、更好读。 */
+.dialogue-panel {
+  width: min(680px, calc(100vw - 32px));
+  padding: 20px 24px 18px;
+  background:
+    radial-gradient(ellipse at 12% 0%, rgba(104, 159, 56, .12), transparent 55%),
+    linear-gradient(145deg, rgba(30, 39, 30, .97), rgba(12, 18, 15, .98));
+  border: 1px solid rgba(179, 153, 93, .55);
+  border-left: 3px solid var(--c-gold-bright);
+  clip-path: polygon(0 0, calc(100% - 16px) 0, 100% 16px, 100% 100%, 0 100%);
+  box-shadow: 0 22px 70px rgba(0, 0, 0, .68), 0 0 26px rgba(179, 153, 93, .08);
+}
+.dialogue-header {
+  padding-bottom: 12px;
+  border-bottom: 1px solid rgba(179, 153, 93, .32);
+}
+.dialogue-header strong { font-size: 17px; letter-spacing: 4px; }
+.dialogue-header span { font-size: 11px; letter-spacing: 1px; }
+.dialogue-line { margin-top: 16px; font-size: 14px; line-height: 1.95; color: var(--c-paper); }
+.dialogue-closing { margin-top: 10px; font-size: 12.5px; color: var(--c-gold-bright); }
+.prophet-actions { gap: 8px; margin-top: 14px; }
+.prophet-action {
+  padding: 7px 11px;
+  border: 1px solid rgba(179, 153, 93, .24);
+  background: rgba(18, 26, 20, .72);
+  transition: border-color .16s ease, background .16s ease, transform .16s ease;
+}
+.prophet-action:hover:not(:disabled) {
+  transform: translateY(-1px);
+  border-color: rgba(230, 213, 167, .65);
+  background: rgba(43, 56, 40, .92);
+}
+.prophet-action-key {
+  border-color: rgba(179, 153, 93, .5);
+  color: var(--c-gold-bright);
+}
+.prophet-action-state[data-state="installed"] { border-color: #7f9a5c; color: #d7e8b8; }
+.prophet-action-state[data-state="owned"] { border-color: rgba(179, 153, 93, .5); color: var(--c-gold-bright); }
+.prophet-row { gap: 7px; }
+.prophet-row-main { flex: 1 1 auto; }
+.prophet-row-adjust { align-self: stretch; padding: 7px 14px; }
+.fragment-targets {
+  flex-basis: 100%;
+  padding: 10px 12px;
+  border: 1px solid rgba(179, 153, 93, .28);
+  background: rgba(8, 13, 10, .55);
+  clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 0 100%);
+}
+.fragment-card { flex-basis: 100%; display: flex; flex-direction: column; gap: 6px; }
+.fragment-card .prophet-row { width: 100%; }
+.fragment-targets--row { padding: 7px 9px; background: rgba(8, 13, 10, .38); }
+.fragment-targets--row .fragment-targets__head { margin-bottom: 6px; font-size: 11px; }
+.fragment-targets__head {
+  display: flex; align-items: center; gap: 8px; margin-bottom: 8px;
+  font-size: 12px; letter-spacing: 1px; color: var(--c-gold-bright);
+}
+.fragment-targets__head small {
+  font-size: 10px; letter-spacing: 0; color: var(--c-paper-dim);
+}
+.fragment-targets__act {
+  margin-left: auto; padding: 2px 7px; cursor: pointer;
+  border: 1px solid rgba(179, 153, 93, .35); background: rgba(179, 153, 93, .08);
+  color: var(--c-paper-dim); font-size: 10px;
+}
+.fragment-targets__act:hover { color: var(--c-gold-bright); border-color: var(--c-gold-bright); }
+.fragment-targets__list { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.fragment-targets__label { font-size: 11px; color: var(--c-paper-dim); margin-right: 2px; }
+.fragment-targets__list--adjust {
+  flex-basis: 100%; padding: 8px 10px; margin-top: 10px;
+  border: 1px solid rgba(179, 153, 93, .2); background: rgba(8, 13, 10, .45);
+}
+.fragment-target-chip {
+  padding: 3px 9px; cursor: pointer;
+  border: 1px solid rgba(179, 153, 93, .3); border-radius: 999px;
+  background: rgba(18, 26, 20, .8); color: var(--c-paper-dim); font-size: 11px;
+  transition: .16s ease;
+}
+.fragment-target-chip:hover { color: var(--c-paper); border-color: rgba(230, 213, 167, .6); }
+.fragment-target-chip.is-on {
+  color: #1a2117; border-color: var(--c-gold-bright); background: var(--c-gold-bright);
+  box-shadow: 0 0 12px rgba(179, 153, 93, .28);
+}
+.fragment-targets__empty { font-size: 11px; color: var(--c-paper-dim); }
+.dialogue-footer {
+  margin-top: 16px; padding-top: 13px;
+  border-top: 1px solid rgba(179, 153, 93, .25);
+}
+.dialogue-next {
+  padding: 7px 18px;
+  clip-path: polygon(7px 0, 100% 0, calc(100% - 7px) 100%, 0 100%);
 }
 </style>
