@@ -118,3 +118,47 @@ def primitive(kind, *, radius=1.0, inner_radius=0.0, height=0.0,
     else:
         raise ValueError(f"Unsupported primitive: {kind}")
     return write_obj(p, ix, n, uv, directory=directory)
+
+
+def spotlight(inner_angle, outer_angle, *, length=.02, segments=64, directory=None):
+    """Return an emissive disk and a watertight, open-front absorbing housing.
+
+    Both angles are half angles. A finite disk and front aperture approximate
+    the source falloff by visibility; no angular emission shader is needed.
+    """
+    if not all(math.isfinite(x) for x in (inner_angle, outer_angle, length)) or not 0 <= inner_angle <= outer_angle < 89 or length <= 0:
+        raise ValueError("Spot requires 0 <= inner <= outer < 89 degrees and a positive length")
+    inner, outer = math.tan(math.radians(inner_angle)), math.tan(math.radians(outer_angle))
+    radius = max(length * (outer-inner)/2, length * 1e-3)
+    aperture = max(length * (outer+inner)/2, radius * 1.01)
+    thickness = length * .025
+    back = max(radius * 1.05, aperture * .25)
+    # Closed meridian: outside, front rim, inner cavity, inner back, rear cap.
+    profile = [(-thickness, back+thickness), (length, aperture+thickness),
+               (length, aperture), (-thickness*.25, back),
+               (-thickness*.25, 0.), (-thickness, 0.)]
+    positions, normals, indices = [], [], []
+    def triangle(a,b,c):
+        u, v = [b[i]-a[i] for i in range(3)], [c[i]-a[i] for i in range(3)]
+        n = [u[1]*v[2]-u[2]*v[1], u[2]*v[0]-u[0]*v[2], u[0]*v[1]-u[1]*v[0]]
+        size = math.sqrt(sum(x*x for x in n))
+        if size < 1e-20:
+            return
+        start = len(positions)
+        positions.extend((a,b,c))
+        normals.extend([[x/size for x in n]]*3)
+        indices.extend((start,start+1,start+2))
+    for j in range(len(profile)):
+        z0,r0 = profile[j]
+        z1,r1 = profile[(j+1)%len(profile)]
+        for i in range(segments):
+            p,q = 2*math.pi*i/segments, 2*math.pi*((i+1)%segments)/segments
+            a,b,c,d = ((r0*math.cos(p),r0*math.sin(p),z0), (r1*math.cos(p),r1*math.sin(p),z1),
+                       (r1*math.cos(q),r1*math.sin(q),z1), (r0*math.cos(q),r0*math.sin(q),z0))
+            triangle(a,c,b)
+            triangle(a,d,c)
+    housing = write_obj(positions, indices, normals, directory=directory)
+    emitter = primitive("disk", radius=radius, segments=segments, directory=directory)
+    # Use the actual polygonal area, not the analytic circle, for intensity.
+    area = .5 * segments * radius**2 * math.sin(2*math.pi/segments)
+    return emitter, housing, area

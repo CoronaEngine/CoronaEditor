@@ -9,6 +9,8 @@ from runtime.archive import transforms as tr
 from .external_scene import SceneBuilder
 from .geometry_cache import primitive, write_obj
 from .cameras import finite, perspective_camera, resolution, vertical_fov
+from .pbrt_appearance import Appearance
+from .appearance import principled
 
 
 _TOKEN = re.compile(r'\s+|#[^\n]*|"((?:[^"\\]|\\.)*)"|([\[\]])|([^\s\[\]"#]+)')
@@ -56,13 +58,20 @@ def statements(path):
         yield start, current
 
 
+class Parameters(dict):
+    def __init__(self):
+        super().__init__()
+        self.types = {}
+
+
 def parameters(tokens):
-    result, i = {}, 0
+    result, i = Parameters(), 0
     while i < len(tokens):
         declaration, quoted = tokens[i]
         if not quoted or len(declaration.split()) != 2:
             raise ValueError(f"Invalid parameter declaration: {declaration}")
-        _, name = declaration.split()
+        type_name, name = declaration.split()
+        result.types[name] = type_name
         if name in result:
             raise ValueError(f"Duplicate parameter: {name}")
         i += 1
@@ -122,15 +131,18 @@ class State:
     active: tuple = (0, 1)
     reverse: bool = False
     shape_attributes: dict = field(default_factory=dict)
+    material: dict = field(default_factory=principled)
+    emission: dict = field(default_factory=dict)
 
     def copy(self):
         return State([list(m) for m in self.matrices], self.active, self.reverse,
-                     {name: list(values) for name, values in self.shape_attributes.items()})
+                     {name: list(values) for name, values in self.shape_attributes.items()}, self.material, self.emission)
 
 
 def read_scene(source, *, cache_directory=None):
     builder = SceneBuilder(source, "pbrt4", cache_directory)
     root = Path(source).resolve().parent
+    appearance = Appearance(builder, root)
     state, scopes, coordinates, objects = State(), [], {}, {}
     object_name = None
     in_world = False
@@ -140,8 +152,8 @@ def read_scene(source, *, cache_directory=None):
         if object_name is not None:
             objects[object_name].append(record)
         else:
-            path, matrix, reverse, kind, name = record
-            builder.add(path, matrix, name, flip_normals=reverse, kind=kind)
+            path, matrix, reverse, kind, name, material = record
+            builder.add(path, matrix, name, flip_normals=reverse, kind=kind, material=material)
 
     def process(path, chain=()):
         nonlocal state, object_name, in_world, coordinates, camera_description, film_description
@@ -261,12 +273,32 @@ def read_scene(source, *, cache_directory=None):
                         builder.warning("ANIMATED_GEOMETRY_UNSUPPORTED", "Skipped animated instance", path)
                         continue
                     # ReverseOrientation belongs to shapes in the object definition.
-                    for model, matrix, reverse, kind, name in objects[values[0]]:
-                        append((model, tr.multiply(state.matrices[0], matrix), reverse, kind, name))
+                    for model, matrix, reverse, kind, name, material in objects[values[0]]:
+                        append((model, tr.multiply(state.matrices[0], matrix), reverse, kind, name, material))
+                elif command == "Texture":
+                    appearance.textures[values[0]] = (values[1],values[2],parameters(args[3:]))
+                elif command == "MakeNamedMaterial":
+                    props = parameters(args[1:])
+                    appearance.materials[values[0]] = appearance.material(props["type"][0],props)
+                elif command == "NamedMaterial":
+                    state.material = appearance.materials[values[0]]
+                elif command == "Material":
+                    state.material = appearance.material(values[0],parameters(args[1:]))
+                elif command == "AreaLightSource":
+                    state.emission = appearance.emission(parameters(args[1:])) if values[0] else {}
+                elif command == "LightSource":
+                    appearance.light(values[0],parameters(args[1:]),list(state.matrices[0]),f"{path.stem}:{line}")
+                elif command in {"MakeNamedMedium", "MediumInterface"}:
+                    builder.warning("MEDIUM_DEFERRED", "Volume transport is deferred", path)
+                elif command == "ColorSpace":
+                    if values[0] != "srgb":
+                        builder.warning("COLOR_SPACE_APPROXIMATION", f"{values[0]} interpreted in working RGB", path)
                 elif command == "Shape":
                     if not in_world:
                         raise ValueError("Shape outside WorldBegin")
                     kind = values[0]
+                    if state.material.get("boundary_only") and not state.emission:
+                        continue
                     if kind not in {"plymesh", "trianglemesh", "sphere", "disk"}:
                         builder.warning("UNSUPPORTED_SHAPE", f"Skipped unsupported PBRT shape '{kind}'", path, kind)
                         continue
@@ -276,6 +308,8 @@ def read_scene(source, *, cache_directory=None):
                     # Explicit Shape parameters override inherited Attribute
                     # defaults. Later Attribute declarations override earlier ones.
                     props = {**state.shape_attributes, **parameters(args[1:])}
+                    if "alpha" in props:
+                        builder.warning("MATERIAL_FEATURE_DEFERRED", "Shape alpha ignored; no new opacity BSDF support", path)
                     if kind == "plymesh":
                         model = root / props["filename"][0]
                         if model.suffix.lower() != ".ply":
@@ -293,7 +327,11 @@ def read_scene(source, *, cache_directory=None):
                         if "innerradius" in props:
                             kwargs["inner_radius"] = float(props["innerradius"][0])
                         model = primitive(kind, directory=cache_directory, **kwargs)
-                    append((model, list(state.matrices[0]), state.reverse, kind, f"{path.stem}:{line}"))
+                    material = {**state.material, **state.emission}
+                    if material.pop("boundary_only",False):
+                        material["base_color"] = [0.]*3
+                        builder.warning("MATERIAL_APPROXIMATION", "Emissive interface uses opaque black Principled",path)
+                    append((model, list(state.matrices[0]), state.reverse, kind, f"{path.stem}:{line}", material))
                 elif command not in {"Integrator", "Sampler", "PixelFilter", "Accelerator", "Option",
                                      "ColorSpace", "MakeNamedMaterial", "NamedMaterial", "Material", "Texture",
                                      "LightSource", "AreaLightSource", "MakeNamedMedium", "MediumInterface"}:

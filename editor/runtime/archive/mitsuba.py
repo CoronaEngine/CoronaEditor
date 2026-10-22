@@ -10,6 +10,7 @@ from runtime.archive import transforms as tr
 from .external_scene import SceneBuilder
 from .geometry_cache import primitive
 from .cameras import finite, perspective_camera, resolution, vertical_fov
+from .mitsuba_appearance import Appearance
 
 
 def read_scene(source, *, cache_directory=None):
@@ -75,21 +76,27 @@ def read_scene(source, *, cache_directory=None):
 
     nodes = load(source)
 
-    def transform(node):
+    def transform(node, name="to_world"):
         matrix = tr.identity()
-        transforms = [x for x in node if x.tag == "transform" and x.get("name") == "to_world"]
+        transforms = [x for x in node if x.tag == "transform" and x.get("name") == name]
         if len(transforms) > 1:
             raise ValueError("Duplicate to_world transform")
         for container in transforms:
             for op in container:
                 if op.tag == "matrix":
-                    m = tr.affine(numbers(op.attrib["value"]))
+                    values = numbers(op.attrib["value"])
+                    if name == "to_uv" and len(values) == 9:
+                        if values[6:] != [0,0,1]:
+                            raise ValueError("Projective UV transforms are unsupported")
+                        values = [values[0],values[1],0,values[2], values[3],values[4],0,values[5], 0,0,1,0, 0,0,0,1]
+                    m = tr.affine(values)
                 elif op.tag == "translate":
                     m = tr.translate(vector(op))
                 elif op.tag == "scale":
                     m = tr.scale(vector(op, 1))
                 elif op.tag == "rotate":
-                    m = tr.rotate(float(value(op.attrib["angle"])), vector(op))
+                    axis = [0,0,1] if name == "to_uv" and not any(k in op.attrib for k in ("x","y","z","value")) else vector(op)
+                    m = tr.rotate(float(value(op.attrib["angle"])), axis)
                 elif op.tag == "lookat":
                     m = tr.look_at(numbers(op.attrib["origin"]), numbers(op.attrib["target"]), numbers(op.attrib["up"]))
                 else:
@@ -150,6 +157,8 @@ def read_scene(source, *, cache_directory=None):
             near_plane=props.get("near_clip", .01), far_plane=props.get("far_clip", 10000),
         )
 
+    appearance = Appearance(builder,nodes,locations,value,numbers,vector,transform)
+
     def visit(node, parent, stack=(), prefix=""):
         kind = value(node.get("type", ""))
         name = prefix + node.get("id", "")
@@ -173,6 +182,9 @@ def read_scene(source, *, cache_directory=None):
             builder.warning("UNSUPPORTED_SHAPE", f"Skipped unsupported Mitsuba shape '{kind}'", path, kind)
             return
         props = {x.get("name"): x for x in node if x.get("name")}
+        material = appearance.shape(node)
+        if material.get("boundary_only"):
+            return
 
         def scalar(key, default):
             return float(value(props[key].attrib["value"])) if key in props else default
@@ -199,7 +211,7 @@ def read_scene(source, *, cache_directory=None):
             model = primitive(kind, **kwargs)
         builder.add(model, matrix, name, kind=kind,
                     flip_uvs=boolean("flip_tex_coords", kind == "obj"),
-                    flip_normals=boolean("flip_normals"), face_normals=boolean("face_normals"))
+                    flip_normals=boolean("flip_normals"), face_normals=boolean("face_normals"), material=material)
 
     sensors = [node for node in nodes if node.tag == "sensor"]
     if len(sensors) > 1:
@@ -209,4 +221,6 @@ def read_scene(source, *, cache_directory=None):
     for node in nodes:
         if node.tag == "shape" and node.get("type") != "shapegroup":
             visit(node, tr.identity())
+        elif node.tag == "emitter":
+            appearance.light(node)
     return builder.snapshot()

@@ -6,6 +6,7 @@ import hashlib
 from pathlib import Path
 
 from .errors import ArchiveParseError
+from .appearance import principled, expression, rgb
 from runtime.archive import transforms as tr
 
 
@@ -18,15 +19,16 @@ class SceneBuilder:
         self.cameras = []
         self.diagnostics = {}
         self.counts = Counter()
+        self.lighting = {"directionals": [], "environments": []}
 
     def warning(self, code, message, path=None, kind=""):
-        key = (code, str(path or self.source), kind)
+        key = (code, str(path or self.source), kind, message)
         if key not in self.diagnostics:
             self.diagnostics[key] = dict(severity="warning", recoverable=True, stage="archive_parse",
                                          code=code, message=message, path=key[1], shape_type=kind, count=0)
         self.diagnostics[key]["count"] += 1
 
-    def add(self, path, matrix, name="", *, flip_uvs=False, flip_normals=False, face_normals=False, kind="mesh"):
+    def add(self, path, matrix, name="", *, flip_uvs=False, flip_normals=False, face_normals=False, kind="mesh", material=None):
         if len(self.actors) >= 100_000:
             raise ValueError("External scene exceeds 100000 instances")
         path = Path(path).resolve()
@@ -46,7 +48,39 @@ class SceneBuilder:
             "material": {"source": "legacy", "overrides": []},
             "optics": {"diffuse": [0.7,0.7,0.7]}, "visible": True,
         })
+        material = material or principled()
+        self.actors[-1]["material"] = {"source": "scene", "overrides": [], "principled": material}
+        if isinstance(material.get("base_color"), list):
+            self.actors[-1]["optics"]["diffuse"] = material["base_color"]
         self.counts[kind] += 1
+
+    def light(self, kind, matrix, color, *, name="light", inner=20., outer=30., radius=.005):
+        from .geometry_cache import primitive, spotlight
+        import math
+        color = rgb(color)
+        if kind == "directional":
+            direction = [matrix[2],matrix[6],matrix[10]]
+            norm = math.sqrt(sum(x*x for x in direction))
+            if norm < 1e-12:
+                raise ValueError("Degenerate light direction")
+            self.lighting["directionals"].append(dict(direction=[x/norm for x in direction], color=color))
+            return
+        origin = [matrix[3],matrix[7],matrix[11]]
+        direction = [matrix[2],matrix[6],matrix[10]]
+        up = [matrix[1],matrix[5],matrix[9]]
+        matrix = tr.look_at(origin, [a+b for a,b in zip(origin,direction)], up)
+        if kind == "point":
+            model = primitive("sphere", radius=radius, segments=32, rings=16, directory=self.cache_directory)
+            emission = expression("multiply", color, 1/(math.pi*radius*radius))
+            self.add(model, matrix, name, kind="point_emitter", material=principled(base_color=[0.]*3, emission=emission))
+        elif kind == "spot":
+            emitter, housing, area = spotlight(inner, outer, directory=self.cache_directory)
+            self.add(emitter, matrix, name+"/emitter", kind="spot_emitter",
+                     material=principled(base_color=[0.]*3, emission=expression("multiply", color, 1/area)))
+            self.add(housing, matrix, name+"/housing", kind="spot_housing",
+                     material=principled(base_color=[.0001]*3, roughness=1., specular=0.))
+        else:
+            self.warning("LIGHT_UNSUPPORTED", f"Unsupported local light {kind}", kind=kind)
 
     def snapshot(self):
         return {
@@ -55,7 +89,8 @@ class SceneBuilder:
             "source_camera_imported": bool(self.cameras),
             "scene": {"route": self.source.name, "name": self.source.parent.name,
                       "actors": self.actors, "cameras": self.cameras, "simulation_enabled": False,
-                      "environment": {"sun_enabled": True, "floor_grid_enabled": False}},
+                      "environment": {"sun_enabled": False, "floor_grid_enabled": False,
+                                      "authored_lighting": self.lighting}},
             "diagnostics": list(self.diagnostics.values()), "geometry_counts": dict(self.counts),
         }
 
