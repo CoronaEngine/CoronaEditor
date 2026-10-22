@@ -4,13 +4,13 @@
          row, and the detail (node list + local transform) exists only while open.
          Styling follows the scene dock rows so the section reads as part of it. -->
     <div
-      class="group flex items-center gap-1 py-0.5 pr-2 pl-[18px] hover:bg-[#3c3c3c]/50 cursor-pointer border-l-2 border-transparent hover:border-[#d8b86c]"
-      :class="{ 'text-[#e0e0e0]': detailOpen }"
+      class="group flex items-center gap-1 py-0.5 pr-2 pl-[18px] hover:bg-[#2b362d]/50 cursor-pointer border-l-2 border-transparent hover:border-[#b3995d]"
+      :class="{ 'text-[#e8ede3]': detailOpen }"
       :title="detailOpen ? '收起模型节点' : '展开模型节点'"
       data-testid="model-node-tag"
       @click="toggleDetail"
     >
-      <span class="w-3 text-center text-[10px] leading-none text-[#909090]">
+      <span class="w-3 text-center text-[10px] leading-none text-[#8d9e85]">
         {{ detailOpen ? '▾' : '▸' }}
       </span>
       <span class="text-[10px] leading-none text-[#c9b987] truncate flex-1">
@@ -31,7 +31,7 @@
             <template v-for="row in renderedRows" :key="rowKey(row)">
               <button
                 v-if="row.kind === 'more'"
-                class="group flex w-full items-center border-0 border-l-2 border-transparent bg-transparent py-0.5 pr-2 text-left hover:bg-[#3c3c3c]/50 hover:border-[#d8b86c] cursor-pointer"
+                class="group flex w-full items-center border-0 border-l-2 border-transparent bg-transparent py-0.5 pr-2 text-left hover:bg-[#2b362d]/50 hover:border-[#b3995d] cursor-pointer"
                 :style="{ paddingLeft: `${(row.depth + 1) * 12 + 18}px` }"
                 @click="loadMore(row.parentKey)"
               >
@@ -39,7 +39,7 @@
               </button>
               <div
                 v-else
-                class="group flex items-center border-l-2 border-transparent py-0.5 pr-2 hover:bg-[#3c3c3c]/50 hover:border-[#d8b86c] cursor-pointer"
+                class="group flex items-center border-l-2 border-transparent py-0.5 pr-2 hover:bg-[#2b362d]/50 hover:border-[#b3995d] cursor-pointer"
                 :class="{
                   'bg-[#4b391c]/60': isSelected(row.node),
                   'opacity-50': !row.node.effective_visible,
@@ -49,17 +49,17 @@
               >
                 <button
                   v-if="Number(row.node.child_count) > 0"
-                  class="w-3 border-0 bg-transparent text-center text-[10px] leading-none text-[#909090] hover:text-[#d8b86c] cursor-pointer"
+                  class="w-3 border-0 bg-transparent text-center text-[10px] leading-none text-[#8d9e85] hover:text-[#b3995d] cursor-pointer"
                   @click.stop="toggleExpanded(row.node)"
                 >
                   {{ expanded.has(Number(row.node.node_index)) ? '⌄' : '›' }}
                 </button>
-                <span v-else class="w-3 text-center text-[10px] leading-none text-[#666]">·</span>
-                <span class="ml-1 text-xs text-[#e0e0e0] truncate flex-1" :title="row.node.name">
+                <span v-else class="w-3 text-center text-[10px] leading-none text-[#6f7f69]">·</span>
+                <span class="ml-1 text-xs text-[#e8ede3] truncate flex-1" :title="row.node.name">
                   {{ row.node.name || `节点 ${row.node.node_index}` }}
                 </span>
                 <button
-                  class="w-4 border-0 bg-transparent text-[10px] leading-none text-[#888] hover:text-[#d8b86c] cursor-pointer"
+                  class="w-4 border-0 bg-transparent text-[10px] leading-none text-[#888] hover:text-[#b3995d] cursor-pointer"
                   :title="row.node.visible ? '隐藏' : '显示'"
                   @click.stop="toggleVisibility(row.node)"
                 >
@@ -71,10 +71,10 @@
         </div>
       </div>
 
-      <div v-if="selectedNode" class="border-t border-[#1a1a1a] px-2 pb-2 pt-1">
-        <div class="text-[10px] text-[#909090]">局部变换</div>
+      <div v-if="selectedNode" class="border-t border-[#18221a] px-2 pb-2 pt-1">
+        <div class="text-[10px] text-[#8d9e85]">局部变换</div>
         <label v-for="field in fields" :key="field.key" class="mt-1 flex items-center gap-1">
-          <span class="w-6 text-[10px] text-[#909090]">{{ field.label }}</span>
+          <span class="w-6 text-[10px] text-[#8d9e85]">{{ field.label }}</span>
           <span v-for="(value, axis) in selectedNode[field.key]" :key="axis" class="flex-1">
             <input
               v-model.number="selectedNode[field.key][axis]"
@@ -332,7 +332,7 @@ onUnmounted(() => {
   /* The CEF default is a bright white bar, which shouts inside the dock.  This uses
      the same gold-on-black scrollbar as the editor's other dark panels. */
   scrollbar-width: thin;
-  scrollbar-color: #8c6f36 #14120c;
+  scrollbar-color: #4d4024 #14120c;
 }
 
 .model-node-list::-webkit-scrollbar {
@@ -344,7 +344,7 @@ onUnmounted(() => {
 }
 
 .model-node-list::-webkit-scrollbar-thumb {
-  background: #8c6f36;
+  background: #4d4024;
   border-radius: 999px;
 }
 

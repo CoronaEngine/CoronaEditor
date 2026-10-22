@@ -5,7 +5,7 @@
     <DockTitleBar
       v-if="!isDocked"
       title="场景管理"
-      extraClass="bg-[#D8B86C] rounded-t-md"
+      extraClass="bg-[#b3995d] rounded-t-md"
       routePath="/SceneBar"
       @close="CloseFloat"
     />
@@ -14,14 +14,14 @@
     <div class="flex flex-col flex-1 min-h-0">
       <div
         v-if="RESOURCE_SEARCH_ENABLED"
-        class="flex items-center gap-1 px-2 py-1.5 bg-[#2a2a2a]/55 border-b border-[#1a1a1a]"
+        class="flex items-center gap-1 px-2 py-1.5 bg-[#263126]/55 border-b border-[#18221a]"
       >
         <div class="relative flex-1">
           <input
             v-model="searchInput"
             type="text"
             placeholder="🔍 搜索资源(名称/中文/拼音,支持模糊)"
-            class="w-full pl-2 pr-7 py-1 text-xs bg-[#1e1e1e] text-[#e0e0e0] border border-[#3a3a3a] rounded focus:border-[#d8b86c] focus:outline-none"
+            class="w-full pl-2 pr-7 py-1 text-xs bg-[#121a14] text-[#e8ede3] border border-[#3a3a3a] rounded focus:border-[#b3995d] focus:outline-none"
             data-testid="resource-search-input"
             @input="onSearchInput"
             @keydown.enter="onSearchEnter"
@@ -29,7 +29,7 @@
           />
           <button
             v-if="searchInput && !searchLoading"
-            class="absolute right-1 top-1/2 -translate-y-1/2 text-[#666] hover:text-[#aaa] text-xs"
+            class="absolute right-1 top-1/2 -translate-y-1/2 text-[#6f7f69] hover:text-[#aaa] text-xs"
             data-testid="resource-search-clear"
             @click="onSearchClear"
           >
@@ -37,14 +37,14 @@
           </button>
           <span
             v-if="searchLoading"
-            class="absolute right-1 top-1/2 -translate-y-1/2 text-[#d8b86c] text-[10px] animate-pulse"
+            class="absolute right-1 top-1/2 -translate-y-1/2 text-[#b3995d] text-[10px] animate-pulse"
           >
             ⌛
           </span>
         </div>
         <!-- 以图搜索 -->
         <label
-          class="px-1.5 py-1 text-xs bg-[#3c3c3c] hover:bg-[#545454] rounded text-[#e0e0e0] cursor-pointer flex items-center"
+          class="px-1.5 py-1 text-xs bg-[#2b362d] hover:bg-[#3a4a3c] rounded text-[#e8ede3] cursor-pointer flex items-center"
           :class="{ 'opacity-50 pointer-events-none': searchLoading }"
           title="以图搜索(本地 pHash)"
           data-testid="resource-image-search"
@@ -60,7 +60,7 @@
         </label>
         <!-- 重建索引 -->
         <button
-          class="px-1.5 py-1 text-xs bg-[#3c3c3c] hover:bg-[#545454] rounded text-[#e0e0e0]"
+          class="px-1.5 py-1 text-xs bg-[#2b362d] hover:bg-[#3a4a3c] rounded text-[#e8ede3]"
           :class="{ 'opacity-50 pointer-events-none': searchLoading }"
           title="重建索引"
           data-testid="resource-rebuild"
@@ -85,21 +85,21 @@
           ⚠ {{ searchError }}
         </div>
         <!-- 命中计数 -->
-        <div v-else class="px-2 py-1 text-[10px] text-[#909090] border-b border-[#1a1a1a]/30">
-          <span v-if="searchIndexing" class="text-[#d8b86c]">正在准备资源索引...</span>
+        <div v-else class="px-2 py-1 text-[10px] text-[#8d9e85] border-b border-[#18221a]/30">
+          <span v-if="searchIndexing" class="text-[#b3995d]">正在准备资源索引...</span>
           <template v-else>
             找到
-            <span class="text-[#d8b86c] font-bold">{{ searchResults.length }}</span>
+            <span class="text-[#b3995d] font-bold">{{ searchResults.length }}</span>
             项
             <span v-if="searchLastQuery" class="ml-2">query=“{{ searchLastQuery }}”</span>
-            <span v-if="searchElapsedMs" class="ml-2 text-[#666]">{{ searchElapsedMs }}ms</span>
+            <span v-if="searchElapsedMs" class="ml-2 text-[#6f7f69]">{{ searchElapsedMs }}ms</span>
           </template>
         </div>
         <!-- 命中列表 -->
         <div
           v-for="item in searchResults"
           :key="item.path"
-          class="group flex items-center px-2 py-1 hover:bg-[#3c3c3c]/50 cursor-pointer border-l-2 border-transparent hover:border-[#d8b86c] text-xs"
+          class="group flex items-center px-2 py-1 hover:bg-[#2b362d]/50 cursor-pointer border-l-2 border-transparent hover:border-[#b3995d] text-xs"
           :class="{ 'bg-[#4b391c]/60': selectedItem === 'search:' + item.path }"
           data-testid="resource-search-item"
           @click="selectedItem = 'search:' + item.path"
@@ -108,17 +108,17 @@
           <span class="w-5 flex-shrink-0 text-center">
             <span :class="typeColorClass(item.type)">{{ typeIcon(item.type) }}</span>
           </span>
-          <span class="text-[#e0e0e0] truncate flex-1 ml-1" :title="item.name">
+          <span class="text-[#e8ede3] truncate flex-1 ml-1" :title="item.name">
             {{ item.name }}
           </span>
-          <span class="text-[10px] text-[#666] mr-1">
+          <span class="text-[10px] text-[#6f7f69] mr-1">
             {{ item.type_label }}
           </span>
-          <span v-if="item.score != null" class="text-[10px] text-[#d8b86c] mr-1" :title="'相似度'">
+          <span v-if="item.score != null" class="text-[10px] text-[#b3995d] mr-1" :title="'相似度'">
             {{ Math.round(item.score * 100) }}%
           </span>
           <button
-            class="w-5 h-5 flex items-center justify-center text-[#666] hover:text-[#d8b86c] rounded opacity-0 group-hover:opacity-100"
+            class="w-5 h-5 flex items-center justify-center text-[#6f7f69] hover:text-[#b3995d] rounded opacity-0 group-hover:opacity-100"
             title="定位到资源"
             @click.stop="OnLocateSearchItem(item)"
           >
@@ -127,7 +127,7 @@
         </div>
         <div
           v-if="!searchError && !searchIndexing && searchResults.length === 0"
-          class="px-4 py-8 text-center text-[#666] text-xs"
+          class="px-4 py-8 text-center text-[#6f7f69] text-xs"
         >
           暂无匹配结果
         </div>
@@ -135,16 +135,16 @@
 
       <!-- 原场景树(无搜索时显示) -->
       <div v-show="!RESOURCE_SEARCH_ENABLED || !searchActive" class="flex flex-col flex-1 min-h-0">
-        <div class="flex items-center gap-2 p-2 bg-[#1a1a1a]/50 border-b border-[#333]"></div>
+        <div class="flex items-center gap-2 p-2 bg-[#18221a]/50 border-b border-[#2b362d]"></div>
 
         <!-- 工具栏 -->
         <div
-          class="flex items-center gap-1 px-2 py-1.5 bg-[#3c3c3c]/60 border-b border-[#1a1a1a]/30"
+          class="flex items-center gap-1 px-2 py-1.5 bg-[#2b362d]/60 border-b border-[#18221a]/30"
         >
           <!-- 导入下拉 -->
           <div class="relative" data-guidance="scene-import-model">
             <button
-              class="p-1.5 hover:bg-[#545454] rounded text-[#e0e0e0] text-xs flex items-center gap-1"
+              class="p-1.5 hover:bg-[#3a4a3c] rounded text-[#e8ede3] text-xs flex items-center gap-1"
               title="导入"
               @click.stop="ToggleModelDropdown"
             >
@@ -168,34 +168,34 @@
             <div
               v-if="ShowModelDropdown"
               v-click-outside="CloseModelDropdown"
-              class="absolute z-20 mt-1 w-32 bg-[#3c3c3c] rounded shadow-lg border border-[#1a1a1a]"
+              class="absolute z-20 mt-1 w-32 bg-[#2b362d] rounded shadow-lg border border-[#18221a]"
             >
               <button
-                class="block w-full px-3 py-1.5 text-xs text-[#e0e0e0] hover:bg-[#545454] text-left"
+                class="block w-full px-3 py-1.5 text-xs text-[#e8ede3] hover:bg-[#3a4a3c] text-left"
                 @click.stop="HandleFileImport"
               >
                 📦 模型
               </button>
               <button
-                class="block w-full px-3 py-1.5 text-xs text-[#e0e0e0] hover:bg-[#545454] text-left"
+                class="block w-full px-3 py-1.5 text-xs text-[#e8ede3] hover:bg-[#3a4a3c] text-left"
                 @click.stop="HandleActorImport"
               >
                 👤 单位
               </button>
               <button
-                class="block w-full px-3 py-1.5 text-xs text-[#e0e0e0] hover:bg-[#545454] text-left"
+                class="block w-full px-3 py-1.5 text-xs text-[#e8ede3] hover:bg-[#3a4a3c] text-left"
                 @click.stop="HandleSceneImport"
               >
                 🎬 场景
               </button>
               <button
-                class="block w-full px-3 py-1.5 text-xs text-[#e0e0e0] hover:bg-[#545454] text-left"
+                class="block w-full px-3 py-1.5 text-xs text-[#e8ede3] hover:bg-[#3a4a3c] text-left"
                 @click.stop="HandleMultimediaImport"
               >
                 🎵 音频
               </button>
               <button
-                class="block w-full px-3 py-1.5 text-xs text-[#e0e0e0] hover:bg-[#545454] text-left"
+                class="block w-full px-3 py-1.5 text-xs text-[#e8ede3] hover:bg-[#3a4a3c] text-left"
                 @click.stop="HandleUiImageImport"
               >
                 🖼 UI图片
@@ -203,7 +203,7 @@
             </div>
           </div>
           <button
-            class="p-1.5 hover:bg-[#545454] rounded text-[#e0e0e0]"
+            class="p-1.5 hover:bg-[#3a4a3c] rounded text-[#e8ede3]"
             title="添加摄像头"
             @click.stop="ImportCamera"
           >
@@ -213,9 +213,9 @@
               />
             </svg>
           </button>
-          <div class="w-px h-4 bg-[#1a1a1a] mx-1"></div>
+          <div class="w-px h-4 bg-[#18221a] mx-1"></div>
           <button
-            class="p-1.5 hover:bg-[#545454] rounded text-[#e0e0e0]"
+            class="p-1.5 hover:bg-[#3a4a3c] rounded text-[#e8ede3]"
             title="保存场景"
             @click.stop="SaveScene"
           >
@@ -229,7 +229,7 @@
             </svg>
           </button>
           <button
-            class="p-1.5 hover:bg-[#545454] rounded text-[#e0e0e0]"
+            class="p-1.5 hover:bg-[#3a4a3c] rounded text-[#e8ede3]"
             title="截图"
             @click.stop="TakeScreenshot"
           >
@@ -251,8 +251,8 @@
           <!-- Vision / Native 渲染后端切换（仅 Vision 可用时显示） -->
           <button
             v-if="visionAvailable"
-            class="p-1.5 hover:bg-[#545454] rounded flex items-center gap-0.5"
-            :class="activeRenderBackend === 'vision' ? 'text-[#d8b86c]' : 'text-[#e0e0e0]'"
+            class="p-1.5 hover:bg-[#3a4a3c] rounded flex items-center gap-0.5"
+            :class="activeRenderBackend === 'vision' ? 'text-[#b3995d]' : 'text-[#e8ede3]'"
             :title="
               activeRenderBackend === 'vision'
                 ? '当前: Vision (路径追踪)，点击切换到 Native'
@@ -277,55 +277,55 @@
           <div class="select-none">
             <!-- Cameras 分组 -->
             <div
-              class="flex items-center px-2 py-1 bg-[#3c3c3c]/50 border-b border-[#1a1a1a]/30 cursor-pointer"
+              class="flex items-center px-2 py-1 bg-[#2b362d]/50 border-b border-[#18221a]/30 cursor-pointer"
               @click="camerasExpanded = !camerasExpanded"
             >
               <svg
-                class="w-3 h-3 text-[#909090] mr-1 transition-transform"
+                class="w-3 h-3 text-[#8d9e85] mr-1 transition-transform"
                 :class="{ 'rotate-90': camerasExpanded }"
                 fill="currentColor"
                 viewBox="0 0 24 24"
               >
                 <path d="M10 6l6 6-6 6z" />
               </svg>
-              <svg class="w-3.5 h-3.5 text-[#d8b86c] mr-1" fill="currentColor" viewBox="0 0 24 24">
+              <svg class="w-3.5 h-3.5 text-[#b3995d] mr-1" fill="currentColor" viewBox="0 0 24 24">
                 <path
                   d="M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4z"
                 />
               </svg>
-              <span class="text-xs text-[#e0e0e0] font-medium">Cameras</span>
+              <span class="text-xs text-[#e8ede3] font-medium">Cameras</span>
               <button
-                class="ml-auto mr-2 text-sm leading-none text-[#d8b86c] hover:text-white"
+                class="ml-auto mr-2 text-sm leading-none text-[#b3995d] hover:text-white"
                 title="Create camera view"
                 aria-label="Create camera view"
                 @click.stop="ImportCamera"
               >
                 +
               </button>
-              <span class="text-xs text-[#666]">{{ sceneCameras.length }}</span>
+              <span class="text-xs text-[#6f7f69]">{{ sceneCameras.length }}</span>
             </div>
             <div v-show="camerasExpanded" class="pl-2">
               <div v-for="cam in sceneCameras" :key="'cam-' + (cam.camera_id || cam.name)">
                 <!-- Camera 行 -->
                 <div
-                  class="group flex items-center px-2 py-0.5 hover:bg-[#3c3c3c]/50 cursor-pointer border-l-2 border-transparent hover:border-[#d8b86c]"
+                  class="group flex items-center px-2 py-0.5 hover:bg-[#2b362d]/50 cursor-pointer border-l-2 border-transparent hover:border-[#b3995d]"
                   :class="{ 'bg-[#4b391c]/60': selectedItem === 'cam:' + cam.name }"
                   @mouseenter="RefreshCameraListOnHover"
                   @click="SelectCamera(cam)"
                   @dblclick="isCameraDeletable(cam) && OpenCameraView(cam)"
                 >
                   <span class="w-5 flex-shrink-0">
-                    <svg class="w-4 h-4 text-[#d8b86c]" fill="currentColor" viewBox="0 0 24 24">
+                    <svg class="w-4 h-4 text-[#b3995d]" fill="currentColor" viewBox="0 0 24 24">
                       <path
                         d="M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4z"
                       />
                     </svg>
                   </span>
-                  <span class="text-xs text-[#e0e0e0] truncate flex-1" :title="cam.name">
+                  <span class="text-xs text-[#e8ede3] truncate flex-1" :title="cam.name">
                     {{ cam.name }}
                   </span>
                   <span
-                    class="text-[10px] text-[#666] mr-1 hidden group-hover:inline"
+                    class="text-[10px] text-[#6f7f69] mr-1 hidden group-hover:inline"
                     :title="'fov: ' + (cam.fov != null ? cam.fov.toFixed(1) : '-')"
                   >
                     {{ cam.width }}x{{ cam.height }}
@@ -343,25 +343,25 @@
                 </div>
               </div>
               <div v-if="sceneCameras.length === 0" class="px-4 py-2 text-center">
-                <span class="text-[10px] text-[#666]">无相机</span>
+                <span class="text-[10px] text-[#6f7f69]">无相机</span>
               </div>
             </div>
 
             <!-- Scene Collection 分组 -->
             <div
-              class="flex items-center px-2 py-1 bg-[#3c3c3c]/50 border-b border-[#1a1a1a]/30 cursor-pointer"
+              class="flex items-center px-2 py-1 bg-[#2b362d]/50 border-b border-[#18221a]/30 cursor-pointer"
               @click="actorsExpanded = !actorsExpanded"
             >
               <svg
-                class="w-3 h-3 text-[#909090] mr-1 transition-transform"
+                class="w-3 h-3 text-[#8d9e85] mr-1 transition-transform"
                 :class="{ 'rotate-90': actorsExpanded }"
                 fill="currentColor"
                 viewBox="0 0 24 24"
               >
                 <path d="M10 6l6 6-6 6z" />
               </svg>
-              <span class="text-xs text-[#e0e0e0] font-medium">Scene Collection</span>
-              <span class="ml-auto text-xs text-[#666]">{{ sceneImages.length }}</span>
+              <span class="text-xs text-[#e8ede3] font-medium">Scene Collection</span>
+              <span class="ml-auto text-xs text-[#6f7f69]">{{ sceneImages.length }}</span>
             </div>
 
             <!-- 对象列表 -->
@@ -369,7 +369,7 @@
               <template v-for="scene in sceneImages" :key="scene.name">
                 <div
                   :data-actor-name="scene.name"
-                  class="group flex items-center px-2 py-0.5 hover:bg-[#3c3c3c]/50 cursor-pointer border-l-2 border-transparent hover:border-[#d8b86c]"
+                  class="group flex items-center px-2 py-0.5 hover:bg-[#2b362d]/50 cursor-pointer border-l-2 border-transparent hover:border-[#b3995d]"
                   :class="{ 'bg-[#4b391c]/60': selectedItem === scene.name }"
                   @click="onActorRowClick(scene, $event)"
                   @dblclick="onActorRowDoubleClick(scene, $event)"
@@ -384,7 +384,7 @@
                       </svg>
                     </template>
                     <template v-else-if="scene.type === 'camera'">
-                      <svg class="w-4 h-4 text-[#d8b86c]" fill="currentColor" viewBox="0 0 24 24">
+                      <svg class="w-4 h-4 text-[#b3995d]" fill="currentColor" viewBox="0 0 24 24">
                         <path
                           d="M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4z"
                         />
@@ -405,13 +405,13 @@
                       </svg>
                     </template>
                     <template v-else>
-                      <svg class="w-4 h-4 text-[#e0e0e0]" fill="currentColor" viewBox="0 0 24 24">
+                      <svg class="w-4 h-4 text-[#e8ede3]" fill="currentColor" viewBox="0 0 24 24">
                         <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
                       </svg>
                     </template>
                   </span>
                   <!-- 名称 -->
-                  <span class="text-xs text-[#e0e0e0] truncate flex-1" :title="scene.name">
+                  <span class="text-xs text-[#e8ede3] truncate flex-1" :title="scene.name">
                     {{ scene.name }}
                   </span>
                   <span
@@ -433,14 +433,14 @@
                   </button>
                   <span
                     v-if="scene.vision_proxy"
-                    class="text-[10px] text-[#e5c77f] mr-1 hidden group-hover:inline"
+                    class="text-[10px] text-[#e6d5a7] mr-1 hidden group-hover:inline"
                     :title="scene.vision_binding?.shape_guid || 'Vision proxy actor'"
                     data-testid="actor-vision-proxy"
                   >
                     Vision
                   </span>
                   <!-- 类型标签 -->
-                  <span class="text-[10px] text-[#666] mr-2 hidden group-hover:inline">
+                  <span class="text-[10px] text-[#6f7f69] mr-2 hidden group-hover:inline">
                     {{ getTypeShort(scene.type) }}
                   </span>
                   <!-- 显隐切换按钮 -->
@@ -449,7 +449,7 @@
                     :class="
                       scene.visible === false
                         ? 'text-[#555] hover:text-[#999]'
-                        : 'text-[#e0e0e0] hover:text-[#ffd54f]'
+                        : 'text-[#e8ede3] hover:text-[#ffd54f]'
                     "
                     :title="scene.visible === false ? '显示' : '隐藏'"
                     @click.stop="ToggleVisible(scene)"
@@ -519,7 +519,7 @@
                   </button>
                   <!-- 删除按钮 -->
                   <button
-                    class="w-5 h-5 flex items-center justify-center text-[#666] hover:text-red-400 hover:bg-red-400/20 rounded transition-all"
+                    class="w-5 h-5 flex items-center justify-center text-[#6f7f69] hover:text-red-400 hover:bg-red-400/20 rounded transition-all"
                     title="删除"
                     @click.stop="DeleteActor(scene)"
                     @dblclick.stop
@@ -546,7 +546,7 @@
               </template>
               <!-- 空状态 -->
               <div v-if="sceneImages.length === 0" class="px-4 py-8 text-center">
-                <span class="text-xs text-[#666]">场景为空，点击 + 添加对象</span>
+                <span class="text-xs text-[#6f7f69]">场景为空，点击 + 添加对象</span>
               </div>
             </div>
           </div>
@@ -555,7 +555,7 @@
 
       <!-- 底部状态栏 -->
       <div
-        class="flex items-center px-2 py-1 bg-[#3c3c3c]/60 border-t border-[#1a1a1a]/30 text-[10px] text-[#909090]"
+        class="flex items-center px-2 py-1 bg-[#2b362d]/60 border-t border-[#18221a]/30 text-[10px] text-[#8d9e85]"
       >
         <span>对象: {{ sceneImages.length }}</span>
       </div>
@@ -759,12 +759,12 @@ const typeIcon = (type) =>
 
 const typeColorClass = (type) =>
   ({
-    model: 'text-[#e5c77f]',
+    model: 'text-[#e6d5a7]',
     actor: 'text-[#ce9178]',
     scene: 'text-[#c586c0]',
     multimedia: 'text-[#dcdcaa]',
     terrain: 'text-[#c9a958]',
-    script: 'text-[#c9bea0]',
+    script: 'text-[#8d9e85]',
     other: 'text-[#808080]',
   })[type] || 'text-[#808080]';
 
@@ -1825,7 +1825,7 @@ onUnmounted(() => {
 .scene-tools-panel {
   /* Opaque on purpose: the dock floats over the 3D viewport, and a translucent panel
      made the tree backgrounds and object names unreadable. */
-  background: linear-gradient(180deg, #211d12, #11100d);
+  background: linear-gradient(180deg, #121a14, #11100d);
   border: 1px solid rgba(255, 255, 255, 0.08);
   box-shadow: 0 18px 42px rgba(0, 0, 0, 0.34);
 }
@@ -1835,7 +1835,7 @@ onUnmounted(() => {
   background: #1d1a15;
   /* Match the editor's dark scrollbars instead of the bright CEF default. */
   scrollbar-width: thin;
-  scrollbar-color: #8c6f36 #14120c;
+  scrollbar-color: #4d4024 #14120c;
 }
 
 .scene-list-surface::-webkit-scrollbar {
@@ -1847,7 +1847,7 @@ onUnmounted(() => {
 }
 
 .scene-list-surface::-webkit-scrollbar-thumb {
-  background: #8c6f36;
+  background: #4d4024;
   border-radius: 999px;
 }
 
