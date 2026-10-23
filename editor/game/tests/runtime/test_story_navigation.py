@@ -104,9 +104,20 @@ class StoryNavigationTests(unittest.TestCase):
         self.assertEqual(result['status'], 'error')
         self.api.main.scene_save.assert_not_called()
 
-    def test_old_multiscene_and_malformed_init_payloads_are_rejected_before_save(self):
-        for payload in ({'scenes': [{'path': 'scene.ini'}], 'active_index': 0},
-                        {'path': 'scene.ini'}, {'scene': []}, {'scene': None}):
+    def test_multiscene_and_top_level_path_init_payloads_are_accepted(self):
+        # 原生 on_init 当前返回多场景契约；旧构建返回单场景 scene。两条路径都必须能保存。
+        for payload in ({'scenes': [{'path': 'scene.ini'}], 'active_index': 0,
+                         'path': 'scene.ini'},
+                        {'path': 'scene.ini'}):
+            with self.subTest(payload=payload):
+                self.api.main.scene_save.reset_mock()
+                self.api.main.on_init.return_value = payload
+                result = self.navigate()
+                self.assertEqual(result['status'], 'ok', result)
+                self.api.main.scene_save.assert_called_once_with('scene.ini')
+
+    def test_malformed_init_payloads_are_rejected_before_save(self):
+        for payload in ({'scene': []}, {'scene': None}, {'scenes': []}):
             with self.subTest(payload=payload):
                 self.api.main.on_init.return_value = payload
                 self.assertEqual(self.navigate()['status'], 'error')

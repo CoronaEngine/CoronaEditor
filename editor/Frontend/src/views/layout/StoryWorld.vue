@@ -212,6 +212,7 @@ const MONSTER_AI = Object.freeze({
   stepSeconds: 0.1,
 });
 const monsterAi = new Map();
+const dyingMonsters = new Set();
 const playerHitPulse = ref(0);
 function monsterState(entry) {
   if (!entry?.actor?.geometry?.position) return null;
@@ -326,6 +327,24 @@ function tickMonsters() {
       }
       faceMonster(entry, state, yaw);
     }
+  }
+}
+function syncMonsterDeaths(data = gameplayState.value) {
+  if (!current() || !data || data.role !== 'main' || !sceneId) return;
+  for (const entry of monsterActors) {
+    const hp = data.state.monsters?.[entry.id]?.hp;
+    if (hp > 0 || dyingMonsters.has(entry.id)) continue;
+    dyingMonsters.add(entry.id);
+    const guid = entry.actor?.actor_guid;
+    if (!guid) continue;
+    // 血条归零的怪物统一走一次 Die，再隐藏；没有 Die 剪辑的模型至少也会被收起，
+    // 不会出现“血条空了还站着”的情况。
+    Promise.resolve()
+      .then(() => editorApi.sceneTools.setActorAnimation(sceneId, guid, 'Die', 0.2))
+      .catch(() => {})
+      .then(() => new Promise(resolve => setTimeout(resolve, 1200)))
+      .then(() => current() ? editorApi.sceneTools.setActorState(sceneId, guid, { visible: false }) : null)
+      .catch(() => {});
   }
 }
 let actorTimer = null;
@@ -471,6 +490,8 @@ const gameplay = createStoryGameplay({
       // 存档 → 行囊：Boss 兵甲只发一次，怪物装备按件数补齐（丢弃/披挂会同步扣账）。
       syncBossLoot(data);
       syncMonsterGear(data);
+      reconcileBagEquipment(data);
+      syncMonsterDeaths(data);
       updateProximity();
     }
   },
@@ -588,7 +609,7 @@ async function navigateWorld() {
    行囊（Tab 背包）：由 111/bag.html 复刻的界面
    —— 纯界面状态，不写任何玩法存档。
    ========================================================= */
-const BAG_UI_KEY = '__corona_story_bag_ui_v1__';
+const BAG_UI_KEY = `__corona_story_bag_ui_v1__:${projectPath}`;
 const BAG_COLS = 12;
 const BAG_TOTAL = 42;
 
@@ -1090,6 +1111,37 @@ function syncMonsterGear(data = gameplayState.value) {
   if (granted.length) bagSave();
   return granted;
 }
+/*
+ * 行囊界面是跨世界复用的 localStorage，而后端存档是每个世界独立的。
+ * 披挂位和装备格必须以后端为准重新对齐，否则在 A 世界穿过的装备会以“背包里还有”
+ * 的样子出现在 B 世界；点披挂时后端只会回一句“背包里没有这件装备”。
+ */
+function reconcileBagEquipment(data = gameplayState.value) {
+  if (!data?.state?.equipped || !data?.state?.inventory) return false;
+  let changed = false;
+  for (const slot of GEAR_SLOTS) {
+    const equippedId = data.state.equipped[slot.id] || null;
+    const current = bag.gear[slot.id] || null;
+    if (equippedId) {
+      if (!current || current.u !== equippedId) {
+        const def = bagDef(equippedId);
+        if (def) { bag.gear[slot.id] = bagMakeItem(def); changed = true; }
+      }
+    } else if (current) {
+      bag.gear[slot.id] = null;
+      changed = true;
+    }
+  }
+  // 没披挂、后端数量也为 0 的装备格，是上一个世界留下的视觉残留：清掉。
+  for (let i = 0; i < bag.cells.length; i += 1) {
+    const item = bag.cells[i];
+    if (!item || item.real || item.cat !== 'equip') continue;
+    const owned = Number(data.state.inventory[item.u]) || 0;
+    if (owned <= 0) { bag.cells[i] = null; changed = true; }
+  }
+  if (changed) bagSave();
+  return changed;
+}
 /* 披挂 / 卸下 / 弃置都会改变后端的件数：账本跟着走，重进世界才不会重复补发。 */
 function adjustGearLedger(itemId, delta) {
   if (!MONSTER_EQUIPMENT.some(def => def.u === itemId)) return;
@@ -1292,6 +1344,12 @@ function bagEquipFromSlot(index) {
   // 器物自带唯一披挂位：胸甲只进胸甲位，不存在“哪格都能装”。
   const [slotId] = bagSlotsFor(item);
   if (!slotId) { bagToast('无处安放'); return; }
+  const owned = Number(gameplayState.value?.state?.inventory?.[item.u]) || 0;
+  if (owned < 1) {
+    // 视觉背包跨世界复用，可能残留上一个世界的装备；后端没有这件东西时不发请求。
+    bagToast('这件装备不在当前世界的背包里');
+    return;
+  }
   const previous = bag.gear[slotId] || null;
   bag.gear[slotId] = item;
   bag.cells[index] = previous;            // 旧物回落到同一格，格阵不塌陷
@@ -2336,7 +2394,12 @@ onMounted(async () => {
   initialization = trackWorldSessionWork((async () => {
     const init = unwrap(await editorApi.main.onInit());
     if (!current()) return;
-    sceneId = init?.scene?.path;
+    // 兼容两种原生返回：单场景契约返回 `scene`，多场景契约返回 `scenes + active_index`。
+    // 只读 `init.scene.path` 会在多场景契约下得到 undefined，剧情模式便直接报“没有可用场景”。
+    const scenes = Array.isArray(init?.scenes) ? init.scenes : [];
+    const index = Math.min(Math.max(Number(init?.active_index) || 0, 0),
+      Math.max(0, scenes.length - 1));
+    sceneId = init?.scene?.path || scenes[index]?.path || init?.path;
     if (!sceneId) throw new Error('当前世界没有可用场景');
     // 原生三角面移动的结果必须回送控制器：没有这条登记，按键只会更新输入状态，
     // 移动请求一直挂在 pendingMove 上等回调，角色永远不动（15 秒后还会报超时）。
@@ -2430,6 +2493,7 @@ onMounted(async () => {
     // 小世界的玩家不渲染模型：绑定发生在相机控制器之后，避免它把模型翻回可见。
     if (loadedGameplay?.role === 'child') keepChildPlayerHidden();
     updateProximity();
+    syncMonsterDeaths(loadedGameplay);
     playerSave = createPlayerSave({ api: editorApi, sceneId,
       readPlayer: camera.snapshotPlayer, stopInput: camera.resetInput,
       assertSource, onSaved: camera.acknowledgePlayerSave });
