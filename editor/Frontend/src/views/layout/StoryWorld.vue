@@ -28,7 +28,7 @@ import { STORY_CHARACTERS, PROPHET_GUID, PLAYER_MODEL_YAW_OFFSET, isMonsterRole,
   resolveStoryAssetPath, sceneSnapshot } from '../../../../game/frontend/storyCharacters.mjs';
 import { MAX_PLACEMENTS, PLACED_BLOCK_REACH, PLACEMENT_DISTANCE, blockSpawnTransform, cycleSlot, findProp,
   hotbarSlots as hotbarSlotsFor, nearestPlacedBlock, nextPlacementIndex, placementGuid,
-  removePlacement, sanitizePlacements } from '../../../../game/frontend/storyProps.mjs';
+  placementIndex, removePlacement, sanitizePlacements } from '../../../../game/frontend/storyProps.mjs';
 import { PROPHET_INTERACTION, prophetAvailable, prophetDistance,
   normalizeDialogue } from '../../../../game/frontend/prophetDialogue.mjs';
 import { ensureStoryCube, cubeTransformOf, playerFacingYaw, CUBE_GUID } from '../../../../game/frontend/storyCube.mjs';
@@ -1819,8 +1819,9 @@ async function loadSelectableObjects() {
 // 选择只由名字列表驱动：视口里不做拾取，因此这里只用列表项自身携带的字段。
 function selectObjectFromList(entry) {
   adjustSelection.value = { guid: entry.guid, name: entry.name,
-    actor: { actor_guid: entry.guid, name: entry.name, geometry: entry.transform },
-    transform: entry.transform };
+    actor: { actor_guid: entry.guid, name: entry.name, geometry: entry.transform,
+      local_aabb: entry.local_aabb },
+    transform: entry.transform, local_aabb: entry.local_aabb };
   actionFeedback.value = `已选中：${entry.name}`;
 }
 function exitAdjustMode({ reopenDialogue = true } = {}) {
@@ -2000,8 +2001,9 @@ async function runProphetAction(chosen) {
     return;
   }
   await runAction(async () => {
+    const bounds = target.local_aabb || adjustSelection.value?.local_aabb || null;
     const next = nextObjectTransform(chosen.id, { current, reference,
-      facingYaw: playerFacingYaw(playerActor) });
+      facingYaw: playerFacingYaw(playerActor), bounds });
     if (!next) return;
     // The light path: the setter does not re-import the resource, so it cannot add mesh work
     // to the geometry thread while the renderer is submitting. `persist: true` is explicit
@@ -2014,7 +2016,23 @@ async function runProphetAction(chosen) {
     }
     const actor = data.actor || { ...target, geometry: next };
     if (target === cubeActor) rememberCube(actor);
-    if (adjustSelection.value) adjustSelection.value = { ...adjustSelection.value, actor, transform: next };
+    if (adjustSelection.value) {
+      adjustSelection.value = { ...adjustSelection.value, actor, transform: next,
+        local_aabb: bounds };
+    }
+    // 陈列物的位置由 `placements` 布局驱动；只改 actor 而不改布局，下一次摆放/同步
+    // 就会把它按旧布局拉回去。这里把 actor 的原点换算回“地面线”再写回布局。
+    const placedIndex = placementIndex(target.actor_guid);
+    if (placedIndex !== null) {
+      const localMinY = Array.isArray(bounds) && Number.isFinite(bounds[1]) ? bounds[1] : 0;
+      const groundY = next.position[1] + localMinY * next.scale[1];
+      placements.value = placements.value.map(entry => entry.index === placedIndex
+        ? { ...entry,
+          position: [next.position[0], groundY, next.position[2]],
+          rotation: [...next.rotation], scale: next.scale[0] }
+        : entry);
+      await placementStep();
+    }
     // Re-anchor the sway, otherwise the next frame would undo the player's own move.
     worldRuleRunner.refreshBase(target.actor_guid, next.position);
     // Confirm against the engine instead of our own optimism. Reading the actor back is the
@@ -2304,6 +2322,11 @@ function onKeyDown(event) {
   if (route === 'inventory') {
     if (!['Enter', 'Space'].includes(event.code)) event.preventDefault();
     event.stopPropagation(); return;
+  }
+  if (route === 'prophet-dialogue') {
+    event.preventDefault(); event.stopPropagation();
+    if (!event.repeat && focused && !dialogueOpen.value) openDialogue(true);
+    return;
   }
   if (route === 'cycle-view') {
     event.preventDefault(); event.stopPropagation();

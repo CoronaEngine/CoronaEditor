@@ -143,7 +143,8 @@ export function selectableObjects(snapshot) {
     const transform = cubeTransformOf(actor);
     if (!Number.isInteger(handle) || handle <= 0 || !transform) continue;
     list.push({ guid: actor.actor_guid, name: actor.name || actor.actor_guid,
-      role: role || actor.actor_type || '物体', transform });
+      role: role || actor.actor_type || '物体', transform,
+      local_aabb: Array.isArray(actor.local_aabb) ? [...actor.local_aabb] : null });
   }
   return list.sort((a, b) => String(a.name).localeCompare(String(b.name), 'zh'));
 }
@@ -171,12 +172,27 @@ export const fragmentAdjustActionForKey = key => keyedBy(FRAGMENT_ADJUST_ACTIONS
  * bounds how far the object may be moved; `facingYaw` makes 前/后/左/右 match what the
  * player sees.
  */
-export function nextObjectTransform(actionId, { current, reference, facingYaw, placement = CUBE_PLACEMENT }) {
-  if (actionId === 'scale-up') return cubeScaleTransform(current, 1, placement);
-  if (actionId === 'scale-down') return cubeScaleTransform(current, -1, placement);
-  const direction = MOVE_DIRECTIONS[actionId];
-  if (!direction) return null;
-  return cubeMoveTransform(current, direction, reference, facingYaw, placement);
+export function nextObjectTransform(actionId, { current, reference, facingYaw,
+  placement = CUBE_PLACEMENT, bounds = null }) {
+  let next = null;
+  if (actionId === 'scale-up') next = cubeScaleTransform(current, 1, placement);
+  else if (actionId === 'scale-down') next = cubeScaleTransform(current, -1, placement);
+  else {
+    const direction = MOVE_DIRECTIONS[actionId];
+    if (!direction) return null;
+    next = cubeMoveTransform(current, direction, reference, facingYaw, placement);
+  }
+  // 缩放围绕 actor 原点进行，原点不在脚底时会“放大即陷地”。用模型局部 AABB 的
+  // 最低点补偿 y，让放大/缩小前后底面留在同一高度。
+  if (next && (actionId === 'scale-up' || actionId === 'scale-down')
+    && Array.isArray(bounds) && Number.isFinite(bounds[1])
+    && Array.isArray(current?.position) && Array.isArray(current?.scale)
+    && Array.isArray(next.scale) && Number.isFinite(current.scale[0])
+    && Number.isFinite(next.scale[0])) {
+    next.position[1] = current.position[1]
+      + bounds[1] * (current.scale[0] - next.scale[0]);
+  }
+  return next;
 }
 
 const fixed2 = value => Number(value).toFixed(2);

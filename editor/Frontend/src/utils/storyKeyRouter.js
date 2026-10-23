@@ -11,7 +11,7 @@
  * routing and the real camera controllers together — the exact flow a keydown takes in the page.
  */
 export const STORY_KEY_ROUTES = Object.freeze([
-  'ignore', 'adjust', 'dialogue', 'hotbar-slot', 'place-item', 'escape',
+  'ignore', 'adjust', 'dialogue', 'prophet-dialogue', 'hotbar-slot', 'place-item', 'escape',
   'tab', 'inventory', 'cycle-view', 'interact', 'space-busy', 'skill', 'camera',
 ]);
 
@@ -59,6 +59,8 @@ export function routeStoryKeydown(event, state) {
   if (event.ctrlKey || event.altKey || event.metaKey || event.isComposing) return 'ignore';
   if (isTab(event)) return 'tab';
   if (inventoryOpen) return 'inventory';
+  // 小世界：R 直接打开右下角的先知对话入口；主世界 R 仍是技能。
+  if (inSubworld && isKey(event, 'KeyR', 'r')) return 'prophet-dialogue';
   if (isKey(event, 'KeyV', 'v')) return 'cycle-view';
   if (isKey(event, 'KeyF', 'f')) return 'interact';
   // 空格只在「主世界 + 动作/保存进行中」被吞（跳跃会改写玩家存档）；小世界的空格是相机升降，
