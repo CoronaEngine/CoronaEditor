@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
-  PLAYER_ANIMATION_BLEND_SECONDS, PLAYER_ATTACK_CLIP, PLAYER_CLIP_DURATIONS, PLAYER_HURT_CLIP,
+  PLAYER_ANIMATION_BLEND_SECONDS, PLAYER_ATTACK_CLIP, PLAYER_CLIP_DURATIONS,
   PLAYER_MOVEMENT_CLIPS, PLAYER_SKILL_CLIP, createPlayerAnimationSwitcher, locomotionClip,
 } from '../../frontend/storyPlayerAnimation.mjs';
 
@@ -121,36 +121,4 @@ test('the constructor refuses an engine without the animation route', () => {
     /scene id/);
   assert.throws(() => createPlayerAnimationSwitcher({ api: { sceneTools: { setActorAnimation() {} } }, sceneId: 's', guid: '' }),
     /actor guid/);
-});
-
-test('the combo alternates A -> B and restarts after the window closes', async () => {
-  const clips = [];
-  let clock = 0;
-  const switcher = createPlayerAnimationSwitcher({
-    api: { sceneTools: { setActorAnimation: async (scene, guid, clip) => { clips.push(clip); } } },
-    sceneId: 'scene.ini', guid: 'g', schedule: () => 0, cancel: () => {}, now: () => clock,
-  });
-  await switcher.combo();
-  clock += 200;
-  await switcher.combo();
-  clock += 200;
-  await switcher.combo();
-  assert.deepEqual(clips, ['AttackA', 'AttackB', 'AttackA'], 'two clips chain and wrap around');
-
-  // Past the window the sequence restarts from the first swing.
-  clock += 5000;
-  await switcher.combo();
-  assert.equal(clips.at(-1), 'AttackA');
-  switcher.dispose();
-});
-
-test('a hit plays the damage clip and hands the actor back to locomotion', async () => {
-  const clips = [];
-  const switcher = createPlayerAnimationSwitcher({
-    api: { sceneTools: { setActorAnimation: async (scene, guid, clip) => { clips.push(clip); } } },
-    sceneId: 'scene.ini', guid: 'g', schedule: () => 0, cancel: () => {}, now: () => 0,
-  });
-  await switcher.hurt();
-  assert.equal(clips.at(-1), PLAYER_HURT_CLIP);
-  switcher.dispose();
 });

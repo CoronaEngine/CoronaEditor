@@ -51,9 +51,7 @@ export const PROPHET_MODEL_REF = 'story.prophet.placement.v1';
  *
  * **Bump this whenever the player's `asset` changes**, the same rule as `BOSS_MODEL_REF`.
  */
-// v7：模型重建过（去掉走路上下抖、裁掉循环里的静止段、补上 JumpA/SitA/AttackC/DamageA）。
-// 版本号一变，已有世界里的玩家 actor 会按新模型重建一次。
-export const PLAYER_MODEL_REF = 'story.player.assassin.v7';
+export const PLAYER_MODEL_REF = 'story.player.assassin.v6';
 /**
  * The boss's **asset generation** — the migration key for its model.
  *
