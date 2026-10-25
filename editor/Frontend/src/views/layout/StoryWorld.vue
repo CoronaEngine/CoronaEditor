@@ -46,6 +46,7 @@ import { ADJUST_ACTIONS, FRAGMENT_ADJUST_ACTIONS, PROPHET_SCREENS, adjustFeedbac
 
 const router = useRouter();
 const surface = ref(null);
+const pointerLocked = ref(false);
 const inventoryOpen = ref(false);
 // 离玩家最近、且在血条射程内的普通怪物；同一时刻只显示它，血条位置固定。
 const nearbyMonsterId = ref(null);
@@ -1747,6 +1748,14 @@ const resolvedRules = computed(() => installedRules.value
 // «调整碎片» is a sub-screen of «碎片»: it edits one installed fragment's numbers.
 const prophetScreen = ref(null);
 const adjustMode = ref(false);
+// 游戏画面里隐藏系统鼠标；面板/调整时恢复。指针锁定成功时浏览器也会隐藏，
+// 这两层是互补的：CEF 宿主不支持 Pointer Lock 时，至少 CSS/原生光标隐藏仍然生效。
+const gameCursorHidden = computed(() => Boolean(gameplayState.value)
+  && !initializing.value && !inventoryOpen.value && !dialogueOpen.value
+  && !adjustMode.value && !transitioning.value);
+watch(gameCursorHidden, hidden => {
+  try { window.coronaBridge?.setViewportSystemCursorHidden?.(hidden, false); } catch { /* 旧宿主没有这个接口 */ }
+}, { immediate: true });
 const previousViewMode = ref(null);
 const adjustSelection = ref(null);
 // Which fragment the «调整碎片» sub-screen is editing; null whenever that screen is closed.
@@ -2365,15 +2374,16 @@ function watchDpi() {
 }
 function onDpiChanged() { camera.syncViewport(); watchDpi(); }
 /**
- * 自由视角把鼠标交给相机：点击视口时请求指针锁定（可选的增强）。
+ * 剧情世界把鼠标交给相机：点击视口时请求指针锁定，锁住后鼠标不会撞到屏幕边界。
  *
  * 浏览器只在用户手势里允许 requestPointerLock，所以请求挂在点击上。但**转向不依赖它**：
- * 拿不到锁定（CEF 宿主、被拒绝、测试环境里没有这个 API）时，裸鼠标移动照样转向，见
- * viewportStoryWorldCamera.js 的 pointerMove。所以这里只做「能锁就锁」，不把任何行为挂在
- * 它成功之上。点到 HUD/按钮上不抢鼠标——那些控件还要用光标点。
+ * 拿不到锁定（CEF 宿主、被拒绝、测试环境里没有这个 API）时，鼠标移动照样转向，见
+ * viewportStoryWorldCamera.js / playerController.mjs。点到 HUD/按钮上不抢鼠标——那些控件还要用光标点。
  */
 function captureMouseLook(event) {
-  if (!inSubworld.value || camera.viewMode?.() !== 'free') return false;
+  if (!current() || initializing.value || inventoryOpen.value || dialogueOpen.value || adjustMode.value) return false;
+  // 俯视是编辑姿态，不接管鼠标；剧情游玩与自由视角才锁定。
+  if (camera.viewMode?.() === 'top') return false;
   if (event?.target?.closest?.('button, input, select, textarea, [contenteditable="true"]')) return false;
   const element = surface.value;
   if (!element || typeof element.requestPointerLock !== 'function') return false;
@@ -2390,6 +2400,21 @@ function releaseMouseLook() {
   try { document.exitPointerLock?.(); } catch { /* 已经释放 */ }
   return true;
 }
+function syncPointerLock() {
+  pointerLocked.value = Boolean(surface.value) && document.pointerLockElement === surface.value;
+}
+function onPointerLockChange() {
+  syncPointerLock();
+  if (!pointerLocked.value) camera.resetInput();
+}
+watch([inventoryOpen, dialogueOpen, adjustMode], ([inventory, dialogue, adjust]) => {
+  if (inventory || dialogue || adjust) releaseMouseLook();
+});
+function onSurfacePointerLeave() {
+  // 游戏画面隐藏光标时不重置，保留边缘转向，鼠标移出视口也不会突然停住；
+  // 面板/调整/对话需要真实光标，仍然按旧的 resetInput 处理。
+  if (!gameCursorHidden.value) camera.resetInput();
+}
 function onPointerDown(event) {
   if (inventoryOpen.value) return;
   surface.value?.focus();
@@ -2402,12 +2427,14 @@ function onPointerDown(event) {
   if (adjustMode.value) return;
   // 小世界的自由视角：这一下点击顺便把鼠标交给相机（Esc 归还）。
   captureMouseLook(event);
+  camera.pointerDown(event);
   void runAction(gameplay.attack, PLAYER_ATTACK_CLIP);
 }
 
 onMounted(async () => {
   // Escape must work even while the native scene/snapshot request is pending.
   document.addEventListener('keydown', onKeyDown);
+  document.addEventListener('pointerlockchange', onPointerLockChange);
   document.addEventListener('focusin', onInventoryFocus);
   cooldownTimer = setInterval(() => { cooldownTick.value++; }, 100);
   initBag();
@@ -2550,6 +2577,9 @@ onUnmounted(() => {
   clearTimeout(bagToastTimer);
   clearInterval(cooldownTimer);
   document.removeEventListener('focusin', onInventoryFocus);
+  document.removeEventListener('pointerlockchange', onPointerLockChange);
+  releaseMouseLook();
+  try { window.coronaBridge?.setViewportSystemCursorHidden?.(false, false); } catch { /* 旧宿主没有这个接口 */ }
   cameraReady = false;
   navigation.dispose();
   // 离开世界不能把俯瞰视角留下来：否则存进场景的就是这个非常规机位。
@@ -2580,8 +2610,8 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div ref="surface" class="story-world-viewport" tabindex="0" data-story-viewport
-    @pointerdown="onPointerDown" @pointerleave="camera.resetInput" @wheel.prevent="onSurfaceWheel" @contextmenu.prevent>
+  <div ref="surface" class="story-world-viewport" :class="{ 'is-pointer-locked': pointerLocked, 'is-cursor-hidden': gameCursorHidden }" tabindex="0" data-story-viewport
+    @pointerdown="onPointerDown" @pointerleave="onSurfacePointerLeave" @wheel.prevent="onSurfaceWheel" @contextmenu.prevent>
     <svg class="hud-symbols" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
       <defs>
         <g id="i-heal"><polygon points="24,4 40,24 24,44 8,24" /><circle cx="24" cy="24" r="6" /></g>
@@ -3371,6 +3401,13 @@ onUnmounted(() => {
   0% { opacity: 0; }
   18% { opacity: 1; }
   100% { opacity: 0; }
+}
+
+.story-world-viewport.is-pointer-locked,
+.story-world-viewport.is-cursor-hidden,
+.story-world-viewport.is-pointer-locked *,
+.story-world-viewport.is-cursor-hidden * {
+  cursor: none !important;
 }
 
 @media (max-width: 800px) {
