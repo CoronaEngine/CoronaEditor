@@ -18,7 +18,7 @@ import HERO_FIGURE from '@/assets/hero-figure.png';
 import './StoryWorld.bag.css';
 
 import { ensureStoryCharacters, syncPlacementActors } from '../../../../game/frontend/storyActors.mjs';
-import { createPlayerAnimationSwitcher, PLAYER_ATTACK_CLIP, PLAYER_SKILL_CLIP } from '../../../../game/frontend/storyPlayerAnimation.mjs';
+import { createPlayerAnimationSwitcher, PLAYER_SKILL_CLIP } from '../../../../game/frontend/storyPlayerAnimation.mjs';
 import { createBossDirector } from '../../../../game/frontend/storyBossAi.mjs';
 import { createPlayerController, VIEW_LABELS } from '../../../../game/frontend/playerController.mjs';
 import { createPlayerSave } from '../../../../game/frontend/playerSave.mjs';
@@ -2428,7 +2428,12 @@ function onPointerDown(event) {
   // 小世界的自由视角：这一下点击顺便把鼠标交给相机（Esc 归还）。
   captureMouseLook(event);
   camera.pointerDown(event);
-  void runAction(gameplay.attack, PLAYER_ATTACK_CLIP);
+  // 先确认这一下真的能攻击（冷却/目标/保存门都通过），再推进连击动画，
+  // 避免空挥也把段数推上去。命中判定仍由 gameplay.attack 负责。
+  void runAction(async () => {
+    const hit = await gameplay.attack();
+    if (hit !== false) playerAnimationSwitcher()?.combo();
+  }, null);
 }
 
 onMounted(async () => {

@@ -48,10 +48,13 @@ export const PROPHET_MODEL_REF = 'story.prophet.placement.v1';
  *                               12 991 triangles, bow included) with the same seven clips. The
  *                               clips were authored for this body — driving the previous mesh with
  *                               them raised its left arm into the package's bow-holding idle.
+ *   `story.player.assassin.v7` -> 同一个 E3D-Assassin.glb 重新导出：去掉走路上下抖、裁掉
+ *                               Walk 循环尾部的静止段，并补上 JumpA/SitA/AttackC/DamageA。
+ *                               这解决了 Walk 播到第二、三步之间会顿一下的循环接缝。
  *
  * **Bump this whenever the player's `asset` changes**, the same rule as `BOSS_MODEL_REF`.
  */
-export const PLAYER_MODEL_REF = 'story.player.assassin.v6';
+export const PLAYER_MODEL_REF = 'story.player.assassin.v7';
 /**
  * The boss's **asset generation** — the migration key for its model.
  *

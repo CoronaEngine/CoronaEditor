@@ -22,7 +22,7 @@
  */
 export const PLAYER_CLIP_DURATIONS = Object.freeze({
   IdleB: 11.0,
-  Walk: 1.5,
+  Walk: 1.067,
   Run: 0.8,
   AttackA: 0.833,
   AttackB: 0.933,
@@ -44,8 +44,14 @@ export const PLAYER_MOVEMENT_CLIPS = Object.freeze({
   dodging: 'IdleB',
 });
 
-/** The clip a melee swing plays. */
+/** The clip a melee swing plays (the first combo step). */
 export const PLAYER_ATTACK_CLIP = 'AttackA';
+/**
+ * 左键连击：第一刀 AttackA、第二刀 AttackB，窗口内再按才推进，超时回到第一刀。
+ * 这两段都来自当前 E3D-Assassin.glb，不需要换模型；第三段 AttackC 暂不进入循环。
+ */
+export const PLAYER_COMBO_CLIPS = Object.freeze(['AttackA', 'AttackB']);
+export const PLAYER_COMBO_WINDOW_SECONDS = 0.85;
 /** The clip a skill plays (heavy slash / sweep). */
 export const PLAYER_SKILL_CLIP = 'AttackB';
 /** Cross-fade used when no caller asks for one, matching the engine's own default. */
@@ -70,6 +76,7 @@ export function createPlayerAnimationSwitcher({
   api, sceneId, guid, blendSeconds = PLAYER_ANIMATION_BLEND_SECONDS,
   schedule = (fn, ms) => setTimeout(fn, ms),
   cancel = id => clearTimeout(id),
+  now = () => Date.now(),
   onError = () => {},
 }) {
   if (!api?.sceneTools?.setActorAnimation) throw new Error('engine does not expose setActorAnimation');
@@ -82,6 +89,8 @@ export function createPlayerAnimationSwitcher({
   let lastResult = '';     // engine's answer to the latest one, for diagnostics
   let locomotion = 'idle'; // last movement state seen
   let oneShot = null;      // clip currently owning the actor, if any
+  let comboIndex = -1;     // 连击游标（-1 表示下一刀从头开始）
+  let comboUntil = 0;      // 这个时间点之前再按左键会推进到下一段
   let timer = null;
   let disposed = false;
 
@@ -108,6 +117,20 @@ export function createPlayerAnimationSwitcher({
   }
 
   return {
+    /**
+     * 打出连击的下一段：窗口内再按推进，超时或打完两段回到第一段。
+     * 第一刀/第二刀都有对应 clip；单点左键每次仍是第一刀。
+     */
+    combo() {
+      const at = now();
+      comboIndex = at <= comboUntil ? (comboIndex + 1) % PLAYER_COMBO_CLIPS.length : 0;
+      const clip = PLAYER_COMBO_CLIPS[comboIndex];
+      comboUntil = at + ((PLAYER_CLIP_DURATIONS[clip] ?? 0.8)
+        + PLAYER_COMBO_WINDOW_SECONDS) * 1000;
+      return this.playOnce(clip);
+    },
+    /** 供 UI/测试观察下一次攻击会落在连击的哪一段。 */
+    comboIndex: () => comboIndex,
     /** Follow the controller's movement state. Ignored while a one-shot owns the actor. */
     update(movementState) {
       locomotion = movementState || 'idle';
