@@ -97,9 +97,14 @@ class Appearance:
         children = [self.material(c,stack) for c in self.children(node,"bsdf")]
         if kind in {"twosided","mask","bumpmap","normalmap"} and children:
             result = dict(children[0])
-            self.builder.warning("MATERIAL_FEATURE_DEFERRED", f"{kind} wrapper uses existing front material; no new Vision BSDF features")
+            if kind != "normalmap":
+                self.builder.warning("MATERIAL_FEATURE_DEFERRED", f"{kind} wrapper uses existing front material; no new Vision BSDF features")
             if kind == "twosided":
                 result["two_sided"] = True
+            elif kind == "normalmap":
+                result["normal"] = self.get(node,"normalmap",[.5,.5,1.],stack)
+            elif kind == "mask":
+                result["opacity"] = self.get(node,"opacity",.5,stack)
         else:
             result = convert_material(kind,lambda k,d:self.get(node,k,d),self.builder.warning,
                                       source="mitsuba3",children=children)

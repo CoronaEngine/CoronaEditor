@@ -119,6 +119,10 @@ def convert_material(kind, get, warn, *, source="", children=()):
             rough = (u*v)**.25
             result["anisotropic"] = max(-.9, min(.9, (1-v/u)/.9))
     result["roughness"] = rough
+    # PBRT reflection models evaluate either surface hemisphere. Keep this
+    # surface property independent of emission sidedness and transmission.
+    if source == "pbrt4" and kind in {"diffuse", "conductor", "coateddiffuse", "coatedconductor", "mirror"}:
+        result["two_sided"] = True
     if kind == "principled":
         result.update(base_color=get("base_color", [.5]*3), metallic=get("metallic",0.),
                       roughness=get("roughness",.5), specular=get("specular",.5),
@@ -160,7 +164,7 @@ def convert_material(kind, get, warn, *, source="", children=()):
             warn("MATERIAL_APPROXIMATION", "Spectral/textured IOR approximated by 1.5")
             eta = 1.5
         result["ior"] = max(1.0001, ior(eta)/ior(get("ext_ior", 1.)))
-    for key in ("displacement", "bumpmap", "normalmap"):
+    for key in ("displacement", "bumpmap"):
         if get(key, None) is not None:
             warn("MATERIAL_FEATURE_DEFERRED", f"{key} is not added to Vision BSDFs in this import")
     return result

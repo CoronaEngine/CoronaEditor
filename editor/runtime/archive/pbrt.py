@@ -139,6 +139,28 @@ class State:
                      {name: list(values) for name, values in self.shape_attributes.items()}, self.material, self.emission)
 
 
+def ply_has_vertex_normals(path):
+    """Inspect only the PLY header; Assimp still owns geometry decoding.
+
+    PBRT uses face normals when nx/ny/nz are absent. Assimp's general model
+    default generates smooth normals, which bends otherwise planar walls.
+    """
+    with Path(path).open('rb') as stream:
+        if stream.readline(8192).strip() != b'ply':
+            raise ValueError(f'Invalid PLY header: {path}')
+        properties=set(); element=None; consumed=4
+        while consumed < 1024*1024:
+            line=stream.readline(8192); consumed+=len(line)
+            if not line: break
+            words=line.split()
+            if words==[b'end_header']:
+                return {b'nx',b'ny',b'nz'} <= properties
+            if len(words)>=2 and words[0]==b'element': element=words[1]
+            if element==b'vertex' and len(words)==3 and words[0]==b'property':
+                properties.add(words[2])
+    raise ValueError(f'Missing or oversized PLY header: {path}')
+
+
 def read_scene(source, *, cache_directory=None):
     builder = SceneBuilder(source, "pbrt4", cache_directory)
     root = Path(source).resolve().parent
@@ -147,13 +169,15 @@ def read_scene(source, *, cache_directory=None):
     object_name = None
     in_world = False
     camera_description, film_description = None, {}
+    flat_normals = {}
 
     def append(record):
         if object_name is not None:
             objects[object_name].append(record)
         else:
             path, matrix, reverse, kind, name, material = record
-            builder.add(path, matrix, name, flip_normals=reverse, kind=kind, material=material)
+            builder.add(path, matrix, name, flip_normals=reverse,
+                        face_normals=flat_normals.get(path,False), kind=kind, material=material)
 
     def process(path, chain=()):
         nonlocal state, object_name, in_world, coordinates, camera_description, film_description
@@ -314,6 +338,8 @@ def read_scene(source, *, cache_directory=None):
                         model = root / props["filename"][0]
                         if model.suffix.lower() != ".ply":
                             raise ValueError("plymesh requires a PLY file")
+                        if model not in flat_normals:
+                            flat_normals[model] = not ply_has_vertex_normals(model)
                     elif kind == "trianglemesh":
                         def rows(key, width):
                             data = [float(x) for x in props.get(key, [])]
@@ -322,6 +348,7 @@ def read_scene(source, *, cache_directory=None):
                             return [data[i:i+width] for i in range(0, len(data), width)]
                         model = write_obj(rows("P", 3), [int(x) for x in props["indices"]],
                                           rows("N", 3), rows("uv" if "uv" in props else "st", 2), directory=cache_directory)
+                        flat_normals[model] = not props.get("N")
                     else:
                         kwargs = {k: float(props[k][0]) for k in ("radius", "zmin", "zmax", "phimax", "height") if k in props}
                         if "innerradius" in props:

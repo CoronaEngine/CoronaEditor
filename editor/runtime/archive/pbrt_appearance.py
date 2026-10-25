@@ -75,13 +75,17 @@ class Appearance:
             names = props.get("materials", [])
             if len(names) == 2:
                 children = [self.materials[n] for n in names]
-        return convert_material(kind,get,self.builder.warning,source="pbrt4",children=children)
+        result = convert_material(kind,get,self.builder.warning,source="pbrt4",children=children)
+        if "normalmap" in props:
+            result["normal"] = image(self.root/get("normalmap",""),encoding="linear")
+        return result
 
     def emission(self, props):
         get = lambda k,d: self.get(props,k,d)
         if "power" in props:
             self.builder.warning("LIGHT_APPROXIMATION", "Area power normalization deferred; using authored radiance and scale")
-        return dict(emission=expression("multiply", get("L",[1.]*3),get("scale",1.)),
+        radiance = image(self.root/get("filename",""),encoding="linear") if "filename" in props else get("L",[1.]*3)
+        return dict(emission=expression("multiply", radiance,get("scale",1.)),
                     emission_two_sided=get("twosided",False))
 
     def light(self, kind, props, matrix, name):
