@@ -11,7 +11,7 @@
  * routing and the real camera controllers together — the exact flow a keydown takes in the page.
  */
 export const STORY_KEY_ROUTES = Object.freeze([
-  'ignore', 'adjust', 'dialogue', 'hotbar-slot', 'place-item', 'escape',
+  'ignore', 'adjust', 'dialogue', 'prophet-dialogue', 'hotbar-slot', 'place-item', 'escape',
   'tab', 'inventory', 'cycle-view', 'interact', 'space-busy', 'skill', 'camera',
 ]);
 
@@ -40,7 +40,13 @@ export function routeStoryKeydown(event, state) {
   } = state;
 
   if (!current) return 'ignore';
-  if (adjustMode) return 'adjust';
+  if (adjustMode) {
+    // 调整模式只把 WASD 让给俯视相机；数字键、Esc 等仍由调整面板独占。
+    // 这样进入俯瞰后可以挪动视角，又不会让空格/技能键漏到相机或战斗里。
+    const cameraMove = event.code === 'KeyW' || event.code === 'KeyA'
+      || event.code === 'KeyS' || event.code === 'KeyD';
+    return cameraMove ? 'camera' : 'adjust';
+  }
   if (dialogueOpen) return 'dialogue';
   // 物品栏：调整模式与对话（上面两个分支）已经吃掉数字键，因此这里只在
   // 小世界、面板关闭时接管数字键与 B。主世界里这套键完全不生效。
@@ -53,6 +59,8 @@ export function routeStoryKeydown(event, state) {
   if (event.ctrlKey || event.altKey || event.metaKey || event.isComposing) return 'ignore';
   if (isTab(event)) return 'tab';
   if (inventoryOpen) return 'inventory';
+  // 小世界：R 直接打开右下角的先知对话入口；主世界 R 仍是技能。
+  if (inSubworld && isKey(event, 'KeyR', 'r')) return 'prophet-dialogue';
   if (isKey(event, 'KeyV', 'v')) return 'cycle-view';
   if (isKey(event, 'KeyF', 'f')) return 'interact';
   // 空格只在「主世界 + 动作/保存进行中」被吞（跳跃会改写玩家存档）；小世界的空格是相机升降，

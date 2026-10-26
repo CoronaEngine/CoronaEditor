@@ -1685,9 +1685,12 @@ onMounted(async () => {
   const queryString = window.location.hash?.split('?')[1] || window.location.search?.slice(1);
   const urlSceneName = queryString ? new URLSearchParams(queryString).get('sceneName') : null;
 
-  // OnInit 只返回当前场景。
+  // OnInit 目前返回多场景契约（scenes + active_index）；仍兼容旧的 scene 字段。
   const initData = result?.data ?? result;
-  const activeScene = initData?.scene;
+  const initScenes = Array.isArray(initData?.scenes) ? initData.scenes : [];
+  const initSceneIndex = Math.min(Math.max(Number(initData?.active_index) || 0, 0),
+    Math.max(0, initScenes.length - 1));
+  const activeScene = initData?.scene || initScenes[initSceneIndex] || null;
   currentSceneName.value = urlSceneName || activeScene?.path || DEFAULT_SCENE_NAME;
 
   await OnInitObjTree();

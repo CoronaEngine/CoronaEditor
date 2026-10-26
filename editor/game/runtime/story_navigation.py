@@ -69,8 +69,21 @@ def handle_navigation_request(payload: str, *, api=None) -> dict:
             init = _unwrap(api.main.on_init())
             if not isinstance(init, dict):
                 raise SubworldError('无法确定当前场景，已取消保存')
+            # Native on_init currently returns the multi-scene payload
+            # (`scenes` + `active_index` + `path`); older builds returned `scene`.
+            # Reading only `scene` made every O/P save look like a scene mismatch.
+            scenes = init.get('scenes') if isinstance(init.get('scenes'), list) else []
+            try:
+                index = int(init.get('active_index') or 0)
+            except (TypeError, ValueError):
+                index = 0
+            index = min(max(index, 0), max(0, len(scenes) - 1))
             scene = init.get('scene')
+            if not isinstance(scene, dict):
+                scene = scenes[index] if scenes and isinstance(scenes[index], dict) else {}
             route = scene.get('path') if isinstance(scene, dict) else None
+            if not isinstance(route, str) or not route:
+                route = init.get('path')
             if not isinstance(route, str) or not route or (source / route).resolve() != source / 'scene.ini':
                 raise SubworldError('当前场景与剧情世界不匹配，已取消保存')
             assert_source()

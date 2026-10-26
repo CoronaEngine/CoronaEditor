@@ -47,7 +47,20 @@ class MainView(PluginBase):
                 index = CoronaEditorApi.main.on_init()
                 if not isinstance(index, dict) or index.get("status") != "success":
                     return {"status": "error", "message": "当前项目尚未完成初始化"}
-                scene_name = (index.get("scene") or {}).get("path")
+                # Native on_init 现在返回 scenes + active_index（并带顶层 path）；
+                # 旧构建返回 scene。两种都接受，否则“运行项目”会在有场景时误报没有场景。
+                scenes = index.get("scenes") if isinstance(index.get("scenes"), list) else []
+                try:
+                    active_index = int(index.get("active_index") or 0)
+                except (TypeError, ValueError):
+                    active_index = 0
+                active_index = min(max(active_index, 0), max(0, len(scenes) - 1))
+                scene = index.get("scene")
+                if not isinstance(scene, dict):
+                    scene = scenes[active_index] if scenes and isinstance(scenes[active_index], dict) else {}
+                scene_name = scene.get("path") if isinstance(scene, dict) else None
+                if not scene_name:
+                    scene_name = index.get("path")
                 if not scene_name:
                     return {"status": "error", "message": "当前项目没有已加载场景"}
                 logger.info("开始运行项目...")

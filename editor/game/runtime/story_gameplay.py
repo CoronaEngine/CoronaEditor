@@ -687,7 +687,7 @@ def handle_world_rule_request(request, source, api):
             listed = request.get('rules')
             if not isinstance(listed, list):
                 raise ValueError('世界规则列表无效')
-            return response(world_rules.save(owner, listed))
+            return response(world_rules.save(owner, listed, request.get('tuning')))
 
 
 def handle_gameplay_request(payload: str, *, api=None):

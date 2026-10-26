@@ -3,11 +3,6 @@
     class="relative h-screen border-2 border-[#d8b86c] bg-[#282828]/95 text-white overflow-hidden flex flex-col font-sans"
   >
     <div class="flex-1 min-h-0 p-20 bg-[#1e1e1e] flex flex-col">
-      <div class="mb-10 shrink-0">
-        <h2 class="text-5xl font-bold text-[#d8b86c] mb-2">Corona Editor</h2>
-        <p class="text-base text-gray-500">版本: {{ appVersion }}</p>
-      </div>
-
       <div class="shrink-0 mb-6">
         <h3 class="text-base font-semibold text-gray-400 uppercase tracking-wider">
           最近项目

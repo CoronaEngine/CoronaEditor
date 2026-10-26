@@ -93,7 +93,7 @@ function throughPage(controls, event, state) {
 
 test('routing is a fixed, closed set of branches so a new key cannot fall through silently', () => {
   assert.deepEqual([...STORY_KEY_ROUTES], [
-    'ignore', 'adjust', 'dialogue', 'hotbar-slot', 'place-item', 'escape',
+    'ignore', 'adjust', 'dialogue', 'prophet-dialogue', 'hotbar-slot', 'place-item', 'escape',
     'tab', 'inventory', 'cycle-view', 'interact', 'space-busy', 'skill', 'camera',
   ]);
 });
@@ -154,16 +154,19 @@ test('面板打开时空格不碰相机：行囊与对话都吞掉它', () => {
   small.controls.dispose();
 });
 
-test('E/R 的世界分界与空格同一条规则：小世界留给相机，主世界仍是技能', () => {
-  const down = keyEvent({ code: 'KeyE', key: 'e' });
-  assert.equal(routeStoryKeydown(down, { ...baseState, inSubworld: true }), 'camera');
-  assert.equal(routeStoryKeydown(down, { ...baseState, inSubworld: false }), 'skill');
+test('E 在小世界留给相机，R 打开先知对话；主世界两者仍是技能', () => {
+  const e = keyEvent({ code: 'KeyE', key: 'e' });
+  assert.equal(routeStoryKeydown(e, { ...baseState, inSubworld: true }), 'camera');
+  assert.equal(routeStoryKeydown(e, { ...baseState, inSubworld: false }), 'skill');
+  const r = keyEvent({ code: 'KeyR', key: 'r' });
+  assert.equal(routeStoryKeydown(r, { ...baseState, inSubworld: true }), 'prophet-dialogue');
+  assert.equal(routeStoryKeydown(r, { ...baseState, inSubworld: false }), 'skill');
   // 非真空：小世界的 E 确实把相机往下带（Q/E 升降按得动）。
   const small = world('child');
   const startY = small.pose().position[1];
-  const e = throughPage(small.controls, keyEvent({ code: 'KeyE', key: 'e' }), baseState);
-  assert.equal(e.route, 'camera');
-  assert.equal(e.handled, true);
+  const down = throughPage(small.controls, keyEvent({ code: 'KeyE', key: 'e' }), baseState);
+  assert.equal(down.route, 'camera');
+  assert.equal(down.handled, true);
   small.step(50);
   near(small.pose().position[1] - startY, -0.6, 'E 降 0.6 m');
   small.controls.dispose();
