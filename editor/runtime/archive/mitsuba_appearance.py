@@ -1,6 +1,7 @@
 """Mitsuba references and wrappers lowered to the shared Principled contract."""
 import math
 from .appearance import convert_material, expression, image, principled, rgb
+from .texture_cache import checker_texture
 from runtime.archive import transforms as tr
 
 
@@ -82,7 +83,8 @@ class Appearance:
             encoding = "linear" if get("raw",False) or filename.suffix.lower() in {".exr",".hdr",".pfm"} else "srgb"
             return image(filename, encoding=encoding,uv=uv,wrap=get("wrap_mode","repeat"),filter=get("filter_type","bilinear"))
         if kind == "checkerboard":
-            return dict(kind="checkerboard",a=get("color0",[.4]*3),b=get("color1",[.2]*3),uv=uv)
+            return checker_texture(get("color0",[.4]*3),get("color1",[.2]*3),uv,
+                                   directory=self.builder.cache_directory,warn=self.builder.warning)
         self.builder.warning("TEXTURE_APPROXIMATION",f"Unsupported texture {kind} approximated by constant")
         return [.5]*3
 

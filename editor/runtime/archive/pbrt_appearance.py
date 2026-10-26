@@ -2,6 +2,7 @@
 from pathlib import Path
 import math
 from .appearance import convert_material, expression, image, rgb
+from .texture_cache import checker_texture
 from runtime.archive import transforms as tr
 
 
@@ -63,8 +64,13 @@ class Appearance:
             return expression("multiply" if kind == "scale" else "mix", get("tex1",1.),get("tex2",1.),
                               get("amount",.5) if kind == "mix" else None)
         if kind == "checkerboard":
-            return dict(kind="checkerboard", a=get("tex1",0.), b=get("tex2",1.), frequency=1,
-                        uv=[get("uscale",1),0,get("udelta",0),0,get("vscale",1),get("vdelta",0),0,0,1])
+            a, b = get("tex1",0.), get("tex2",1.)
+            uv = [get("uscale",1),0,get("udelta",0),0,get("vscale",1),get("vdelta",0),0,0,1]
+            if get("dimension",2) != 2 or get("mapping","uv") != "uv":
+                self.builder.warning("TEXTURE_BAKE_DEFERRED", "Non-UV or 3D checker retains the existing approximate 2D expression")
+                return dict(kind="checkerboard",a=a,b=b,frequency=1,uv=uv)
+            return checker_texture(a,b,uv,frequency=1,directory=self.builder.cache_directory,
+                                   warn=self.builder.warning)
         self.builder.warning("TEXTURE_APPROXIMATION", f"Texture {kind} approximated by its constant value")
         return get("value", .5)
 

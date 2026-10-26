@@ -163,7 +163,9 @@ def convert_material(kind, get, warn, *, source="", children=()):
         if not isinstance(eta, (str, int, float)):
             warn("MATERIAL_APPROXIMATION", "Spectral/textured IOR approximated by 1.5")
             eta = 1.5
-        result["ior"] = max(1.0001, ior(eta)/ior(get("ext_ior", 1.)))
+        # This is a relative IOR. Air bubbles inside water/ice legitimately
+        # have eta < 1; clamping them to one erases refraction and TIR.
+        result["ior"] = ior(eta)/ior(get("ext_ior", 1.))
     for key in ("displacement", "bumpmap"):
         if get(key, None) is not None:
             warn("MATERIAL_FEATURE_DEFERRED", f"{key} is not added to Vision BSDFs in this import")
