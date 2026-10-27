@@ -13,7 +13,8 @@ export const visionDenoisers = [
 ];
 
 export const visionDenoiserFromCamera = (camera) => {
-  const type = String(camera?.vision_denoiser || 'scene').toLowerCase();
+  const fallback = camera?.vision_render_mode === 'svgf' ? 'svgf' : 'reblur';
+  const type = String(camera?.vision_denoiser || fallback).toLowerCase();
   return type === 'svgf' || type === 'reblur' || type === 'relax' ? type : 'scene';
 };
 
@@ -31,7 +32,7 @@ export const visionDenoiseFromCamera = (camera) => {
   if (typeof enabled === 'boolean') return enabled;
   if (enabled === 'true') return true;
   if (enabled === 'false') return false;
-  return camera?.vision_render_mode === 'svgf';
+  return true;
 };
 
 export const visionStablePlanesFromCamera = (camera) => {

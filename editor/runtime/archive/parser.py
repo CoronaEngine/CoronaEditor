@@ -296,7 +296,7 @@ def _parse_camera(
     vision_denoise = (
         configparser.ConfigParser.BOOLEAN_STATES[denoise_value]
         if denoise_value in configparser.ConfigParser.BOOLEAN_STATES
-        else legacy_svgf
+        else True
     )
     return {
         "id": camera_id,
@@ -324,7 +324,7 @@ def _parse_camera(
         "vision_denoise": vision_denoise,
         "vision_accumulation": vision_accumulation,
         "vision_stable_planes": vision_stable_planes,
-        "vision_denoiser": str(get("vision_denoiser", "scene")).strip().lower(),
+        "vision_denoiser": str(get("vision_denoiser", "svgf" if legacy_svgf else "reblur")).strip().lower(),
         "vision_reblur_settings": json.loads(get("vision_reblur_settings", "{}")),
         "vision_pt_settings": json.loads(get("vision_pt_settings", "{}")),
         "vision_restir_settings": json.loads(get("vision_restir_settings", "{}")),
