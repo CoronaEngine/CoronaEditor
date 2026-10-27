@@ -86,22 +86,18 @@ const animateParticles = (id) => {
   const d = 0.6;
   switch (id) {
     case 'panel-new':
-      gsap.to(particleSystem.material.color, { r: 0.4, g: 0.66, b: 1, duration: d, force3D: true });
       gsap.to(particleSystem.scale, { x: 1, y: 1, z: 1, duration: d, force3D: true });
       gsap.to(camera.position, { z: 80, duration: d, ease: 'power2.out', force3D: true });
       break;
     case 'panel-continue':
-      gsap.to(particleSystem.material.color, { r: 0.1, g: 0.8, b: 0.4, duration: d, force3D: true });
       gsap.to(particleSystem.scale, { x: 1, y: 1, z: 1, duration: d, force3D: true });
       gsap.to(camera.position, { z: 42, duration: d, ease: 'power2.inOut', force3D: true });
       break;
     case 'panel-multi':
-      gsap.to(particleSystem.material.color, { r: 1.0, g: 0.4, b: 0.1, duration: d, force3D: true });
       gsap.to(particleSystem.scale, { x: 1, y: 1, z: 1, duration: d, force3D: true });
       gsap.to(camera.position, { z: 65, duration: d, ease: 'power2.out', force3D: true });
       break;
     case 'panel-exit':
-      gsap.to(particleSystem.material.color, { r: 0.8, g: 0.1, b: 0.2, duration: d, force3D: true });
       gsap.to(particleSystem.scale, { x: 0.4, y: 0.4, z: 0.4, duration: d, ease: 'power3.inOut', force3D: true });
       gsap.to(camera.position, { z: 100, duration: d, ease: 'power3.inOut', force3D: true });
       break;

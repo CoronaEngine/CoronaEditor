@@ -30,6 +30,7 @@ let controllerSequence = 0;
 export function createPlayerController({ getPose, setPose, submitPose, getBridge,
   isCurrent = () => true, isInputLocked = () => false, onError = () => {},
   getRect = () => null, onPlayerChanged = () => {},
+  isPointerLocked = () => false,
   requestFrame = callback => requestAnimationFrame(callback), cancelFrame = id => cancelAnimationFrame(id),
   now = () => globalThis.performance.now(), config = PLAYER_CONTROLS }) {
   let player = null, targetOffset = 0, yaw = 0, pitch = config.pitch, distance = config.distance;
@@ -335,6 +336,7 @@ export function createPlayerController({ getPose, setPose, submitPose, getBridge
       return true;
     },
     pointerDown(event) {
+      if (isPointerLocked()) return true;
       if (!ready() || !Number.isFinite(event.clientX) || !Number.isFinite(event.clientY)) return false;
       // Seed on clicks as well as first entry; no held mouse button is required.
       pointer = { id: event.pointerId, x: event.clientX, y: event.clientY, edgeX: 0, edgeY: 0 };
@@ -342,6 +344,17 @@ export function createPlayerController({ getPose, setPose, submitPose, getBridge
     },
     pointerMove(event) {
       if (!ready()) { resetInput(); return false; }
+      if (isPointerLocked()) {
+        // 指针锁定后 clientX/Y 被浏览器钉住，只有 movementX/Y 还能表达鼠标位移。
+        // 用增量转向，不进入“到屏幕边缘才转”的分支，鼠标因此永远不会撞到边界。
+        const dx = Number(event.movementX), dy = Number(event.movementY);
+        if (!Number.isFinite(dx) || !Number.isFinite(dy)) return false;
+        const [lo, hi] = pitchLimits();
+        yaw += dx * config.sensitivity;
+        pitch = clamp(pitch + dy * config.sensitivity, lo, hi);
+        pointer = { id: event.pointerId, x: 0, y: 0, edgeX: 0, edgeY: 0 };
+        schedule(); return true;
+      }
       const x = event.clientX, y = event.clientY, rect = getRect();
       if (!Number.isFinite(x) || !Number.isFinite(y)) return false;
       if (rect && (x < rect.left || y < rect.top || x >= rect.left + rect.width || y >= rect.top + rect.height)) {
@@ -365,7 +378,7 @@ export function createPlayerController({ getPose, setPose, submitPose, getBridge
       schedule(); return true;
     },
     pointerUp() { return false; },
-    pointerLeave: resetInput,
+    pointerLeave() { if (!isPointerLocked()) resetInput(); },
     wheel(event) {
       // The eye is fixed to the head in first person; zooming it out would silently
       // turn the possession view back into an orbit.
