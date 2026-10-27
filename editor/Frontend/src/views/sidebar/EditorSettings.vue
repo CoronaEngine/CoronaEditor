@@ -110,6 +110,43 @@
         </label>
       </section>
 
+      <section class="settings-section">
+        <div class="section-heading">
+          <h3>{{ t('editorSettings.ai.title') }}</h3>
+        </div>
+
+        <label class="field">
+          <span>{{ t('editorSettings.ai.keyLabel') }}</span>
+          <input
+            v-model="aiKeyInput"
+            :type="!aiKeyEditing && aiKeyStatus.configured ? 'text' : 'password'"
+            class="ai-key-input"
+            :class="{ 'is-masked': !aiKeyEditing && aiKeyStatus.configured }"
+            :placeholder="t('editorSettings.ai.placeholder')"
+            autocomplete="off"
+            autocapitalize="off"
+            spellcheck="false"
+            :disabled="aiKeyBusy"
+            @focus="beginAiKeyEdit"
+            @blur="restoreAiKeyMask"
+            @keydown.enter.prevent="saveAiKey"
+          />
+        </label>
+
+        <button
+          type="button"
+          class="small-button apply-button"
+          :disabled="aiKeyBusy || !aiKeyEditing || !aiKeyInput.trim()"
+          @click="saveAiKey"
+        >
+          {{ aiKeyBusy ? t('common.saving') : t('common.save') }}
+        </button>
+
+        <p v-if="aiKeyMessage" class="status-line" :class="aiKeyMessageType" role="status">
+          {{ aiKeyMessage }}
+        </p>
+      </section>
+
       <section class="settings-section leave-section">
         <div class="section-heading">
           <h3>{{ t('editorSettings.leave') }}</h3>
@@ -140,6 +177,7 @@ import { useI18n } from 'vue-i18n';
 import { useDockPanel } from '@/composables/useDockPanel.js';
 import { setLocale } from '@/i18n/index.js';
 import { appService } from '@/services/appService.js';
+import { editorApi } from '@/api/editorApi.js';
 import { coronaEventBus } from '@/utils/eventBus.js';
 import DockTitleBar from '@/components/ui/DockTitleBar.vue';
 
@@ -147,6 +185,12 @@ const router = useRouter();
 const { t, locale } = useI18n();
 const { closePanel, isDocked } = useDockPanel();
 const confirmHome = ref(false);
+const aiKeyInput = ref('');
+const aiKeyEditing = ref(false);
+const aiKeyBusy = ref(false);
+const aiKeyStatus = ref({ configured: false, masked_key: '' });
+const aiKeyMessage = ref('');
+const aiKeyMessageType = ref('');
 const EDITOR_CONTROLS_KEY = '__coronaEditorControls';
 const defaultViewportControls = {
   available: false,
@@ -310,7 +354,71 @@ function onViewportControlsState(state) {
   syncViewportControls(state);
 }
 
+function normalizeAiKeyStatus(payload) {
+  const data = payload && typeof payload === 'object' ? payload : {};
+  return {
+    configured: Boolean(data.configured),
+    masked_key: String(data.masked_key || ''),
+  };
+}
 
+async function loadAiKeyStatus() {
+  try {
+    const response = await editorApi.ai.submitRequest({
+      operation: 'ai.settings.get',
+    });
+    const data = response?.data ?? response;
+    aiKeyStatus.value = normalizeAiKeyStatus(data);
+    if (!aiKeyEditing.value) {
+      aiKeyInput.value = aiKeyStatus.value.configured
+        ? aiKeyStatus.value.masked_key
+        : '';
+    }
+  } catch (error) {
+    console.warn('[EditorSettings] failed to read DeepSeek API key status', error);
+  }
+}
+
+function beginAiKeyEdit() {
+  if (aiKeyBusy.value || aiKeyEditing.value) return;
+  aiKeyEditing.value = true;
+  aiKeyInput.value = '';
+}
+
+function restoreAiKeyMask() {
+  if (aiKeyBusy.value || !aiKeyEditing.value) return;
+  if (aiKeyInput.value.trim()) return;
+  aiKeyEditing.value = false;
+  aiKeyInput.value = aiKeyStatus.value.configured
+    ? aiKeyStatus.value.masked_key
+    : '';
+}
+
+async function saveAiKey() {
+  const key = aiKeyInput.value.trim();
+  if (!key || aiKeyBusy.value || !aiKeyEditing.value) return;
+  aiKeyBusy.value = true;
+  aiKeyMessage.value = '';
+  try {
+    const response = await editorApi.ai.submitRequest({
+      operation: 'ai.settings.set',
+      payload: { api_key: key },
+    });
+    const data = response?.data ?? response;
+    aiKeyStatus.value = normalizeAiKeyStatus(data);
+    aiKeyEditing.value = false;
+    aiKeyInput.value = aiKeyStatus.value.configured
+      ? aiKeyStatus.value.masked_key
+      : '';
+    aiKeyMessageType.value = 'success';
+    aiKeyMessage.value = t('editorSettings.ai.saved');
+  } catch (error) {
+    aiKeyMessageType.value = 'error';
+    aiKeyMessage.value = String(error?.message || t('editorSettings.ai.saveFailed'));
+  } finally {
+    aiKeyBusy.value = false;
+  }
+}
 
 function handleLocaleChange(nextLocale) {
   setLocale(nextLocale);
@@ -319,6 +427,7 @@ function handleLocaleChange(nextLocale) {
 onMounted(() => {
   coronaEventBus.on('viewport-controls-state', onViewportControlsState);
   requestViewportControlsState();
+  void loadAiKeyStatus();
   viewportControlPollTimer = window.setInterval(requestViewportControlsState, 1000);
 });
 
@@ -634,6 +743,10 @@ function goHome() {
   line-height: 1.35;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.ai-key-input.is-masked {
+  color: var(--text-muted);
 }
 
 

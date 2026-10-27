@@ -5,12 +5,14 @@ from __future__ import annotations
 import logging
 import os
 import re
+import sys
 from pathlib import Path
 from typing import Any
 
 logger = logging.getLogger(__name__)
 
 _KEY_NAME = re.compile(r"[^A-Za-z0-9]+")
+_ENV_FILE = Path(__file__).resolve().parents[3] / ".env"
 _KNOWN_PROVIDER_ENV_NAMES = {
     "openai": "OPENAI_API_KEY",
     "anthropic": "ANTHROPIC_API_KEY",
@@ -66,6 +68,37 @@ def _env_value(*names: str) -> str:
         if value:
             return value
     return ""
+
+
+def _mask_secret(value: str) -> str:
+    text = str(value or "").strip()
+    if not text:
+        return ""
+    if len(text) <= 8:
+        return "*" * len(text)
+    return f"{text[:4]}...{text[-4:]}"
+
+
+def _write_dotenv_updates(path: Path, updates: dict[str, str]) -> None:
+    """Update matching dotenv keys while preserving unrelated user entries."""
+    text = path.read_text(encoding="utf-8-sig") if path.is_file() else ""
+    for name, value in updates.items():
+        line = f"{name}={value}"
+        pattern = re.compile(rf"(?m)^\s*(?:export\s+)?{re.escape(name)}\s*=.*$")
+        if pattern.search(text):
+            text = pattern.sub(lambda _match: line, text)
+        else:
+            prefix = text.rstrip() + "\n" if text.strip() else ""
+            text = f"{prefix}{line}\n"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(text, encoding="utf-8")
+
+
+def _persist_deepseek_key(key: str) -> None:
+    env_names = _provider_env_names("deepseek")
+    _write_dotenv_updates(_ENV_FILE, {name: key for name in env_names})
+    for name in env_names:
+        os.environ[name] = key
 
 
 def _provider_env_names(provider_name: Any, explicit_name: Any = None) -> tuple[str, ...]:
@@ -155,11 +188,30 @@ def _apply_to_collector(collector: Any) -> dict[str, int]:
     return summary
 
 
+def deepseek_api_key_status() -> dict[str, Any]:
+    load_dotenv_file(_ENV_FILE)
+    key = _env_value(*_provider_env_names("deepseek"))
+    return {"configured": bool(key), "masked_key": _mask_secret(key)}
+
+
+def set_deepseek_api_key(api_key: Any) -> dict[str, Any]:
+    key = _unquote(str(api_key or "").strip())
+    if not key:
+        raise ValueError("DeepSeek API Key 不能为空")
+    if any(char in key for char in "\r\n"):
+        raise ValueError("DeepSeek API Key 格式无效")
+    _persist_deepseek_key(key)
+    entrance_module = sys.modules.get("Quasar.ai_service.entrance")
+    entrance = getattr(entrance_module, "ai_entrance", None)
+    if getattr(entrance, "if_import", False):
+        load_ai_setting()
+    return deepseek_api_key_status()
+
+
 def load_ai_setting():
     """Load ``editor/.env`` and apply keys after Quasar settings collection."""
     try:
-        dotenv_path = Path(__file__).resolve().parents[3] / ".env"
-        load_dotenv_file(dotenv_path)
+        load_dotenv_file(_ENV_FILE)
 
         from Quasar.ai_service.entrance import get_ai_entrance
         from Quasar.ai_agent.executor import reset_cached_agent

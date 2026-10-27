@@ -1,10 +1,13 @@
 import os
 import re
+import sys
 import tempfile
+import types
 import unittest
 from pathlib import Path
 from unittest.mock import patch
 
+from editor.plugins.AITool.configuration import local_secrets
 from editor.plugins.AITool.configuration.local_secrets import (
     apply_api_key_env_overrides,
     load_dotenv_file,
@@ -109,6 +112,105 @@ class LoadLocalAISettingTests(unittest.TestCase):
 
         self.assertNotIn("secret-test-key", repr(result))
         self.assertEqual({"providers": 1, "overridden": 1}, result)
+
+
+class DeepSeekKeySettingsTests(unittest.TestCase):
+    KEY = "sk-test-1234567890"
+
+    def _fake_quasar_modules(self, collector):
+        quasar = types.ModuleType("Quasar")
+        quasar.__path__ = []
+        ai_service = types.ModuleType("Quasar.ai_service")
+        ai_service.__path__ = []
+        entrance = types.ModuleType("Quasar.ai_service.entrance")
+        entrance.ai_entrance = types.SimpleNamespace(
+            if_import=True, collector=collector
+        )
+        entrance.get_ai_entrance = lambda: types.SimpleNamespace(
+            collector=collector
+        )
+        ai_agent = types.ModuleType("Quasar.ai_agent")
+        ai_agent.__path__ = []
+        executor = types.ModuleType("Quasar.ai_agent.executor")
+        executor.reset_cached_agent = lambda: None
+        return {
+            "Quasar": quasar,
+            "Quasar.ai_service": ai_service,
+            "Quasar.ai_service.entrance": entrance,
+            "Quasar.ai_agent": ai_agent,
+            "Quasar.ai_agent.executor": executor,
+        }
+
+    def test_save_persists_key_without_exposing_it(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            env_file = Path(temp_dir) / ".env"
+            env_file.write_text(
+                "DEEPSEEK_API_KEY=old-value\nOTHER_SETTING=keep\n", encoding="utf-8"
+            )
+            with (
+                patch.object(local_secrets, "_ENV_FILE", env_file),
+                patch.object(local_secrets, "load_ai_setting"),
+                patch.dict(os.environ, {}, clear=True),
+            ):
+                result = local_secrets.set_deepseek_api_key(self.KEY)
+
+                self.assertTrue(result["configured"])
+                self.assertEqual("sk-t...7890", result["masked_key"])
+                self.assertNotIn(self.KEY, repr(result))
+                self.assertEqual(self.KEY, os.environ["CORONA_DEEPSEEK_API_KEY"])
+                self.assertEqual(self.KEY, os.environ["DEEPSEEK_API_KEY"])
+
+            text = env_file.read_text(encoding="utf-8")
+            self.assertIn(f"CORONA_DEEPSEEK_API_KEY={self.KEY}", text)
+            self.assertIn(f"DEEPSEEK_API_KEY={self.KEY}", text)
+            self.assertIn("OTHER_SETTING=keep", text)
+
+    def test_key_validation_rejects_empty_and_control_characters(self):
+        with self.assertRaises(ValueError):
+            local_secrets.set_deepseek_api_key("   ")
+        with self.assertRaises(ValueError):
+            local_secrets.set_deepseek_api_key("sk-test\nrm -rf")
+
+    def test_save_updates_live_provider_through_existing_loader(self):
+        class Collector:
+            def __init__(self):
+                self._ai_settings = {
+                    "providers": [
+                        {"name": "example", "api_key": "example-key"},
+                    ]
+                }
+                self._ai_load = {
+                    "providers": lambda raw: {p["name"]: p for p in raw}
+                }
+                self._ai_config = types.SimpleNamespace()
+
+            @property
+            def AI_SETTINGS(self):
+                return {
+                    "providers": [
+                        dict(provider)
+                        for provider in self._ai_settings["providers"]
+                    ]
+                }
+
+        collector = Collector()
+        with tempfile.TemporaryDirectory() as temp_dir:
+            with (
+                patch.object(
+                    local_secrets, "_ENV_FILE", Path(temp_dir) / ".env"
+                ),
+                patch.dict(sys.modules, self._fake_quasar_modules(collector)),
+                patch.dict(os.environ, {}, clear=True),
+            ):
+                local_secrets.set_deepseek_api_key(self.KEY)
+
+        providers = collector._ai_settings["providers"]
+        self.assertEqual("deepseek", providers[0]["name"])
+        self.assertEqual(self.KEY, providers[0]["api_key"])
+        self.assertEqual(
+            "https://api.deepseek.com/v1", providers[0]["base_url"]
+        )
+        self.assertEqual(self.KEY, collector._ai_config.providers["deepseek"]["api_key"])
 
 
 if __name__ == "__main__":

@@ -324,14 +324,31 @@ class AITool(PluginBase):
 
     @classmethod
     def submit_request(cls, request) -> dict:
-        if cls.runtime_state()[0] != "ready":
-            return cls._initializing_response()
         try:
             parsed = json.loads(request) if isinstance(request, str) else request
         except Exception:
             parsed = request
+        operation = parsed.get("operation") if isinstance(parsed, dict) else None
+        if operation in {"ai.settings.get", "ai.settings.set"}:
+            from .configuration.local_secrets import (
+                deepseek_api_key_status,
+                set_deepseek_api_key,
+            )
+
+            try:
+                if operation == "ai.settings.get":
+                    return deepseek_api_key_status()
+                payload = parsed.get("payload") or {}
+                key = payload.get("api_key") if isinstance(payload, dict) else payload
+                return set_deepseek_api_key(key)
+            except ValueError as exc:
+                return {"success": False, "error": str(exc)}
+            except Exception:
+                logger.exception("AITool settings operation failed")
+                return {"success": False, "error": "AI 配置保存失败"}
+        if cls.runtime_state()[0] != "ready":
+            return cls._initializing_response()
         if isinstance(parsed, dict):
-            operation = parsed.get("operation")
             service = {
                 "node_graph.review.start": cls._node_graph_review_service.start,
                 "node_graph.review.status": cls._node_graph_review_service.status,
