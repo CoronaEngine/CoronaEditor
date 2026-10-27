@@ -325,7 +325,8 @@
       @click.stop
       @wheel.stop
     >
-      <section class="scene-quick-render" aria-label="渲染设置" data-guidance="render-settings">
+      <section class="scene-quick-render" aria-label="渲染设置" data-guidance="render-settings"
+        :inert="creativeRenderDefaultsBusy" :aria-busy="creativeRenderDefaultsBusy">
         <div class="scene-quick-render-mode">
           <span>渲染模式</span>
           <!-- CEF's offscreen renderer paints PET_VIEW only, so keep the menu in the page. -->
@@ -436,8 +437,8 @@
             <span>Stable Plane</span>
           </label>
         </div>
-        <p v-if="mainVisionAccumulationError || mainVisionDenoiseError || mainVisionDenoiserError || mainVisionStablePlanesError" role="alert" class="text-red-300 text-xs">
-          {{ mainVisionAccumulationError || mainVisionDenoiseError || mainVisionDenoiserError || mainVisionStablePlanesError }}
+        <p v-if="creativeRenderDefaultsError || mainVisionAccumulationError || mainVisionDenoiseError || mainVisionDenoiserError || mainVisionStablePlanesError" role="alert" class="text-red-300 text-xs">
+          {{ creativeRenderDefaultsError || mainVisionAccumulationError || mainVisionDenoiseError || mainVisionDenoiserError || mainVisionStablePlanesError }}
         </p>
       </section>
       <label class="scene-quick-camera-speed" data-guidance="camera-speed">
@@ -1202,6 +1203,8 @@ const previewStatusText = ref('');
 const previewDetails = ref({});
 let tutorialPreviewObservedRunning = false;
 const visionAvailable = ref(false);
+const creativeRenderDefaultsBusy = ref(true);
+const creativeRenderDefaultsError = ref('');
 const mainRenderBackend = ref('native');
 const mainVisionRenderMode = ref('path_tracing');
 const mainVisionAccumulation = ref(false);
@@ -1456,6 +1459,60 @@ const toggleMenu = (menu) => {
     if (menu === 'physics') {
       loadPhysicsParams();
     }
+  }
+};
+
+// Apply once when entering the creative world, after camera restoration. Keep
+// this editor policy out of archive defaults and subsequent snapshot refreshes.
+const initializeCreativeRenderMode = async () => {
+  const sceneId = currentMainSceneId();
+  const cameraId = currentMainCameraId();
+  const cameraHandle = cameraBindingState.value.cameraHandle;
+  const current = () => viewCurrent() && worldModeState.mode === 'creative'
+    && currentMainSceneId() === sceneId && currentMainCameraId() === cameraId
+    && cameraBindingState.value.cameraHandle === cameraHandle;
+  creativeRenderDefaultsError.value = '';
+  try {
+    if (!current() || !visionAvailable.value || !cameraId) return false;
+    // Configure the integrator and denoiser before activating Vision. Each
+    // bridge acknowledgement may precede the renderer consuming its command.
+    for (const [method, value] of [
+      ['setVisionRenderMode', 'restir'],
+      ['setVisionStablePlanes', true],
+      ['setVisionDenoiser', 'reblur'],
+      ['setVisionDenoise', true],
+      ['setVisionAccumulation', false],
+      ['setOutputMode', 'final_color'],
+    ]) {
+      if (!current()) return false;
+      await editorApi.sceneTools[method](sceneId, cameraId, value);
+    }
+    if (!current()) return false;
+    const result = unwrapBridgeData(await editorApi.sceneTools.setRenderBackend('vision', sceneId, cameraId));
+    if (!current()) return false;
+    if (result?.mode !== 'vision') throw new Error('Vision 后端不可用');
+
+    pendingMainRenderSelection = { sceneId, cameraId, backend: 'vision', visionMode: 'restir', expiresAt: Date.now() + 3000 };
+    pendingMainStablePlanesSelection = { sceneId, cameraId, enabled: true };
+    pendingMainDenoiserSelection = { sceneId, cameraId, type: 'reblur' };
+    pendingMainDenoiseSelection = { sceneId, cameraId, enabled: true };
+    pendingMainAccumulationSelection = { sceneId, cameraId, enabled: false };
+    mainRenderBackend.value = 'vision';
+    mainVisionRenderMode.value = 'restir';
+    mainVisionStablePlanes.value = true;
+    mainVisionDenoiser.value = 'reblur';
+    mainVisionDenoise.value = true;
+    mainVisionAccumulation.value = false;
+    return true;
+  } catch (error) {
+    if (current()) {
+      creativeRenderDefaultsError.value = `初始化创造模式渲染设置失败：${error.message}`;
+      logError('Failed to initialize creative viewport rendering', error);
+    }
+    return false;
+  } finally {
+    if (current()) await syncSceneCameraBinding(sceneId, { preservePose: true });
+    creativeRenderDefaultsBusy.value = false;
   }
 };
 
@@ -3163,6 +3220,8 @@ onMounted(async () => {
   // Always take a second snapshot after that phase so the main viewport owns the
   // current camera handle rather than the camera object that was just destroyed.
   await syncSceneCameraBinding(initialSceneId);
+  if (!viewCurrent()) return;
+  await initializeCreativeRenderMode();
   if (!viewCurrent()) return;
   // The CEF window can survive project creation/switching, so discard stale
   // frontend lock reasons using the backend's self-healed runtime truth.
