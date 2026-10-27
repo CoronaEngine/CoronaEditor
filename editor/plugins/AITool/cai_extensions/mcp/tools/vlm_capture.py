@@ -237,7 +237,7 @@ def _resolve_scene(scene_name: str, scene: Any = None) -> Any:
         return scene
 
     try:
-        from ..mcp.tools.native_scene_state import resolve_native_scene_value
+        from .native_scene_state import resolve_native_scene_value
 
         resolved = resolve_native_scene_value(scene_name or "")
         if resolved is not None:
