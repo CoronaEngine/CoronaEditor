@@ -138,12 +138,27 @@ def convert_material(kind, get, warn, *, source="", children=()):
             get("specular_reflectance", [1.]*3)))
         if kind == "coatedconductor":
             result["coat"] = 1.
-    elif kind in {"dielectric", "roughdielectric", "thindielectric", "diffusetransmission"}:
+    elif kind == "diffusetransmission":
+        reflectance=get("reflectance",[.25]*3)
+        transmittance=get("transmittance",[.25]*3)
+        scale=get("scale",1.)
+        if not any(isinstance(x,dict) for x in (reflectance,transmittance,scale)):
+            reflected=[max(0.,min(1.,c*scale)) for c in rgb(reflectance)]
+            transmitted=[max(0.,min(1.,c*scale)) for c in rgb(transmittance)]
+            total=[r+t for r,t in zip(reflected,transmitted)]
+            weight=sum(transmitted)/max(sum(total),1e-12)
+            result.update(base_color=[min(1.,c) for c in total],transmission=weight,
+                          roughness=1.,specular=0.,two_sided=True)
+        else:
+            # Keep spatial inputs in the existing expression graph. The fixed
+            # half split is an explicitly reported approximation, not a scene override.
+            result.update(base_color=expression("multiply",expression("mix",reflectance,transmittance,.5),expression("multiply",2.,scale)),
+                          transmission=.5,roughness=1.,specular=0.,two_sided=True)
+        warn("MATERIAL_APPROXIMATION", "Diffuse reflection/transmission energy retained; angular response approximated by rough Principled")
+    elif kind in {"dielectric", "roughdielectric", "thindielectric"}:
         result.update(transmission=1., specular=1., base_color=get("specular_transmittance", get("transmittance", [1.]*3)))
-        if kind in {"thindielectric", "diffusetransmission"}:
+        if kind == "thindielectric":
             warn("MATERIAL_APPROXIMATION", f"{kind} uses existing Principled transmission")
-        if kind == "diffusetransmission":
-            result["roughness"] = 1.
     elif kind in {"plastic", "roughplastic", "coateddiffuse"}:
         result.update(base_color=get("diffuse_reflectance", get("reflectance", [.5]*3)), specular=1.)
     elif kind in {"null", "interface"}:

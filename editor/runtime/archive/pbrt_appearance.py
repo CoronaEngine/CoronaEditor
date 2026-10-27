@@ -48,7 +48,14 @@ class Appearance:
         get = lambda k,d: self.get(props,k,d,(*stack,name))
         if kind == "imagemap":
             filename = self.root / get("filename", "")
-            encoding = get("encoding", "srgb" if filename.suffix.lower() == ".png" else "linear").lower()
+            # Corona's shared import policy treats ordinary 8-bit color maps
+            # consistently across formats. PBRT's native default is PNG-only
+            # sRGB; retain explicit author intent and scalar/data-map defaults.
+            suffix=filename.suffix.lower()
+            color_ldr=category in {"spectrum","color","rgb"} and suffix in {".png",".tga",".jpg",".jpeg",".bmp",".qoi"}
+            encoding = get("encoding", "srgb" if suffix==".png" or color_ldr else "linear").lower()
+            if color_ldr and suffix!=".png" and "encoding" not in props and "gamma" not in props:
+                self.builder.warning("COLOR_ENCODING_NORMALIZED", "Unspecified 8-bit color map uses shared sRGB import policy rather than PBRT's non-PNG linear default")
             if "gamma" in props:
                 encoding = "srgb" if get("gamma", True) else "linear"
             filtering = get("filter", "bilinear")

@@ -106,7 +106,20 @@ class Appearance:
             elif kind == "normalmap":
                 result["normal"] = self.get(node,"normalmap",[.5,.5,1.],stack)
             elif kind == "mask":
-                result["opacity"] = self.get(node,"opacity",.5,stack)
+                opacity=self.get(node,"opacity",.5,stack)
+                result["opacity"] = opacity
+                if not isinstance(opacity,dict):
+                    values=rgb(opacity)
+                    amount=max(0.,min(1.,sum(values)/3))
+                    child_transmission=result.get("transmission",0.)
+                    child_color=result["base_color"]
+                    result["transmission"]=expression("mix",1.,child_transmission,amount)
+                    result["base_color"]=expression("mix",[1.]*3,result["base_color"],amount)
+                    if not isinstance(child_color,dict) and not isinstance(child_transmission,dict):
+                        color=rgb(child_color)
+                        transmitted=[1-amount+amount*c*child_transmission for c in color]
+                        result["transmission"]=sum(transmitted)/max(sum(rgb(result["base_color"])),1e-12)
+                    self.builder.warning("MATERIAL_APPROXIMATION", "Constant opacity uses existing Principled transmission; no new mask BSDF or exact null scattering")
         else:
             result = convert_material(kind,lambda k,d:self.get(node,k,d),self.builder.warning,
                                       source="mitsuba3",children=children)
