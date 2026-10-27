@@ -1,11 +1,6 @@
 from runtime import network_sync_policy
 from api.editor_api import CoronaEditorApi
 from runtime.plugin_base import PluginBase
-from plugins.SceneTools.vision_import import (
-    import_embedded_vision_scene_into_current_scene,
-    import_vision_scene_into_current_scene,
-    prepare_external_live_vision_scene,
-)
 
 import logging
 
@@ -381,9 +376,6 @@ class SceneTools(PluginBase):
         except Exception as exc:
             return {"status": "error", "message": str(exc)}
 
-    @staticmethod
-    def prepare_external_live_vision_scene(scene) -> str:
-        return prepare_external_live_vision_scene(scene)
 
     @staticmethod
     def open_camera_view(scene_name: str, camera_name: str) -> dict:
@@ -431,22 +423,8 @@ class SceneTools(PluginBase):
         except Exception as exc:
             return {"status": "error", "message": str(exc)}
 
-    @staticmethod
-    def load_vision_scene(path: str = "") -> dict:
-        try:
-            result = CoronaEditorApi.scene_tools.load_vision_scene(path)
-            logger.info("Vision scene load requested: %s", path or "<unload>")
-            return result
-        except Exception as exc:
-            return {"status": "error", "message": str(exc)}
 
-    @staticmethod
-    def import_vision_scene_into_current_scene(scene_name: str, path: str) -> dict:
-        return import_vision_scene_into_current_scene(scene_name, path)
 
-    @staticmethod
-    def import_embedded_vision_scene_into_current_scene(scene_name: str) -> dict:
-        return import_embedded_vision_scene_into_current_scene(scene_name)
 
     @staticmethod
     def list_actor_tree(scene_name) -> list:

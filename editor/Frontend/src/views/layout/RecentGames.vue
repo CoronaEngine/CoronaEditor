@@ -193,12 +193,7 @@ const handleImport = async () => {
   try {
     const result = await editorApi.project.openProjectFile();
     if (result?.data?.path) {
-      let path = result.data.path;
-      if (path.toLowerCase().endsWith('.json')) {
-        const imported = unwrapResponse(await projectLauncherService.importVisionScene(path));
-        if (!imported?.ok || !imported.path) throw new Error(imported?.message || 'Vision 导入失败');
-        path = imported.path;
-      }
+      const path = result.data.path;
       await handleOpenProject(path);
     }
   } catch (error) {

@@ -70,6 +70,15 @@ def _resolve_source(source: Path) -> tuple[Path, configparser.ConfigParser]:
         raise ArchiveParseError(
             "UNSUPPORTED_ARCHIVE_VERSION", "Expected corona_scene_folder version 1", path=str(selected)
         )
+    # Old external Vision documents are not Corona scenes. Reject the marker
+    # before reading actors so proxy geometry is never mistaken for the scene.
+    if any(config.has_section(section) for section in (
+        "vision", "vision_document", "vision_bindings", "vision_unsupported_shapes"
+    )):
+        raise ArchiveParseError(
+            "UNSUPPORTED_VISION_ARCHIVE", "External Vision archives are no longer supported",
+            path=str(selected),
+        )
     return selected, config
 
 
@@ -460,18 +469,6 @@ def _parse_archive_impl(input_path: str) -> dict[str, Any]:
             "terrain": {
                 "type": config.get("terrain", "type", fallback=""),
                 "path": config.get("terrain", "path", fallback=""),
-            },
-            "vision": {
-                "storage": config.get("vision", "storage", fallback=""),
-                "source_id": config.get("vision", "source_id", fallback=""),
-                "source_path": config.get("vision", "source_path", fallback=""),
-                "import_mode": config.get("vision", "import_mode", fallback=""),
-                "document_version": config.get("vision_document", "version", fallback=""),
-                "document_encoding": config.get("vision_document", "encoding", fallback=""),
-                "document_data": config.get("vision_document", "data", fallback=""),
-                "document_asset_root": config.get(
-                    "vision_document", "asset_root", fallback=""
-                ),
             },
             "actors": actors,
             "cameras": cameras,

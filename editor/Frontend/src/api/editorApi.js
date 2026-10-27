@@ -639,7 +639,6 @@ const editorApiStatic = {
     getDefaultProjectPath: () => call_manifest_editor_api('project.getDefaultProjectPath', []),
     getProjectLoadStatus: () => call_manifest_editor_api('project.getProjectLoadStatus', []),
     getRecentProjects: () => call_manifest_editor_api('project.getRecentProjects', []),
-    importVisionScene: (path) => call_manifest_editor_api('project.importVisionScene', [path]),
     openProject: (projectPath, options = {}) =>
       call_manifest_editor_api('project.openProject', [projectPath, options]),
     openProjectFile: () => call_manifest_editor_api('project.openProjectFile', []),
@@ -802,7 +801,6 @@ const editorApiStatic = {
     getSsaoEnabled: (sceneName, cameraName) =>
       call_manifest_editor_api('sceneTools.getSsaoEnabled', [sceneName, cameraName]),
     isVisionAvailable: () => call_manifest_editor_api('sceneTools.isVisionAvailable', []),
-    loadVisionScene: (path) => call_manifest_editor_api('sceneTools.loadVisionScene', [path]),
     pickActor: (sceneName, x, y, vpWidth, vpHeight) =>
       call_manifest_editor_api('sceneTools.pickActor', [sceneName, x, y, vpWidth, vpHeight]),
     playAudio: (resourceId, loop) =>

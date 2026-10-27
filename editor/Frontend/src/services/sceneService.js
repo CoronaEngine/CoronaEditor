@@ -47,7 +47,6 @@ export const sceneService = {
   updateCameraView: (sceneName, cameraId, state) =>
     editorApi.sceneTools.updateCameraView(sceneName, cameraId, state),
   deleteCamera: (sceneName, cameraId) => editorApi.sceneTools.deleteCamera(sceneName, cameraId),
-  loadVisionScene: (path) => editorApi.sceneTools.loadVisionScene(path),
   reloadScene: (sceneName, projectPath = '') =>
     editorApi.sceneTools.reloadScene(sceneName, projectPath),
   rebindActorResource: (sceneName, actorGuid, path) =>

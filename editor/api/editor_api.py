@@ -367,9 +367,6 @@ class _ProjectApi(_DynamicApiNamespace):
         )
 
 
-    @staticmethod
-    def import_vision_scene(path):
-        return _invoke_manifest_cpp_api("project.import_vision_scene", [path])
 
     @staticmethod
     def open_project(project_path, options=None):
@@ -1009,9 +1006,6 @@ class _SceneToolsApi(_DynamicApiNamespace):
     def is_vision_available():
         return _invoke_manifest_cpp_api("scene_tools.is_vision_available", [])
 
-    @staticmethod
-    def load_vision_scene(path):
-        return _invoke_manifest_cpp_api("scene_tools.load_vision_scene", [path])
 
     @staticmethod
     def save_screenshot(scene_name, path, camera_name=None):

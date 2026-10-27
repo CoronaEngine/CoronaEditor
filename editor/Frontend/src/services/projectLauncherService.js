@@ -1,4 +1,4 @@
-/** Single-scene project creation, opening, and Vision import facade. */
+/** Single-scene project creation and opening facade. */
 
 import { nextTick } from 'vue';
 import { appService } from './appService.js';
@@ -74,7 +74,6 @@ export const projectLauncherService = {
   importPortableAsset: (payload = {}) => editorApi.project.importPortableAsset(payload),
   cleanupPortableSceneAssets: (payload = {}) =>
     editorApi.project.cleanupPortableSceneAssets(payload),
-  importVisionScene: (path) => editorApi.project.importVisionScene(path),
   openProjectFile: () => editorApi.project.openProjectFile(),
   createProject: (projectData) => editorApi.project.createProject(projectData),
   createWorldProject: (worldData) => editorApi.project.createWorldProject(worldData),

@@ -431,14 +431,6 @@
                   >
                     ⚠ 重新绑定
                   </button>
-                  <span
-                    v-if="scene.vision_proxy"
-                    class="text-[10px] text-[#e6d5a7] mr-1 hidden group-hover:inline"
-                    :title="scene.vision_binding?.shape_guid || 'Vision proxy actor'"
-                    data-testid="actor-vision-proxy"
-                  >
-                    Vision
-                  </span>
                   <!-- 类型标签 -->
                   <span class="text-[10px] text-[#6f7f69] mr-2 hidden group-hover:inline">
                     {{ getTypeShort(scene.type) }}
@@ -701,7 +693,6 @@ const camerasExpanded = ref(true);
 const actorsExpanded = ref(true);
 
 const sceneImages = ref([]);
-const sceneVision = ref({});
 const playingStates = reactive({}); // { name: true/false } — 音频播放状态
 const route = useRoute();
 const px = ref('1.0'),
@@ -1647,8 +1638,6 @@ const OnInitObjTree = async () => {
             visible: item.visible !== false,
             handle: normalizeHandle(item.handle),
             audioResourceId: item.audio_resource_id || '',
-            vision_proxy: item.vision_proxy === true,
-            vision_binding: item.vision_binding || null,
             load_status: item.load_status || 'loaded',
             load_error: item.load_error || null,
           }))
@@ -1661,8 +1650,7 @@ const OnInitObjTree = async () => {
         settlement: sceneTreeSettlement.value,
       });
       sceneTreeSettlement.value = decision.settlement;
-      // Cameras and vision metadata do not depend on actor materialization.
-      sceneVision.value = data.vision || {};
+      // Cameras do not depend on actor materialization.
       if (Array.isArray(data.cameras)) applyCameraList(data.cameras);
       // An empty snapshot taken while a freshly opened scene is still building its
       // actors is provisional; committing it left the dock empty for good.
