@@ -249,6 +249,15 @@ def _parse_actor(
             section.getint(f"{key}.runtime.actor_version", fallback=1), 1
         ),
         "follow_camera": section.getboolean(f"{key}.follow_camera", fallback=False),
+        "camera_lock": {
+            "enabled": section.getboolean(f"{key}.camera_lock.enabled", fallback=False),
+            "position_offset": _float3(
+                section.get(f"{key}.camera_lock.position_offset", "0, 0, 2"), (0.0, 0.0, 2.0)
+            ),
+            "rotation_offset": _float3(
+                section.get(f"{key}.camera_lock.rotation_offset", "0, 0, 0"), (0.0, 0.0, 0.0)
+            ),
+        },
         "transform": {
             "position": _float3(
                 section.get(f"{key}.geometry.position", "0, 0, 0"), (0.0, 0.0, 0.0)
@@ -448,6 +457,17 @@ def _parse_archive_impl(input_path: str) -> dict[str, Any]:
                 }
             )
     project_name = scene_section.get("name", root.name)
+    physics = {}
+    if config.has_section("physics"):
+        section = config["physics"]
+        if "gravity" in section:
+            physics["gravity"] = _float3(section["gravity"], (0.0, -9.8, 0.0))
+        for field in ("floor_y", "floor_restitution", "fixed_dt"):
+            if field in section:
+                physics[field] = _finite_number(section[field], f"physics.{field}")
+        if ("fixed_dt" in physics and physics["fixed_dt"] <= 0
+                or "floor_restitution" in physics and not 0 <= physics["floor_restitution"] <= 1):
+            raise ArchiveParseError("INVALID_PHYSICS", "Physics requires fixed_dt > 0 and restitution in [0, 1]")
     return {
         "schema_version": 1,
         "archive_type": "portable_scene",
@@ -464,6 +484,7 @@ def _parse_archive_impl(input_path: str) -> dict[str, Any]:
                     (1.0, 1.0, 1.0),
                 ),
                 "floor_grid_enabled": config.getboolean("grid", "enabled", fallback=True),
+                "physics": physics,
             },
             "scripts": {"path": config.get("scripts", "path", fallback="")},
             "terrain": {
