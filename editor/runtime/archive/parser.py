@@ -336,7 +336,6 @@ def _parse_camera(
         "output_mode": get("output_mode", "final_color"),
         "render_backend": get("render_backend", "native"),
         "vision_render_mode": "path_tracing" if legacy_svgf or legacy_progressive else vision_mode,
-        "ssao_enabled": str(get("ssao_enabled", "true")).lower() == "true",
         "vision_spp": get("vision_spp", ""),
         "vision_max_depth": get("vision_max_depth", ""),
         "vision_denoise": vision_denoise,

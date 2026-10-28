@@ -19,14 +19,6 @@ export const sceneService = {
     editorApi.sceneTools.setOutputMode(sceneName, cameraName, mode),
   getOutputMode: (sceneName, cameraName) =>
     editorApi.sceneTools.getOutputMode(sceneName, cameraName),
-  setShadowCascadeDebug: (sceneName, cameraName, enabled) =>
-    editorApi.sceneTools.setShadowCascadeDebug(sceneName, cameraName, enabled),
-  getShadowCascadeDebug: (sceneName, cameraName) =>
-    editorApi.sceneTools.getShadowCascadeDebug(sceneName, cameraName),
-  setSsaoEnabled: (sceneName, cameraName, enabled) =>
-    editorApi.sceneTools.setSsaoEnabled(sceneName, cameraName, enabled),
-  getSsaoEnabled: (sceneName, cameraName) =>
-    editorApi.sceneTools.getSsaoEnabled(sceneName, cameraName),
   isVisionAvailable: () => editorApi.sceneTools.isVisionAvailable(),
   setRenderBackend: (mode, sceneName = null, cameraId = null) =>
     editorApi.sceneTools.setRenderBackend(mode, sceneName, cameraId),

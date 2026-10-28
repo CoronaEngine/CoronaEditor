@@ -173,9 +173,7 @@ export function createPlayerController({ getPose, setPose, submitPose, getBridge
     if (token !== epoch) return;
     frame = null;
     if (!ready()) { resetInput(); return; }
-    if (pendingMove) return;
     const delta = clamp((time - (lastTime ?? time)) / 1000, 0, config.maxDelta);
-    lastTime = time;
     try {
       if (pointer && view !== 'first') {
         yaw += pointer.edgeX * config.edgeYawSpeed * delta;
@@ -183,6 +181,11 @@ export function createPlayerController({ getPose, setPose, submitPose, getBridge
         pitch = clamp(pitch + pointer.edgeY * config.edgePitchSpeed * delta, lo, hi);
       }
       poseCamera();
+      // Looking around remains responsive while the authoritative collision
+      // result is pending. Never predict or queue another character movement.
+      if (pendingMove) { schedule(); return; }
+      if (!hasWork()) return;
+      lastTime = time;
       if (delta <= 0) { schedule(); return; }
       let vx = 0, vz = 0, facing = null, dodgeElapsed = dodge?.elapsed ?? 0;
       if (dodge) {
@@ -203,6 +206,10 @@ export function createPlayerController({ getPose, setPose, submitPose, getBridge
           facing = Math.atan2(direction[0], direction[1]);
         }
       }
+      if (player.grounded && !jump && !dodge && vx === 0 && vz === 0) {
+        // Orbiting a stationary character does not require another ground sweep.
+        schedule(); return;
+      }
       const id = `${controllerId}:${binding}:${++moveSequence}`;
       const pending = { id, handle: player.handle, binding, jump, dodge, delta, dodgeElapsed, facing };
       pending.settled = new Promise((resolve, reject) => { pending.resolve = resolve; pending.reject = reject; });
@@ -219,11 +226,12 @@ export function createPlayerController({ getPose, setPose, submitPose, getBridge
         pendingMove = null; clearTimeout(pending.timer); pending.resolve();
         throw new Error('原生三角形移动接口不可用');
       }
+      schedule();
     } catch (error) { resetInput(); onError(error); }
   }
   function schedule() {
     if (!ready()) { resetInput(); return; }
-    if (frame !== null || pendingMove) return;
+    if (frame !== null) return;
     if (lastTime === null) lastTime = now();
     const token = epoch;
     frame = requestFrame(time => tick(time, token));

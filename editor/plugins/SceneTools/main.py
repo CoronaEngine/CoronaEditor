@@ -215,37 +215,9 @@ class SceneTools(PluginBase):
         except Exception as exc:
             return {"status": "error", "message": str(exc)}
 
-    @staticmethod
-    def set_shadow_cascade_debug(scene_name: str, camera_name: str = None, enabled: bool = False) -> dict:
-        try:
-            return CoronaEditorApi.scene_tools.set_shadow_cascade_debug(
-                scene_name, camera_name, bool(enabled)
-            )
-        except Exception as exc:
-            return {"status": "error", "message": str(exc)}
 
-    @staticmethod
-    def get_shadow_cascade_debug(scene_name: str, camera_name: str = None) -> dict:
-        try:
-            return CoronaEditorApi.scene_tools.get_shadow_cascade_debug(scene_name, camera_name)
-        except Exception as exc:
-            return {"status": "error", "message": str(exc)}
 
-    @staticmethod
-    def set_ssao_enabled(scene_name: str, camera_name: str = None, enabled: bool = True) -> dict:
-        try:
-            return CoronaEditorApi.scene_tools.set_ssao_enabled(
-                scene_name, camera_name, bool(enabled)
-            )
-        except Exception as exc:
-            return {"status": "error", "message": str(exc)}
 
-    @staticmethod
-    def get_ssao_enabled(scene_name: str, camera_name: str = None) -> dict:
-        try:
-            return CoronaEditorApi.scene_tools.get_ssao_enabled(scene_name, camera_name)
-        except Exception as exc:
-            return {"status": "error", "message": str(exc)}
 
     @staticmethod
     def is_vision_available() -> dict:

@@ -1724,8 +1724,6 @@ const normalizeCameraPayload = (cam) => ({
   handle: normalizeHandle(cam.handle ?? cam.camera_handle),
   render_backend: cam.render_backend || 'native',
   output_mode: cam.output_mode || 'final_color',
-  shadow_cascade_debug: !!cam.shadow_cascade_debug,
-  ssao_enabled: cam.ssao_enabled !== false,
   deletable: cam.deletable !== false,
   move_speed: cam.move_speed || 1,
   view_open: !!cam.view_open,

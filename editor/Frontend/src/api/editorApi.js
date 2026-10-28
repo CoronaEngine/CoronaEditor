@@ -792,14 +792,6 @@ const editorApiStatic = {
       call_manifest_editor_api('sceneTools.setOutputMode', [sceneName, cameraName, mode]),
     getOutputMode: (sceneName, cameraName) =>
       call_manifest_editor_api('sceneTools.getOutputMode', [sceneName, cameraName]),
-    setShadowCascadeDebug: (sceneName, cameraName, enabled) =>
-      call_manifest_editor_api('sceneTools.setShadowCascadeDebug', [sceneName, cameraName, !!enabled]),
-    getShadowCascadeDebug: (sceneName, cameraName) =>
-      call_manifest_editor_api('sceneTools.getShadowCascadeDebug', [sceneName, cameraName]),
-    setSsaoEnabled: (sceneName, cameraName, enabled) =>
-      call_manifest_editor_api('sceneTools.setSsaoEnabled', [sceneName, cameraName, !!enabled]),
-    getSsaoEnabled: (sceneName, cameraName) =>
-      call_manifest_editor_api('sceneTools.getSsaoEnabled', [sceneName, cameraName]),
     isVisionAvailable: () => call_manifest_editor_api('sceneTools.isVisionAvailable', []),
     pickActor: (sceneName, x, y, vpWidth, vpHeight) =>
       call_manifest_editor_api('sceneTools.pickActor', [sceneName, x, y, vpWidth, vpHeight]),

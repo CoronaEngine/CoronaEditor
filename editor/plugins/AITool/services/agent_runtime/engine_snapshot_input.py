@@ -101,8 +101,6 @@ _CAMERA_FIELDS = frozenset(
         "vision_spp",
         "vision_max_depth",
         "vision_denoise",
-        "shadow_cascade_debug",
-        "ssao_enabled",
         "move_speed",
         "view_open",
         "view_x",

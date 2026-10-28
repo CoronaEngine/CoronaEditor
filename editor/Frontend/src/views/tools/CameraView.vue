@@ -124,24 +124,6 @@
           </button>
         </div>
       </div>
-      <button
-        v-if="backend === 'native'"
-        class="cascade-toggle no-drag"
-        :class="{ active: shadowCascadeDebug }"
-        title="Show shadow cascade levels"
-        @click="toggleShadowCascadeDebug"
-      >
-        CSM
-      </button>
-      <button
-        v-if="backend === 'native'"
-        class="cascade-toggle no-drag"
-        :class="{ active: ssaoEnabled }"
-        title="Toggle screen-space ambient occlusion"
-        @click="toggleSsaoEnabled"
-      >
-        SSAO
-      </button>
       <label class="speed no-drag">
         Speed
         <input v-model.number="moveSpeed" type="number" min="0.01" step="0.1" @change="saveSettings" />
@@ -261,8 +243,6 @@ const visionStablePlanes = ref(true);
 const visionStablePlanesBusy = ref(false);
 let pendingStablePlanesSelection = null;
 const outputMode = ref('final_color');
-const shadowCascadeDebug = ref(false);
-const ssaoEnabled = ref(true);
 const moveSpeed = ref(1);
 const renderWidth = ref(960);
 const renderHeight = ref(540);
@@ -354,8 +334,6 @@ const loadCamera = async () => {
   outputMode.value = backend.value === 'vision'
     ? 'final_color'
     : camera.value.output_mode || 'final_color';
-  shadowCascadeDebug.value = !!camera.value.shadow_cascade_debug;
-  ssaoEnabled.value = camera.value.ssao_enabled !== false;
   moveSpeed.value = camera.value.move_speed || 1;
   renderWidth.value = camera.value.width || 960;
   renderHeight.value = camera.value.height || 540;
@@ -549,37 +527,7 @@ const selectOutput = async (mode) => {
   await changeOutput();
 };
 
-const toggleShadowCascadeDebug = async () => {
-  if (backend.value === 'vision') return;
-  const next = !shadowCascadeDebug.value;
-  shadowCascadeDebug.value = next;
-  try {
-    const result = unwrap(await editorApi.sceneTools.setShadowCascadeDebug(sceneId, cameraId, next));
-    shadowCascadeDebug.value = !!result.enabled;
-    if (camera.value) {
-      camera.value.shadow_cascade_debug = shadowCascadeDebug.value;
-    }
-  } catch (error) {
-    shadowCascadeDebug.value = !next;
-    errorText.value = error.message;
-  }
-};
 
-const toggleSsaoEnabled = async () => {
-  if (backend.value === 'vision') return;
-  const next = !ssaoEnabled.value;
-  ssaoEnabled.value = next;
-  try {
-    const result = unwrap(await editorApi.sceneTools.setSsaoEnabled(sceneId, cameraId, next));
-    ssaoEnabled.value = result.enabled !== false;
-    if (camera.value) {
-      camera.value.ssao_enabled = ssaoEnabled.value;
-    }
-  } catch (error) {
-    ssaoEnabled.value = !next;
-    errorText.value = error.message;
-  }
-};
 
 const viewportUiDescriptor = () => ({
   scope: 'camera',
