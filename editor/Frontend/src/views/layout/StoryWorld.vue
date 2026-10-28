@@ -2475,22 +2475,24 @@ onMounted(async () => {
     const { snapshot, player, targetOffset } = await ensureStoryCharacters({
       api: editorApi, sceneId, frontendUrl: window.location.href, gameplay: loadedGameplay, assertSource, projectPath,
       isCurrent: () => current() && worldModeState.projectPath === projectPath,
+      // Start scenery while characters import/build, after registering their assets.
+      // The shared initializer drains both jobs before a world switch can commit.
+      prepareScene: async () => {
+        try {
+          await ensureStoryMap({
+            api: editorApi, sceneId, frontendUrl: window.location.href, resolveAsset: resolveStoryAssetPath,
+            placement: loadedGameplay?.role === 'child' ? SUBWORLD_MAP_PLACEMENT : MAP_PLACEMENT,
+            assertSource, isCurrent: () => current() && worldModeState.projectPath === projectPath,
+          });
+        } catch (error) {
+          if (error.name === 'AbortError') throw error;
+          actionFeedback.value = `地图未能就位：${error.message}`;
+        }
+      },
     });
     if (!current() || worldModeState.projectPath !== projectPath) return;
     // 小世界只保留玩家（隐形）、先知与地形：Boss、商人、小怪与红球在此从副本场景移除。
     await cullChildWorld(snapshot, loadedGameplay);
-    // 地图是这条故事线的地面：与角色、方块一样在进入世界时由前端确认在位。
-    // 不按角色分叉——主世界要有它，小世界是主场景的副本因此自动继承同一份；
-    // 没有它角色只会站在空气里，所以这里不设 role 门槛。
-    // 与方块同样的处理方式：失败只报告，不阻断进入世界。
-    try {
-      await ensureStoryMap({
-        api: editorApi, sceneId, frontendUrl: window.location.href, resolveAsset: resolveStoryAssetPath,
-        placement: loadedGameplay?.role === 'child' ? SUBWORLD_MAP_PLACEMENT : MAP_PLACEMENT,
-      });
-    } catch (error) {
-      actionFeedback.value = `地图未能就位：${error.message}`;
-    }
     if (!current() || worldModeState.projectPath !== projectPath) return;
     // Look the boss up by role: array position is not an identity, and inserting a
     // character would otherwise silently point this at whoever slid into slot 1.

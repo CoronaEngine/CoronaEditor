@@ -70,7 +70,7 @@ test('partial failure preserves successful actors; retry repairs incomplete plac
   const f = apiFixture(); const original = f.api.scene.setActorTransform;
   f.api.scene.setActorTransform = async () => { throw new Error('disk failed'); };
   await assert.rejects(load(f), /玩家加载失败.*disk failed/);
-  assert.equal(f.state.actors.length, 1);
+  assert.equal(f.state.actors.length, INHABITANT_COUNT, 'imports are registered before placement');
   f.api.scene.setActorTransform = original;
   await load(f);
   assert.equal(f.state.actors.length, 4);
@@ -97,7 +97,7 @@ test('cancellation after an in-flight import never schedules another mutation', 
 test('GPU failure and timeout are not reported as successful initialization', async () => {
   const f = apiFixture({ actors: STORY_CHARACTERS.map(c => actorFixture(c)) });
   f.get(PLAYER_GUID).render_failed = true;
-  await assert.rejects(load(f), /玩家加载失败.*模型渲染失败/);
+  await assert.rejects(load(f), /玩家加载失败.*模型导入失败/);
   f.get(PLAYER_GUID).render_failed = false; f.get(PLAYER_GUID).render_ready = false; f.get(PLAYER_GUID).gpu_build_state = 'Pending';
   await assert.rejects(load(f, { renderAttempts: 2 }), /玩家.*超时/);
 });
@@ -124,20 +124,21 @@ test('asynchronous imports wait for native bounds before scaling each character'
     let polls = 0;
     const result = await load(f, { wait: async () => {
       polls++;
-      const actor = f.state.actors.at(-1);
-      // No normalization/save may run while the importer still owns the bounds.
-      assert.deepEqual(actor.geometry.scale, [1, 1, 1]);
-      if (polls % 2) {
-        actor.local_aabb = [0, 0, 0, 0, 0, 0];
-        actor.gpu_build_state = 'PendingBuild';
-      } else {
-        const character = STORY_CHARACTERS.find(c => c.guid === actor.actor_guid);
-        actor.local_aabb = actorFixture(character).local_aabb;
-        actor.render_ready = true;
-        actor.gpu_build_state = 'Ready';
+      assert.equal(f.state.actors.length, INHABITANT_COUNT, 'all imports precede the first bounds wait');
+      for (const actor of f.state.actors) {
+        assert.deepEqual(actor.geometry.scale, [1, 1, 1]);
+        if (polls % 2) {
+          actor.local_aabb = [0, 0, 0, 0, 0, 0];
+          actor.gpu_build_state = 'PendingBuild';
+        } else {
+          const character = STORY_CHARACTERS.find(c => c.guid === actor.actor_guid);
+          actor.local_aabb = actorFixture(character).local_aabb;
+          actor.render_ready = true;
+          actor.gpu_build_state = 'Ready';
+        }
       }
     } });
-    assert.equal(polls, 8);
+    assert.equal(polls, 2);
     assert.equal(f.calls.filter(c => c[0] === 'create').length, INHABITANT_COUNT);
     assert.ok(result.targetOffset > 0);
     // Only the inhabitants exist: with no `gameplay` the small-world creatures are not
@@ -163,10 +164,10 @@ test('unavailable bounds time out with the source path; retry reuses the origina
   await assert.rejects(load(f, { renderAttempts: 2, wait: async () => { waits++; } }),
     /玩家加载失败.*game\/art\/models\/player\/.*等待模型包围盒超时/);
   assert.equal(waits, 2);
-  assert.equal(f.calls.length, 1);
-  assert.equal(f.state.actors.length, 1);
+  assert.equal(f.calls.length, INHABITANT_COUNT);
+  assert.equal(f.state.actors.length, INHABITANT_COUNT);
   f.api.sceneTools.createActor = create;
-  f.get(PLAYER_GUID).local_aabb = actorFixture().local_aabb;
+  for (const character of INHABITANTS) f.get(character.guid).local_aabb = actorFixture(character).local_aabb;
   await load(f);
   assert.equal(f.calls.filter(c => c[0] === 'create').length, 4);
   assert.equal(f.state.actors.length, 4);
@@ -194,7 +195,8 @@ test('canceling while waiting for bounds prevents later reads, creates and trans
   await assert.rejects(load(f, { isCurrent: () => current, wait: async () => { current = false; } }),
     { name: 'AbortError' });
   assert.equal(reads, 1);
-  assert.equal(f.calls.length, 0);
+  assert.equal(f.calls.length, INHABITANT_COUNT - 1);
+  assert.ok(f.calls.every(call => call[0] === 'create'), 'cancellation stops all later transforms');
 });
 
 test('a failed async import reports the role without waiting for a bounds timeout', async () => {
@@ -337,6 +339,7 @@ test('migration retries before/after commit never rotate twice or duplicate a pl
     const player = actorFixture(); delete player.model_ref; player.geometry.rotation = [0, -0.8, 0];
     const f = apiFixture({ actors: [player] }), create = f.api.sceneTools.createActor;
     f.api.sceneTools.createActor = async (...args) => {
+      if (args[3].actor_guid !== PLAYER_GUID) return create(...args);
       if (committed) await create(...args);
       throw new Error(committed ? 'reply lost' : 'disk full');
     };
@@ -418,7 +421,7 @@ test('a monster whose health reaches zero leaves the main-world stage', async ()
     assert.equal(f.get(monster.guid).visible, true, monster.role);
 });
 
-test('each character reaches real render readiness before the next character is submitted', async () => {
+test('all characters are submitted before waiting for GPU residency, and readiness still gates completion', async () => {
   const f = apiFixture(), gate = deferred(), entered = deferred();
   const create = f.api.sceneTools.createActor;
   f.api.sceneTools.createActor = async (...args) => {
@@ -431,11 +434,49 @@ test('each character reaches real render readiness before the next character is 
   };
   const loading = load(f, { wait: async ms => { assert.equal(ms, 200); entered.resolve(); await gate.promise; } });
   await entered.promise;
-  assert.deepEqual(f.calls.filter(c => c[0] === 'create').map(c => c[1]), [PLAYER_GUID]);
+  assert.deepEqual(f.calls.filter(c => c[0] === 'create').map(c => c[1]), INHABITANTS.map(c => c.guid));
   f.get(PLAYER_GUID).render_ready = true;
   gate.resolve();
   await loading;
   assert.deepEqual(f.calls.filter(c => c[0] === 'create').map(c => c[1]), INHABITANTS.map(c => c.guid));
+});
+
+test('scenery starts alongside characters and is drained even if a character fails', async () => {
+  const f = apiFixture(), scenery = deferred(), entered = deferred();
+  let settled = false;
+  f.api.scene.setActorTransform = async () => { throw new Error('import failed'); };
+  const outcome = assert.rejects(load(f, { prepareScene: async () => {
+    assert.equal(f.calls.filter(c => c[0] === 'create').length, INHABITANT_COUNT,
+      'register characters before adding the heavy map to the manifest');
+    entered.resolve(); await scenery.promise;
+  } }), /import failed/).then(() => { settled = true; });
+  await entered.promise;
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(settled, false, 'world replacement cannot race unfinished scenery');
+  scenery.resolve();
+  await outcome;
+});
+
+test('batch completion waits for every character collision, even when rendering is ready', async () => {
+  const f = apiFixture({ actors: INHABITANTS.map(character => actorFixture(character)) });
+  f.get(INHABITANTS[0].guid).collision_ready = false;
+  f.get(INHABITANTS[1].guid).collision_ready = false;
+  let waits = 0;
+  await load(f, { wait: async () => {
+    assert.ok(waits < 2, 'collision readiness must eventually release the batch');
+    f.get(INHABITANTS[waits++].guid).collision_ready = true;
+  } });
+  assert.equal(waits, 2);
+});
+
+test('a late GPU failure in another character fails the whole pending batch', async () => {
+  const f = apiFixture({ actors: INHABITANTS.map(character => actorFixture(character)) });
+  f.get(PLAYER_GUID).render_ready = false;
+  const failed = INHABITANTS.at(-1);
+  await assert.rejects(load(f, { wait: async () => {
+    f.get(failed.guid).render_failed = true;
+    f.get(failed.guid).load_error = { message: 'upload failed' };
+  } }), new RegExp(`${failed.name}加载失败.*upload failed`));
 });
 
 test('gameplay visibility leaves unrelated scene models untouched', async () => {

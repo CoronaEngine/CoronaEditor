@@ -76,8 +76,22 @@ async function waitForStoryResources({ api, projectPath, wait = ms => new Promis
 /** All native mutations are awaited; the host registers this work before world replacement. */
 export async function ensureStoryCharacters(options) {
   await waitForStoryResources(options);
-  try { return await initializeStoryCharacters(options); }
-  finally { await waitForStoryResources(options, true); }
+  let scenery = Promise.resolve();
+  try {
+    return await initializeStoryCharacters({ ...options, onImportsSubmitted: () => {
+      scenery = Promise.resolve().then(() => {
+        if (options.isCurrent && !options.isCurrent()) throw canceled();
+        return options.prepareScene?.();
+      });
+      // Attach immediately: scene failure must not become an unhandled rejection
+      // while characters are still loading. The original promise is awaited below.
+      scenery.catch(() => {});
+    } });
+  }
+  finally {
+    try { await scenery; }
+    finally { await waitForStoryResources(options, true); }
+  }
 }
 
 /**
@@ -100,7 +114,7 @@ const TRANSIENT_SCENE_WRITE_ATTEMPTS = 6;
 
 async function initializeStoryCharacters({ api, sceneId, frontendUrl, isCurrent = () => true,
   wait = ms => new Promise(resolve => setTimeout(resolve, ms)), renderAttempts = 150,
-  gameplay = null, combatOnly = false, assertSource = async () => {} }) {
+  gameplay = null, combatOnly = false, assertSource = async () => {}, onImportsSubmitted = () => {} }) {
   const check = () => { if (!isCurrent()) throw canceled(); };
   const call = async (operation, invoke) => {
     for (let attempt = 1; ; attempt++) {
@@ -177,11 +191,46 @@ async function initializeStoryCharacters({ api, sceneId, frontendUrl, isCurrent 
   // 里真实存在、并且仍然被存档的 actor——F 的射程、摆放的位置、玩家存档读的都是它。
   const hideProtagonistRole = gameplay?.role === 'child';
   const characters = visibleCharacters.filter(character => !combatOnly || character.role === 'boss');
+  const existingGuids = new Set(actors.keys());
+  // Register all imports before waiting for bounds or GPU residency. Native
+  // mutations remain ordered; CPU import and GPU upload can overlap behind them.
+  for (const character of characters) {
+    check();
+    let actor = actors.get(character.guid);
+    let source;
+    try {
+      if (actor?.render_failed || ['Failed', 'Invalid'].includes(actor?.gpu_build_state)) {
+        throw new Error(actor.load_error?.message || '模型导入失败');
+      }
+      if (!actor || !loaded(actor)) source = resolveStoryAssetPath(frontendUrl, character.asset);
+      if (!actor) {
+        actor = (await call('创建模型', () => api.sceneTools.createActor(sceneId, source, 'model', {
+          name: character.name, actor_guid: character.guid, semantic_role: character.role,
+          entity_id: `story.${character.role}`, entity_type: 'story_character',
+          ...(character.role === 'player' ? { model_ref: PLAYER_MODEL_REF }
+            : character.role === 'prophet' ? { model_ref: PROPHET_MODEL_REF }
+            : character.role === 'boss' ? { model_ref: BOSS_MODEL_REF } : {}),
+          position: [character.x, 0, character.z], rotation: character.rotation, scale: [1, 1, 1],
+          follow_camera: false, physics_enabled: false,
+        }))).actor;
+      } else if (!loaded(actor)) {
+        actor = (await call('重新绑定模型', () => api.sceneTools.rebindActorResource(sceneId, character.guid, source))).actor;
+      }
+      if (!loaded(actor)) throw new Error(actor?.load_error?.message || '模型解码失败');
+      actors.set(character.guid, actor);
+    } catch (error) {
+      if (error.name === 'AbortError') throw error;
+      throw new Error(`${character.name}加载失败（${source || actor?.route || character.asset}）：${error.message}`, { cause: error });
+    }
+  }
+  // Start the heavy map before readiness waits, but after actor registration:
+  // otherwise every actor's portable import rehashes the large map manifest.
+  onImportsSubmitted();
   for (let character of characters) {
     check();
     const hideProtagonist = hideProtagonistRole && character.role === 'player';
     let actor = actors.get(character.guid);
-    const wasPresent = Boolean(actor);
+    const wasPresent = existingGuids.has(character.guid);
     if (gameplay?.role === 'child' && character.role === 'prophet' && actor?.model_ref !== PROPHET_MODEL_REF) {
       const player = actors.get(PLAYER_GUID);
       if (!player?.geometry) throw new Error('先知初始化前玩家位置未就绪');
@@ -192,26 +241,7 @@ async function initializeStoryCharacters({ api, sceneId, frontendUrl, isCurrent 
     }
     let source;
     try {
-      // An intact portable project must also open after game/art is moved.
-      if (!actor || !loaded(actor)) source = resolveStoryAssetPath(frontendUrl, character.asset);
-      if (!actor) {
-        const created = await call('创建模型', () => api.sceneTools.createActor(sceneId, source, 'model', {
-          name: character.name, actor_guid: character.guid, semantic_role: character.role,
-          entity_id: `story.${character.role}`, entity_type: 'story_character',
-          // Every role that owns a placement version must be created with it. Omitting
-          // the prophet's marker made every entry take the legacy repair path, and that
-          // path never persisted the marker, so the world failed to load forever.
-          ...(character.role === 'player' ? { model_ref: PLAYER_MODEL_REF }
-            : character.role === 'prophet' ? { model_ref: PROPHET_MODEL_REF }
-            : character.role === 'boss' ? { model_ref: BOSS_MODEL_REF } : {}),
-          position: [character.x, 0, character.z], rotation: character.rotation, scale: [1, 1, 1],
-          follow_camera: false, physics_enabled: false,
-        }));
-        actor = created.actor;
-      } else if (!loaded(actor)) {
-        actor = (await call('重新绑定模型', () => api.sceneTools.rebindActorResource(sceneId, character.guid, source))).actor;
-      }
-      if (!loaded(actor)) throw new Error(actor?.load_error?.message || '模型解码失败');
+      if (!wasPresent) source = resolveStoryAssetPath(frontendUrl, character.asset);
       // createActor acknowledges the handle before asynchronous import fills the AABB.
       // Wait for real local bounds instead of guessing a scale or creating a duplicate.
       for (let attempt = 0; !hasUsableBounds(actor.local_aabb); attempt++) {
@@ -227,6 +257,9 @@ async function initializeStoryCharacters({ api, sceneId, frontendUrl, isCurrent 
         await assertSource();
         const refreshed = sceneSnapshot(await api.scene.getSnapshot(sceneId));
         if (!isCurrent()) throw canceled();
+        for (const item of refreshed?.actors || []) {
+          if (actors.has(item.actor_guid)) actors.set(item.actor_guid, item);
+        }
         actor = refreshed?.actors?.find(item => item.actor_guid === character.guid);
         if (!loaded(actor)) throw new Error(actor?.load_error?.message || '模型实例已失效');
       }
@@ -362,28 +395,30 @@ async function initializeStoryCharacters({ api, sceneId, frontendUrl, isCurrent 
         actor = (await call('关闭相机锁定', () => api.sceneTools.setActorCameraLock(sceneId, character.guid,
           { enabled: false }))).actor;
       }
-      // Finish this model before submitting the next one. Ready GPU build state
-      // alone is insufficient: require render slots, bounds, and native
-      // triangle collision readiness (older bridges omit the latter field).
-      for (let attempt = 0; ; attempt++) {
-        if (!isCurrent()) throw canceled();
-        await assertSource();
-        snapshot = sceneSnapshot(await api.scene.getSnapshot(sceneId));
-        if (!isCurrent()) throw canceled();
-        actor = snapshot?.actors?.find(item => item.actor_guid === character.guid);
-        if (!loaded(actor) || actor.render_failed || ['Failed', 'Invalid'].includes(actor.gpu_build_state)) {
-          throw new Error(actor?.load_error?.message || '模型渲染失败');
-        }
-        if (actor.render_ready === true && actor.collision_ready !== false && hasUsableBounds(actor.local_aabb)) break;
-        if (attempt >= renderAttempts - 1) throw new Error('等待模型渲染超时');
-        await wait(200);
-      }
       check();
       actors.set(character.guid, actor);
     } catch (error) {
       if (error.name === 'AbortError') throw error;
       throw new Error(`${character.name}加载失败（${source || actor?.route || character.asset}）：${error.message}`, { cause: error });
     }
+  }
+  // Poll the whole batch once per interval, keeping the same readiness contract.
+  for (let attempt = 0; ; attempt++) {
+    check(); await assertSource(); check();
+    snapshot = sceneSnapshot(await api.scene.getSnapshot(sceneId));
+    check();
+    let pending = null;
+    for (const character of characters) {
+      const actor = snapshot?.actors?.find(item => item.actor_guid === character.guid);
+      if (!loaded(actor) || actor.render_failed || ['Failed', 'Invalid'].includes(actor.gpu_build_state)) {
+        throw new Error(`${character.name}加载失败：${actor?.load_error?.message || '模型渲染失败'}`);
+      }
+      actors.set(character.guid, actor);
+      if (actor.render_ready !== true || actor.collision_ready === false || !hasUsableBounds(actor.local_aabb)) pending ??= character;
+    }
+    if (!pending) break;
+    if (attempt >= renderAttempts - 1) throw new Error(`${pending.name}加载失败：等待模型渲染超时`);
+    await wait(200);
   }
   if (combatOnly) return { snapshot };
   const player = actors.get(PLAYER_GUID);

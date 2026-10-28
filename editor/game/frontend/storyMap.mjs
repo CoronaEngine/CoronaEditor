@@ -286,14 +286,15 @@ async function call(operation, invoke) {
  * create the map is gone), so every key the snapshot gives for this one actor is tried in turn.
  * Identity is still the map's own fields — a user-authored actor is never a candidate.
  */
-async function removeMapActor(api, sceneId, actor) {
+async function removeMapActor(api, sceneId, actor, submit = call) {
   const keys = [actor.actor_guid, actor.name, Number(actor.handle) > 0 ? String(actor.handle) : '']
     .filter(key => typeof key === 'string' && key.trim());
   let last = null;
   for (const key of [...new Set(keys)]) {
     try {
-      return await call('移除旧版本地图', () => api.sceneTools.removeActor(sceneId, key));
+      return await submit('移除旧版本地图', () => api.sceneTools.removeActor(sceneId, key));
     } catch (error) {
+      if (error.name === 'AbortError') throw error;
       last = error;
     }
   }
@@ -336,14 +337,25 @@ export const MAP_ACTOR_DATA = Object.freeze({
 
 export async function ensureStoryMap({ api, sceneId, frontendUrl, resolveAsset = null,
   placement = MAP_PLACEMENT, wait = ms => new Promise(resolve => setTimeout(resolve, ms)),
-  confirmAttempts = 150 }) {
+  confirmAttempts = 150, isCurrent = () => true, assertSource = async () => {} }) {
+  const check = () => {
+    if (!isCurrent()) throw Object.assign(new Error('剧情世界初始化已取消'), { name: 'AbortError' });
+  };
+  const submit = async (operation, invoke) => {
+    check(); await assertSource(); check();
+    const result = await call(operation, invoke);
+    check();
+    return result;
+  };
+  check(); await assertSource(); check();
   const actors = sceneSnapshot(await api.scene.getSnapshot(sceneId))?.actors;
+  check();
   let map = (Array.isArray(actors) ? actors : []).find(isMapActor) || null;
 
   if (!map) {
     const route = typeof resolveAsset === 'function' ? resolveAsset(frontendUrl, placement.asset) : null;
     if (!route) throw new Error('地图资源路径不可用');
-    const created = await call('创建地图', () => api.sceneTools.createActor(sceneId, route, 'model', {
+    const created = await submit('创建地图', () => api.sceneTools.createActor(sceneId, route, 'model', {
       ...MAP_ACTOR_DATA, actor_guid: placement.guid, model_ref: placement.modelRef,
       ...mapOriginTransform(placement),
     }));
@@ -354,10 +366,10 @@ export async function ensureStoryMap({ api, sceneId, frontendUrl, resolveAsset =
     // rewrites the transform and never the route, so the engine keeps serving the bundle it
     // imported back then. The only path that reaches the importer is a fresh creation, and the
     // guid stays the same, so this replaces the map instead of adding a second one.
-    await removeMapActor(api, sceneId, map);
+    await removeMapActor(api, sceneId, map, submit);
     const route = typeof resolveAsset === 'function' ? resolveAsset(frontendUrl, placement.asset) : null;
     if (!route) throw new Error('地图资源路径不可用');
-    const created = await call('重建地图', () => api.sceneTools.createActor(sceneId, route, 'model', {
+    const created = await submit('重建地图', () => api.sceneTools.createActor(sceneId, route, 'model', {
       ...MAP_ACTOR_DATA, actor_guid: placement.guid, model_ref: placement.modelRef,
       ...mapOriginTransform(placement),
     }));
@@ -372,7 +384,7 @@ export async function ensureStoryMap({ api, sceneId, frontendUrl, resolveAsset =
     const route = (typeof resolveAsset === 'function' ? resolveAsset(frontendUrl, placement.asset) : null)
       || map.route;
     if (!route) throw new Error('地图资源路径不可用');
-    const updated = await call('校正地图摆位', () => api.sceneTools.createActor(sceneId, route, 'model', {
+    const updated = await submit('校正地图摆位', () => api.sceneTools.createActor(sceneId, route, 'model', {
       ...MAP_ACTOR_DATA, actor_guid: placement.guid, model_ref: placement.modelRef,
       skip_if_exists: true, update_if_exists: true,
       ...mapOriginTransform(placement),
@@ -388,8 +400,10 @@ export async function ensureStoryMap({ api, sceneId, frontendUrl, resolveAsset =
   // player onto nothing. The handle is acknowledged before the asynchronous import fills
   // the record, so a fresh actor needs a bounded wait rather than one read.
   for (let attempt = 0; ; attempt++) {
+    check(); await assertSource(); check();
     const confirmed = sceneSnapshot(await api.scene.getSnapshot(sceneId))?.actors
       ?.find(item => item.actor_guid === placement.guid);
+    check();
     // Native publishes readiness only after its original triangle data is
     // available. Older bridges omit this field and retain their old behavior.
     if (isMapReady(confirmed, placement) && confirmed.collision_ready !== false) return confirmed;
