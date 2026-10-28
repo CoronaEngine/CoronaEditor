@@ -35,7 +35,6 @@ def test_python_project_adapter_exposes_native_project_operations():
         "create_project",
         "create_world_project",
         "create_multiplayer_project",
-        "import_vision_scene",
         "open_project",
     ):
         assert f'"project.{method}"' in source

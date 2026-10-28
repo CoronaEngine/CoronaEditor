@@ -4,25 +4,11 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from plugins.SceneTools import vision_document, vision_import
 from plugins.SceneTools.main import SceneTools
 from runtime.archive.parser import parse_archive
 
 
 class VisionStablePlanePreferencesTests(unittest.TestCase):
-    def test_document_roundtrip_preserves_false_and_legacy_defaults(self):
-        for value, expected in ((True, True), (False, False), ("true", True),
-                                ("false", False), ("off", False), (0, False)):
-            with self.subTest(value=value):
-                document = {"render": {"integrator": {"type": "rt", "param": {
-                    "direct": {"stable_planes": value}}}}}
-                restored = vision_document.decode_vision_document(
-                    vision_document.encode_vision_document(document))
-                self.assertIs(vision_document.infer_vision_stable_planes(restored), expected)
-                self.assertEqual(vision_document.infer_vision_render_mode(restored), "restir")
-        for document in ({}, None, {"render": None}, {"render": {"integrator": {"param": []}}}):
-            with self.subTest(document=document):
-                self.assertIs(vision_document.infer_vision_stable_planes(document), True)
 
     def test_archive_preserves_camera_preference_and_defaults_to_enabled(self):
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -54,33 +40,6 @@ class VisionStablePlanePreferencesTests(unittest.TestCase):
             ("scene_tools.get_vision_stable_planes", ["scene.ini", "camera"]),
         ])
 
-    def test_import_applies_and_saves_explicit_false(self):
-        document = {"render": {"integrator": {"type": "rt", "param": {
-            "direct": {"stable_planes": False}}}}, "output": {"denoise": True}}
-        calls = []
-
-        def invoke(wrapper, args):
-            calls.append((wrapper, args))
-            if wrapper == "scene_tools.is_vision_available":
-                return {"available": True}
-            if wrapper == "scene.get_snapshot":
-                return {"scene": "scene.ini", "camera": {"name": "MainCamera"}, "actors": []}
-            return {"status": "success", "pending": True}
-
-        with tempfile.TemporaryDirectory() as temp_dir:
-            source = Path(temp_dir) / "source.json"
-            source.write_text(json.dumps(document), encoding="utf-8")
-            with patch("api.editor_api._invoke_manifest_cpp_api", side_effect=invoke), patch.object(
-                vision_import, "prepare_external_live_vision_scene", return_value=str(source)
-            ):
-                result = vision_import.import_vision_scene_into_current_scene("scene.ini", str(source))
-        self.assertEqual(result["status"], "success", result)
-        self.assertIn(("scene_tools.set_vision_stable_planes", ["scene.ini", "MainCamera", False]), calls)
-        self.assertIn(("scene_tools.set_vision_render_mode", ["scene.ini", "MainCamera", "restir"]), calls)
-        self.assertIn(("scene_tools.set_vision_denoise", ["scene.ini", "MainCamera", True]), calls)
-        saved = next(args[1] for wrapper, args in calls if wrapper == "main.scene_save")
-        restored = vision_document.decode_vision_document(saved["vision_document"]["data"])
-        self.assertIs(restored["render"]["integrator"]["param"]["direct"]["stable_planes"], False)
 
 
 if __name__ == "__main__":

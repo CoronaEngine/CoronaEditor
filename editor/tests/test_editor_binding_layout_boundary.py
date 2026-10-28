@@ -12,7 +12,7 @@ def test_editor_aggregate_manifest_owns_vision_and_media_entries():
     for entry in (
         '"scene_tools.is_vision_available"',
         '"scene_tools.set_render_backend"',
-        '"scene_tools.load_vision_scene"',
+
         '"scene_tools.play_audio"',
         '"scene_tools.stop_audio"',
     ):

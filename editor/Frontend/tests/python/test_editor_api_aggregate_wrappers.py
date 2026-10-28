@@ -52,7 +52,6 @@ class EditorApiAggregateWrapperTests(unittest.TestCase):
 
     def test_frontend_exposes_project_network_and_lan_chat_aggregates(self):
         for marker in (
-            "importVisionScene: (path)",
             "lockObject: (objectId, userId, operation = 'modify')",
             "broadcastIntent: (userId, tooltip, position, status = 'placing_object')",
             "sendAgentReply: (payload)",

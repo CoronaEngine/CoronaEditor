@@ -12,7 +12,8 @@ def test_manifest_and_handlers_expose_no_multiscene_or_migration_operations():
                    "copy_existing_to_data", "choose_portable_scene_target", "browse_scene_file"):
         assert not re.search(r"EDITOR_API_METHOD[^\n]*, " + method + r",", manifest)
         assert f'{{"{method}",' not in handlers
-    assert '"project.importVisionScene", "project.import_vision_scene"' in manifest
+    assert "importVisionScene" not in manifest
+    assert "loadVisionScene" not in manifest
     assert '"scene.getSnapshot", "scene.get_snapshot"' in manifest
     assert "migrate_project_sidecar_scene_to_embedded" not in handlers
 
@@ -62,7 +63,11 @@ def test_shipped_examples_have_only_scene_ini_archives():
     examples = ENGINE / "examples/scenes"
     assert not list(examples.rglob("*.scene"))
     assert not list(examples.rglob("project.ini"))
-    assert (examples / "learnopengl_ssao/scene.ini").is_file()
+    # Examples are optional; validate any shipped archive instead of requiring
+    # the removed learnopengl_ssao fixture.
+    from runtime.archive.parser import parse_archive
+    for scene in examples.rglob("scene.ini"):
+        assert parse_archive(str(scene))["archive_type"] == "portable_scene"
 
 
 def test_python_adapters_do_not_default_to_old_archive_paths():

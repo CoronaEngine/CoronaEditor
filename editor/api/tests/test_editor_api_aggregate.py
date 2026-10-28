@@ -22,16 +22,6 @@ from api.editor_api import (
 
 
 class EditorAggregateApiTest(unittest.TestCase):
-    def test_vision_import_uses_native_aggregate_contract(self):
-        payload = "D:/source/vision.json"
-        with patch(
-            "api.editor_api._invoke_manifest_cpp_api",
-            return_value={"ok": True, "name": "project", "path": "D:/runtime/data/project"},
-        ) as invoke:
-            result = CoronaEditorApi.project.import_vision_scene(payload)
-
-        self.assertTrue(result["ok"])
-        invoke.assert_called_once_with("project.import_vision_scene", [payload])
 
     def test_script_runtime_manifest_lookup_uses_script_channel(self):
         import api.editor_api as editor_api_module
@@ -534,15 +524,12 @@ class EditorAggregateApiTest(unittest.TestCase):
             ],
         ) as invoke:
             available = CoronaEditorApi.scene_tools.is_vision_available()
-            loaded = CoronaEditorApi.scene_tools.load_vision_scene("vision.json")
 
         self.assertTrue(available["available"])
-        self.assertEqual(loaded["status"], "success")
         self.assertEqual(
             [call.args for call in invoke.call_args_list],
             [
                 ("scene_tools.is_vision_available", []),
-                ("scene_tools.load_vision_scene", ["vision.json"]),
             ],
         )
 

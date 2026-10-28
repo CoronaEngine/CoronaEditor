@@ -1,7 +1,8 @@
 from pathlib import Path
 
 
-ROOT = Path(__file__).parents[4]
+ROOT = next(path for path in Path(__file__).resolve().parents
+            if (path / "src/systems/ui/editor_api/cef_editor_api.cpp").is_file())
 MANIFEST = (ROOT / "src" / "systems" / "ui" / "editor_api" / "cef_editor_api.cpp").read_text(
     encoding="utf-8"
 )

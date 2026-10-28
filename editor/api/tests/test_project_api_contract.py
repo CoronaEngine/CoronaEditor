@@ -16,7 +16,6 @@ def test_project_lifecycle_manifest_methods_have_public_wrappers():
         "ProjectLauncher.get_default_project_path": ("project.getDefaultProjectPath", "project.get_default_project_path"),
         "ProjectLauncher.get_project_load_status": ("project.getProjectLoadStatus", "project.get_project_load_status"),
         "ProjectLauncher.get_recent_projects": ("project.getRecentProjects", "project.get_recent_projects"),
-        "ProjectLauncher.import_vision_scene": ("project.importVisionScene", "project.import_vision_scene"),
         "ProjectLauncher.open_project": ("project.openProject", "project.open_project"),
         "ProjectLauncher.open_project_file": ("project.openProjectFile", "project.open_project_file"),
         "ProjectSettings.get_active_project_info": ("projectSettings.getActiveProjectInfo", "project_settings.get_active_project_info"),

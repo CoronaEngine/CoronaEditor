@@ -202,15 +202,6 @@ class CoronaEditor:
         event_mapping = {
             "ai-chunk": ("events.on_ai_chunk", lambda values: values[0] if len(values) > 0 else ""),
             "log-batch": ("events.on_log_batch", lambda values: values[0] if len(values) > 0 else []),
-            "scene-add": ("events.on_scene_added", lambda values: {
-                "name": values[0] if len(values) > 0 else "",
-                "route": values[1] if len(values) > 1 else "",
-            }),
-            "scene-rename": ("events.on_scene_renamed", lambda values: {
-                "old_path": values[0] if len(values) > 0 else "",
-                "new_path": values[1] if len(values) > 1 else "",
-                "name": values[2] if len(values) > 2 else "",
-            }),
             "scene-tree-changed": ("events.on_scene_tree_changed", lambda values: {
                 "scene": values[0] if len(values) > 0 else "",
             }),

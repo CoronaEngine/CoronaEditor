@@ -11,6 +11,57 @@ from runtime.archive.parser import parse_archive
 
 
 class ArchiveParserTests(unittest.TestCase):
+    def test_physics_and_camera_lock_are_restored_as_runtime_fields(self):
+        with tempfile.TemporaryDirectory() as directory:
+            scene = Path(directory) / "scene.ini"
+            scene.write_text(
+                "[format]\ntype=corona_scene_folder\nversion=1\n"
+                "[physics]\ngravity=1,-3,2\nfloor_y=-4\nfloor_restitution=0.25\nfixed_dt=0.02\n"
+                "[actors]\na.camera_lock.enabled=true\na.camera_lock.position_offset=1,2,3\n"
+                "a.camera_lock.rotation_offset=0.1,0.2,0.3\n", encoding="utf-8")
+            snapshot = parse_archive(str(scene))["scene"]
+            self.assertEqual(snapshot["environment"]["physics"], {
+                "gravity": [1., -3., 2.], "floor_y": -4., "floor_restitution": .25, "fixed_dt": .02})
+            self.assertEqual(snapshot["actors"][0]["camera_lock"], {
+                "enabled": True, "position_offset": [1., 2., 3.], "rotation_offset": [.1, .2, .3]})
+
+    def test_absent_physics_preserves_runtime_defaults_and_lock_defaults(self):
+        with tempfile.TemporaryDirectory() as directory:
+            scene = Path(directory) / "scene.ini"
+            scene.write_text("[format]\ntype=corona_scene_folder\nversion=1\n[actors]\na.name=A\n", encoding="utf-8")
+            snapshot = parse_archive(str(scene))["scene"]
+            self.assertEqual(snapshot["environment"]["physics"], {})
+            self.assertEqual(snapshot["actors"][0]["camera_lock"], {
+                "enabled": False, "position_offset": [0., 0., 2.], "rotation_offset": [0., 0., 0.]})
+
+    def test_invalid_physics_and_camera_lock_are_rejected(self):
+        with tempfile.TemporaryDirectory() as directory:
+            scene = Path(directory) / "scene.ini"
+            for fields in ("[physics]\ngravity=0,nan,0", "[physics]\nfloor_y=inf",
+                           "[physics]\nfixed_dt=0", "[physics]\nfixed_dt=-1",
+                           "[physics]\nfloor_restitution=1.1", "[physics]\nfloor_restitution=-0.1",
+                           "[actors]\na.camera_lock.enabled=maybe",
+                           "[actors]\na.camera_lock.position_offset=1,2",
+                           "[actors]\na.camera_lock.rotation_offset=0,inf,0"):
+                with self.subTest(fields=fields):
+                    scene.write_text("[format]\ntype=corona_scene_folder\nversion=1\n" + fields, encoding="utf-8")
+                    with self.assertRaises(ArchiveParseError):
+                        parse_archive(str(scene))
+
+    def test_retired_vision_documents_are_rejected_without_decoding(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            scene = Path(temp_dir) / "scene.ini"
+            for section in ("vision", "vision_document", "vision_bindings", "vision_unsupported_shapes"):
+                with self.subTest(section=section):
+                    scene.write_text(
+                        "[format]\ntype = corona_scene_folder\nversion = 1\n"
+                        f"[scene]\nname = Unsupported\n[{section}]\ndata = invalid\n",
+                        encoding="utf-8",
+                    )
+                    with self.assertRaises(ArchiveParseError) as raised:
+                        parse_archive(str(scene))
+                    self.assertEqual(raised.exception.code, "UNSUPPORTED_VISION_ARCHIVE")
+
     def test_explicit_actor_body_type_survives_archive(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             scene = Path(temp_dir) / "scene.ini"
@@ -157,9 +208,9 @@ class ArchiveParserTests(unittest.TestCase):
             ("path_tracing", None, "true", "path_tracing", False, True),
             ("restir", "on", "false", "restir", True, False),
             ("restir", "off", "true", "restir", False, True),
-            ("progressive_path_tracing", None, None, "path_tracing", True, False),
+            ("progressive_path_tracing", None, None, "path_tracing", True, True),
             ("PROGRESSIVE-PATH-TRACING", "false", "true", "path_tracing", False, True),
-            ("progressive_path_tracing", "0", None, "path_tracing", False, False),
+            ("progressive_path_tracing", "0", None, "path_tracing", False, True),
             ("svgf", None, None, "path_tracing", False, True),
             ("svgf", "yes", "false", "path_tracing", True, False),
         ]
@@ -195,7 +246,7 @@ class ArchiveParserTests(unittest.TestCase):
 
     def test_vision_denoise_is_an_independent_boolean_and_migrates_legacy_svgf(self):
         cases = [
-            ("path_tracing", None, "path_tracing", False),
+            ("path_tracing", None, "path_tracing", True),
             ("restir", "true", "restir", True),
             ("restir", "false", "restir", False),
             ("svgf", None, "path_tracing", True),

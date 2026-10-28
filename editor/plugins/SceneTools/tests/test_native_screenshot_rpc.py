@@ -7,9 +7,12 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
     def _repo_root(self):
         return pathlib.Path(__file__).resolve().parents[4]
 
+    def _engine_root(self):
+        return self._repo_root().parent
+
     def _handler_source(self):
         repo_root = self._repo_root().parent
-        handler_path = repo_root / "src" / "systems" / "ui" / "cef" / "cef_editor_native_api_handlers.cpp"
+        handler_path = self._engine_root() / "src" / "systems" / "ui" / "cef" / "cef_editor_native_api_handlers.cpp"
         return handler_path.read_text(encoding="utf-8")
 
     def test_network_actor_create_rejects_missing_stable_guid(self):
@@ -28,7 +31,7 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
 
     def _editor_api_header(self):
         api_path = (
-            self._repo_root()
+            self._engine_root()
             / "src"
             / "systems"
             / "ui"
@@ -39,7 +42,7 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
 
     def _editor_api_source(self):
         api_path = (
-            self._repo_root()
+            self._engine_root()
             / "src"
             / "systems"
             / "ui"
@@ -50,7 +53,7 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
 
     def _native_api_header(self):
         return (
-            self._repo_root()
+            self._engine_root()
             / "src"
             / "systems"
             / "ui"
@@ -60,7 +63,7 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
 
     def _query_bridge_source(self):
         return (
-            self._repo_root()
+            self._engine_root()
             / "src"
             / "systems"
             / "ui"
@@ -100,7 +103,7 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
 
     def _network_system_source(self):
         return (
-            self._repo_root()
+            self._engine_root()
             / "src"
             / "systems"
             / "network"
@@ -363,14 +366,14 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
         bridge_source = self._frontend_bridge_source()
 
         self.assertIn("Bridge.validateEditorApiReturn(apiName, jsonResponse?.data, spec)", bridge_source)
-        self.assertIn("reject(e);", bridge_source)
+        self.assertIn("reject(error);", bridge_source)
         self.assertNotIn("resolve(response);", bridge_source)
 
-    def test_frontend_callback_unregister_keeps_local_token_until_cpp_confirms(self):
+    def test_frontend_callback_unregister_releases_local_token_even_on_failure(self):
         bridge_source = self._frontend_bridge_source()
 
-        self.assertIn("return call_editor_api('EditorApi.unregister_callback', [callbackToken])", bridge_source)
-        self.assertIn(".then((response) => {", bridge_source)
+        self.assertIn("return await call_editor_api('EditorApi.unregister_callback', [callbackToken])", bridge_source)
+        self.assertIn("} finally {\n    editorApiCallbacks.delete(callbackToken);", bridge_source)
         self.assertIn("editorApiCallbacks.delete(callbackToken);", bridge_source)
         self.assertNotIn(
             "const unregister_editor_api_callback = async (callbackToken) => {\n  editorApiCallbacks.delete(callbackToken);",
@@ -382,13 +385,13 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
         api_header = self._editor_api_header()
 
         native_rpc_source = (
-            self._repo_root() / "src" / "systems" / "ui" / "cef" / "cef_editor_native_api_registry.cpp"
+            self._engine_root() / "src" / "systems" / "ui" / "cef" / "cef_editor_native_api_registry.cpp"
         ).read_text(encoding="utf-8")
         editor_source = (
             self._repo_root() / "editor" / "runtime" / "editor_host.py"
         ).read_text(encoding="utf-8")
         bind_source = (
-            self._repo_root() / "src" / "systems" / "ui" / "cef" / "cef_py_bind.cpp"
+            self._engine_root() / "src" / "systems" / "ui" / "cef" / "cef_py_bind.cpp"
         ).read_text(encoding="utf-8")
         for text in (api_source, api_header, bind_source, editor_source):
             with self.subTest(source=text[:24]):
@@ -429,7 +432,7 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
         header = self._editor_api_header()
         source = self._editor_api_source()
         cmake = (
-            self._repo_root() / "src" / "systems" / "ui" / "CMakeLists.txt"
+            self._engine_root() / "src" / "systems" / "ui" / "CMakeLists.txt"
         ).read_text(encoding="utf-8")
 
         for symbol in (
@@ -617,7 +620,7 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
     def test_old_public_rpc_contract_is_removed(self):
         repo_root = self._repo_root()
         self.assertFalse(
-            (repo_root / "src" / "systems" / "ui" / "cef" / "cef_editor_rpc_contract.cpp").exists()
+            (self._engine_root() / "src" / "systems" / "ui" / "cef" / "cef_editor_rpc_contract.cpp").exists()
         )
         native_header = self._native_api_header()
         for symbol in (
@@ -697,7 +700,7 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
 
     def test_python_cpp_editor_api_transport_is_internal_only(self):
         bind_source = (
-            self._repo_root() / "src" / "systems" / "ui" / "cef" / "cef_py_bind.cpp"
+            self._engine_root() / "src" / "systems" / "ui" / "cef" / "cef_py_bind.cpp"
         ).read_text(encoding="utf-8")
         python_api_source = (
             self._repo_root() / "editor" / "api" / "editor_api.py"
@@ -721,7 +724,7 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
         ).read_text(encoding="utf-8")
 
         self.assertIn(
-            "EDITOR_API_METHOD_SCHEMA(EditorApi, list_methods, kNoParams, EditorApiValueType::Object)",
+            'EDITOR_API_METHOD_SCHEMA_WRAPPED_CALLERS(EditorApi, list_methods, kNoParams, "", "", EditorApiValueType::Object, animation_callers())',
             api_source,
         )
         self.assertIn(
@@ -767,7 +770,7 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
     def test_python_script_service_dispatcher_is_registered_explicitly(self):
         repo_root = self._repo_root()
         bind_source = (
-            repo_root / "src" / "systems" / "ui" / "cef" / "cef_py_bind.cpp"
+            self._engine_root() / "src" / "systems" / "ui" / "cef" / "cef_py_bind.cpp"
         ).read_text(encoding="utf-8")
         main_source = (
             repo_root / "editor" / "runtime" / "bootstrap.py"
@@ -1065,8 +1068,6 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
             "events.onNetworkAssetImportCompleted",
             "events.onNetworkFileSyncStatusChanged",
             "events.onNetworkSyncPauseRequested",
-            "events.onSceneAdded",
-            "events.onSceneRenamed",
             "events.onSceneTreeChanged",
             "events.onProjectOpened",
             "events.onLanChatEvent",
@@ -1198,7 +1199,7 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
         self.assertIn('{"actor", actor_name}', handler_source)
 
         self.assertIn("editorApi.sceneTools.selectActor(sceneId, type, actorName, {", main_page_source)
-        self.assertIn("editorApi.sceneTools.selectActor(currentSceneName.value, scene.type || 'actor', scene.name)", scene_bar_source)
+        self.assertIn(".selectActor(currentSceneName.value, scene.type || 'actor', scene.name)", scene_bar_source)
         self.assertIn("editorApi.events.onActorSelectionChanged(handleSelection)", object_source)
         self.assertIn("editorApi.off(selectionToken)", object_source)
         for source_name, frontend_source in (
@@ -1781,7 +1782,7 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
     def test_realtime_focus_and_pick_events_are_defined_and_emitted_by_cpp_callback_registry(self):
         source = self._editor_api_source()
         realtime_source = (
-            self._repo_root()
+            self._engine_root()
             / "src"
             / "systems"
             / "ui"
@@ -1863,80 +1864,20 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
         self.assertNotIn("coronaEventBus.on('focus-pose-result'", scene_bar_source)
         self.assertNotIn("coronaEventBus.off('focus-pose-result'", scene_bar_source)
 
-        self.assertIn("editorApi.events.onActorPickResult(handleActorPickResult)", main_page_source)
+        self.assertIn("subscribeWhileCurrent(editorApi.events.onActorPickResult, handleActorPickResult)", main_page_source)
         self.assertIn("editorApi.off(actorPickResultCallbackToken)", main_page_source)
         self.assertNotIn("coronaEventBus.on('actor-pick-result'", main_page_source)
         self.assertNotIn("coronaEventBus.off('actor-pick-result'", main_page_source)
 
-    def test_scene_tab_events_are_cpp_defined_and_python_can_emit_them(self):
-        source = self._editor_api_source()
-        bridge_source = self._frontend_bridge_source()
-        python_api_source = (
-            self._repo_root()
-            / "editor"
-            / "api"
-            / "editor_api.py"
-        ).read_text(encoding="utf-8")
-        corona_editor_source = (
-            self._repo_root()
-            / "editor"
-            / "runtime"
-            / "editor_host.py"
-        ).read_text(encoding="utf-8")
-        py_bind_source = (
-            self._repo_root()
-            / "src"
-            / "systems"
-            / "ui"
-            / "cef"
-            / "cef_py_bind.cpp"
-        ).read_text(encoding="utf-8")
+    def test_retired_multiscene_events_have_no_wrappers_or_aliases(self):
+        from api.editor_api import _EventsApi
+        host = (self._repo_root() / "editor/runtime/editor_host.py").read_text(encoding="utf-8")
+        for name in ("on_scene_added", "on_scene_renamed"):
+            self.assertFalse(hasattr(_EventsApi, name))
+            self.assertNotIn(name, host)
+        for name in ("SceneTools.sceneAdded", "SceneTools.sceneRenamed"):
+            self.assertNotIn(name, self._editor_api_source())
 
-        for snippet in (
-            '{"SceneTools.sceneAdded", EditorApiValueType::Object, all_callers(), '
-            '"events.onSceneAdded", "events.on_scene_added"}',
-            '{"SceneTools.sceneRenamed", EditorApiValueType::Object, all_callers(), '
-            '"events.onSceneRenamed", "events.on_scene_renamed"}',
-            "onSceneAdded: (callback) => register_manifest_editor_api_callback("
-            "'events.onSceneAdded', callback)",
-            "onSceneRenamed: (callback) => register_manifest_editor_api_callback("
-            "'events.onSceneRenamed', callback)",
-            'return _register_manifest_editor_api_event_callback("events.on_scene_added", callback)',
-            'return _register_manifest_editor_api_event_callback("events.on_scene_renamed", callback)',
-            "def _emit_cpp_editor_api_event(event_name, payload):",
-            "def _emit_manifest_cpp_editor_api_event(wrapper_name, payload):",
-            "CoronaEngine.emit_editor_api_event(event_name, json.dumps(payload))",
-            'm.def("emit_editor_api_event"',
-            '"scene-add": ("events.on_scene_added"',
-            '"scene-rename": ("events.on_scene_renamed"',
-        ):
-            with self.subTest(snippet=snippet):
-                self.assertIn(snippet, source + bridge_source + python_api_source + corona_editor_source + py_bind_source)
-
-    def test_main_page_scene_tab_events_use_cpp_defined_event_wrappers(self):
-        main_page_source = (
-            self._repo_root()
-            / "editor"
-            / "Frontend"
-            / "src"
-            / "views"
-            / "layout"
-            / "MainPage.vue"
-        ).read_text(encoding="utf-8")
-
-        self.assertIn("editorApi.events.onSceneAdded(onSceneAddedEvent)", main_page_source)
-        self.assertIn("editorApi.events.onSceneRenamed(onSceneRenamedEvent)", main_page_source)
-        self.assertIn("editorApi.off(sceneAddedCallbackToken)", main_page_source)
-        self.assertIn("editorApi.off(sceneRenamedCallbackToken)", main_page_source)
-        self.assertIn("const onSceneAddedEvent = (payload) => addSceneTab(payload?.name, payload?.route);", main_page_source)
-        self.assertIn(
-            "const onSceneRenamedEvent = (payload) => renameSceneTab(payload?.old_path, payload?.new_path, payload?.name);",
-            main_page_source,
-        )
-        self.assertNotIn("coronaEventBus.on('scene-add'", main_page_source)
-        self.assertNotIn("coronaEventBus.on('scene-rename'", main_page_source)
-        self.assertNotIn("coronaEventBus.off('scene-add'", main_page_source)
-        self.assertNotIn("coronaEventBus.off('scene-rename'", main_page_source)
 
     def test_scene_tab_events_are_not_relayed_by_legacy_event_bus(self):
         event_bus_source = (
@@ -2022,7 +1963,7 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
 
     def test_network_pending_actor_apply_covers_editor_fields_and_retry_policy(self):
         source = self._handler_source()
-        state_start = source.find("apply_pending_network_actor_state(")
+        state_start = source.rfind("PendingNetworkActorApplyOutcome apply_pending_network_actor_state(")
         state_end = source.find("apply_pending_network_actor_delete(", state_start)
         self.assertGreaterEqual(state_start, 0)
         self.assertGreater(state_end, state_start)
@@ -2038,9 +1979,7 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
             "set_mass",
             "set_restitution",
             "set_damping",
-            "set_physics_enabled",
-            "set_collision_enabled",
-            "set_collision_shape",
+            "set_body_type",
             "set_linear_lock",
             "set_angular_lock",
             "camera_lock_position_offset",
@@ -2062,30 +2001,21 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
         self.assertIn("if (!find_native_actor", delete)
         self.assertIn("PendingNetworkActorApplyResult::Applied", delete)
 
-    def test_network_polling_stops_batch_when_native_apply_retries(self):
-        source = (
-            self._repo_root()
-            / "editor"
-            / "Frontend"
-            / "src"
-            / "views"
-            / "sidebar"
-            / "Network.vue"
-        ).read_text(encoding="utf-8")
-        self.assertNotIn("native 创建接口尚未接入", source)
-        for pending_name in (
-            "pending.retrying",
-            "pendingState.retrying",
-            "pendingTransform.retrying",
-            "pendingDelete.retrying",
-        ):
-            start = source.find(f"if ({pending_name})")
-            self.assertGreaterEqual(start, 0)
-            self.assertIn("break;", source[start : start + 300])
+    def test_native_network_polling_retains_retrying_updates(self):
+        source = self._handler_source()
+        for method in ("poll_pending_actor_create", "poll_pending_actor_transform",
+                       "poll_pending_actor_delete", "poll_pending_actor_state_update"):
+            with self.subTest(method=method):
+                start = source.index('{"' + method + '",')
+                end = source.index('        }},', start)
+                handler = source[start:end]
+                self.assertIn("peek_pending_actor_", handler)
+                self.assertIn('payload["retrying"]', handler)
+                self.assertRegex(handler, r'if \(outcome.result != PendingNetworkActorApplyResult::Retry\)\s*\{\s*sys->ack_pending_actor_')
 
     def test_network_actor_delete_clears_pending_state_updates(self):
         source = (
-            self._repo_root()
+            self._engine_root()
             / "src"
             / "systems"
             / "network"
@@ -2138,7 +2068,6 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
         source = self._editor_api_source()
 
         expected = {
-            "SceneTools.create_scene": ("kSceneNameParam", "EditorApiValueType::Object"),
             "SceneTools.list_scene_tree": ("kSceneNameParam", "EditorApiValueType::Object"),
             "SceneTools.reload_scene": ("kSceneToolsReloadSceneParams", "EditorApiValueType::Object"),
             "SceneTools.create_camera_view": ("kSceneToolsCreateCameraViewParams", "EditorApiValueType::Object"),
@@ -2207,7 +2136,6 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
 
         for snippet in (
             "listActorTree: (sceneName) => call_manifest_editor_api('scene.listActorTree', [sceneName])",
-            "createScene: (sceneName) => call_manifest_editor_api('sceneTools.createScene', [sceneName])",
             "listSceneTree: (sceneName) => call_manifest_editor_api('sceneTools.listSceneTree', [sceneName])",
             "createActor: (sceneName, objPath, actorType = 'model', actorData = null) =>",
             "call_manifest_editor_api('sceneTools.createActor',",
@@ -2239,7 +2167,6 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
         self.assertGreater(end, start)
         scene_tools_section = bridge_source[start:end]
         expected_wrappers = (
-            "sceneTools.createScene",
             "sceneTools.listSceneTree",
             "sceneTools.reloadScene",
             "sceneTools.createActor",
@@ -2272,7 +2199,6 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
             "sceneTools.setSsaoEnabled",
             "sceneTools.getSsaoEnabled",
             "sceneTools.isVisionAvailable",
-            "sceneTools.loadVisionScene",
             "sceneTools.pickActor",
             "sceneTools.playAudio",
             "sceneTools.stopAudio",
@@ -2304,7 +2230,6 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
             "SceneTools.set_ssao_enabled": ("kSceneToolsSetCameraBoolParams", "EditorApiValueType::Object"),
             "SceneTools.get_ssao_enabled": ("kSceneToolsCameraOptionalParams", "EditorApiValueType::Object"),
             "SceneTools.is_vision_available": ("kNoParams", "EditorApiValueType::Object"),
-            "SceneTools.load_vision_scene": ("kPathParam", "EditorApiValueType::Object"),
             "SceneTools.pick_actor_at_pixel": ("kSceneToolsPickActorParams", "EditorApiValueType::Object"),
             "SceneTools.play_audio": ("kSceneToolsPlayAudioParams", "EditorApiValueType::Object"),
             "SceneTools.stop_audio": ("kResourceIdParam", "EditorApiValueType::Object"),
@@ -2339,7 +2264,6 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
             "setSsaoEnabled: (sceneName, cameraName, enabled) =>\n    editorApi.sceneTools.setSsaoEnabled",
             "getSsaoEnabled: (sceneName, cameraName) =>\n    editorApi.sceneTools.getSsaoEnabled",
             "isVisionAvailable: () => editorApi.sceneTools.isVisionAvailable()",
-            "loadVisionScene: (path) => editorApi.sceneTools.loadVisionScene(path)",
             "pickActor: (sceneName, x, y, vpWidth, vpHeight) =>\n    editorApi.sceneTools.pickActor",
             "playAudio: (resourceId, loop) =>\n    editorApi.sceneTools.playAudio",
             "stopAudio: (resourceId) =>\n    editorApi.sceneTools.stopAudio",
@@ -2406,7 +2330,6 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
             "ProjectLauncher.get_recent_projects": ("kNoParams", "EditorApiValueType::Array"),
             "ProjectLauncher.open_project": ("kOpenProjectParams", "EditorApiValueType::Object"),
             "ProjectLauncher.open_project_file": ("kNoParams", "EditorApiValueType::Object"),
-            "ProjectLauncher.set_project_mode": ("kObjectPayloadParam", "EditorApiValueType::Boolean"),
         }
         for api_name, (params_name, return_type) in expected.items():
             module, method = api_name.split(".", 1)
@@ -2414,7 +2337,7 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
                 plain_macro = f"EDITOR_API_METHOD_SCHEMA({module}, {method}, {params_name}, {return_type})"
                 wrapped_macro = f"EDITOR_API_METHOD_SCHEMA_WRAPPED({module}, {method}, {params_name},"
                 self.assertTrue(
-                    plain_macro in source or wrapped_macro in source or wrapped_callers_macro in source,
+                    plain_macro in source or wrapped_macro in source,
                     f"{api_name} should define an explicit C++ method schema",
                 )
 
@@ -2429,9 +2352,8 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
             "createWorldProject: (worldData) =>\n    editorApi.project.createWorldProject",
             "createMultiplayerProject: (projectData) =>\n    editorApi.project.createMultiplayerProject",
             "getProjectLoadStatus: () => editorApi.project.getProjectLoadStatus()",
-            "openProject: async (projectPath, options = {}) => {",
+            "openProject: (projectPath, options = {}) => {",
             "const result = await editorApi.project.openProject(projectPath, { load_policy: loadPolicy })",
-            "setProjectMode: (mode, settings) =>\n    editorApi.project.setProjectMode",
             "getRecentProjects: () => editorApi.project.getRecentProjects()",
         ):
             with self.subTest(snippet=snippet):
@@ -2468,7 +2390,6 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
         source = self._editor_api_source()
 
         expected = {
-            "ProjectSettings.browse_scene_file": ("kNoParams", "EditorApiValueType::Object"),
             "ProjectSettings.get_active_project_info": ("kNoParams", "EditorApiValueType::Object"),
             "ProjectSettings.save_active_project_info": ("kObjectPayloadParam", "EditorApiValueType::Object"),
         }
@@ -2492,10 +2413,8 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
             "projectSettings: {",
             "getActiveProjectInfo: () => call_manifest_editor_api('projectSettings.getActiveProjectInfo', [])",
             "saveActiveProjectInfo: (settings) =>",
-            "browseSceneFile: () => call_manifest_editor_api('projectSettings.browseSceneFile', [])",
             "getActiveProjectInfo: () => editorApi.projectSettings.getActiveProjectInfo()",
             "saveActiveProjectInfo: (settings) =>\n    editorApi.projectSettings.saveActiveProjectInfo",
-            "browseSceneFile: () => editorApi.projectSettings.browseSceneFile()",
         ):
             with self.subTest(snippet=snippet):
                 self.assertIn(snippet, bridge_source)
@@ -2526,7 +2445,8 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
         project_settings_section = bridge_source[start:end]
 
         self.assertIn("call_manifest_editor_api('projectSettings.getActiveProjectInfo'", project_settings_section)
-        self.assertIn("call_manifest_editor_api('projectSettings.browseSceneFile'", project_settings_section)
+        self.assertIn("call_manifest_editor_api('projectSettings.saveActiveProjectInfo'", project_settings_section)
+        self.assertNotIn("browseSceneFile", project_settings_section)
         self.assertNotIn("ProjectSettings.", project_settings_section)
 
     def test_file_manager_editor_apis_have_explicit_schema(self):
@@ -3064,7 +2984,7 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
     def test_editor_api_events_validate_payload_and_cleanup_cef_callbacks(self):
         source = self._editor_api_source()
         cef_client_source = (
-            self._repo_root() / "src" / "systems" / "ui" / "cef" / "cef_client.cpp"
+            self._engine_root() / "src" / "systems" / "ui" / "cef" / "cef_client.cpp"
         ).read_text(encoding="utf-8")
 
         for snippet in (
@@ -3091,7 +3011,7 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
         source = self._editor_api_source()
         header = self._editor_api_header()
         bind_source = (
-            self._repo_root() / "src" / "systems" / "ui" / "cef" / "cef_py_bind.cpp"
+            self._engine_root() / "src" / "systems" / "ui" / "cef" / "cef_py_bind.cpp"
         ).read_text(encoding="utf-8")
         python_api_source = (
             self._repo_root()
@@ -3147,7 +3067,7 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
 
     def test_python_api_shutdown_does_not_release_objects_or_take_gil_off_thread(self):
         source = (
-            self._repo_root() / "src" / "systems" / "script" / "python" / "python_api.cpp"
+            self._engine_root() / "src" / "systems" / "script" / "python" / "python_api.cpp"
         ).read_text(encoding="utf-8")
         shutdown_start = source.index("void PythonAPI::shutdown()")
         shutdown_end = source.index("int64_t PythonAPI::nowMsec()", shutdown_start)
@@ -3179,135 +3099,11 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
             with self.subTest(method=method):
                 self.assertIn(f'{{"{method}"', scene_tools_handlers)
 
-    def test_native_scene_save_preserves_embedded_vision_document(self):
-        source = self._handler_source()
-        self.assertIn("persist_native_scene_common", source)
-        self.assertIn("persist_native_scene_vision_metadata", source)
-        self.assertIn("storage == \"embedded\"", source)
-        self.assertIn("storage = embedded", source)
-        self.assertIn("persist_native_scene_vision_document", source)
-        start = source.find("void persist_native_scene_common")
-        end = source.find("void apply_native_scene_environment", start)
-        self.assertGreaterEqual(start, 0)
-        self.assertGreater(end, start)
-        persist_body = source[start:end]
-        self.assertNotIn('remove_ini_section(scene_file, "vision_document")', persist_body)
 
-        match = re.search(
-            r'\{"scene_save", \[\]\(const NativeRequest& request, const NativeContext&\).*?'
-            r"return native_success",
-            source,
-            re.S,
-        )
-        self.assertIsNotNone(match)
-        self.assertIn("persist_native_scene_common(*scene)", match.group(0))
 
-    def test_native_scene_snapshot_exposes_embedded_vision_document_metadata(self):
-        source = self._handler_source()
-        for function_name, end_marker in (
-            ("nlohmann::json scene_to_json(const NativeEditorScene& scene)", "NativeEditorActor* find_native_actor"),
-            ("std::string get_editor_scene_snapshot_from_python(const std::string& scene_name)", "std::string set_editor_actor_transform_from_python"),
-        ):
-            start = source.find(function_name)
-            end = source.find(end_marker, start)
-            self.assertGreaterEqual(start, 0)
-            self.assertGreater(end, start)
-            snapshot_body = source[start:end]
-            for field in ("document_version", "document_encoding", "document_asset_root", "document_data"):
-                with self.subTest(function=function_name, field=field):
-                    self.assertIn(f'"{field}"', snapshot_body)
 
-    def test_vision_project_open_embeds_document_without_scene_source_path(self):
-        source = self._handler_source()
 
-        self.assertIn("create_embedded_vision_document", source)
-        self.assertIn("VISION_DOCUMENT_ENCODING", source)
-        self.assertIn('"storage", "embedded"', source)
-        self.assertIn('"import_mode", "external"', source)
-        self.assertIn('"vision_document"', source)
 
-        start = source.find("std::filesystem::path create_vision_project_native")
-        end = source.find("std::filesystem::path open_project_native", start)
-        self.assertGreaterEqual(start, 0)
-        self.assertGreater(end, start)
-        create_body = source[start:end]
-        self.assertIn("create_embedded_vision_document", create_body)
-        self.assertIn("persist_vision_proxy_actors_from_document", create_body)
-        self.assertIn("replace_ini_section_from_map", create_body)
-        self.assertIn("create_scene_folder", create_body)
-        self.assertIn("scene.ini", create_body)
-        self.assertNotIn("create_project_from_template_native", create_body)
-        self.assertNotIn('"source_path"', create_body)
-
-    def test_embedded_vision_source_loads_from_memory_without_runtime_json(self):
-        source = self._handler_source()
-        repo_root = pathlib.Path(__file__).resolve().parents[4]
-        scene_tools_source = (
-            repo_root / "editor" / "plugins" / "SceneTools" / "main.py"
-        ).read_text(encoding="utf-8")
-
-        self.assertNotIn("write_embedded_vision_runtime_scene", source)
-        self.assertNotIn("vision_runtime", source)
-        self.assertNotIn("vision_runtime", scene_tools_source)
-        self.assertIn('scene.vision_storage == "embedded"', source)
-        self.assertIn("decode_vision_document_data(scene.vision_document_data)", source)
-        self.assertIn("Corona::API::load_vision_scene_from_json", source)
-        self.assertIn('CFW_LOG_ERROR("Vision embedded scene missing', source)
-
-    def test_project_sidecar_vision_source_remains_compatible(self):
-        source = self._handler_source()
-
-        self.assertIn("resolve_project_sidecar_vision_json", source)
-        self.assertIn('scene.vision_storage == "project_sidecar"', source)
-        self.assertIn('Corona::API::load_vision_scene(path_to_utf8(sidecar_json))', source)
-        self.assertIn('CFW_LOG_ERROR("Vision sidecar scene missing', source)
-        self.assertNotIn("migrate_project_sidecar_scene_to_embedded", source)
-
-    def test_vision_scene_load_event_supports_embedded_json_payload(self):
-        repo_root = pathlib.Path(__file__).resolve().parents[4]
-        event_source = (
-            repo_root / "include" / "corona" / "events" / "optics_system_events.h"
-        ).read_text(encoding="utf-8")
-        api_header = (
-            repo_root / "include" / "corona" / "engine" / "engine_runtime_api.h"
-        ).read_text(encoding="utf-8")
-        api_source = (
-            repo_root / "src" / "engine" / "engine_runtime_api.cpp"
-        ).read_text(encoding="utf-8")
-        optics_header = (
-            repo_root / "include" / "corona" / "systems" / "optics" / "optics_system.h"
-        ).read_text(encoding="utf-8")
-        optics_source = (
-            repo_root / "src" / "systems" / "optics" / "optics_system.cpp"
-        ).read_text(encoding="utf-8")
-        scene_resource_header = (
-            repo_root
-            / "include"
-            / "corona"
-            / "systems"
-            / "optics"
-            / "vision_scene_resource.h"
-        ).read_text(encoding="utf-8")
-
-        for snippet in (
-            "std::string scene_json",
-            "std::string base_dir",
-            "std::string scene_key",
-            "bool external_live",
-        ):
-            with self.subTest(snippet=snippet):
-                self.assertIn(snippet, event_source)
-        self.assertIn("load_vision_scene_from_json", api_header)
-        self.assertIn("load_vision_scene_from_json", api_source)
-        self.assertIn("event_bus->publish<Events::VisionSceneLoadEvent>", api_source)
-        self.assertIn("VisionSceneLoadRequest", optics_header)
-        self.assertIn("std::optional<VisionSceneLoadRequest> pending_vision_scene_load_", optics_header)
-        self.assertIn("import_vision_scene_from_data", optics_source)
-        self.assertIn("DataWrap::parse(request.scene_json)", optics_source)
-        self.assertIn("vision::Global::instance().set_scene_path(base_dir)", optics_source)
-        self.assertIn("request.external_live", optics_source)
-        self.assertIn("VisionPipelineSource::ExternalLive", optics_source)
-        self.assertIn("binding->visible", optics_source)
 
     def test_python_corona_engine_loader_has_no_fallback_module(self):
         self.assertFalse((pathlib.Path(__file__).resolve().parents[4] / "editor" / "CoronaCore" / "core" / "corona_engine.py").is_file())
@@ -3321,132 +3117,9 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
             (repo_root / "editor" / "CoronaCore" / "utils" / "corona_engine_fallback.py").exists()
         )
 
-    def test_embedded_vision_registers_synthetic_external_live_bindings(self):
-        source = self._handler_source()
 
-        for snippet in (
-            "embedded_vision_scene_key",
-            "register_embedded_vision_actor_bindings",
-            "clear_embedded_vision_actor_bindings",
-            "set_external_vision_binding(",
-            "clear_external_vision_binding()",
-            "const auto shape_guid = vision_shape_guid(shape, index)",
-            "scene_key,",
-            "static_cast<int>(index)",
-            "Corona::API::load_vision_scene_from_json(render_document.dump()",
-            "true);",
-        ):
-            with self.subTest(snippet=snippet):
-                self.assertIn(snippet, source)
 
-        load_body = re.search(
-            r"void apply_native_scene_vision_source\(.*?\n\}",
-            source,
-            re.S,
-        )
-        self.assertIsNotNone(load_body)
-        self.assertIn("register_embedded_vision_actor_bindings", load_body.group(0))
-        self.assertIn("register_embedded_vision_actor_bindings(scene, render_document, scene_key)", load_body.group(0))
 
-    def test_embedded_vision_visibility_uses_live_transform_without_scene_reload(self):
-        source = self._handler_source()
-        repo_root = pathlib.Path(__file__).resolve().parents[4]
-        optics_source = (
-            repo_root / "src" / "systems" / "optics" / "optics_system.cpp"
-        ).read_text(encoding="utf-8")
-        scene_resource_header = (
-            repo_root
-            / "include"
-            / "corona"
-            / "systems"
-            / "optics"
-            / "vision_scene_resource.h"
-        ).read_text(encoding="utf-8")
-
-        render_body = re.search(
-            r"nlohmann::json vision_document_for_render\(.*?\n\}",
-            source,
-            re.S,
-        )
-        self.assertIsNotNone(render_body)
-        self.assertNotIn("remove_if", render_body.group(0))
-        self.assertNotIn("vision_shape_visible(shape)", render_body.group(0))
-
-        sync_start = source.find(
-            "bool sync_native_actor_to_embedded_vision_document(NativeEditorScene& scene,\n"
-            "                                                   const NativeEditorActor& actor,\n"
-            "                                                   bool create_if_missing,\n"
-            "                                                   bool sync_transform) {"
-        )
-        sync_end = source.find("bool remove_native_actor_from_embedded_vision_document", sync_start)
-        self.assertGreaterEqual(sync_start, 0)
-        self.assertGreater(sync_end, sync_start)
-        sync_body = source[sync_start:sync_end]
-        self.assertIn("persisted && created_shape", sync_body)
-        self.assertNotIn("previous_visible != next_visible", sync_body)
-
-        remove_body = re.search(
-            r"auto remove_actor_shape = .*?\n    \};",
-            optics_source,
-            re.S,
-        )
-        self.assertIsNotNone(remove_body)
-        self.assertIn("external_live_shape_removal_action", remove_body.group(0))
-        self.assertIn("ExternalLiveShapeRemovalAction::HideOriginal", remove_body.group(0))
-        self.assertIn("embedded_runtime", remove_body.group(0))
-        self.assertIn("scene_resource->erase_external_live_shape(actor_handle)", remove_body.group(0))
-
-        transform_body = re.search(
-            r"void OpticsSystem::sync_external_live_vision_transforms\(.*?\n\}",
-            optics_source,
-            re.S,
-        )
-        self.assertIsNotNone(transform_body)
-        self.assertIn("hidden_bound_actors", transform_body.group(0))
-        self.assertIn("hidden_external_live_o2w()", transform_body.group(0))
-        self.assertIn("external_live_hidden_transform_signature", transform_body.group(0))
-        self.assertIn("!binding->visible", transform_body.group(0))
-        self.assertNotIn("!actor_has_visible_optics(actor_handle)", transform_body.group(0))
-        self.assertIn("cache_external_live_original_instance", transform_body.group(0))
-        self.assertIn("external_live_original_transform_signatures", transform_body.group(0))
-        self.assertIn("restore_external_live_original_instances", transform_body.group(0))
-        self.assertIn("continue;", transform_body.group(0))
-
-        self.assertIn("external_live_original_instances", scene_resource_header)
-        self.assertIn("external_live_original_transform_signatures", scene_resource_header)
-        self.assertIn("cache_external_live_original_instance", scene_resource_header)
-        self.assertIn("restore_external_live_original_instances", scene_resource_header)
-
-    def test_embedded_vision_visibility_does_not_rewrite_transform_schema(self):
-        source = self._handler_source()
-
-        for snippet in (
-            "write_actor_visibility_to_vision_shape",
-            "write_actor_state_to_vision_shape(actor, *shape, sync_transform)",
-            "cleanup_editor_trs_overrides_for_non_trs_transform",
-            "cleanup_vision_document_editor_transform_overrides",
-        ):
-            with self.subTest(snippet=snippet):
-                self.assertIn(snippet, source)
-
-    def test_embedded_vision_rewrites_and_copies_common_vision_assets(self):
-        source = self._handler_source()
-
-        for snippet in (
-            "rewrite_vision_resource_paths_for_project_archive",
-            "copy_vision_archive_asset",
-            "copy_obj_dependencies",
-            "copy_mtl_texture_dependencies",
-            "copy_gltf_dependencies",
-            'std::filesystem::path("Resource")',
-            '"vision_imports"',
-            'key == "fn"',
-            'key == "texture"',
-            'copy_uri_array("buffers")',
-            'copy_uri_array("images")',
-        ):
-            with self.subTest(snippet=snippet):
-                self.assertIn(snippet, source)
 
     def test_native_actor_save_load_preserves_common_optics_fields(self):
         source = self._handler_source()
@@ -3463,58 +3136,6 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
             with self.subTest(snippet=snippet):
                 self.assertIn(snippet, source)
 
-    def test_embedded_vision_actor_operations_update_document_without_reload(self):
-        source = self._handler_source()
-
-        for snippet in (
-            "sync_native_actor_to_embedded_vision_document",
-            "remove_native_actor_from_embedded_vision_document",
-            "persist_embedded_vision_document",
-            "vision_document_for_render",
-            "ensure_vision_shape_guids",
-            "scene.vision_document_data = encode_vision_document_data(document)",
-            "Corona::API::load_vision_scene_from_json(",
-            '"visible"',
-            '".optics.visible = "',
-            'actor.optics->set_visible',
-        ):
-            with self.subTest(snippet=snippet):
-                self.assertIn(snippet, source)
-
-        sync_body = re.search(
-            r"bool sync_native_actor_to_embedded_vision_document\(.*?\n\}",
-            source,
-            re.S,
-        )
-        self.assertIsNotNone(sync_body)
-        self.assertNotIn("load_vision_scene_from_json", sync_body.group(0))
-
-        transform_body = re.search(
-            r"NativeResult set_native_editor_actor_transform\(.*?\n\}",
-            source,
-            re.S,
-        )
-        self.assertIsNotNone(transform_body)
-        self.assertIn("sync_native_actor_to_embedded_vision_document(*scene, *actor)", transform_body.group(0))
-
-        remove_body = re.search(
-            r"NativeResult remove_native_editor_actor\(.*?\n\}",
-            source,
-            re.S,
-        )
-        self.assertIsNotNone(remove_body)
-        self.assertIn("remove_native_actor_from_embedded_vision_document(*scene, removed_guid)", remove_body.group(0))
-
-        document_remove_body = re.search(
-            r"bool remove_native_actor_from_embedded_vision_document\(NativeEditorScene& scene,\s+"
-            r"const std::string& actor_guid\) \{.*?\n\}",
-            source,
-            re.S,
-        )
-        self.assertIsNotNone(document_remove_body)
-        self.assertIn("persist_embedded_vision_document", document_remove_body.group(0))
-        self.assertNotIn("refresh_embedded_vision_view", document_remove_body.group(0))
-        self.assertNotIn("load_vision_scene_from_json", document_remove_body.group(0))
 
     def test_native_actor_guid_changes_when_same_name_and_index_are_reused(self):
         source = self._handler_source()
@@ -3541,8 +3162,6 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
             'item["actor_version"] = std::max(actor.actor_version, 1);',
             '".runtime.entity_id = "',
             '".runtime.actor_version = "',
-            'actor_value(".runtime.entity_id")',
-            'actor_value(".runtime.actor_version", "1")',
         ):
             with self.subTest(snippet=snippet):
                 self.assertIn(snippet, source)
@@ -3618,17 +3237,6 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
         )
         self.assertNotIn("asset_id = r.read_string", source)
 
-    def test_embedded_vision_reload_logs_shape_guid_uniqueness(self):
-        source = self._handler_source()
-        refresh_body = re.search(
-            r"bool refresh_embedded_vision_view\(NativeEditorScene& scene,\s+"
-            r"const nlohmann::json& document\) \{.*?\n\}",
-            source,
-            re.S,
-        )
-        self.assertIsNotNone(refresh_body)
-        self.assertIn("duplicate_guid_count", refresh_body.group(0))
-        self.assertIn("Vision embedded reload snapshot", refresh_body.group(0))
 
     def test_native_camera_save_load_preserves_vision_render_settings(self):
         source = self._handler_source()
@@ -3643,16 +3251,6 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
             with self.subTest(snippet=snippet):
                 self.assertIn(snippet, source)
 
-    def test_opening_legacy_project_is_read_only_and_does_not_duplicate_it(self):
-        source = self._handler_source()
-        start = source.find("std::filesystem::path open_project_native")
-        end = source.find("nlohmann::json recent_projects_native", start)
-        self.assertGreaterEqual(start, 0)
-        self.assertGreater(end, start)
-        open_body = source[start:end]
-        self.assertNotIn("copy_existing_project_to_data_native", open_body)
-        self.assertIn("project_dir = candidate", open_body)
-        self.assertIn("project_dir = raw_path.parent_path()", open_body)
 
     def test_project_launcher_business_logic_is_native(self):
         source = self._handler_source()
@@ -3662,8 +3260,6 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
             '"create_world_project"',
             '"create_multiplayer_project"',
             '"open_project"',
-            "create_vision_project_native",
-            "create_embedded_vision_document",
             "prepare_archive_load",
             "materialize_scene_snapshot",
         ):
@@ -3671,7 +3267,7 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
                 self.assertIn(snippet, source)
 
         rpc_source = (
-            pathlib.Path(__file__).resolve().parents[4]
+            self._engine_root()
             / "src" / "systems" / "ui" / "cef" / "cef_editor_native_api_registry.cpp"
         ).read_text(encoding="utf-8")
         self.assertIn("register_project_launcher_api_handlers(registry)", rpc_source)
@@ -3693,65 +3289,14 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
             or "EDITOR_API_METHOD_SCHEMA_WRAPPED(ProjectLauncher, create_project, kObjectPayloadParam, \"project.createProject\", \"project.create_project\", EditorApiValueType::String)" in api_source
         )
 
-    def test_native_project_template_uses_project_launcher_template_owner(self):
-        source = self._handler_source()
-        match = re.search(
-            r"std::filesystem::path project_template_path\(\) \{(?P<body>.*?)\n\}",
-            source,
-            re.S,
-        )
-        self.assertIsNotNone(match)
-        body = match.group("body")
-        self.assertIn('"plugins" / "ProjectLauncher" / "templates" / "project"', body)
-        self.assertNotIn('"CoronaCore" / "demo" / "project"', body)
 
-    def test_vision_project_open_updates_recent_only_after_successful_open(self):
-        source = self._handler_source()
 
-        match = re.search(
-            r"std::filesystem::path create_project_from_template_native\(.*?\n\}",
-            source,
-            re.S,
-        )
-        self.assertIsNotNone(match)
-        self.assertNotIn("add_recent_project_native", match.group(0))
-
-        match = re.search(
-            r"std::filesystem::path open_project_native\(.*?\n\}",
-            source,
-            re.S,
-        )
-        self.assertIsNotNone(match)
-        self.assertIn("add_recent_project_native(project_dir)", match.group(0))
-
-    def test_vision_import_uses_type_safe_json_accessors(self):
-        source = self._handler_source()
-        fragile_snippets = (
-            'output["denoise"].get<bool>()',
-            'shape.value("type"',
-            'shape.value("shape_type"',
-            'shape.value("name"',
-            'shape.value("fn"',
-            'shape.value("path"',
-            'params.value("fn"',
-            'params.value("path"',
-            'params.value("position"',
-            'params.value("direction"',
-            'params.value("up"',
-            'transform_params.value("t"',
-            'transform_params.value("s"',
-        )
-        for snippet in fragile_snippets:
-            with self.subTest(snippet=snippet):
-                self.assertNotIn(snippet, source)
-        self.assertIn('json_bool_value(output, "denoise", false)', source)
-        self.assertIn("shapes.is_object()", source)
 
     def test_project_launcher_open_project_returns_resolved_project_path(self):
         source = self._handler_source()
 
         start = source.find('{"open_project", [](const NativeRequest& request, const NativeContext&)')
-        end = source.find('{"set_project_mode"', start)
+        end = source.find('{"open_project_file"', start)
         self.assertGreaterEqual(start, 0)
         self.assertGreater(end, start)
         handler = source[start:end]
@@ -3760,7 +3305,7 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
         materialize_start = source.index("NativeEditorScene& materialize_scene_snapshot_into_state")
         materialize_end = source.index("NativeResult invoke_project_archive_parser", materialize_start)
         self.assertIn(
-            "state.project_path = path_to_utf8(scene.project_root)",
+            'state.project_path = scene.read_only ? snapshot.at("source_path").get<std::string>()',
             source[materialize_start:materialize_end],
         )
         self.assertIn('{"path", state.project_path}', handler)
@@ -3771,7 +3316,7 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
         source = (
             repo_root / "editor" / "Frontend" / "src" / "services" / "projectLauncherService.js"
         ).read_text(encoding="utf-8")
-        self.assertIn("const activeProjectPath = success?.path || projectPath;", source)
+        self.assertIn("const activeProjectPath = opened?.path || projectPath;", source)
         self.assertIn("setItem('corona.activeProjectPath', activeProjectPath)", source)
 
     def test_project_launcher_canonicalizes_settings_project_paths(self):
@@ -3783,7 +3328,6 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
             "resolve_active_project_path",
             "add_recent_project_native",
             "recent_projects_native",
-            "open_project_native",
         ):
             with self.subTest(function=function_name):
                 match = re.search(
@@ -3845,22 +3389,6 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
         self.assertNotIn("callDockCommand", source)
         self.assertNotIn("engine-started", source)
 
-    def test_python_scene_save_preserves_embedded_vision_document(self):
-        self.assertFalse((pathlib.Path(__file__).resolve().parents[4] / "editor" / "runtime" / "legacy" / "entities" / "scene.py").is_file())
-        return
-        repo_root = pathlib.Path(__file__).resolve().parents[4]
-        source = (repo_root / "editor" / "runtime" / "legacy" / "entities" / "scene.py").read_text(
-            encoding="utf-8"
-        )
-
-        self.assertIn("self.vision_storage", source)
-        self.assertIn("self.vision_document", source)
-        self.assertIn("_encode_vision_document(vision_document)", source)
-        self.assertIn("zlib.compressobj(level=0)", source)
-        self.assertIn("'vision_document': {", source)
-        self.assertIn("'data': _encode_vision_document(vision_document)", source)
-        self.assertIn("'source_id': getattr(self, 'vision_source_id', '')", source)
-        self.assertNotIn("self.file_data['vision']['source_path']", source)
 
     def test_recent_games_import_awaits_open_project_and_catches_errors(self):
         repo_root = pathlib.Path(__file__).resolve().parents[4]
@@ -3873,14 +3401,14 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
         self.assertGreater(end, start)
         body = source[start:end]
         self.assertIn("try {", body)
-        self.assertIn("await handleOpenProject(result.data.path)", body)
+        self.assertIn("await handleOpenProject(path)", body)
         self.assertIn("console.error('打开现有项目失败:'", body)
 
     def test_native_scene_load_enables_runtime_mesh_optimization(self):
         repo_root = pathlib.Path(__file__).resolve().parents[4]
-        engine_source = (repo_root / "src" / "engine.cpp").read_text(encoding="utf-8")
+        engine_source = (self._engine_root() / "src" / "engine.cpp").read_text(encoding="utf-8")
         parse_common_source = (
-            repo_root
+            self._engine_root()
             / "modules"
             / "corona_resource"
             / "src"
@@ -3958,67 +3486,31 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
         self.assertIn("self._active_project_path = project_path", settings_source)
         self.assertIn("self.active_project_config = proj_cfg", settings_source)
 
-    def test_collision_shape_is_persisted_and_round_trips_as_three_state_value(self):
-        repo_root = self._repo_root()
-        hub_source = (repo_root / "include" / "corona" / "shared_data_hub.h").read_text(encoding="utf-8")
-        api_source = (
-            repo_root / "src" / "systems" / "ui" / "cef" / "cef_editor_native_api_handlers.cpp"
-        ).read_text(encoding="utf-8")
-        object_source = (
-            repo_root / "editor" / "Frontend" / "src" / "views" / "sidebar" / "Object.vue"
-        ).read_text(encoding="utf-8")
+    def test_actor_body_type_is_persisted_through_native_and_editor(self):
+        hub = (self._engine_root() / "include/corona/shared_data_hub.h").read_text(encoding="utf-8")
+        panel = (self._repo_root() / "editor/Frontend/src/views/sidebar/Object.vue").read_text(encoding="utf-8")
+        self.assertIn("enum class BodyType", hub)
+        for value in ("Dynamic", "Kinematic", "Static", "Phantom"):
+            self.assertIn("BodyType::" + value, hub)
+        self.assertIn(".mechanics.body_type", self._handler_source())
+        self.assertIn("set_body_type", self._handler_source())
+        self.assertIn("normalizeBodyType", panel)
+        self.assertIn("{ body_type: next }", panel)
 
-        self.assertIn("enum class CollisionShape", hub_source)
-        self.assertIn("CollisionShape collision_shape{CollisionShape::Box}", hub_source)
-        self.assertIn(".mechanics.collision_type", api_source)
-        self.assertIn('? collision_shape_name(*actor.mechanics)', api_source)
-        self.assertIn(': actor.persisted_collision_type', api_source)
-        self.assertIn("set_collision_shape", api_source)
-        self.assertIn("const normalizeCollisionType", object_source)
-        self.assertIn("actor.collision = normalizeCollisionType(", object_source)
-        scratch_source = (
-            repo_root / "editor" / "script_runtime" / "engine" / "corona_engine.py"
-        ).read_text(encoding="utf-8")
-        self.assertIn("def _normalize_native_collision_type", scratch_source)
-        self.assertIn("[self._collision_type]", scratch_source)
-        self.assertNotIn('[bool(actor_data.get("collision", True))]', scratch_source)
-        mechanics_source = (
-            repo_root / "src" / "systems" / "mechanics" / "mechanics_system.cpp"
-        ).read_text(encoding="utf-8")
-        self.assertIn("const bool both_mesh", mechanics_source)
-        self.assertIn("collision_shape == CollisionShape::Mesh", mechanics_source)
-
-    def test_physics_loop_does_not_synchronously_invoke_python_move_callback(self):
-        self.assertFalse((self._repo_root() / "editor" / "runtime" / "legacy" / "entities" / "actor.py").is_file())
-        return
-        repo_root = self._repo_root()
-        mechanics_source = (
-            repo_root / "src" / "systems" / "mechanics" / "mechanics_system.cpp"
-        ).read_text(encoding="utf-8")
-        bindings_source = (
-            repo_root / "src" / "systems" / "script" / "python" / "engine_bindings.cpp"
-        ).read_text(encoding="utf-8")
-        lifecycle_source = (
-            repo_root / "src" / "systems" / "mechanics" / "mechanics_lifecycle.cpp"
-        ).read_text(encoding="utf-8")
-        actor_source = (
-            repo_root / "editor" / "runtime" / "legacy" / "entities" / "actor.py"
-        ).read_text(encoding="utf-8")
-
-        self.assertNotIn("Py_AddPendingCall", bindings_source)
-        self.assertNotIn("shared_ptr<nb::object>", bindings_source)
-        self.assertIn("PythonRuntimeRequestKind::Callback", bindings_source)
-        self.assertIn("callback_token", bindings_source)
-        self.assertIn("resolve_fixed_dt", lifecycle_source)
-        self.assertIn("kMaxCatchUpSteps", lifecycle_source)
-        on_move_start = actor_source.index("    def on_move(self):")
-        on_move_end = actor_source.index("\n    def enable_collision_callback", on_move_start)
-        self.assertNotIn("self.save_data()", actor_source[on_move_start:on_move_end])
+    def test_physics_callbacks_remain_queued_and_catch_up_is_bounded(self):
+        bindings = (self._engine_root() / 'src/systems/script/python/engine_bindings.cpp').read_text(encoding='utf-8')
+        lifecycle = (self._engine_root() / 'src/systems/mechanics/mechanics_lifecycle.cpp').read_text(encoding='utf-8')
+        self.assertNotIn('Py_AddPendingCall', bindings)
+        self.assertNotIn('shared_ptr<nb::object>', bindings)
+        self.assertIn('PythonRuntimeRequestKind::Callback', bindings)
+        self.assertIn('callback_token', bindings)
+        self.assertIn('resolve_fixed_dt', lifecycle)
+        self.assertIn('kMaxCatchUpSteps', lifecycle)
 
     def test_synchronous_screenshot_wait_releases_the_python_gil(self):
         repo_root = self._repo_root()
         bindings_source = (
-            repo_root / "src" / "systems" / "script" / "python" / "engine_bindings.cpp"
+            self._engine_root() / "src" / "systems" / "script" / "python" / "engine_bindings.cpp"
         ).read_text(encoding="utf-8")
 
         binding_start = bindings_source.index('.def("save_screenshot_sync"')
@@ -4028,39 +3520,30 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
         self.assertIn("nb::call_guard<nb::gil_scoped_release>()", screenshot_binding)
 
     def test_portable_scene_folder_is_wired_through_project_and_frontend_apis(self):
-        repo_root = self._repo_root()
-        handler_source = (
-            repo_root / "src" / "systems" / "ui" / "cef" / "cef_editor_native_api_handlers.cpp"
-        ).read_text(encoding="utf-8")
+        editor_root = self._repo_root()
+        engine_root = editor_root.parent
+        handler_source = self._handler_source()
         api_source = (
-            repo_root / "src" / "systems" / "ui" / "editor_api" / "cef_editor_api.cpp"
+            engine_root / "src" / "systems" / "ui" / "editor_api" / "cef_editor_api.cpp"
         ).read_text(encoding="utf-8")
         bridge_source = (
-            repo_root / "editor" / "Frontend" / "src" / "api" / "editorApi.js"
+            editor_root / "editor" / "Frontend" / "src" / "api" / "editorApi.js"
         ).read_text(encoding="utf-8")
         self.assertIn('#include "scene_folder.h"', handler_source)
         self.assertIn('detect_scene_folder(project_dir)', handler_source)
-        self.assertIn('{"migrate_legacy_scene"', handler_source)
-        self.assertIn('migrate_legacy_scene({source_path, target_path, scene_name})', handler_source)
-        self.assertIn('ProjectLauncher, choose_portable_scene_target', api_source)
-        self.assertIn('ProjectLauncher, migrate_legacy_scene', api_source)
-        self.assertIn("project.choosePortableSceneTarget", bridge_source)
-        self.assertIn("project.migrateLegacyScene", bridge_source)
-        self.assertIn('{"choose_portable_scene_target", []', handler_source)
-        self.assertIn('L"*.ini;*.scene;*.json"', handler_source)
-        open_start = handler_source.index("std::filesystem::path open_project_native")
-        open_end = handler_source.index("nlohmann::json recent_projects_native", open_start)
-        open_body = handler_source[open_start:open_end]
-        self.assertIn('ext == ".scene"', open_body)
-        self.assertIn('candidate / "project.ini"', open_body)
-        self.assertNotIn("copy_existing_project_to_data_native", open_body)
-        self.assertIn("project_dir = raw_path.parent_path()", open_body)
-        self.assertIn("Legacy projects are read-only", handler_source)
+        self.assertIn('L"scene.ini;*.xml;*.pbrt"', handler_source)
+        self.assertNotIn('L"*.json"', handler_source)
+        self.assertIn('ProjectLauncher, open_project', api_source)
+        self.assertIn("project.openProject", bridge_source)
+        for retired in ("migrate_legacy_scene", "load_vision_scene", "import_vision_scene"):
+            self.assertNotIn(retired, handler_source)
+            self.assertNotIn(retired, api_source)
+            self.assertNotIn(retired, bridge_source)
 
     def test_new_project_creation_uses_portable_scene_folder_without_mode(self):
         repo_root = self._repo_root()
         handler_source = (
-            repo_root / "src" / "systems" / "ui" / "cef" / "cef_editor_native_api_handlers.cpp"
+            self._engine_root() / "src" / "systems" / "ui" / "cef" / "cef_editor_native_api_handlers.cpp"
         ).read_text(encoding="utf-8")
         create_start = handler_source.index('{"create_project"')
         create_end = handler_source.index('{"create_world_project"', create_start)
@@ -4068,8 +3551,6 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
         self.assertIn("create_scene_folder(target, name)", create_body)
         self.assertNotIn('data.value("mode"', create_body)
         self.assertNotIn("create_project_from_template_native", create_body)
-        portable_info_start = handler_source.index("if (const auto portable = detect_scene_folder(project_root))")
-        portable_info_end = handler_source.index("const auto project_ini", portable_info_start)
 
     def test_world_creation_updates_default_save_location_for_portable_migration(self):
         handler_source = self._handler_source()
@@ -4081,20 +3562,6 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
             world_body,
         )
 
-    def test_legacy_project_template_does_not_reference_missing_scene_script(self):
-        repo_root = self._repo_root()
-        template_source = (
-            repo_root
-            / "editor"
-            / "plugins"
-            / "ProjectLauncher"
-            / "templates"
-            / "project"
-            / "Scene"
-            / "default.scene"
-        ).read_text(encoding="utf-8")
-        self.assertIn("[scripts]\npath =\n", template_source)
-        self.assertNotIn("Scripts/scene_script.py", template_source)
 
     def test_archive_open_is_python_parsed_and_cpp_materialized(self):
         source = self._handler_source()
@@ -4234,17 +3701,16 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
         self.assertLess(core_registration, dispatcher_registration)
         self.assertLess(dispatcher_registration, remaining_registration)
 
-    def test_main_on_init_only_reads_committed_native_scene(self):
+    def test_main_on_init_reuses_the_committed_scene_and_checks_requested_path(self):
         source = self._handler_source()
-        start = source.index('static const NativeMethodTable methods = {', source.index("void register_main_view_api_handlers"))
-        end = source.index('};', start)
-        methods = source[start:end]
-        on_init_start = methods.index('{"on_init"')
-        on_init_end = methods.index('{"create_scene"', on_init_start)
-        on_init = methods[on_init_start:on_init_end]
-        self.assertIn("auto& state = native_editor_state()", on_init)
-        self.assertIn("state.scene", on_init)
-        self.assertNotIn("ensure_native_editor_scene", on_init)
+        start = source.index('{"on_init"', source.index("void register_main_view_api_handlers"))
+        end = source.index('{"run_project"', start)
+        handler = source[start:end]
+        self.assertIn("auto& state = native_editor_state()", handler)
+        self.assertIn("absolute_normalized_path(state.scene->project_root)", handler)
+        self.assertIn('else if (!state.scene)', handler)
+        self.assertIn("No committed native editor scene", handler)
+        self.assertIn("make_native_main_init_payload(state.scene.get())", handler)
 
     def test_frontend_handles_degraded_archive_without_duplicate_reload(self):
         repo_root = self._repo_root()
@@ -4260,12 +3726,12 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
         object_panel = (
             repo_root / "editor" / "Frontend" / "src" / "views" / "sidebar" / "Object.vue"
         ).read_text(encoding="utf-8")
-        open_start = bridge.index("openProject: async")
+        open_start = bridge.index("openProject:")
         open_end = bridge.index("\n  },", open_start)
         open_body = bridge[open_start:open_end]
         self.assertIn("options = {}", open_body)
         self.assertIn("load_policy", open_body)
-        self.assertIn("openProject: async (projectPath, options = {}) => {", bridge)
+        self.assertIn("openProject: (projectPath, options = {}) => {", bridge)
         self.assertIn(
             "editorApi.project.openProject(projectPath, { load_policy: loadPolicy })",
             open_body,
@@ -4307,37 +3773,7 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
             self.assertIn(field, materialize)
             self.assertIn(field, actor_json)
 
-    def test_legacy_scene_migration_has_prompt_and_permanent_file_manager_action(self):
-        repo_root = self._repo_root()
-        handler_source = (
-            repo_root / "src" / "systems" / "ui" / "cef" / "cef_editor_native_api_handlers.cpp"
-        ).read_text(encoding="utf-8")
-        recent_games_source = (
-            repo_root / "editor" / "Frontend" / "src" / "views" / "layout" / "RecentGames.vue"
-        ).read_text(encoding="utf-8")
-        file_manager_source = (
-            repo_root / "editor" / "Frontend" / "src" / "views" / "sidebar" / "FileManager.vue"
-        ).read_text(encoding="utf-8")
 
-        self.assertIn('prepared.snapshot.value("project", nlohmann::json::object())', handler_source)
-        self.assertIn('.value("legacy", false)', handler_source)
-        self.assertIn("corona.legacyMigrationPrompted", recent_games_source)
-        self.assertIn("另存为便携场景", recent_games_source)
-        self.assertIn("migrateLegacyScene", recent_games_source)
-        self.assertIn("migrateLegacyScene", file_manager_source)
-        self.assertIn("另存为便携场景", file_manager_source)
-
-    def test_recent_project_card_exposes_legacy_migration_action(self):
-        repo_root = self._repo_root()
-        recent_games_source = (
-            repo_root / "editor" / "Frontend" / "src" / "views" / "layout" / "RecentGames.vue"
-        ).read_text(encoding="utf-8")
-        self.assertIn("migrateLegacyProject", recent_games_source)
-        self.assertIn("另存为便携场景", recent_games_source)
-        self.assertIn("proj.legacy", recent_games_source)
-        self.assertIn("@click.stop=\"migrateLegacyProject(proj)\"", recent_games_source)
-        self.assertIn("便携场景", recent_games_source)
-        self.assertIn("旧格式", recent_games_source)
 
     def test_project_launcher_route_and_component_are_removed_after_recent_games_unification(self):
         repo_root = self._repo_root()
@@ -4372,12 +3808,6 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
         self.assertIn("collapsedSections.physics", object_panel)
         self.assertIn(".placeholder-warning", object_panel)
 
-    def test_recent_project_entries_mark_legacy_projects_for_recent_games(self):
-        source = self._handler_source()
-        start = source.index("nlohmann::json recent_projects_native()")
-        end = source.index("nlohmann::json active_project_info_json()", start)
-        recent_body = source[start:end]
-        self.assertIn('{"legacy", exists && !portable}', recent_body)
 
     def test_project_settings_does_not_write_project_section_into_portable_scene(self):
         repo_root = self._repo_root()
@@ -4388,70 +3818,27 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
         self.assertIn("CoronaEditorApi.project_settings.save_active_project_info", settings_source)
         self.assertNotIn("configparser", settings_source)
 
-    def test_python_scene_save_preserves_portable_scene_metadata_without_base_section(self):
-        self.assertFalse((self._repo_root() / "editor" / "runtime" / "legacy" / "entities" / "scene.py").is_file())
-        return
-        repo_root = self._repo_root()
-        scene_source = (
-            repo_root / "editor" / "runtime" / "legacy" / "entities" / "scene.py"
-        ).read_text(encoding="utf-8")
-        self.assertIn("def _is_portable_scene_folder", scene_source)
-        save_start = scene_source.index("    def save_data(self):")
-        save_end = scene_source.index("    @auto_save\n    def set_script", save_start)
-        save_body = scene_source[save_start:save_end]
-        self.assertIn("if self._is_portable_scene_folder():", save_body)
-        self.assertIn("CoronaEditorApi.main.scene_save", save_body)
-        self.assertLess(save_body.index("CoronaEditorApi.main.scene_save"),
-                        save_body.index("with open(data_path"))
+    def test_retired_python_scene_writer_is_removed(self):
+        self.assertFalse((self._repo_root() / 'editor/runtime/legacy/entities/scene.py').exists())
 
     def test_portable_scene_has_one_native_transactional_save_path(self):
-        self.assertFalse((self._repo_root() / "editor" / "runtime" / "legacy" / "entities" / "scene.py").is_file())
-        return
-        repo_root = self._repo_root()
-        handler_source = (
-            repo_root / "src" / "systems" / "ui" / "cef" / "cef_editor_native_api_handlers.cpp"
-        ).read_text(encoding="utf-8")
-        scene_source = (
-            repo_root / "editor" / "runtime" / "legacy" / "entities" / "scene.py"
-        ).read_text(encoding="utf-8")
-        autosave_source = (
-            repo_root / "editor" / "runtime" / "scene_support.py"
-        ).read_text(encoding="utf-8")
-        settings_source = (
-            repo_root / "editor" / "config" / "project_state.py"
-        ).read_text(encoding="utf-8")
-
-        self.assertIn("SceneDocumentStore document_store", handler_source)
-        self.assertIn("document_store.replace_sections", handler_source)
-        self.assertIn('sections["scene"] = {"[scene]"}', handler_source)
-        self.assertIn('scene_metadata["name"] = scene.name', handler_source)
-        save_start = scene_source.index("    def save_data(self):")
-        save_end = scene_source.index("    @auto_save\n    def set_script", save_start)
-        save_body = scene_source[save_start:save_end]
-        self.assertIn("CoronaEditorApi.main.scene_save", save_body)
-        self.assertIn("Portable scene saves are owned by the native scene store", save_body)
-        self.assertIn("if isinstance(result, dict) and not result.get('ok', False):", save_body)
-        self.assertIn("logger.exception", autosave_source)
-        self.assertIn("if portable:", settings_source)
-        self.assertIn(
-            'self.config.set("General", "last_project", self.active_project_path)',
-            settings_source,
-        )
-
-        project_settings_source = (
-            repo_root / "editor" / "plugins" / "ProjectSettings" / "main.py"
-        ).read_text(encoding="utf-8")
-        self.assertIn("get_active_project_info", project_settings_source)
-        self.assertIn("save_active_project_info", project_settings_source)
-        self.assertNotIn("scene_save", project_settings_source)
+        handlers = self._handler_source()
+        self.assertIn('SceneDocumentStore document_store(scene.project_root)', handlers)
+        self.assertIn('document_store.replace_sections(sections, write_diagnostics)', handlers)
+        self.assertIn('sections["scene"] = {"[scene]"}', handlers)
+        self.assertIn('scene_metadata["name"] = scene.name', handlers)
+        settings = (self._repo_root() / 'editor/plugins/ProjectSettings/main.py').read_text(encoding='utf-8')
+        self.assertIn('get_active_project_info', settings)
+        self.assertIn('save_active_project_info', settings)
+        self.assertNotIn('scene_save', settings)
 
     def test_portable_scene_validation_import_and_cleanup_apis_are_exposed(self):
         repo_root = self._repo_root()
         api_source = (
-            repo_root / "src" / "systems" / "ui" / "editor_api" / "cef_editor_api.cpp"
+            self._engine_root() / "src" / "systems" / "ui" / "editor_api" / "cef_editor_api.cpp"
         ).read_text(encoding="utf-8")
         handler_source = (
-            repo_root / "src" / "systems" / "ui" / "cef" / "cef_editor_native_api_handlers.cpp"
+            self._engine_root() / "src" / "systems" / "ui" / "cef" / "cef_editor_native_api_handlers.cpp"
         ).read_text(encoding="utf-8")
         bridge_source = (
             repo_root / "editor" / "Frontend" / "src" / "api" / "editorApi.js"
@@ -4468,7 +3855,7 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
     def test_duplicate_native_actor_check_happens_before_portable_asset_import(self):
         repo_root = self._repo_root()
         handler_source = (
-            repo_root / "src" / "systems" / "ui" / "cef" / "cef_editor_native_api_handlers.cpp"
+            self._engine_root() / "src" / "systems" / "ui" / "cef" / "cef_editor_native_api_handlers.cpp"
         ).read_text(encoding="utf-8")
         start = handler_source.index("NativeResult create_native_editor_actor")
         end = handler_source.index("NativeResult remove_native_editor_actor", start)
@@ -4478,7 +3865,7 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
     def test_scene_save_returns_structured_portable_validation_diagnostics(self):
         repo_root = self._repo_root()
         source = (
-            repo_root / "src" / "systems" / "ui" / "cef" / "cef_editor_native_api_handlers.cpp"
+            self._engine_root() / "src" / "systems" / "ui" / "cef" / "cef_editor_native_api_handlers.cpp"
         ).read_text(encoding="utf-8")
         start = source.index('{"scene_save"')
         end = source.index('{"update_view_tool_state"', start)

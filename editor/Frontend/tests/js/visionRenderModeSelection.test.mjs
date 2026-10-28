@@ -72,7 +72,7 @@ function mainHost({ fail = false, pending = false, denoiseFail = false, denoiseR
     const syncViewportUiMode = () => {}, scheduleCameraUpdate = () => {};
     const isRealtimeCameraInputActive = () => false, indexActorsByHandle = () => new Map();
     const sceneGridEnabled = ref(true), sceneLightSettings = { direction: {} };
-    const cameraState = ref({ position: [0, 0, 0], forward: [0, 0, 1], up: [0, 1, 0], fov: 60 });
+    const cameraState = ref({ vision_denoise: false, position: [0, 0, 0], forward: [0, 0, 1], up: [0, 1, 0], fov: 60 });
     let actorPickIndex, lastCameraViewportSignature;
     ${source}
     return { selectMainRenderMode, mainRenderModeOptions, mainRenderModeLabel,
@@ -145,7 +145,7 @@ test('detached camera selects ReSTIR and stores the returned camera mode', async
 const cameraSnapshot = (fields = {}, cameraId = 'camera-2') => ({
   scene_id: 'scene.ini', active_camera_name: cameraId,
   cameras: [{ camera_id: cameraId, name: cameraId, handle: cameraId === 'camera-2' ? 2 : 3,
-    render_backend: 'vision', vision_render_mode: 'path_tracing', ...fields }],
+    render_backend: 'vision', vision_render_mode: 'path_tracing', vision_denoise: false, ...fields }],
 });
 
 function detachedHost({ fields = {}, fail = false, pending = false, accumulationFail = false, stablePlanesFail = false, stablePlanesReply, denoiserFail = false, denoiserReply } = {}) {
@@ -198,7 +198,7 @@ function detachedHost({ fields = {}, fail = false, pending = false, accumulation
   return { ...host, calls };
 }
 
-for (const [fields, type] of [[{}, 'scene'], [{ vision_denoiser: 'SVGF' }, 'svgf'], [{ vision_denoiser: 'ReBLUR' }, 'reblur'], [{ vision_denoiser: 'ReLAX' }, 'relax']]) {
+for (const [fields, type] of [[{ vision_denoiser: 'scene' }, 'scene'], [{ vision_denoiser: 'SVGF' }, 'svgf'], [{ vision_denoiser: 'ReBLUR' }, 'reblur'], [{ vision_denoiser: 'ReLAX' }, 'relax']]) {
   test(`both views load denoiser ${type}`, async () => {
     const main = mainHost();
     main.applySceneSnapshot('scene.ini', cameraSnapshot(fields));
@@ -292,11 +292,11 @@ test('algorithm menus keep accumulation and SVGF as separate settings', () => {
 });
 
 for (const [name, fields, mode, enabled] of [
-  ['new camera defaults off', {}, 'path_tracing', false],
+  ['explicit denoise off', { vision_denoise: false }, 'path_tracing', false],
   ['ReSTIR persisted on', { vision_render_mode: 'restir', vision_denoise: true }, 'restir', true],
   ['string true', { vision_denoise: 'true' }, 'path_tracing', true],
   ['string false', { vision_denoise: 'false' }, 'path_tracing', false],
-  ['legacy SVGF', { vision_render_mode: 'svgf' }, 'path_tracing', true],
+  ['legacy SVGF', { vision_render_mode: 'svgf', vision_denoise: undefined }, 'path_tracing', true],
   ['explicit false overrides legacy', { vision_render_mode: 'svgf', vision_denoise: false }, 'path_tracing', false],
   ['string false overrides legacy', { vision_render_mode: 'svgf', vision_denoise: 'false' }, 'path_tracing', false],
 ]) {
@@ -416,7 +416,7 @@ test('a late main denoise response cannot modify the newly bound camera', async 
 });
 
 for (const [name, fields, mode, enabled] of [
-  ['new camera defaults off', {}, 'path_tracing', false],
+  ['explicit denoise off', { vision_denoise: false }, 'path_tracing', false],
   ['PT persisted on', { vision_accumulation: true }, 'path_tracing', true],
   ['ReSTIR persisted on', { vision_render_mode: 'restir', vision_accumulation: true }, 'restir', true],
   ['string true', { vision_accumulation: 'true' }, 'path_tracing', true],
@@ -651,3 +651,9 @@ for (const fail of [false, true]) {
     assert.equal(main.mainVisionStablePlanesError.value, '');
   });
 }
+
+test('creation defaults retain REBLUR, denoise and Stable Planes', () => {
+  assert.equal(visionModes.visionDenoiseFromCamera({}), true);
+  assert.equal(visionModes.visionStablePlanesFromCamera({}), true);
+  assert.equal(visionModes.visionDenoiserFromCamera({}), 'reblur');
+});

@@ -110,6 +110,6 @@ def test_unreferenced_scene_tools_helper_is_removed_after_native_migration():
     canonical_import = PLUGINS_ROOT / "SceneTools" / "vision_import.py"
 
     assert not helper.exists()
-    assert canonical_import.is_file()
+    assert not canonical_import.exists()
     assert "canonical" in boundary
     assert "removed compatibility code" in boundary

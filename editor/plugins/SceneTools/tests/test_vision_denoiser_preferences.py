@@ -38,7 +38,7 @@ class VisionDenoiserPreferencesTests(unittest.TestCase):
             self.assertEqual(cameras[0]["vision_reblur_settings"], {"max_history":20})
             self.assertEqual(cameras[1].get("vision_relax_settings"), {})
 
-    def test_archive_preserves_camera_types_and_inherits_legacy_scene(self):
+    def test_archive_preserves_camera_types_and_defaults_to_reblur(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             scene = Path(temp_dir) / "scene.ini"
             scene.write_text(
@@ -49,7 +49,7 @@ class VisionDenoiserPreferencesTests(unittest.TestCase):
                 encoding="utf-8",
             )
             cameras = parse_archive(str(scene))["scene"]["cameras"]
-            self.assertEqual([camera["vision_denoiser"] for camera in cameras], ["reblur", "svgf", "scene"])
+            self.assertEqual([camera["vision_denoiser"] for camera in cameras], ["reblur", "svgf", "reblur"])
             self.assertIs(cameras[0]["vision_denoise"], True)
             self.assertIs(cameras[1]["vision_denoise"], False)
 

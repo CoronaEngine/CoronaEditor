@@ -488,14 +488,6 @@ class _EventsApi(_DynamicApiNamespace):
         return _register_manifest_editor_api_event_callback("events.on_focus_pose_result", callback)
 
     @staticmethod
-    def on_scene_added(callback):
-        return _register_manifest_editor_api_event_callback("events.on_scene_added", callback)
-
-    @staticmethod
-    def on_scene_renamed(callback):
-        return _register_manifest_editor_api_event_callback("events.on_scene_renamed", callback)
-
-    @staticmethod
     def on_project_opened(callback):
         return _register_manifest_editor_api_event_callback("events.on_project_opened", callback)
 
