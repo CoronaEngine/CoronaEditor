@@ -209,7 +209,7 @@ const handleCreate = async () => {
     const info = result?.data ?? result;
 
     if (info && info.path) {
-      const opened = await projectLauncherService.openProject(info.path);
+      const opened = await projectLauncherService.openProject(info.path, { newProject: true });
       if (disposed || isProjectOpenSuperseded(opened)) return;
       const openResult = opened?.data ?? opened;
       if (openResult?.status === 'service_initializing') {

@@ -1462,8 +1462,9 @@ const toggleMenu = (menu) => {
   }
 };
 
-// Apply once when entering the creative world, after camera restoration. Keep
-// this editor policy out of archive defaults and subsequent snapshot refreshes.
+// Apply the Vision preset to continued creative worlds after camera restoration.
+// New worlds retain the archive's Native default for their creation session.
+// Keep this editor policy out of archive defaults and subsequent snapshot refreshes.
 const initializeCreativeRenderMode = async () => {
   const sceneId = currentMainSceneId();
   const cameraId = currentMainCameraId();
@@ -1473,7 +1474,9 @@ const initializeCreativeRenderMode = async () => {
     && cameraBindingState.value.cameraHandle === cameraHandle;
   creativeRenderDefaultsError.value = '';
   try {
-    if (!current() || !visionAvailable.value || !cameraId) return false;
+    if (!current() || !cameraId) return false;
+    if (worldModeState.newProject) return true;
+    if (!visionAvailable.value) return false;
     // Configure the integrator and denoiser before activating Vision. Each
     // bridge acknowledgement may precede the renderer consuming its command.
     for (const [method, value] of [

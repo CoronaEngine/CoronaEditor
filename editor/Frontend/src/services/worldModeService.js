@@ -21,14 +21,14 @@ export async function readWorldProjectInfo(api) {
 }
 
 export function createWorldModeController({ readProjectInfo, publish = () => {} }) {
-  const state = { status: 'idle', mode: null, projectPath: '', revision: 0, error: null };
+  const state = { status: 'idle', mode: null, projectPath: '', newProject: false, revision: 0, error: null };
   let pending = null;
   let opening = false;
   let openToken = 0;
   const emit = () => publish({ ...state });
-  function invalidate(projectPath = '') {
+  function invalidate(projectPath = '', { newProject = false } = {}) {
     state.revision += 1;
-    Object.assign(state, { status: 'loading', mode: null, projectPath, error: null });
+    Object.assign(state, { status: 'loading', mode: null, projectPath, newProject, error: null });
     pending = null;
     emit();
     return state.revision;
@@ -39,6 +39,9 @@ export function createWorldModeController({ readProjectInfo, publish = () => {} 
       return { ...state };
     }
     if (pending && pending.expected === expected) return pending.promise;
+    // Keep the entry policy through metadata refreshes of this project only.
+    // A subsequent beginOpen resets it, even when continuing the same archive.
+    const newProjectPath = state.newProject ? normalizeProjectPath(state.projectPath) : '';
     const revision = invalidate(expectedPath);
     const request = { expected, promise: null };
     request.promise = (async () => {
@@ -49,7 +52,9 @@ export function createWorldModeController({ readProjectInfo, publish = () => {} 
           throw new Error('当前世界已改变，请重新打开目标世界。');
         }
         Object.assign(state, { status: 'ready', mode: normalizeWorldMode(info.mode),
-          projectPath: info.project_path, error: null });
+          projectPath: info.project_path,
+          newProject: Boolean(newProjectPath) && normalizeProjectPath(info.project_path) === newProjectPath,
+          error: null });
         emit();
         return { ...state };
       } catch (error) {
@@ -68,11 +73,11 @@ export function createWorldModeController({ readProjectInfo, publish = () => {} 
     state, resolve, invalidate,
     fail(error) {
       pending = null;
-      Object.assign(state, { status: 'error', mode: null, error });
+      Object.assign(state, { status: 'error', mode: null, newProject: false, error });
       emit();
     },
     get opening() { return opening; },
-    beginOpen(path) { opening = true; invalidate(path); return ++openToken; },
+    beginOpen(path, options = {}) { opening = true; invalidate(path, options); return ++openToken; },
     finishOpen(token) {
       if (token !== openToken) return false;
       opening = false;
@@ -82,7 +87,7 @@ export function createWorldModeController({ readProjectInfo, publish = () => {} 
 }
 
 export const worldModeState = shallowReactive({
-  status: 'idle', mode: null, projectPath: '', revision: 0, error: null,
+  status: 'idle', mode: null, projectPath: '', newProject: false, revision: 0, error: null,
 });
 export const worldModeService = createWorldModeController({
   readProjectInfo: () => readWorldProjectInfo(editorApi),

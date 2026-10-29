@@ -86,7 +86,7 @@ export const projectLauncherService = {
     runtimeCleanupRequired ||= worldModeState.mode === 'creative';
     const saveOldWorld = window.__coronaNodeGraphFlushSave;
     if (saveOldWorld) pendingWorldSaves.add(saveOldWorld);
-    const token = worldModeService.beginOpen(projectPath);
+    const token = worldModeService.beginOpen(projectPath, { newProject: options.newProject === true });
     const operation = projectOpenQueue.catch(() => {}).then(async () => {
       if (!current()) return superseded();
       try {
