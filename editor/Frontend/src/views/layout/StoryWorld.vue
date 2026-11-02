@@ -3,6 +3,7 @@ import { onMounted, onUnmounted, ref, nextTick, watch, reactive, computed } from
 import { useRouter, onBeforeRouteLeave } from 'vue-router';
 import { editorApi } from '@/api/editorApi.js';
 import { worldModeState, normalizeProjectPath } from '@/services/worldModeService.js';
+import { initializeWorldRenderBackend } from '@/services/worldRenderPolicy.js';
 import { createStoryCameraController } from '@/utils/viewportStoryCamera.js';
 import { createStoryWorldControls, SMALL_WORLD_VIEW_LABELS } from '@/utils/viewportStoryWorldCamera.js';
 import { routeStoryKeydown } from '@/utils/storyKeyRouter.js';
@@ -2451,6 +2452,7 @@ onMounted(async () => {
     if (!current()) return;
     sceneId = init?.scene?.path;
     if (!sceneId) throw new Error('当前世界没有可用场景');
+    if (!await initializeWorldRenderBackend({ api: editorApi, sceneId, isCurrent: current })) return;
     // 原生三角面移动的结果必须回送控制器：没有这条登记，按键只会更新输入状态，
     // 移动请求一直挂在 pendingMove 上等回调，角色永远不动（15 秒后还会报超时）。
     motionCallbackToken = await editorApi.events.onMeshMoveResult(camera.acceptMeshMove);

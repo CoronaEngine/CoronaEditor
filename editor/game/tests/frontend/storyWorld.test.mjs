@@ -25,6 +25,7 @@ import { routeStoryKeydown } from '../../../Frontend/src/utils/storyKeyRouter.js
 import { editorApi } from '../../../Frontend/src/api/editorApi.js';
 import * as launcher from '../../../Frontend/src/services/projectLauncherService.js';
 import * as worldMode from '../../../Frontend/src/services/worldModeService.js';
+import { initializeWorldRenderBackend } from '../../../Frontend/src/services/worldRenderPolicy.js';
 import { NAVIGATION_KEY } from '../../frontend/storyNavigation.mjs';
 import { gameplayConfig, projectReady } from './fixtures.mjs';
 import * as lifecycle from '../../../Frontend/src/services/worldSessionLifecycle.js';
@@ -256,6 +257,7 @@ async function fixture(t, options = {}) {
   });
   // 剧情角色在快照里并不都存在，由建模流程创建：这里按同一份角色表补上建模夹具。
   // （世界碎片不再是一个场景 actor：Boss 的奖励直接进入背包。）
+  t.mock.method(editorApi.sceneTools, 'setRenderBackend', async mode => ({ data: { mode } }));
   t.mock.method(editorApi.sceneTools, 'createActor', async (scene, path, type, data) => {
     calls.push(['create', activePath, scene, path, structuredClone(data)]);
     const character = STORY_CHARACTERS.find(item => item.guid === data.actor_guid);
@@ -367,6 +369,7 @@ async function fixture(t, options = {}) {
       'vue-router': { onBeforeRouteLeave() {}, useRouter: () => ({ replace: async path => { route = path; } }) },
       '@/api/editorApi.js': { editorApi },
       '@/services/worldModeService.js': worldMode,
+      '@/services/worldRenderPolicy.js': { initializeWorldRenderBackend },
       '@/services/projectLauncherService.js': launcher,
       '@/services/worldSessionLifecycle.js': lifecycle,
       '@/utils/viewportStoryCamera.js': { createStoryCameraController },

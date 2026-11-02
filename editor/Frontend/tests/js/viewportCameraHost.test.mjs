@@ -20,6 +20,7 @@ import { ref, reactive, nextTick, watch, computed } from 'vue';
 import { babelParse, compileScript, parse } from 'vue/compiler-sfc';
 import { cameraMovementKey, createViewportCameraController } from '../../src/utils/viewportCameraController.js';
 import { createStoryCameraController } from '../../src/utils/viewportStoryCamera.js';
+import { initializeWorldRenderBackend } from '../../src/services/worldRenderPolicy.js';
 import { createStoryWorldControls, SMALL_WORLD_VIEW_LABELS } from '../../src/utils/viewportStoryWorldCamera.js';
 import { routeStoryKeydown } from '../../src/utils/storyKeyRouter.js';
 import { createStoryNavigationController } from '../../../game/frontend/storyNavigation.mjs';
@@ -222,6 +223,7 @@ const deferred = () => { let resolve; const promise = new Promise(done => { reso
 async function mountStory(t, { pendingInit = null, sceneSnapshot = { data: snapshot() }, role = 'main',
   navigationFailures = 0, expectInitError = false } = {}) {
   const mounted = [], unmounted = [], frames = new Map(), calls = [], routes = [];
+  const renderRequests = [];
   const listeners = new Map(); let id = 0, time = 0;
   // 小世界切换准备：把页面真正交给控制器的 options 抓住，并记录每次桥调用，
   // 这样「重试接在 prepare 上」可以被直接观测，而不是只测一个孤立的重试工具。
@@ -271,6 +273,10 @@ async function mountStory(t, { pendingInit = null, sceneSnapshot = { data: snaps
       off: async token => { assert.equal(token, 1); motionCallback = null; },
       project: { getProjectLoadStatus: async () => projectReady('world') },
       sceneTools: {
+        setRenderBackend: async (mode, scene, camera) => {
+          renderRequests.push({ mode, scene, camera, viewportBound: calls.some(call => call[0] === 'setCameraViewport') });
+          return { data: { mode } };
+        },
         setActorAnimation: async () => ({ status: 'success' }),
         setActorState: async (scene, guid, state) => {
           const actor = placementActor(guid);
@@ -324,6 +330,7 @@ async function mountStory(t, { pendingInit = null, sceneSnapshot = { data: snaps
           return { status: 'success', actor }; } },
     } },
     '@/services/worldModeService.js': { worldModeState, normalizeProjectPath: value => String(value).toLowerCase() },
+    '@/services/worldRenderPolicy.js': { initializeWorldRenderBackend },
     // 图片资源：测试里只当作一个 URL 字符串（默认导入经上面的改写走 .default）。
     '@/assets/hero-figure.png': { default: 'hero-figure.png' },
     '@/services/projectLauncherService.js': { projectLauncherService: {}, cancelPendingProjectOpen() {}, getProjectSelectionVersion: () => 0 },
@@ -402,12 +409,18 @@ async function mountStory(t, { pendingInit = null, sceneSnapshot = { data: snaps
     for (const [callback, name] of listeners) if (name === type) callback(event);
     return event;
   };
-  return { page, calls, routes, frames, document, dispatch, worldModeState, mounting, sceneActors, placementExhibit,
+  return { page, calls, routes, frames, document, dispatch, worldModeState, mounting, sceneActors, placementExhibit, renderRequests,
     moves, ack, stateWrites, navigationAttempts,
     get navigationOptions() { return navigationOptions; },
     get gameplayOptions() { return gameplayOptions; },
     step(next) { time = next; const callbacks = [...frames.values()]; frames.clear(); for (const cb of callbacks) cb(time); } };
 }
+
+test('story selects Native before binding its viewport', async t => {
+  const h = await mountStory(t);
+  assert.deepEqual(h.renderRequests, [{ mode: 'native', scene: 'scene.ini', camera: null, viewportBound: false }]);
+  assert.ok(h.calls.some(call => call[0] === 'setCameraViewport'));
+});
 
 test('real story page binds player follow and stops on blur, hidden state, exit and revision changes', async t => {
   const h = await mountStory(t), p = h.page;

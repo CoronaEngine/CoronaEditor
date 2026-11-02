@@ -643,6 +643,7 @@ import {
 } from '@/api/editorApi.js';
 import { appService, isCurrentWindowEvent } from '@/services/appService.js';
 import { worldModeState } from '@/services/worldModeService.js';
+import { initializeWorldRenderBackend } from '@/services/worldRenderPolicy.js';
 import { projectLauncherService } from '@/services/projectLauncherService.js';
 import { useErrorHandler } from '@/composables/useErrorHandler.js';
 import { useDockStore } from '@/stores/dockStore.js';
@@ -1462,9 +1463,8 @@ const toggleMenu = (menu) => {
   }
 };
 
-// Apply the Vision preset to continued creative worlds after camera restoration.
-// New worlds retain the archive's Native default for their creation session.
-// Keep this editor policy out of archive defaults and subsequent snapshot refreshes.
+// Apply Native both before first binding and after restoring camera windows,
+// which can recreate the camera from an archive that still remembers Vision.
 const initializeCreativeRenderMode = async () => {
   const sceneId = currentMainSceneId();
   const cameraId = currentMainCameraId();
@@ -1472,40 +1472,14 @@ const initializeCreativeRenderMode = async () => {
   const current = () => viewCurrent() && worldModeState.mode === 'creative'
     && currentMainSceneId() === sceneId && currentMainCameraId() === cameraId
     && cameraBindingState.value.cameraHandle === cameraHandle;
+  creativeRenderDefaultsBusy.value = true;
   creativeRenderDefaultsError.value = '';
   try {
-    if (!current() || !cameraId) return false;
-    if (worldModeState.newProject) return true;
-    if (!visionAvailable.value) return false;
-    // Configure the integrator and denoiser before activating Vision. Each
-    // bridge acknowledgement may precede the renderer consuming its command.
-    for (const [method, value] of [
-      ['setVisionRenderMode', 'restir'],
-      ['setVisionStablePlanes', true],
-      ['setVisionDenoiser', 'reblur'],
-      ['setVisionDenoise', true],
-      ['setVisionAccumulation', false],
-      ['setOutputMode', 'final_color'],
-    ]) {
-      if (!current()) return false;
-      await editorApi.sceneTools[method](sceneId, cameraId, value);
-    }
-    if (!current()) return false;
-    const result = unwrapBridgeData(await editorApi.sceneTools.setRenderBackend('vision', sceneId, cameraId));
-    if (!current()) return false;
-    if (result?.mode !== 'vision') throw new Error('Vision 后端不可用');
-
-    pendingMainRenderSelection = { sceneId, cameraId, backend: 'vision', visionMode: 'restir', expiresAt: Date.now() + 3000 };
-    pendingMainStablePlanesSelection = { sceneId, cameraId, enabled: true };
-    pendingMainDenoiserSelection = { sceneId, cameraId, type: 'reblur' };
-    pendingMainDenoiseSelection = { sceneId, cameraId, enabled: true };
-    pendingMainAccumulationSelection = { sceneId, cameraId, enabled: false };
-    mainRenderBackend.value = 'vision';
-    mainVisionRenderMode.value = 'restir';
-    mainVisionStablePlanes.value = true;
-    mainVisionDenoiser.value = 'reblur';
-    mainVisionDenoise.value = true;
-    mainVisionAccumulation.value = false;
+    if (!await initializeWorldRenderBackend({ api: editorApi, sceneId, cameraId, isCurrent: current })) return false;
+    pendingMainRenderSelection = { sceneId, cameraId, backend: 'native',
+      visionMode: mainVisionRenderMode.value, expiresAt: Date.now() + 3000 };
+    mainRenderBackend.value = 'native';
+    await syncSceneCameraBinding(sceneId, { preservePose: true });
     return true;
   } catch (error) {
     if (current()) {
@@ -1514,7 +1488,6 @@ const initializeCreativeRenderMode = async () => {
     }
     return false;
   } finally {
-    if (current()) await syncSceneCameraBinding(sceneId, { preservePose: true });
     creativeRenderDefaultsBusy.value = false;
   }
 };
@@ -1984,6 +1957,8 @@ const restoreCameraViews = async (sceneId) => {
       : [];
     for (const camera of openCameras) {
       if (!viewCurrent()) return;
+      if (!await initializeWorldRenderBackend({ api: editorApi, sceneId,
+        cameraId: camera.camera_id || camera.name, isCurrent: viewCurrent })) return;
       await appService.createCameraView({ ...camera, scene_id: sceneId });
     }
   } catch (e) {
@@ -3191,6 +3166,8 @@ onMounted(async () => {
   if (!viewCurrent()) return;
   const initData = result?.data ?? result;
   const openedSceneId = resolveOpenedProjectScene(initData) || DEFAULT_SCENE_NAME;
+  currentSceneId.value = openedSceneId;
+  if (!await initializeCreativeRenderMode() || !viewCurrent()) return;
   await pollProjectResourceLoadStatus();
   if (!viewCurrent()) return;
   try {
@@ -3200,8 +3177,6 @@ onMounted(async () => {
   } catch (error) {
     visionAvailable.value = false;
   }
-
-  currentSceneId.value = openedSceneId;
 
   await startEngine();
   if (!viewCurrent()) return;
@@ -3224,8 +3199,7 @@ onMounted(async () => {
   // current camera handle rather than the camera object that was just destroyed.
   await syncSceneCameraBinding(initialSceneId);
   if (!viewCurrent()) return;
-  await initializeCreativeRenderMode();
-  if (!viewCurrent()) return;
+  if (!await initializeCreativeRenderMode() || !viewCurrent()) return;
   // The CEF window can survive project creation/switching, so discard stale
   // frontend lock reasons using the backend's self-healed runtime truth.
   await reconcileEditorCameraInputLocks();
