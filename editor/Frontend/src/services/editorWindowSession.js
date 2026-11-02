@@ -180,6 +180,7 @@ export function createEditorWindowSession({ storage, send, getWorld, getQuery, o
   async function closeThis(panelId) {
     if (!standalone()) throw new Error('主世界窗口不能作为面板关闭');
     let record = ownRecord();
+    panelId ||= record?.panelId || '';
     // Once retired, the owner closes this page only after its outstanding native
     // replies settle. Self-closing now would strand their registered callbacks.
     if (record && !policy().enabled && record.status !== 'closing') return;

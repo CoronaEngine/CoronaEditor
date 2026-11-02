@@ -1,5 +1,7 @@
 <template>
+  <slot v-if="nativeHost" name="actions"></slot>
   <div
+    v-else
     ref="titleBarRef"
     class="titlebar"
     :class="extraClass"
@@ -54,6 +56,7 @@ const props = defineProps({
 });
 
 const emit = defineEmits(['close', 'toggleFloat']);
+const nativeHost = new URLSearchParams((window.location.hash || '').split('?')[1] || '').get('nativeHost') === '1';
 const { t } = useI18n();
 
 // DOM 引用
@@ -104,6 +107,7 @@ let resizeObserver = null;
 // ============================================================================
 
 onMounted(() => {
+  if (nativeHost) return;
   if (titleBarRef.value && props.routePath) {
     // 1. 初始化时发送一次坐标
     sendRegionsToNative(props.routePath, titleBarRef.value);

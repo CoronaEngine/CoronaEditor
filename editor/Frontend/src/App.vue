@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router';
 import { useDockStore } from '@/stores/dockStore.js';
 import { getPluginComponent } from '@/views/panelRegistry.js';
 import DockLayout from '@/components/dock/DockLayout.vue';
+import NativeDockLayout from '@/components/dock/NativeDockLayout.vue';
 import DockPanel from '@/components/dock/DockPanel.vue';
 import { editorApi } from '@/api/editorApi.js';
 import { appService } from '@/services/appService.js';
@@ -12,7 +13,7 @@ import { LAUNCHER_ROUTES, normalizeProjectPath, editorUiAllowed, worldModeServic
 import lanchat from '@/stores/lanchat.js';
 import { cancelPendingProjectOpen } from '@/services/projectLauncherService.js';
 import { notifyWorldError } from '@/services/worldSessionLifecycle.js';
-import '@/utils/eventBus.js'; // init window.__coronaEmit
+import { coronaEventBus } from '@/utils/eventBus.js';
 
 const route = useRoute();
 const router = useRouter();
@@ -28,8 +29,11 @@ const worldReady = computed(() => worldModeState.status === 'ready'
 const mayRenderRoute = computed(() => isLauncherRoute.value || (worldReady.value
   && (route.path === '/' || editorUiAllowed())));
 const isStandalonePanel = computed(() => route.query?.standalone === '1');
+const nativeDocking = typeof window.coronaBridge?.dockCommand === 'function';
+const nativeHost = computed(() => route.query?.nativeHost === '1');
+function closeNativePanel() { void appService.closeThisTab('').catch(error => console.error('[NativeDock] close failed', error)); }
 
-const centerPanels = computed(() => isEditorRoute.value && worldReady.value
+const centerPanels = computed(() => !nativeDocking && isEditorRoute.value && worldReady.value
   ? dockStore.panelsByZone('center') : []);
 const standaloneResizeHandles = [
   'n',
@@ -242,6 +246,7 @@ async function registerLanChatEvent() {
 }
 
 onMounted(() => {
+  coronaEventBus.on('native-panel-close', closeNativePanel);
   appUnmounted = false;
   window.addEventListener('corona-active-project-changed', onActiveProjectChanged);
   window.addEventListener('storage', onProjectStorageChanged);
@@ -269,6 +274,7 @@ onMounted(() => {
 });
 
 onUnmounted(() => {
+  coronaEventBus.off('native-panel-close', closeNativePanel);
   appUnmounted = true;
   ++refreshRevision;
   window.removeEventListener('corona-active-project-changed', onActiveProjectChanged);
@@ -293,10 +299,11 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <DockLayout v-if="isEditorRoute && worldReady" :key="worldModeState.projectPath" :component-resolver="getPluginComponent" />
+  <NativeDockLayout v-if="nativeDocking && isEditorRoute && worldReady" :key="worldModeState.projectPath" />
+  <DockLayout v-else-if="isEditorRoute && worldReady" :key="worldModeState.projectPath" :component-resolver="getPluginComponent" />
   <div v-else-if="mayRenderRoute" :key="isLauncherRoute ? route.path : worldModeState.projectPath" :class="isStandalonePanel ? 'standalone-route-shell' : null">
     <router-view />
-    <template v-if="isStandalonePanel">
+    <template v-if="isStandalonePanel && !nativeHost">
       <div
         v-for="handle in standaloneResizeHandles"
         :key="handle"

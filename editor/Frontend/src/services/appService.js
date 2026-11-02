@@ -34,6 +34,7 @@ export const isCurrentWindowEvent = payload => editorUiAllowed() && session().ac
 const openEditorWindow = command => session().open(command);
 
 export const appService = {
+  createDockedPanel: options => openEditorWindow({ cmd: 'createPanelTab', ...options, nativeDocked: true }),
   readEditorUiPolicy: async () => session().policy(),
   setEditorUiEnabled: enabled => session().prepare(enabled),
   setDragRegions: (_routePath, x, y, w, h) =>
