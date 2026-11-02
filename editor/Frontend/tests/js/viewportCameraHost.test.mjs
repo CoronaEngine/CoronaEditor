@@ -454,13 +454,21 @@ test('story Escape works during loading and late initialization cannot bind a ca
   h.page.onKeyDown(input({ code: 'Escape', stopPropagation() {} }));
   pending.resolve({ scene: { path: 'scene.ini' } }); await h.mounting;
   await new Promise(resolve => setImmediate(resolve));
-  assert.deepEqual(h.routes, ['/StartScreen']); assert.equal(h.calls.length, 0);
+  assert.deepEqual(h.routes, ['/StartScreen']);
+  assert.equal(h.frames.size, 0);
+  assert.deepEqual(h.renderRequests, [], 'late initialization must not configure the old camera');
+  assert.ok(h.calls.length > 0, 'the system cursor must remain visible on the launcher');
+  for (const call of h.calls) assert.deepEqual(call, ['setViewportSystemCursorHidden', false, false]);
 });
 
 test('story missing-camera error returns to launcher without editor actions', async t => {
   const h = await mountStory(t, { sceneSnapshot: { cameras: [] }, expectInitError: true });
   assert.deepEqual(h.routes, ['/StartScreen']);
-  assert.deepEqual(h.calls, [['alert', '当前场景没有可用相机']]);
+  assert.deepEqual(h.calls.filter(call => call[0] === 'alert'), [['alert', '当前场景没有可用相机']]);
+  assert.equal(h.frames.size, 0);
+  for (const call of h.calls.filter(call => call[0] !== 'alert')) {
+    assert.deepEqual(call, ['setViewportSystemCursorHidden', false, false]);
+  }
 });
 
 // ---- 占祈健四项功能：在新 UI 基线上重新接入后的回归 ----
@@ -571,19 +579,19 @@ test('only the small world places what the main world yielded', async t => {
   await p.placeSelectedItem();
   assert.deepEqual(h.placementExhibit.placements, [], '主世界不许摆放');
 
-  // 小世界：物品栏里的方块可以在身前落地，布局写入盘上并生成真实 actor。
+  // 小世界：旧 block 计数器对应山石，落地后的布局使用当前 prop id。
   enterWorld(h, 'child', { inventory: { worldFragment: 2, block: 4 } });
   assert.equal(p.hotbarVisible.value, true);
-  assert.equal(p.hotbarSlots.value[0].id, 'block');
+  assert.equal(p.hotbarSlots.value[0].id, 'rock1');
   assert.equal(p.hotbarSlots.value[0].available, 4);
   await p.placeSelectedItem();
   assert.equal(p.placements.value.length, 1);
-  assert.equal(p.placements.value[0].propId, 'block');
+  assert.equal(p.placements.value[0].propId, 'rock1');
   assert.deepEqual(h.placementExhibit.placements.map(item => item.index), [0], 'the layout was persisted');
   assert.equal(p.hotbarSlots.value[0].available, 3);
   const actor = h.sceneActors.find(item => item.actor_guid === 'story.placement.0000');
   assert.ok(actor, 'the exhibit exists as a real scene actor');
-  assert.equal(actor.name, '方块1');
+  assert.equal(actor.name, '山石1');
 
   await p.placeSelectedItem();
   assert.equal(p.placements.value.length, 2);

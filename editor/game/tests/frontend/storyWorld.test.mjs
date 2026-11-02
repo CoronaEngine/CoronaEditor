@@ -6,6 +6,8 @@ import { createPlayerController, VIEW_LABELS } from '../../frontend/playerContro
 import { createPlayerSave } from '../../frontend/playerSave.mjs';
 import { ensureStoryCharacters, syncPlacementActors } from '../../frontend/storyActors.mjs';
 import * as gameplayModule from '../../frontend/storyGameplay.mjs';
+import * as storyPlayerAnimationModule from '../../frontend/storyPlayerAnimation.mjs';
+import * as storyBossAiModule from '../../frontend/storyBossAi.mjs';
 import * as storyPropsModule from '../../frontend/storyProps.mjs';
 import * as storyLootModule from '../../frontend/storyLoot.mjs';
 import * as prophetDialogueModule from '../../frontend/prophetDialogue.mjs';
@@ -20,6 +22,7 @@ import { STORY_CHARACTERS, PROPHET_GUID, PLAYER_MODEL_YAW_OFFSET, isMonsterRole,
 import { actorFixture, apiFixture, CHARACTER_BY_GUID } from './fixtures.mjs';
 import { createStoryNavigationController } from '../../frontend/storyNavigation.mjs';
 import { createStoryCameraController } from '../../../Frontend/src/utils/viewportStoryCamera.js';
+import { createMeshMoveHost } from '../../../Frontend/tests/js/meshMoveFixture.mjs';
 import { createStoryWorldControls, SMALL_WORLD_VIEW_LABELS } from '../../../Frontend/src/utils/viewportStoryWorldCamera.js';
 import { routeStoryKeydown } from '../../../Frontend/src/utils/storyKeyRouter.js';
 import { editorApi } from '../../../Frontend/src/api/editorApi.js';
@@ -112,6 +115,23 @@ async function walkTo(page, f, code, steps, done) {
     page.instance.camera.keyUp(event({ code }));
   }
 }
+function groundPlayer(page, f) {
+  // A stationary native reply establishes grounded state; the Web controller
+  // must never infer a landing from an input reset or a save acknowledgement.
+  page.instance.camera.pointerMove(event({ clientX: 400, clientY: 300 }));
+  f.step();
+  f.meshHost.flush();
+  page.instance.camera.resetInput();
+  assert.equal(page.instance.camera.snapshotPlayer().grounded, true);
+}
+
+const RULE_OBJECT_GUID = 'test.rule-cube';
+function ruleCube() {
+  // A user object, distinct from the retired prophet cube culled on entry.
+  return { name: '规则测试方块', actor_guid: RULE_OBJECT_GUID, handle: 9001,
+    local_aabb: [-0.5, -0.5, -0.5, 0.5, 0.5, 0.5], visible: true,
+    geometry: { position: [3, 0.5, 0], rotation: [0, 0, 0], scale: [1, 1, 1] } };
+}
 function stylePixels(value) {
   if (typeof value !== 'string') return null;
   const trimmed = value.trim();
@@ -202,12 +222,17 @@ async function fixture(t, options = {}) {
   // 否则上一个用例的地面会悄悄留给下一个。
   storyMapHeightModule.clearHeightGrid();
   const calls = [], alerts = [], frames = new Map(), pages = [];
+  const intervals = new Map();
+  let intervalId = 0;
+  t.mock.method(globalThis, 'setInterval', callback => { intervals.set(++intervalId, callback); return intervalId; });
+  t.mock.method(globalThis, 'clearInterval', id => { intervals.delete(id); });
   let frameTime = performance.now();
   let activePath = MAIN, route = '/', frameId = 0, page = null, handle = 10;
   const poses = new Map([[MAIN, pose([1, 2, 3])], [CHILD, pose([5, 6, 7])]]);
   // Built from the fixture's table, which is where the boss's shipped placement lives:
   // this page defines it locally, so a literal list here drifts the moment the art moves.
   const actors = new Map([MAIN, CHILD].map(path => [path, [...CHARACTER_BY_GUID.values()].map(actorFixture)]));
+  actors.get(CHILD).push(...structuredClone(options.childActors || []));
   function surface() {
     const listeners = new Map();
     return {
@@ -221,6 +246,7 @@ async function fixture(t, options = {}) {
     .map(name => [name, (...args) => { calls.push([name, ...args]); return true; }]));
   globalThis.window = Object.assign(surface(), { coronaBridge: bridge, devicePixelRatio: 1,
     location: { href: 'file:///D:/engine/editor/Frontend/dist/index.html' },
+    setInterval: globalThis.setInterval,
     localStorage: { setItem() {} }, alert: message => alerts.push(message) });
   globalThis.document = Object.assign(surface(), { hidden: false, hasFocus: () => true });
   globalThis.CustomEvent = class { constructor(type, options) { Object.assign(this, { type }, options); } };
@@ -230,7 +256,32 @@ async function fixture(t, options = {}) {
 
   t.mock.method(editorApi.projectSettings, 'getActiveProjectInfo', async () => ({ project_path: activePath, mode: 'story' }));
   t.mock.method(editorApi.project, 'getProjectLoadStatus', async () => options.loadStatus ? options.loadStatus(activePath) : projectReady(activePath));
-  t.mock.method(editorApi.main, 'onInit', async () => options.init ? options.init() : { scenes: [{ path: 'scene.ini' }], active_index: 0 });
+  t.mock.method(editorApi.main, 'onInit', async () => options.init ? options.init() : { scene: { path: 'scene.ini' } });
+  const motionCallbacks = new Map();
+  let motionToken = 0;
+  t.mock.method(editorApi.events, 'onMeshMoveResult', async callback => {
+    motionCallbacks.set(++motionToken, callback);
+    return motionToken;
+  });
+  t.mock.method(editorApi, 'off', async token => { motionCallbacks.delete(token); });
+  t.mock.method(editorApi.sceneTools, 'setActorAnimation', async () => ({ status: 'success' }));
+  const meshHost = createMeshMoveHost({
+    autoReply: options.autoMoveReply !== false,
+    readActor: () => page.instance.camera.snapshotPlayer(),
+    onRequest: (...args) => calls.push(['moveActorMesh', ...args]),
+    onResult: result => {
+      assert.ok([...motionCallbacks.values()].some(callback => callback(result)), 'native movement reply must reach its controller');
+    },
+  });
+  bridge.moveActorMesh = meshHost.moveActorMesh;
+  bridge.setProperty = (actorHandle, property, value) => {
+    calls.push(['setProperty', actorHandle, property, value]);
+    const actor = actors.get(activePath).find(actor => actor.handle === actorHandle);
+    assert.ok(actor, 'visibility must target a live actor');
+    assert.equal(property, 3);
+    actor.visible = value;
+    return true;
+  };
   t.mock.method(editorApi.scene, 'setActorTransform', async (sceneId, guid, transform) => {
     const source = activePath;
     calls.push(['playerSave', source, sceneId, guid, structuredClone(transform)]);
@@ -260,6 +311,15 @@ async function fixture(t, options = {}) {
   t.mock.method(editorApi.sceneTools, 'setRenderBackend', async mode => ({ data: { mode } }));
   t.mock.method(editorApi.sceneTools, 'createActor', async (scene, path, type, data) => {
     calls.push(['create', activePath, scene, path, structuredClone(data)]);
+    const existingActor = actors.get(activePath).find(actor => actor.actor_guid === data.actor_guid);
+    if (existingActor && data.skip_if_exists) {
+      if (data.update_if_exists) {
+        for (const key of ['position', 'rotation', 'scale']) if (data[key]) existingActor.geometry[key] = [...data[key]];
+        if (data.model_ref) existingActor.model_ref = data.model_ref;
+        if (data.body_type) existingActor.mechanics.body_type = data.body_type;
+      }
+      return { status: 'success', actor: structuredClone(existingActor), existed: true };
+    }
     const character = STORY_CHARACTERS.find(item => item.guid === data.actor_guid);
     // 剧情世界的地图：引擎侧不是角色、也不是布局里的陈列物，它自带一条 static 的
     // 物理记录（真实引擎的 create_actor 会把 body_type 写进 mechanics）。
@@ -384,6 +444,8 @@ async function fixture(t, options = {}) {
       '../../../../game/frontend/playerController.mjs': { createPlayerController, VIEW_LABELS },
       '../../../../game/frontend/playerSave.mjs': { createPlayerSave },
       '../../../../game/frontend/storyGameplay.mjs': gameplayModule,
+      '../../../../game/frontend/storyPlayerAnimation.mjs': storyPlayerAnimationModule,
+      '../../../../game/frontend/storyBossAi.mjs': storyBossAiModule,
       '../../../../game/frontend/storyCharacters.mjs': { STORY_CHARACTERS, PROPHET_GUID, PLAYER_MODEL_YAW_OFFSET,
         isMonsterRole, resolveStoryAssetPath, sceneSnapshot },
       '../../../../game/frontend/storyProps.mjs': storyPropsModule,
@@ -414,14 +476,19 @@ async function fixture(t, options = {}) {
     return page;
   }
   t.after(async () => {
-    for (const p of pages) p.unmount();
-    await lifecycle.drainWorldSession();
-    await lifecycle.flushWorldSessionSaves();
-    worldMode.worldModeService.invalidate();
-    storyMapHeightModule.clearHeightGrid();
-    Object.assign(globalThis, previous);
+    try {
+      for (const p of pages) p.unmount();
+      await lifecycle.drainWorldSession();
+      await lifecycle.flushWorldSessionSaves();
+      assert.equal(intervals.size, 0, 'unmount must clear all page intervals');
+      assert.equal(motionCallbacks.size, 0, 'unmount must unsubscribe native movement callbacks');
+    } finally {
+      worldMode.worldModeService.invalidate();
+      storyMapHeightModule.clearHeightGrid();
+      Object.assign(globalThis, previous);
+    }
   });
-  return { mount, calls, alerts, frames, poses, actors, get route() { return route; },
+  return { mount, calls, alerts, frames, poses, actors, meshHost, get route() { return route; },
     step(ms = 50) { frameTime = Math.max(frameTime, performance.now()) + ms;
       const pending = [...frames.values()]; frames.clear(); pending.forEach(fn => fn(frameTime)); },
     opens: () => calls.filter(call => call[0] === 'nativeOpen').map(call => call[1]) };
@@ -719,9 +786,9 @@ test('unacknowledged combat blocks native replacement; retry does not change ope
   // the swing would really land — `canHitBoss` is the same predicate the page's attack uses.
   // The Boss is not authored on the player's own x = 0 path, so the initial approach is diagonal
   // and the final one is head-on; that is exactly why the walk may not run a fixed number of frames.
-  await walkTo(page, f, 'KeyD', 60, () => page.instance.camera.snapshotPlayer().position[0]
-    < STORY_CHARACTERS.find(character => character.role === 'boss').x - 0.1);
-  await walkTo(page, f, 'KeyW', 60, () => {
+  await walkTo(page, f, 'KeyD', 200, () => page.instance.camera.snapshotPlayer().position[0]
+    >= STORY_CHARACTERS.find(character => character.role === 'boss').x - 0.1);
+  await walkTo(page, f, 'KeyW', 200, () => {
     const player = page.instance.camera.snapshotPlayer();
     const boss = f.actors.get(MAIN).find(a => a.actor_guid === STORY_CHARACTERS[1].guid);
     return gameplayModule.canHitBoss(player, gameplayModule.worldBounds(boss), config);
@@ -782,7 +849,7 @@ test('inventory template captures pointer input and its close button restores co
 });
 
 
-test('real story page settles airborne Tab, blur, pointerleave and hidden-page interruptions', async t => {
+test('Tab, blur, pointerleave and hidden-page interruptions preserve the last native airborne pose', async t => {
   const f = await fixture(t); const page = f.mount(); await page.mount();
   const groundY = page.instance.camera.snapshotPlayer().position[1];
   const stopCases = [
@@ -793,13 +860,14 @@ test('real story page settles airborne Tab, blur, pointerleave and hidden-page i
       () => { document.hidden = false; page.instance.onVisibilityChange(); }],
   ];
   for (const [stop, resume] of stopCases) {
+    groundPlayer(page, f);
     page.instance.onKeyDown(event({ code: 'Space' })); f.step();
     const airborne = page.instance.camera.snapshotPlayer();
     assert.equal(airborne.grounded, false); assert.ok(airborne.position[1] > groundY);
     const stale = [...f.frames.values()][0]; stop();
-    const landed = page.instance.camera.snapshotPlayer();
-    assert.equal(landed.grounded, true); assert.equal(landed.position[1], groundY);
-    assert.equal(landed.position[2], airborne.position[2]);
+    const stopped = page.instance.camera.snapshotPlayer();
+    assert.equal(stopped.grounded, false);
+    assert.deepEqual(stopped.position, airborne.position, 'stopping input must not invent a landing');
     assert.equal(f.frames.size, 0); const count = f.calls.length; stale(50000); assert.equal(f.calls.length, count);
     // Locks reject new Space; pointerleave instead clears held state.
     if (document.hidden || page.instance.inventoryOpen.value) {
@@ -811,67 +879,98 @@ test('real story page settles airborne Tab, blur, pointerleave and hidden-page i
     assert.deepEqual(page.instance.camera.snapshotPose(), camera);
   }
   await page.instance.saveRegistration.flush();
-  assert.equal(f.actors.get(MAIN)[0].geometry.position[1], groundY);
+  assert.deepEqual(f.actors.get(MAIN)[0].geometry.position, page.instance.camera.snapshotPlayer().position);
   assert.deepEqual(f.alerts, []);
 });
-test('half-jump inventory travel saves ground and the corrected model once, preserves camera and keeps child combat hidden', async t => {
+test('airborne inventory travel saves the native pose and keeps child combat absent', async t => {
   const f = await fixture(t); let page = f.mount(); await page.mount();
-  page.instance.onKeyDown(event({ code: 'Space' })); f.step(); f.step();
-  const airborne = page.instance.camera.snapshotPlayer(), groundY = f.actors.get(MAIN)[0].geometry.position[1];
+  groundPlayer(page, f);
+  page.instance.onKeyDown(event({ code: 'Space' })); f.step();
+  const airborne = page.instance.camera.snapshotPlayer();
+  assert.equal(airborne.grounded, false);
   clickWorld(page); await turn();
   assert.deepEqual(f.opens(), [CHILD]);
   const saved = f.actors.get(MAIN)[0].geometry;
-  assert.equal(saved.position[1], groundY); assert.equal(saved.position[2], airborne.position[2]);
+  assert.deepEqual(saved.position, airborne.position);
   assert.deepEqual(saved.rotation, airborne.rotation);
   const savedCamera = structuredClone(f.poses.get(MAIN));
   page = f.mount(); await page.mount();
-  assert.equal(page.instance.bossNearby.value, false); assert.equal(f.actors.get(CHILD)[1].visible, false);
+  assert.equal(page.instance.bossNearby.value, false);
+  const bossGuid = STORY_CHARACTERS.find(character => character.role === 'boss').guid;
+  assert.equal(f.actors.get(CHILD).some(actor => actor.actor_guid === bossGuid), false);
   clickWorld(page); await turn();
   page = f.mount(); await page.mount();
   const restored = page.instance.camera.snapshotPlayer();
-  assert.equal(restored.grounded, true); assert.deepEqual(restored.position, saved.position);
+  assert.equal(restored.grounded, false, 'binding must wait for a native ground result');
+  assert.deepEqual(restored.position, saved.position);
   assert.deepEqual(restored.rotation, saved.rotation); assert.equal(restored.facingYaw, airborne.facingYaw);
   assert.deepEqual(page.instance.camera.snapshotPose().camera.position, savedCamera.position);
   assert.deepEqual(f.alerts, []);
 });
-test('half-jump Escape waits for the ground save, blocks Space and remains in world on save failure', async t => {
+test('airborne Escape waits for the native pose save, blocks Space and supports retry', async t => {
   const gate = deferred(); let fail = true, block = true;
   const f = await fixture(t, { save: async () => { if (block) await gate.promise; if (fail) throw new Error('landing disk full'); } });
-  const page = f.mount(); await page.mount(); const groundY = page.instance.camera.snapshotPlayer().position[1];
+  const page = f.mount(); await page.mount(); groundPlayer(page, f);
   page.instance.onKeyDown(event({ code: 'Space' })); f.step();
   const before = page.instance.camera.snapshotPlayer(); page.instance.onKeyDown(event({ code: 'Escape' }));
   await turn(); assert.equal(f.route, '/');
   page.instance.onKeyDown(event({ code: 'Space' })); assert.equal(f.frames.size, 0);
   gate.resolve(); await turn();
   assert.equal(f.route, '/'); assert.match(page.instance.gameplayError.value, /landing disk full/);
-  assert.equal(page.instance.camera.snapshotPlayer().position[1], groundY);
+  assert.deepEqual(page.instance.camera.snapshotPlayer().position, before.position);
   const writes = f.calls.filter(c => c[0] === 'playerSave'); assert.equal(writes.length, 1);
-  assert.equal(writes[0][4].position[1], groundY); assert.equal(writes[0][4].position[2], before.position[2]);
+  assert.deepEqual(writes[0][4].position, before.position);
   fail = false; block = false; page.instance.onKeyDown(event({ code: 'Escape' })); await turn();
   assert.equal(f.route, '/StartScreen'); assert.deepEqual(f.actors.get(MAIN)[0].geometry.position, writes[0][4].position);
 });
-test('unrelated world replacement settles locally after invalidation and saves without using old handles', async t => {
-  const f = await fixture(t); const page = f.mount(); await page.mount();
-  const groundY = page.instance.camera.snapshotPlayer().position[1];
+test('world replacement waits for the native move after invalidation without reusing old handles', async t => {
+  const f = await fixture(t, { autoMoveReply: false }); const page = f.mount(); await page.mount();
+  groundPlayer(page, f);
   page.instance.onKeyDown(event({ code: 'Space' })); f.step();
-  const before = page.instance.camera.snapshotPlayer(), stale = [...f.frames.values()][0];
+  const result = f.meshHost.pending[0], stale = [...f.frames.values()][0];
+  assert.ok(result);
   const index = f.calls.length;
-  await launcher.projectLauncherService.openProject('D:/other'); stale(99999);
+  const opening = launcher.projectLauncherService.openProject('D:/other'); await turn();
+  assert.deepEqual(f.opens(), [], 'an unacknowledged move must block native replacement');
+  stale(99999);
+  f.meshHost.flush();
+  await opening;
   assert.deepEqual(f.opens(), ['D:/other']);
-  assert.ok(!f.calls.slice(index).some(c => ['actorTransform', 'cameraMove'].includes(c[0])));
+  assert.ok(!f.calls.slice(index).some(c => ['actorTransform', 'cameraMove', 'moveActorMesh'].includes(c[0])));
   const write = f.calls.slice(index).find(c => c[0] === 'playerSave');
-  assert.equal(write[1], MAIN); assert.equal(write[4].position[1], groundY);
-  assert.equal(write[4].position[2], before.position[2]);
+  assert.equal(write[1], MAIN); assert.deepEqual(write[4].position, result.position);
 });
-test('Space cannot start during an acknowledged save; a late save never leaves the player airborne', async t => {
+test('a late native reply after timeout remains authoritative and allows world replacement retry', async t => {
+  const f = await fixture(t, { autoMoveReply: false });
+  const page = f.mount(); await page.mount(); groundPlayer(page, f);
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  page.instance.onKeyDown(event({ code: 'Space' })); f.step();
+  const result = f.meshHost.pending[0];
+  assert.ok(result);
+  const index = f.calls.length;
+  const opening = launcher.projectLauncherService.openProject('D:/other');
+  const rejected = assert.rejects(opening, /等待原生碰撞回调超时/);
+  await turn();
+  t.mock.timers.tick(15_001); await rejected;
+  assert.deepEqual(f.opens(), [], 'timeout cannot release the old scene with an unknown pose');
+  f.meshHost.flush();
+  await launcher.projectLauncherService.openProject('D:/other');
+  assert.deepEqual(f.opens(), ['D:/other']);
+  const writes = f.calls.slice(index).filter(call => call[0] === 'playerSave');
+  assert.equal(writes.length, 1);
+  assert.deepEqual(writes[0][4].position, result.position);
+  assert.ok(!f.calls.slice(index).some(call => ['actorTransform', 'cameraMove', 'moveActorMesh'].includes(call[0])));
+});
+test('Space cannot start during a pending save and saving does not manufacture a landing', async t => {
   const gate = deferred(); const f = await fixture(t, { save: () => gate.promise });
   const page = f.mount(); await page.mount();
+  groundPlayer(page, f);
   page.instance.onKeyDown(event({ code: 'Space' })); f.step();
   const saved = page.instance.saveRegistration.flush(); await turn();
   page.instance.onKeyDown(event({ code: 'Space' })); clickWorld(page);
   assert.equal(f.frames.size, 0); assert.deepEqual(f.opens(), []);
   gate.resolve(); await saved;
-  assert.equal(page.instance.camera.snapshotPlayer().grounded, true);
+  assert.equal(page.instance.camera.snapshotPlayer().grounded, false);
   assert.equal(page.instance.camera.snapshotPlayer().position[1], f.actors.get(MAIN)[0].geometry.position[1]);
 });
 test('HUD pins the boss plate top-center, vitals top-left and skills bottom-right without the old tip strip', async t => {
@@ -1334,9 +1433,9 @@ test('the boss kill opens the small world and drops gear straight into the bag, 
   // 直到这一刀真的能落上——用的是页面攻击自己那条判据。
   const bagBoss = STORY_CHARACTERS.find(character => character.role === 'boss');
   const bagBossActor = () => f.actors.get(MAIN).find(a => a.actor_guid === bagBoss.guid);
-  await walkTo(page, f, 'KeyD', 100, () => page.instance.camera.snapshotPlayer().position[0]
-    < bagBoss.x - 0.1);
-  await walkTo(page, f, 'KeyW', 100, () => gameplayModule.canHitBoss(
+  await walkTo(page, f, 'KeyD', 200, () => page.instance.camera.snapshotPlayer().position[0]
+    >= bagBoss.x - 0.1);
+  await walkTo(page, f, 'KeyW', 200, () => gameplayModule.canHitBoss(
     page.instance.camera.snapshotPlayer(), gameplayModule.worldBounds(bagBossActor()), gameplayConfig));
   assert.equal(gameplayModule.canHitBoss(page.instance.camera.snapshotPlayer(),
     gameplayModule.worldBounds(bagBossActor()), gameplayConfig), true, 'the player can reach the Boss');
@@ -1359,13 +1458,13 @@ test('the boss kill opens the small world and drops gear straight into the bag, 
   assert.equal(blockItem.qty, 64);
   assert.ok(blockItem.stats.some(([, value]) => value === '可以在小世界中使用'),
     '鼠标悬停的浮签必须说明方块可以在小世界中使用');
-  assert.match(page.instance.bagTipFoot(blockItem), /可以在小世界中使用/);
+  assert.match(page.instance.bagTipFoot(blockItem), /来自界隙/);
   const ballItem = page.instance.bagCellItems()[2];
   assert.equal(ballItem.name, '球');
   assert.equal(ballItem.qty, 64);
-  assert.equal(page.instance.hotbarSlots.value[0].id, 'block');
+  assert.equal(page.instance.hotbarSlots.value[0].id, 'rock1');
   assert.equal(page.instance.hotbarSlots.value[0].owned, 64);
-  assert.equal(page.instance.hotbarSlots.value[1].id, 'ball');
+  assert.equal(page.instance.hotbarSlots.value[1].id, 'shrine1');
   assert.equal(page.instance.hotbarSlots.value[1].owned, 64);
   // 再确认一次状态不会重复发奖。
   await page.instance.gameplay.flush();
@@ -1392,10 +1491,13 @@ test('only the nearest nearby monster shows one health bar at a fixed slot', asy
     monsters, inventory: { worldFragment: 0, block: 0, ball: 0 } };
   const f = await fixture(t, { gameplay: async (request, activePath) => ({ status: 'ok',
     role: activePath === MAIN ? 'main' : 'child', config: gameplayConfig, state: structuredClone(state) }) });
+  const playerGuid = STORY_CHARACTERS.find(character => character.role === 'player').guid;
+  const playerActor = () => f.actors.get(MAIN).find(actor => actor.actor_guid === playerGuid);
+  playerActor().geometry.position = [100, 0, 100];
   let page = f.mount(); await page.mount(); await turn();
   let p = () => page.instance;
 
-  // 出生点离所有怪物都很远：右侧什么都不显示。
+  // Explicitly start outside every monster's range; authored spawn sites can move.
   p().updateProximity();
   assert.equal(p().nearbyMonsterBar.value, null, '远离怪物时不显示血条');
   assert.equal(findNode(renderStory(proxyRefs(p()), []),
@@ -1403,8 +1505,6 @@ test('only the nearest nearby monster shows one health bar at a fixed slot', asy
 
   // Place the player beside the first monster, then reopen the page so the camera reads
   // the saved actor position (a snapshotPlayer copy is not the live controller state).
-  const playerGuid = STORY_CHARACTERS.find(character => character.role === 'player').guid;
-  const playerActor = () => f.actors.get(MAIN).find(actor => actor.actor_guid === playerGuid);
   playerActor().geometry.position = [cast[0].x, 0, cast[0].z];
   page.unmount(); page = f.mount(); await page.mount(); await turn();
   p = () => page.instance;
@@ -1424,6 +1524,10 @@ test('only the nearest nearby monster shows one health bar at a fixed slot', asy
   // 已死亡的怪物即使就在身边也不再显示。
   p().gameplayState.value.state.monsters[cast[1].role].hp = 0;
   p().updateProximity();
+  assert.notEqual(p().nearbyMonsterBar.value?.id, cast[1].role);
+  // Other living monsters can be nearby; only an entirely cleared group has no bar.
+  for (const monster of Object.values(p().gameplayState.value.state.monsters)) monster.hp = 0;
+  p().updateProximity();
   assert.equal(p().nearbyMonsterBar.value, null);
 });
 
@@ -1436,7 +1540,7 @@ test('the small world item bar starts with the 64 blocks the boss dropped', asyn
   clickWorld(page); await turn(); await turn();
   page = f.mount(); await page.mount(); await turn(); await turn();
   assert.equal(page.instance.roleRef.value, 'child');
-  assert.equal(page.instance.hotbarSlots.value[0].id, 'block');
+  assert.equal(page.instance.hotbarSlots.value[0].id, 'rock1');
   assert.equal(page.instance.hotbarSlots.value[0].owned, 64);
   assert.equal(page.instance.hotbarSlots.value[0].available, 64);
   const blockItem = page.instance.bagCellItems()[1];
@@ -1463,15 +1567,15 @@ test('monster loot appears in the bag and can be selected in the small world ite
   const gear = page.instance.bag.cells.filter(item => item?.u?.startsWith('hunter-'));
   assert.deepEqual(gear.map(item => item.u).sort(), ['hunter-blade', 'hunter-helm']);
   for (const item of cells.slice(1, 3))
-    assert.match(page.instance.bagTipFoot(item), /可以在小世界中使用/);
+    assert.match(page.instance.bagTipFoot(item), /来自界隙/);
   const slots = page.instance.hotbarSlots.value;
   assert.deepEqual(slots.slice(0, 2).map(entry => [entry.id, entry.available]),
-    [['block', 64], ['ball', 2]]);
+    [['rock1', 64], ['shrine1', 2]]);
 });
 
 // 回归：F 的提示与 F 的动作必须永远一致。拾取红球已经删掉，主世界不再有 F；
-// 小世界里只剩先知与小世界的方块，提示说什么，F 就做什么。
-test('the F prompt and the F key agree: no pickup in the main world, the prophet still talks', async t => {
+// 小世界通过 HUD 与先知交谈，不再依赖场景中的先知 actor。
+test('F stays inactive without a nearby prop, and the child HUD opens prophet dialogue', async t => {
   const state = { version: 2, revision: 0, rage: 20, boss: { hp: 0 }, drop: null,
     inventory: { worldFragment: 1 } };
   const f = await fixture(t, { gameplay: async (request, activePath) => ({
@@ -1491,28 +1595,19 @@ test('the F prompt and the F key agree: no pickup in the main world, the prophet
   assert.equal(p().gameplayState.value.state.inventory.worldFragment, 1, 'F 不会改动拾取进度');
   assert.equal(p().dialogueOpen.value, false, '主世界没有先知可谈');
 
-  // 小世界：先知远在天边时 F 什么都不做，把它挪到玩家身边后提示与 F 一起变成交谈。
-  const character = role => STORY_CHARACTERS.find(item => item.role === role);
-  const childActor = role => f.actors.get(CHILD).find(item => item.actor_guid === character(role).guid);
-  const prophetAt = [...childActor('prophet').geometry.position];
+  // 小世界没有 3D 先知；HUD 的交谈入口不受相机位置影响。
   clickWorld(page); await turn();
   page = f.mount(); await page.mount(); await turn(); await turn();
-  assert.equal(p().fKeyAction.value.kind, null, '先知远在射程外，没有可执行的动作');
+  assert.equal(f.actors.get(CHILD).some(actor => actor.actor_guid === PROPHET_GUID), false);
+  assert.equal(p().fKeyAction.value.kind, null, '没有可收回的物体，没有 F 动作');
   assert.equal(hint(), undefined, '没有动作就没有 F 提示');
   p().onKeyDown(event({ code: 'KeyF' }));
-  assert.equal(p().dialogueOpen.value, false, '够不着就不能交谈');
-
-  // 让玩家站到先知面前：页面在挂载时把场景快照读进 prophetActor，所以摆位要在挂载前完成。
-  // 小世界里内部主角不显示，相机就是那双眼睛——F 量的是相机脚下的玩家位置
-  // （`viewportStoryWorldCamera.snapshotPlayer`），所以「站到先知面前」是把机位放过去。
-  f.poses.set(CHILD, pose([...prophetAt]));
-  page.unmount(); await turn();
-  page = f.mount(); await page.mount(); await turn(); await turn();
-  assert.equal(p().fKeyAction.value.kind, 'prophet', '先知就在身上，裁决必须选它');
-  assert.equal(hint(), 'F 与先知交谈');
-  assert.ok(p().fKeyAction.value.distance <= 1, '先知确实在射程内');
-  p().onKeyDown(event({ code: 'KeyF' }));
-  assert.equal(p().dialogueOpen.value, true, '提示说交谈，F 就必须交谈');
+  assert.equal(p().dialogueOpen.value, false, '没有 F 提示时不能触发交谈');
+  const dialogueButton = findNode(renderStory(proxyRefs(p()), []),
+    node => node.props?.['aria-label'] === '与先知交谈');
+  assert.ok(dialogueButton, '小世界必须渲染先知交谈入口');
+  dialogueButton.props.onClick(event());
+  assert.equal(p().dialogueOpen.value, true, '点击 HUD 入口必须打开交谈');
   p().closeDialogue(); await turn();
   assert.equal(p().gameplayState.value.state.inventory.worldFragment, 1, '交谈不会顺手改动拾取进度');
 });
@@ -1576,6 +1671,9 @@ test('the killing blow grants the fragment and gear immediately, with no red bal
         state.inventory.worldFragment = 1;
         state.inventory.block = (state.inventory.block || 0) + 64;
         state.inventory.ball = (state.inventory.ball || 0) + 64;
+        for (const key of ['boss-main', 'boss-helm', 'boss-chest', 'boss-legs', 'boss-boots']) {
+          state.inventory[key] = (state.inventory[key] || 0) + 1;
+        }
         state.drop = null;
       }
     }
@@ -1625,7 +1723,7 @@ test('the killing blow grants the fragment and gear immediately, with no red bal
 // （`load()` 里对兄弟方法的裸调用抛 ReferenceError，被空 catch 吞掉），于是玩家放下的方块全部
 // 回到行囊：离开再回来，物品栏又显示 64。这里走完整的换场景流程断言 64 − 3 = 61。
 test('leaving and re-entering the small world shows the saved block count, not the seed again', async t => {
-  const placements = { version: 1, placements: [0, 1, 2].map(index => ({ propId: 'block', index,
+  const placements = { version: 1, placements: [0, 1, 2].map(index => ({ propId: 'rock1', index,
     siteId: null, position: [index, 0, 0], rotation: [0, 0, 0], scale: 1 })) };
   const f = await fixture(t, {
     documents: { loadPlacements: placements },
@@ -1650,9 +1748,9 @@ test('leaving and re-entering the small world shows the saved block count, not t
   // 主世界里陈列是空的（主世界只显示空布局），进小世界才读得回来。
   clickWorld(page); await turn(); await turn();
   page = f.mount(); await page.mount(); await turn(); await turn();
-  assert.deepEqual(page.instance.placements.value.map(entry => entry.propId), ['block', 'block', 'block']);
-  assert.deepEqual(blockCount(), { slot: 0, id: 'block', name: '方块',
-    description: '主世界带回的方块，可直接在小世界中摆放。',
+  assert.deepEqual(page.instance.placements.value.map(entry => entry.propId), ['rock1', 'rock1', 'rock1']);
+  assert.deepEqual(blockCount(), { slot: 0, id: 'rock1', name: '山石',
+    description: storyPropsModule.findProp('rock1').description,
     owned: 64, placed: 3, available: 61, empty: false });
   assert.deepEqual(countText(), ['61'], '物品栏上那个数字必须就是 61');
 
@@ -1710,8 +1808,8 @@ test('the small world takes a placed block back: the 取回 prompt, F removes it
   p().onKeyDown(event({ code: 'KeyB', key: 'b' }));
   await turn(); await turn(); await turn();
   assert.equal(p().gameplayError.value, '', '摆放不能报错');
-  assert.deepEqual(p().placements.value.map(entry => entry.propId), ['block']);
-  assert.deepEqual(saved.at(-1).map(entry => entry.propId), ['block'], '布局必须先落盘');
+  assert.deepEqual(p().placements.value.map(entry => entry.propId), ['rock1']);
+  assert.deepEqual(saved.at(-1).map(entry => entry.propId), ['rock1'], '布局必须先落盘');
   assert.equal(available(), 3, '放下一个方块，可用数就该少一');
   const guid = storyPropsModule.placementGuid(p().placements.value[0].index);
   assert.ok(f.actors.get(CHILD).some(actor => actor.actor_guid === guid), '方块必须真的进了场景');
@@ -1745,7 +1843,7 @@ test('a saved fragment rule comes back with the world, and 1 in 调整 reaches t
   let rules = { version: 1, rules: [{ fragmentId: 'sway', type: 'sway', axis: 'x', amplitude: 0.25, periodMs: 2400 }] };
   const saved = [];
   const f = await fixture(t, {
-    documents: { loadWorldRules: rules },
+    childActors: [ruleCube()], documents: { loadWorldRules: rules },
     gameplay: async (request, activePath) => {
       if (request.action === 'saveWorldRules') {
         saved.push(structuredClone(request.rules));
@@ -1781,7 +1879,7 @@ test('a saved fragment rule comes back with the world, and 1 in 调整 reaches t
   assert.deepEqual(saved, [[{ fragmentId: 'sway', type: 'sway', axis: 'x', amplitude: 0.3, periodMs: 2400 }]],
     '幅度 0.25 + 0.05 必须落盘');
   assert.deepEqual(captured.at(-1), [{ type: 'sway', axis: 'x', amplitude: 0.3, periodMs: 2400,
-    excludeRoles: ['player'] }], '规则引擎收到的是新幅度');
+    excludeRoles: ['player'], target: undefined }], '旧存档仍是无指定目标的规则，幅度必须更新');
   assert.match(page.instance.actionFeedback.value, /0\.30/);
   assert.equal(page.instance.worldRuleRunner.isRunning(), true);
 });
@@ -1801,12 +1899,10 @@ test('an existing world gets the walkable map on entry, and a second entry never
   const transform = storyMapModule.mapOriginTransform();
   assert.deepEqual(first[4].position, transform.position, '地面必须落在 y = 0 约定的摆位上');
   assert.deepEqual(first[4].scale, transform.scale, '引擎归一化成单位立方体，缩放要还原真实尺寸');
-  assert.equal(first[4].body_type, 'phantom',
-    '地图是布景：站立由对齐后的庭院与世界地板提供，不为 164 万面建 octree');
+  assert.equal(first[4].body_type, 'static', '原生三角形移动需要静态地图碰撞体');
   assert.equal(first[4].physics_enabled, undefined, 'body_type 与 physics_enabled 不能各说各话');
   assert.equal(first[4].model_ref, storyMapModule.MAP_MODEL_REF);
-  assert.equal(mapActor().mechanics.body_type, 'phantom',
-    '地图不参与碰撞：靠庭院对齐 y = 0 与世界地板站立');
+  assert.equal(mapActor().mechanics.body_type, 'static', '地图必须参与原生碰撞');
   assert.deepEqual(mapActor().geometry.position, transform.position);
 
   // 第二次进入同一个世界：GUID 不变，而且摆位与数据表一致，因此不能再造一张地图、
@@ -1831,7 +1927,7 @@ test('the map is created as a world object from an in-project route, never as UI
     && call[4]?.actor_guid === storyMapModule.MAP_GUID);
   assert.ok(first, '进入已有世界必须创建地图');
   assert.equal(first[4].follow_camera, false, 'follow_camera 为 true 时引擎把地图画进 UI 空间');
-  assert.equal(first[4].body_type, 'phantom');
+  assert.equal(first[4].body_type, 'static');
 
   const route = first[3];
   assert.equal(typeof route, 'string');
@@ -2086,7 +2182,7 @@ test('小世界里内部主角不渲染，主世界里照常显示', async t => 
   const f = await fixture(t, { gameplay: childGameplay() });
   const playerOf = path => f.actors.get(path)
     .find(actor => actor.actor_guid === STORY_CHARACTERS[0].guid);
-  // 可见性由引擎持久化：普通进入世界一个字节都不写，只有真正要翻转的那一次才写。
+  // 主世界不改已经正确的可见性；小世界会在初始化和切换视角后确认隐藏。
   const visibilityWrites = path => f.calls.filter(call => call[0] === 'state'
     && call[1] === path && call[2] === STORY_CHARACTERS[0].guid);
   let page = f.mount(); await page.mount(); await turn();
@@ -2097,14 +2193,17 @@ test('小世界里内部主角不渲染，主世界里照常显示', async t => 
   const player = playerOf(CHILD);
   assert.ok(player, '玩家 actor 仍然存在：存档、F 的射程、摆放都读它');
   assert.equal(player.visible, false, '小世界里内部主角不显示——相机就是它的眼睛');
-  assert.equal(visibilityWrites(CHILD).length, 1, '隐藏只写一次');
+  assert.ok(visibilityWrites(CHILD).length > 0, '小世界必须明确隐藏主角');
+  for (const write of visibilityWrites(CHILD)) assert.equal(write[3].visible, false);
+  page.instance.onKeyDown(event({ code: 'KeyV' })); await turn();
+  assert.equal(playerOf(CHILD).visible, false, '切换视角后仍然隐藏');
 
-  // 再进一次小世界：已经隐藏了，于是同一次进入不再写可见性（引擎记住了）。
+  // 再进一次小世界：保存的隐藏状态和页面确认都不能把主角翻回可见。
   clickWorld(page); await turn(); await turn();
   page = f.mount(); await page.mount(); await turn(); await turn();
   page = await enterChild(f, page);
   assert.equal(playerOf(CHILD).visible, false);
-  assert.equal(visibilityWrites(CHILD).length, 1, '第二次进入不再重复写');
+  for (const write of visibilityWrites(CHILD)) assert.equal(write[3].visible, false);
 
   // 非空证明的另一半：回到主世界，它必须重新可见（隐藏只属于小世界）。
   clickWorld(page); await turn(); await turn();
@@ -2183,6 +2282,7 @@ test('空格在小世界里抬高相机（自由与俯视），面板打开时�
   const p = () => page.instance;
 
   // 主世界：空格 = 跳跃，不是「把机位抬上去」。
+  groundPlayer(page, f);
   const groundY = p().camera.snapshotPlayer().position[1];
   const mainSpace = event({ code: 'Space', key: ' ' });
   p().onKeyDown(mainSpace);
@@ -2245,15 +2345,17 @@ test('空格在小世界里抬高相机（自由与俯视），面板打开时�
   assert.equal(f.frames.size, 0);
 });
 
-test('碎片规则不写先知：正常物体照常浮动，先知一个字节都没有', async t => {
+test('碎片规则不写存档里的先知：普通物体照常浮动', async t => {
   const rules = { version: 1, rules: [{ fragmentId: 'sway', type: 'sway', axis: 'x',
     amplitude: 0.25, periodMs: 2400 }] };
-  const f = await fixture(t, { documents: { loadWorldRules: rules }, gameplay: childGameplay() });
+  const f = await fixture(t, { childActors: [ruleCube()], documents: { loadWorldRules: rules }, gameplay: childGameplay() });
   let page = f.mount(); await page.mount(); await turn();
   page = await enterChild(f, page);
   const actorOf = guid => f.actors.get(CHILD).find(actor => actor.actor_guid === guid);
-  const prophet = actorOf(PROPHET_GUID);
-  const cube = actorOf(storyCubeModule.CUBE_GUID);
+  const prophet = actorFixture(STORY_CHARACTERS.find(character => character.role === 'prophet'));
+  f.actors.get(CHILD).push(prophet);
+  page.instance.applyWorldRules(await editorApi.scene.getSnapshot());
+  const cube = actorOf(RULE_OBJECT_GUID);
   const map = actorOf(storyMapModule.MAP_GUID);
   assert.ok(prophet && cube && map, '先知、方块、地图都在小世界里');
   assert.equal(page.instance.worldRuleRunner.isRunning(), true, '规则按保存的碎片跑起来');
@@ -2270,7 +2372,7 @@ test('碎片规则不写先知：正常物体照常浮动，先知一个字节�
   const listed = storyProphetActionsModule.selectableObjects(
     { data: { scene: { actors: f.actors.get(CHILD) } } }).map(entry => entry.guid);
   assert.ok(!listed.includes(PROPHET_GUID), '先知不在可调物体列表里');
-  assert.ok(listed.includes(storyCubeModule.CUBE_GUID), '方块才是可调物体');
+  assert.ok(listed.includes(RULE_OBJECT_GUID), '方块才是可调物体');
 });
 
 /* ---------------------------------------------------------------
@@ -2282,10 +2384,10 @@ test('带目标的碎片规则只动自己的物体：另一件没规则的物�
   // 两条规则各指一个物体：浮动 → 先知方块，旋转 → 第一件陈列物。第二件陈列物没有任何规则。
   const rules = { version: 1, rules: [
     { fragmentId: 'sway', type: 'sway', axis: 'x', amplitude: 0.25, periodMs: 2400,
-      target: storyCubeModule.CUBE_GUID },
+      target: RULE_OBJECT_GUID },
     { fragmentId: 'spin', type: 'spin', axis: 'z', amplitude: 15, periodMs: 3600, target: spinTarget },
   ] };
-  const f = await fixture(t, { documents: { loadWorldRules: rules }, gameplay: placementAware() });
+  const f = await fixture(t, { childActors: [ruleCube()], documents: { loadWorldRules: rules }, gameplay: placementAware() });
   let page = f.mount(); await page.mount(); await turn();
   page = await enterChild(f, page);
   const p = () => page.instance;
@@ -2296,10 +2398,11 @@ test('带目标的碎片规则只动自己的物体：另一件没规则的物�
   }
   assert.deepEqual(p().placements.value.map(entry => entry.index), [0, 1], '两件方块都落盘了');
   const actorOf = guid => f.actors.get(CHILD).find(actor => actor.actor_guid === guid);
-  const cube = actorOf(storyCubeModule.CUBE_GUID);
+  const cube = actorOf(RULE_OBJECT_GUID);
   const spun = actorOf(spinTarget);
   const idle = actorOf(bystander);
-  const prophet = actorOf(PROPHET_GUID);
+  const prophet = actorFixture(STORY_CHARACTERS.find(character => character.role === 'prophet'));
+  f.actors.get(CHILD).push(prophet);
   const map = actorOf(storyMapModule.MAP_GUID);
   assert.ok(cube && spun && idle && prophet && map, '方块、两件陈列物、先知与地图都在小世界里');
 
@@ -2341,6 +2444,7 @@ test('「碎片」屏先选目标物体再装填：落盘的规则带着那个�
   const saved = [];
   let layout = { version: 1, placements: [] };
   const f = await fixture(t, {
+    childActors: [ruleCube()],
     gameplay: async (request, activePath) => {
       if (request.action === 'saveWorldRules') {
         saved.push(structuredClone(request.rules));
@@ -2367,54 +2471,51 @@ test('「碎片」屏先选目标物体再装填：落盘的规则带着那个�
   };
   const render = () => renderStory(proxyRefs(p()), []);
 
-  // 「碎片」屏：每块碎片一行，点行进子屏（不再直接装填成「整世界生效」）。
+  // 「碎片」屏先选择作用对象，主按钮装填，独立的「调整」按钮进入子屏。
   p().dialogueOpen.value = true;
   p().openProphetScreen('fragments');
   await turn();
-  const rows = collectNodes(render(), node => node.props?.['data-prophet-fragment'] !== undefined);
-  assert.deepEqual(rows.map(node => node.props['data-prophet-fragment']), ['sway', 'spin']);
-  // 点行 = 进子屏（而不是立刻把碎片装成「整世界生效」）。
-  rows[0].props.onClick();
-  assert.equal(p().prophetScreen.value, 'fragment-adjust');
-  assert.equal(p().installedRules.value.length, 0, '进子屏本身一个字节都没写');
-  await turn();
-  let tree = render();
-  const targets = collectNodes(tree, node => node.props?.['data-fragment-target'] !== undefined);
+  const rows = () => collectNodes(render(), node => node.props?.['data-prophet-fragment'] !== undefined);
+  assert.deepEqual(rows().map(node => node.props['data-prophet-fragment']), ['sway', 'spin']);
+  await rows()[0].props.onClick();
+  assert.deepEqual(saved, [], '没选目标时不能装填为整世界规则');
+  const card = () => findNode(render(), node => node.props?.['data-prophet-row'] === 'sway');
+  const targets = collectNodes(card(), node => node.props?.['data-fragment-target'] !== undefined);
   const targetGuids = targets.map(node => node.props['data-fragment-target']);
-  assert.ok(targetGuids.includes(storyCubeModule.CUBE_GUID), '方块是可以选的');
+  assert.ok(targetGuids.includes(RULE_OBJECT_GUID), '方块是可以选的');
   assert.ok(!targetGuids.includes(storyMapModule.MAP_GUID), '地图不在目标列表里');
   assert.ok(!targetGuids.includes(PROPHET_GUID), '先知不在目标列表里');
   // 目标列表就是「调整物体」那份列表：同一个 selectableObjects，没有第二套过滤器。
   assert.deepEqual(targetGuids, storyProphetActionsModule.selectableObjects(
     { data: { scene: { actors: f.actors.get(CHILD) } } }).map(entry => entry.guid));
-  const toggleOf = rendered => collectNodes(rendered,
-    node => node.props?.['data-fragment-toggle'] !== undefined)[0];
-  assert.equal(toggleOf(tree).props.disabled, true, '没选目标时装填不可用');
-  assert.equal(p().fragmentToggle.value.state, 'pick-target');
-
-  // 选方块：按钮变成「装填到这个物体」，点下去之后规则带着方块的 guid 落盘。
-  const cubeEntry = p().selectableList.value.find(entry => entry.guid === storyCubeModule.CUBE_GUID);
-  p().selectFragmentTarget(cubeEntry);
-  tree = render();
-  const install = toggleOf(tree);
-  assert.equal(install.props.disabled, false);
-  assert.equal(install.props['data-state'], 'install');
-  await install.props.onClick();
+  // 点击真实目标按钮：只影响这一块碎片，选中本身不写存档。
+  targets.find(node => node.props['data-fragment-target'] === RULE_OBJECT_GUID).props.onClick(event());
+  assert.deepEqual(p().targetsFor('sway'), [RULE_OBJECT_GUID]);
+  assert.deepEqual(p().targetsFor('spin'), []);
+  assert.deepEqual(saved, []);
+  await rows()[0].props.onClick();
   await turn(); await turn();
   assert.deepEqual(saved.at(-1), [{ fragmentId: 'sway', type: 'sway', axis: 'x',
-    amplitude: 0.25, periodMs: 2400, target: storyCubeModule.CUBE_GUID }],
+    amplitude: 0.25, periodMs: 2400, target: RULE_OBJECT_GUID }],
   '装填记录必须点名那个物体');
-  assert.equal(p().installedRules.value[0].target, storyCubeModule.CUBE_GUID);
+  assert.equal(p().installedRules.value[0].target, RULE_OBJECT_GUID);
+  assert.ok(p().worldRuleRunner.isRunning());
+  const adjust = findNode(card(), node => node.props?.['data-prophet-adjust'] === 'sway');
+  adjust.props.onClick();
+  assert.equal(p().prophetScreen.value, 'fragment-adjust');
+  assert.equal(p().fragmentAdjustTarget.value, RULE_OBJECT_GUID);
   // 装好之后子屏显示的是这个物体上的数字，五个调整按钮都在。
-  tree = render();
-  const actions = collectNodes(tree, node => node.props?.['data-fragment-action'] !== undefined);
+  const actions = collectNodes(render(), node => node.props?.['data-fragment-action'] !== undefined);
   assert.deepEqual(actions.map(node => node.props['data-fragment-action']),
     ['amplitude-up', 'amplitude-down', 'period-up', 'period-down', 'axis-next']);
-  assert.ok(actions.every(node => node.props.disabled === false));
-  assert.equal(toggleOf(tree).props['data-state'], 'remove');
-  // 「碎片」屏那一行也写出了作用对象。
+  await actions[0].props.onClick();
+  assert.deepEqual(saved.at(-1), [{ fragmentId: 'sway', type: 'sway', axis: 'x',
+    amplitude: 0.3, periodMs: 2400, target: RULE_OBJECT_GUID }]);
+  // 返回后仍显示作用对象，再点主按钮只拆掉这条已装填规则。
   p().leaveProphetScreen();
   await turn();
-  const owner = collectNodes(render(), node => node.props?.['data-fragment-owner'] !== undefined);
-  assert.equal(owner.length, 1, '装填过的那一行写出作用对象');
+  assert.match(renderedText(page.instance), /作用于：规则测试方块/);
+  await rows()[0].props.onClick();
+  assert.deepEqual(saved.at(-1), []);
+  assert.deepEqual(p().installedRules.value, []);
 });

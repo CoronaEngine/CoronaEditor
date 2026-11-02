@@ -102,8 +102,20 @@ let visualPlacements = null;
 let disposed = false;
 let cameraReady = false;
 let playerSave = null;
-// 原生移动结果的事件订阅（离开世界必须注销，否则旧页面继续收事件）。
+// 保留到最后一次原生移动确认，再注销旧页面的事件订阅。
 let motionCallbackToken = null;
+async function releaseMotionCallback() {
+  if (motionCallbackToken === null) return;
+  const token = motionCallbackToken;
+  motionCallbackToken = null;
+  await editorApi.off(token);
+}
+function acceptMeshMove(event) {
+  const accepted = camera.acceptMeshMove(event);
+  // 超时后控制器仍接受迟到的权威回包；它也负责最终释放订阅。
+  if (disposed && accepted) releaseMotionCallback().catch(() => {});
+  return accepted;
+}
 let savingPlayer = false;
 let initialization = Promise.resolve();
 let exitPending = null;
@@ -2455,8 +2467,8 @@ onMounted(async () => {
     if (!await initializeWorldRenderBackend({ api: editorApi, sceneId, isCurrent: current })) return;
     // 原生三角面移动的结果必须回送控制器：没有这条登记，按键只会更新输入状态，
     // 移动请求一直挂在 pendingMove 上等回调，角色永远不动（15 秒后还会报超时）。
-    motionCallbackToken = await editorApi.events.onMeshMoveResult(camera.acceptMeshMove);
-    if (!current()) { await editorApi.off(motionCallbackToken); motionCallbackToken = null; return; }
+    motionCallbackToken = await editorApi.events.onMeshMoveResult(acceptMeshMove);
+    if (!current()) { await releaseMotionCallback(); return; }
     // 地图高度网格是这张地图真正的地面线，而角色的脚 y 由它给出：必须在
     // ensureStoryCharacters 之前读入，否则角色先按固定地板落地，之后才补网格也来不及。
     // 读不到只报告、不阻断进入世界（`heightAt` 返回 null，摆位与控制器都退回固定地板）。
@@ -2572,10 +2584,9 @@ onMounted(async () => {
 });
 onUnmounted(() => {
   disposed = true;
-  if (motionCallbackToken !== null) {
-    editorApi.off(motionCallbackToken).catch(() => {});
-    motionCallbackToken = null;
-  }
+  // 外部打开世界会先卸载页面，再保存旧玩家。等待已提交的移动，
+  // 否则提前注销会丢掉最终姿态，让存档一直等到超时。
+  camera.resetInput().then(releaseMotionCallback).catch(() => {});
   clearTimeout(feedbackTimer);
   clearTimeout(toastTimer);
   clearTimeout(bagToastTimer);
