@@ -45,9 +45,13 @@ class ProjectArchive(PluginBase):
             }
 
         diagnostics = list(snapshot.get("diagnostics") or [])
-        if diagnostics and load_policy == "prompt":
+        requires_confirmation = any(
+            item.get("severity", "error") == "error" or item.get("requires_confirmation", True)
+            for item in diagnostics
+        )
+        if requires_confirmation and load_policy == "prompt":
             status = "decision_required"
-        elif diagnostics:
+        elif requires_confirmation:
             status = "ready_degraded"
         else:
             status = "ready"

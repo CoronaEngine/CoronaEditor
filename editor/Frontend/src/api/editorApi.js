@@ -15,10 +15,18 @@ const CURRENT_CALLER = 'SceneBar';
 const dockChannels = new WeakMap();
 let dockRequestSequence = 0;
 const DOCK_RESPONSE_TIMEOUT_MS = 30_000;
+// Native pickers wait for a user decision, which has no RPC execution deadline.
+const INTERACTIVE_FILE_PICKER_APIS = new Set([
+  'ProjectLauncher.open_project_file',
+  'ProjectLauncher.browse_folder',
+  'SceneTools.select_model_file',
+  'MainView.import_resource_file',
+  'SceneTools.select_screenshot_path',
+]);
 
-// How long a manifest-backed request waits for a native reply before failing. Exposed so an
-// embedding host can tune it without reaching into module internals; native CEF calls have no
-// built-in deadline, so without this a request that is never answered hangs the caller forever.
+// How long a non-interactive manifest-backed request waits for a native reply before failing.
+// Exposed so an embedding host can tune it without reaching into module internals; native CEF
+// calls have no built-in deadline, so an unanswered non-interactive request would hang forever.
 export const editorApiTransportLimits = {
   responseTimeoutMs: 30_000,
 };
@@ -285,7 +293,7 @@ const call_editor_api = async (apiName, args) => {
 
   return new Promise((resolve, reject) => {
     let settled = false;
-    const timer = setTimeout(() => {
+    const timer = INTERACTIVE_FILE_PICKER_APIS.has(apiName) ? null : setTimeout(() => {
       if (settled) return;
       settled = true;
       const error = new Error(
