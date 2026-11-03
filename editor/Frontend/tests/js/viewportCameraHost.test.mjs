@@ -342,8 +342,6 @@ async function mountStory(t, { pendingInit = null, sceneSnapshot = { data: snaps
       NAVIGATION_KEY },
     '../../../../game/frontend/storyActors.mjs': { ensureStoryCharacters, syncPlacementActors },
     '../../../../game/frontend/storyProps.mjs': storyPropsModule,
-    '../../../../game/frontend/storyPlayerAnimation.mjs': storyPlayerAnimationModule,
-    '../../../../game/frontend/storyBossAi.mjs': storyBossAiModule,
     '../../../../game/frontend/storyLoot.mjs': storyLootModule,
     '../../../../game/frontend/prophetDialogue.mjs': prophetDialogueModule,
     '../../../../game/frontend/storyCube.mjs': storyCubeModule,

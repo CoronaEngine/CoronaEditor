@@ -34973,8 +34973,6 @@ class AgentRuntime:
             ),
             payload={"status": "applied", "applied_count": 1, "receipt_id": receipt_id},
         )
-        if not applied:
-            raise RuntimeError(f"failed to persist direct planning context: {apply_reason}")
 
     def _execute_planning_context_persist_graph(
         self,

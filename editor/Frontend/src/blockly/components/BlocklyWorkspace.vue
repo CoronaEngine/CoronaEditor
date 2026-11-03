@@ -1386,10 +1386,6 @@ onMounted(async () => {
 });
 
 onUnmounted(async () => {
-  // 1) 标记组件已卸载（阻止后续 resize/keyboard 回调操作已销毁对象）
-  let disposed = false;
-  const isAlive = () => !disposed && workspace !== null;
-  const safeResize = () => { if (isAlive() && BlocklyLib) { try { BlocklyLib.svgResize(workspace); } catch {} } };
 
   window.removeEventListener('resize', handleWindowResize);
   if (resizeObserver) { resizeObserver.disconnect(); resizeObserver = null; }
@@ -1417,7 +1413,6 @@ onUnmounted(async () => {
     try { await latestBlocklySavePromise; } catch {}
   }
 
-  disposed = true;
 
   if (workspace) {
     // 移除 change listener 防止 dispose 过程中的回调

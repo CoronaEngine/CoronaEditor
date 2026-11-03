@@ -3108,14 +3108,6 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
     def test_python_corona_engine_loader_has_no_fallback_module(self):
         self.assertFalse((pathlib.Path(__file__).resolve().parents[4] / "editor" / "CoronaCore" / "core" / "corona_engine.py").is_file())
         return
-        repo_root = pathlib.Path(__file__).resolve().parents[4]
-        loader_source = (
-            repo_root / "editor" / "CoronaCore" / "core" / "corona_engine.py"
-        ).read_text(encoding="utf-8")
-        self.assertNotIn("corona_engine_fallback", loader_source)
-        self.assertFalse(
-            (repo_root / "editor" / "CoronaCore" / "utils" / "corona_engine_fallback.py").exists()
-        )
 
 
 

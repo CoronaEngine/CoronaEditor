@@ -586,9 +586,6 @@ const handleNodeGraphPanelOpenRequest = async () => {
   await openFloatingPanel(dockStore, 'NodeGraphPanel');
 };
 
-const goToHome = () => {
-  router.push('/');
-};
 
 const showLocalModal = ref(false);
 const localModalTitle = ref('');
@@ -1245,7 +1242,6 @@ function onCabbageRunFailed(event) {
 }
 
 // Assistant state has been initialized above.
-const isLoadingMenu = ref(false);
 
 // 新增：切换菜单显示
 const toggleMenu = (menu) => {

@@ -624,7 +624,6 @@ async function navigateWorld() {
    —— 纯界面状态，不写任何玩法存档。
    ========================================================= */
 const BAG_UI_KEY = `__corona_story_bag_ui_v1__:${projectPath}`;
-const BAG_COLS = 12;
 const BAG_TOTAL = 42;
 
 const RARITY = {
@@ -812,7 +811,6 @@ const BAG_ITEMS = [
     stats: [['缝制', '上品']],
     flavor: '抖开像一小片云，落在手上几乎没有分量。' },
 ];
-const BAG_LOADOUT = { weapon: 'main-1', helm: 'helm-1', chest: 'armor-1', legs: 'legs-1', boots: 'boots-1' };
 const BAG_WEIGHT_MAX = 120;
 /* 真实存档里唯一的行囊物品 */
 const FRAGMENT_DEF = { u: 'corona-world-fragment', name: '世界碎片', type: '未解之物', cat: 'mat', rarity: 'epic',
@@ -914,8 +912,6 @@ const WS_MOONS = [
    图象（art）仍可自选，属纯界面偏好。 */
 const WORLD_MAIN = { name: '主世界', tier: '主界', art: { s: 0, m: 0 } };
 const WORLD_SMALL = { name: '小世界', tier: '沙盒', art: { s: 1, m: 1 } };
-const WORLDS_DEF = [WORLD_MAIN];
-const WORLDS_FRAGMENT = WORLD_SMALL;
 /* 一览里的下标 → 场景角色。 */
 const WORLD_ROLES = ['main', 'child'];
 
@@ -1333,12 +1329,6 @@ function bagToast(text) {
   bagToastTimer = setTimeout(() => { bag.toast = ''; }, 1400);
 }
 /* ------------------ 提示语 / 浮签 ------------------ */
-function bagShowTip(item, event) {
-  if (!item) return;
-  bag.tipItem = item;
-  bag.tipOn = true;
-  bagMoveTip(event);
-}
 function bagMoveTip(event) {
   if (!bag.tipOn) return;
   const width = bagTip.value?.offsetWidth || 260;
@@ -1349,7 +1339,6 @@ function bagMoveTip(event) {
   if (top + height > window.innerHeight - 8) top = Math.max(8, event.clientY - height - 16);
   bag.tipStyle = { left: `${Math.max(8, left)}px`, top: `${Math.max(8, top)}px` };
 }
-function bagHideTip() { bag.tipOn = false; }
 /* ------------------ 披掛 / 卸下 / 服用 / 弃置（仅界面状态） ------------------ */
 function bagEquipFromSlot(index) {
   const item = bagCellItems()[index];
@@ -1463,17 +1452,6 @@ function worldArtHTML(art) {
     + '<g class="ws-fall"><path d="M77 42v61"/><path d="M71 47c3 2 3 6 0 8"/><path d="M83 52c-3 2-3 6 0 8"/></g>'
     + `<g class="ws-pine"><path d="${shape.pine}"/><path d="M30 79l-13 9h26z"/><path d="M30 68l-10 8h20z"/><path d="M30 58l-7 7h14z"/></g>`
     + '<g class="ws-water"><path d="M6 108c10-4 18 4 28 0s18 4 28 0 18 4 28 0 18 4 28 0"/><path d="M18 103c8-3 14 3 22 0s14 3 22 0"/></g>'
-    + '</svg>';
-}
-function worldThumbHTML(art) {
-  const a = normalizeArt(art);
-  const shape = WS_SHAPES[a.s];
-  const moon = WS_MOONS[a.m];
-  return '<svg viewBox="0 0 160 112" preserveAspectRatio="xMidYMid meet" aria-hidden="true">'
-    + (moon.r ? `<g class="ws-moon"><circle cx="${moon.x}" cy="${moon.y}" r="${moon.r}"/>`
-      + (moon.cr ? `<circle class="ws-moon__cut" cx="${moon.cx}" cy="${moon.cy}" r="${moon.cr}"/>` : '') + '</g>' : '')
-    + `<g class="ws-far"><path d="${shape.far[1]}"/></g>`
-    + `<g class="ws-near"><path d="${shape.near}"/></g>`
     + '</svg>';
 }
 function bagWorldList() { return bagVisibleWorlds(); }

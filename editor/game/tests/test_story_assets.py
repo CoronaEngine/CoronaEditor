@@ -20,27 +20,6 @@ NS = {"c": "http://www.collada.org/2005/11/COLLADASchema"}
 
 
 class StoryAssetTests(unittest.TestCase):
-    @staticmethod
-    def _glb_json(document: Path) -> tuple[dict, int]:
-        """The JSON chunk of a GLB and the byte offset of its BIN chunk.
-
-        A `.glb` is a 12-byte header (magic, version, total) followed by length-prefixed
-        chunks; JSON is 0x4E4F534A and BIN is 0x004E4942. The engine parses the whole file
-        through Assimp, so this reads the same document it does, without a native build.
-        """
-        with document.open("rb") as stream:
-            magic, version, total = struct.unpack("<4sII", stream.read(12))
-            assert magic == b"glTF" and version == 2 and total == document.stat().st_size
-            header = None
-            while stream.tell() < total:
-                length, kind = struct.unpack("<II", stream.read(8))
-                if kind == 0x4E4F534A:
-                    header = json.loads(stream.read(length).decode("utf-8"))
-                    continue
-                if kind == 0x004E4942 and header is not None:
-                    return header, stream.tell()
-                stream.seek(length, 1)
-        raise AssertionError(f"{document} has no JSON chunk followed by a BIN chunk")
 
     def _assert_glb_character_art(self, model: Path):
         """A model the engine can animate, whose textures travel inside the file.

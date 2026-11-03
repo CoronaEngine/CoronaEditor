@@ -135,24 +135,6 @@ class EditorAggregateApiTest(unittest.TestCase):
     def test_scene_adapter_wraps_legacy_snapshot_transform_and_bounds_bindings(self):
         self.assertIsNone(get_scene_adapter(object()))
         return
-        class LegacyEngine:
-            def get_editor_scene_snapshot(self, scene_name):
-                return {"scene": scene_name, "actors": []}
-
-            def set_editor_actor_transform(self, scene_name, actor_name, payload):
-                return {"status": "success", "scene": scene_name, "actor": actor_name, "payload": payload}
-
-            def get_editor_actor_bounds(self, scene_name, actor_name):
-                return {"status": "success", "aabb": {"min": [0, 0, 0], "max": [1, 1, 1]}}
-
-        adapter = get_scene_adapter(LegacyEngine())
-        self.assertIsNotNone(adapter)
-        self.assertEqual(adapter.get_snapshot("level.scene")["scene"], "level.scene")
-        self.assertEqual(
-            adapter.set_actor_transform("level.scene", "Box", {"position": [1, 2, 3]})["status"],
-            "success",
-        )
-        self.assertEqual(adapter.get_actor_bounds("level.scene", "Box")["aabb"]["max"], [1, 1, 1])
 
     def test_active_project_context_sync_is_hidden_behind_runtime_adapter(self):
         class NativeEngine:
@@ -226,18 +208,6 @@ class EditorAggregateApiTest(unittest.TestCase):
     def test_scene_tools_adapter_falls_back_only_for_legacy_engine(self):
         self.assertIsNone(get_scene_tools_adapter(object()))
         return
-        class LegacyEngine:
-            def create_editor_actor(self, scene_name, source_path, actor_type, actor_data):
-                return {"status": "success", "scene": scene_name, "actor_type": actor_type}
-
-        adapter = get_scene_tools_adapter(LegacyEngine())
-
-        self.assertEqual(
-            adapter.create_actor("level.scene", "chair.glb", "model", {"actor_name": "Chair"})[
-                "actor_type"
-            ],
-            "model",
-        )
 
     def test_viewport_adapter_uses_manifest_for_value_object_capture(self):
         class NativeEngine:
@@ -572,22 +542,6 @@ class EditorAggregateApiTest(unittest.TestCase):
     def test_viewport_adapter_preserves_legacy_capture_binding(self):
         self.assertIsNone(get_viewport_adapter(object()))
         return
-        class LegacyEngine:
-            def capture_editor_camera_view(self, scene, camera, payload, path):
-                return {
-                    "status": "success",
-                    "scene": scene,
-                    "camera": camera,
-                    "payload": payload,
-                    "path": path,
-                }
-
-        result = get_viewport_adapter(LegacyEngine()).capture(
-            "level.scene", "review", {"position": [0, 0, 0]}, "shot.png"
-        )
-
-        self.assertEqual(result["status"], "success")
-        self.assertEqual(result["path"], "shot.png")
 
     def test_viewport_set_camera_pose_uses_value_object_contract(self):
         camera = {
@@ -748,63 +702,18 @@ class EditorAggregateApiTest(unittest.TestCase):
     def test_lan_chat_queue_adapter_preserves_empty_poll_result(self):
         self.assertIsNone(get_lan_chat_queue_adapter(object()))
         return
-        class LegacyEngine:
-            def network_pop_lanchat_agent_trigger(self):
-                return None
-
-        adapter = get_lan_chat_queue_adapter(LegacyEngine())
-
-        self.assertIsNone(adapter.poll_agent_trigger())
 
     def test_legacy_network_injection_is_adapted_without_changing_business_surface(self):
         self.assertIsNone(get_network_adapter(object()))
         return
-        class LegacyEngine:
-            def network_broadcast_intent(self, *args):
-                return args == ("alice", "moving", [0.0, 0.0, 0.0], "placing")
-
-            def network_session_role_name(self):
-                return "client"
-
-        adapter = get_network_adapter(LegacyEngine())
-
-        self.assertTrue(adapter.broadcast_intent(
-            "alice", "moving", [0.0, 0.0, 0.0], "placing"
-        ))
-        self.assertEqual(adapter.get_session_info()["role"], "client")
 
     def test_lan_chat_roster_uses_aggregate_adapter(self):
         self.assertIsNone(get_lan_chat_adapter(object()))
         return
-        class LegacyEngine:
-            def network_lanchat_agents_snapshot(self):
-                return [{"agent_id": "agent-1", "name": "Builder"}]
-
-        adapter = get_lan_chat_adapter(LegacyEngine())
-
-        self.assertEqual(adapter.list_agents()["agents"][0]["agent_id"], "agent-1")
 
     def test_legacy_lan_chat_transport_preserves_specialized_reply_arguments(self):
         self.assertIsNone(get_lan_chat_transport_adapter(object()))
         return
-        class LegacyEngine:
-            def __init__(self):
-                self.calls = []
-
-            def network_send_agent_reply_ex(self, *args):
-                self.calls.append(args)
-                return True
-
-        engine = LegacyEngine()
-        adapter = get_lan_chat_transport_adapter(engine)
-
-        self.assertTrue(adapter.send_agent_reply(
-            "agent-1", "Builder", "done", "progress", "agent-2", "corr-1", "{}"
-        ))
-        self.assertEqual(
-            engine.calls,
-            [("agent-1", "Builder", "done", "progress", "agent-2", "corr-1", "{}")],
-        )
 
 
 if __name__ == "__main__":
