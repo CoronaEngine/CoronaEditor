@@ -25,7 +25,8 @@ class SceneBuilder:
         key = (code, str(path or self.source), kind, message)
         if key not in self.diagnostics:
             self.diagnostics[key] = dict(severity="warning", recoverable=True, stage="archive_parse",
-                                         code=code, message=message, path=key[1], shape_type=kind, count=0)
+                                         code=code, message=message, path=key[1], shape_type=kind, count=0,
+                                         requires_confirmation=code not in {"MATERIAL_APPROXIMATION", "MATERIAL_FEATURE_DEFERRED"})
         self.diagnostics[key]["count"] += 1
 
     def add(self, path, matrix, name="", *, flip_uvs=False, flip_normals=False, face_normals=False, kind="mesh", material=None):
