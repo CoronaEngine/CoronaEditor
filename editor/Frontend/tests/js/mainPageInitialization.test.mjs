@@ -4,7 +4,7 @@ import test from 'node:test';
 import * as Vue from 'vue';
 import { babelParse, compileScript, parse } from 'vue/compiler-sfc';
 import * as constants from '../../src/utils/constants.js';
-import * as projectSceneLifecycle from '../../src/utils/projectSceneLifecycle.js';
+import * as projectLauncher from '../../src/services/projectLauncherService.js';
 import * as visionRenderModes from '../../src/utils/visionRenderModes.js';
 import * as viewportCamera from '../../src/utils/viewportCameraController.js';
 import * as viewportPick from '../../src/utils/viewportPick.js';
@@ -98,7 +98,7 @@ function mountMainPage(t, visionMode = 'path_tracing') {
     'vue-router': { useRouter: () => ({}) },
     'vue-i18n': { useI18n: () => ({ t: text => text }) },
     '@/utils/constants.js': constants,
-    '@/utils/projectSceneLifecycle.js': projectSceneLifecycle,
+    '@/services/projectLauncherService.js': projectLauncher,
     '@/utils/visionRenderModes.js': visionRenderModes,
     '@/utils/viewportPick.js': viewportPick,
     '@/utils/viewportGizmo.js': viewportGizmo,

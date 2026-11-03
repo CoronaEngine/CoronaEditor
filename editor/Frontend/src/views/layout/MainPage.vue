@@ -438,7 +438,6 @@ import { computed, ref, onMounted, onUnmounted, reactive, watch, nextTick } from
 import { useRouter } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import { DEFAULT_SCENE_NAME } from '@/utils/constants.js';
-import { resolveOpenedProjectScene } from '@/utils/projectSceneLifecycle.js';
 import {
   normalizeVisionRenderMode, visionAccumulationFromCamera, visionDenoiseFromCamera, visionStablePlanesFromCamera, visionRenderModes,
   visionDenoisers, visionDenoiserFromCamera,
@@ -450,7 +449,7 @@ import {
 import { appService, isCurrentWindowEvent } from '@/services/appService.js';
 import { worldModeState } from '@/services/worldModeService.js';
 import { initializeWorldRenderBackend } from '@/services/worldRenderPolicy.js';
-import { projectLauncherService } from '@/services/projectLauncherService.js';
+import { projectLauncherService, resolveOpenedProjectScene } from '@/services/projectLauncherService.js';
 import { useErrorHandler } from '@/composables/useErrorHandler.js';
 import { useDockStore } from '@/stores/dockStore.js';
 import { PLUGIN_MANIFEST } from '@/config/pluginManifest.js';
