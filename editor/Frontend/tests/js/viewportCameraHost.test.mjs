@@ -416,9 +416,9 @@ async function mountStory(t, { pendingInit = null, sceneSnapshot = { data: snaps
     step(next) { time = next; const callbacks = [...frames.values()]; frames.clear(); for (const cb of callbacks) cb(time); } };
 }
 
-test('story selects Native before binding its viewport', async t => {
+test('story selects Vision before binding its viewport', async t => {
   const h = await mountStory(t);
-  assert.deepEqual(h.renderRequests, [{ mode: 'native', scene: 'scene.ini', camera: null, viewportBound: false }]);
+  assert.deepEqual(h.renderRequests, [{ mode: 'vision', scene: 'scene.ini', camera: null, viewportBound: false }]);
   assert.ok(h.calls.some(call => call[0] === 'setCameraViewport'));
 });
 

@@ -33,7 +33,7 @@ for (const node of [...imports].reverse()) {
 const makeComponent = new Function('modules', 'window', 'document', 'requestAnimationFrame',
   'cancelAnimationFrame', 'ResizeObserver', `${setupSource}; return MainPage;`);
 
-function mountMainPage(t) {
+function mountMainPage(t, visionMode = 'path_tracing') {
   const calls = [], errors = [], mounted = [], unmounted = [], observed = [];
   const frames = new Map();
   let sequence = 0;
@@ -73,7 +73,7 @@ function mountMainPage(t) {
       return { data: { scene, active_camera_name: 'KitchenCamera', actors: [], cameras: [{
         name: 'KitchenCamera', camera_id: 'camera-1', handle: 42,
         position: [0, 1, -5], forward: [0, 0, 1], world_up: [0, 1, 0], fov: 45,
-        render_backend: 'native', vision_render_mode: 'path_tracing',
+        render_backend: 'native', vision_render_mode: visionMode,
         vision_accumulation: false, vision_denoise: true, vision_denoiser: 'reblur',
         vision_stable_planes: true, view_open: false,
       }] } };
@@ -149,19 +149,23 @@ function mountMainPage(t) {
   };
 }
 
-test('external scene entry selects its backend before binding and initializes the viewport', async t => {
-  const h = mountMainPage(t);
+for (const visionMode of ['path_tracing', 'restir']) {
+test(`external scene entry defaults to Vision and preserves saved ${visionMode}`, async t => {
+  const h = mountMainPage(t, visionMode);
   assert.equal(h.page.currentMainSceneId(), 'scene.ini', 'the unopened page starts at the default scene');
   assert.equal(h.page.cameraBindingState.value.cameraHandle, null);
   await h.mount();
 
-  assert.deepEqual(h.calls[0], ['backend', 'native', 'scene_v3.xml', null]);
+  assert.deepEqual(h.calls[0], ['backend', 'vision', 'scene_v3.xml', null]);
   assert.deepEqual(h.calls[1], ['snapshot', 'scene_v3.xml'], 'backend selection must precede snapshot binding');
   assert.equal(h.page.cameraBindingState.value.sceneId, 'scene_v3.xml');
   assert.equal(h.page.cameraBindingState.value.cameraHandle, 42);
+  assert.equal(h.page.mainRenderBackend.value, 'vision');
+  assert.equal(h.page.mainVisionRenderMode.value, visionMode);
   assert.deepEqual(h.observed, [h.surface]);
   h.flushFrames();
   assert.ok(h.calls.some(call => call[0] === 'viewport' && call[1] === 42
     && call[4] === 1536 && call[5] === 825), 'the mounted page must send camera viewport bounds');
   assert.deepEqual(h.errors, []);
 });
+}

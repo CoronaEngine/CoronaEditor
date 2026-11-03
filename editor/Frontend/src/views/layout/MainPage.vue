@@ -1002,7 +1002,7 @@ let tutorialPreviewObservedRunning = false;
 const visionAvailable = ref(false);
 const creativeRenderDefaultsBusy = ref(true);
 const creativeRenderDefaultsError = ref('');
-const mainRenderBackend = ref('native');
+const mainRenderBackend = ref('vision');
 const mainVisionRenderMode = ref('path_tracing');
 const mainVisionAccumulation = ref(false);
 const mainVisionAccumulationBusy = ref(false);
@@ -1259,8 +1259,8 @@ const toggleMenu = (menu) => {
   }
 };
 
-// Apply Native both before first binding and after restoring camera windows,
-// which can recreate the camera from an archive that still remembers Vision.
+// Apply Vision both before first binding and after restoring camera windows,
+// which can recreate the camera from an archive that still remembers Native.
 const initializeCreativeRenderMode = async () => {
   const sceneId = currentMainSceneId();
   const cameraId = currentMainCameraId();
@@ -1272,9 +1272,9 @@ const initializeCreativeRenderMode = async () => {
   creativeRenderDefaultsError.value = '';
   try {
     if (!await initializeWorldRenderBackend({ api: editorApi, sceneId, cameraId, isCurrent: current })) return false;
-    pendingMainRenderSelection = { sceneId, cameraId, backend: 'native',
+    pendingMainRenderSelection = { sceneId, cameraId, backend: 'vision',
       visionMode: mainVisionRenderMode.value, expiresAt: Date.now() + 3000 };
-    mainRenderBackend.value = 'native';
+    mainRenderBackend.value = 'vision';
     await syncSceneCameraBinding(sceneId, { preservePose: true });
     return true;
   } catch (error) {
