@@ -13,6 +13,37 @@ const CALLER_CEF = 1;
 
 const MANIFEST_METHODS = [
   {
+    api: 'ProjectLauncher.open_project_file', js_wrapper: 'project.openProjectFile',
+    params: [], return: 'object', allowed_callers: CALLER_CEF,
+  },
+  {
+    api: 'ProjectLauncher.browse_folder', js_wrapper: 'project.browseFolder',
+    params: [{ name: 'path', type: 'string', optional: true }],
+    return: 'string', allowed_callers: CALLER_CEF,
+  },
+  {
+    api: 'ProjectLauncher.open_project', js_wrapper: 'project.openProject',
+    params: [{ name: 'path', type: 'string' }, { name: 'options', type: 'object', optional: true }],
+    return: 'object', allowed_callers: CALLER_CEF,
+  },
+  {
+    api: 'SceneTools.select_model_file', js_wrapper: 'sceneTools.selectModelFile',
+    params: [{ name: 'scene_name', type: 'string' }, { name: 'actor_name', type: 'string' },
+      { name: 'file_type', type: 'string', optional: true }],
+    return: 'string', allowed_callers: CALLER_CEF,
+  },
+  {
+    api: 'MainView.import_resource_file', js_wrapper: 'main.importResourceFile',
+    params: [{ name: 'scene_name', type: 'string' }, { name: 'file_type', type: 'string' }],
+    return: 'object', allowed_callers: CALLER_CEF,
+  },
+  {
+    api: 'SceneTools.select_screenshot_path', js_wrapper: 'sceneTools.selectScreenshotPath',
+    params: [{ name: 'scene_name', type: 'string', optional: true },
+      { name: 'camera_name', type: 'string', optional: true }],
+    return: 'object', allowed_callers: CALLER_CEF,
+  },
+  {
     api: 'SceneTools.get_restir_settings', js_wrapper: 'sceneTools.getRestirSettings',
     params: [{ name: 'scene_name', type: 'string' }, { name: 'camera_id', type: 'string' }],
     return: 'object', allowed_callers: CALLER_CEF,
@@ -220,6 +251,95 @@ test('a late native reply after a timeout must be ignored', async () => {
     assert.doesNotThrow(() =>
       late.onSuccess(JSON.stringify({ status: 'success', data: { methods: MANIFEST_METHODS } }))
     );
+  });
+});
+
+const PICKER_CASES = [
+  {
+    api: 'ProjectLauncher.open_project_file',
+    invoke: (editorApi) => editorApi.project.openProjectFile(),
+    selected: { name: 'Kitchen', path: 'C:/Projects/Kitchen/Kitchen.corona' },
+    canceled: {},
+  },
+  {
+    api: 'ProjectLauncher.browse_folder',
+    invoke: (editorApi) => editorApi.project.browseFolder('C:/Projects'),
+    selected: 'C:/Projects/Kitchen',
+    canceled: '',
+  },
+  {
+    api: 'SceneTools.select_model_file',
+    invoke: (editorApi) => editorApi.sceneTools.selectModelFile('scene.ini', 'Chair'),
+    selected: 'Assets/Chair.glb',
+    canceled: '',
+  },
+  {
+    api: 'MainView.import_resource_file',
+    invoke: (editorApi) => editorApi.main.importResourceFile('scene.ini', 'model'),
+    selected: { status: 'success', scene: 'scene.ini', path: 'Assets/Chair.glb',
+      file_path: 'Assets/Chair.glb', actor_type: 'model' },
+    canceled: { status: 'canceled', message: '用户取消了文件选择' },
+  },
+  {
+    api: 'SceneTools.select_screenshot_path',
+    invoke: (editorApi) => editorApi.sceneTools.selectScreenshotPath('scene.ini', 'camera-a'),
+    selected: { status: 'success', path: 'C:/Pictures/Kitchen.png', camera_name: 'camera-a' },
+    canceled: { status: 'canceled', path: '' },
+  },
+];
+
+for (const picker of PICKER_CASES) {
+  for (const result of ['selected', 'canceled']) {
+    test(`${picker.api} accepts a ${result} result after the ordinary RPC deadline`, async () => {
+      const { editorApi, host, limits } = await loadEditorApi();
+
+      await withShortTimeout(limits, async () => {
+        host.hangFor.add(picker.api);
+        // Observe rejection immediately so the old timeout produces an assertion failure,
+        // not an unhandled rejection before the simulated user finishes the dialog.
+        const outcome = picker.invoke(editorApi).then(
+          (value) => ({ value }), (error) => ({ error }),
+        );
+        await new Promise((resolve) => setTimeout(resolve, 60));
+
+        const response = { status: 'success', data: picker[result] };
+        host.pending.get(picker.api).onSuccess(JSON.stringify(response));
+        const actual = await outcome;
+        assert.ifError(actual.error);
+        assert.deepEqual(actual.value, response);
+      });
+    });
+  }
+}
+
+test('a picker still rejects a native error after waiting past the ordinary RPC deadline', async () => {
+  const { editorApi, host, limits } = await loadEditorApi();
+
+  await withShortTimeout(limits, async () => {
+    host.hangFor.add('ProjectLauncher.open_project_file');
+    const outcome = editorApi.project.openProjectFile().then(
+      (value) => ({ value }), (error) => ({ error }),
+    );
+    await new Promise((resolve) => setTimeout(resolve, 60));
+
+    host.pending.get('ProjectLauncher.open_project_file').onFailure(-2, 'dialog unavailable');
+    const actual = await outcome;
+    assert.match(actual.error.message, /Editor API Error \(-2\): dialog unavailable/);
+  });
+});
+
+test('loading a selected project still times out and ignores its late native reply', async () => {
+  const { editorApi, host, limits } = await loadEditorApi();
+
+  await withShortTimeout(limits, async () => {
+    host.hangFor.add('ProjectLauncher.open_project');
+    await assert.rejects(
+      () => editorApi.project.openProject('C:/Projects/Kitchen/Kitchen.corona'),
+      (error) => error.code === 'EDITOR_API_TIMEOUT',
+    );
+    assert.doesNotThrow(() => host.pending.get('ProjectLauncher.open_project').onSuccess(
+      JSON.stringify({ status: 'success', data: {} }),
+    ));
   });
 });
 
