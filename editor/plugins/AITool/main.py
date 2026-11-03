@@ -2,18 +2,12 @@
 
 import json
 import logging
-import sys
 import threading
-from pathlib import Path
 
 from runtime.plugin_base import PluginBase
 
 
 logger = logging.getLogger(__name__)
-_AITOOL_DIR = Path(__file__).resolve().parent
-if str(_AITOOL_DIR) not in sys.path:
-    sys.path.insert(0, str(_AITOOL_DIR))
-
 # Publish the lightweight facade before initializing its services.
 INITIALIZE_AFTER_PUBLISH = True
 
@@ -69,12 +63,11 @@ class AITool(PluginBase):
 
     @staticmethod
     def _configure_runtime():
-        from .cai_extensions.register import install
+        from .configuration.deepseek_settings import load_model_options
         from .configuration.local_secrets import load_ai_setting
 
-        # Set editor paths before Quasar collects settings. No agent/tool warmup.
-        install()
         load_ai_setting()
+        load_model_options()
 
     @staticmethod
     def _service_factories():

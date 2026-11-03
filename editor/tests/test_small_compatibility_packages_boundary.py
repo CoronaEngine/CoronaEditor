@@ -31,7 +31,6 @@ def test_canonical_production_code_does_not_import_small_compatibility_packages(
             if (
                 "tests" in source_path.parts
                 or "__pycache__" in source_path.parts
-                or "Quasar" in source_path.parts
             ):
                 continue
             tree = ast.parse(source_path.read_text(encoding="utf-8-sig"), filename=str(source_path))

@@ -6,7 +6,7 @@ EDITOR_ROOT = Path(__file__).resolve().parents[1]
 
 def test_editor_business_modules_use_aggregate_api():
     for path in (EDITOR_ROOT / "plugins").rglob("*.py"):
-        if "tests" in path.parts or "Quasar" in path.parts:
+        if "tests" in path.parts:
             continue
         source = path.read_text(encoding="utf-8-sig")
         assert "CoronaCore" not in source

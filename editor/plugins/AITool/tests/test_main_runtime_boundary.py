@@ -38,9 +38,8 @@ def test_ai_services_only_contain_current_frontend_features():
         "node_graph_review_chat_service.py", "node_graph_generation_service.py",
         "cabbage_context_service.py",
     }
-    assert {path.name for path in (AI_ROOT / "cai_extensions").rglob("*.py")} == {
-        "__init__.py", "register.py", "paths_provider.py", "app_config_provider.py",
-    }
+    assert not (AI_ROOT / "Quasar").exists()
+    assert not any((AI_ROOT / "cai_extensions").rglob("*.py"))
 
 
 def test_frontend_ai_operations_match_backend_routes():
@@ -56,11 +55,12 @@ def test_frontend_ai_operations_match_backend_routes():
     assert operations == set(ast.literal_eval(routes))
 
 
-def test_configuration_bridge_does_not_register_agent_runtime():
-    source = (AI_ROOT / "cai_extensions/register.py").read_text(encoding="utf-8")
-    tree = ast.parse(source)
-    modules = {node.module for node in ast.walk(tree) if isinstance(node, ast.ImportFrom)}
-    assert modules == {
-        "Quasar.ai_config.paths_config", "Quasar.ai_tools.warmup",
-        "app_config_provider", "paths_provider",
-    }
+def test_production_ai_has_no_external_runtime_imports():
+    forbidden = {"Quasar", "langchain", "langchain_core", "langgraph", "openai", "torch"}
+    for path in AI_ROOT.rglob("*.py"):
+        if "tests" in path.parts:
+            continue
+        for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
+            names = ([node.module or ""] if isinstance(node, ast.ImportFrom) else
+                     [alias.name for alias in node.names] if isinstance(node, ast.Import) else [])
+            assert not any(name.split(".")[0] in forbidden for name in names), path

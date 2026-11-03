@@ -20,11 +20,8 @@ def test_legacy_workflow_packages_are_removed():
     assert all(not any(path.rglob("*.py")) for path in removed)
 
 
-def test_workflow_registration_has_no_legacy_module_list():
-    source = (CAI_EXTENSIONS / "register.py").read_text(encoding="utf-8")
-
-    assert "legacy_flow_modules" not in source
-    assert "flow_modules" not in source
+def test_workflow_registration_is_removed():
+    assert not (CAI_EXTENSIONS / "register.py").exists()
 
 
 def test_legacy_generation_adapters_are_removed():

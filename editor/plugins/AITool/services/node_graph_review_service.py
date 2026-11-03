@@ -13,7 +13,6 @@ import urllib.error
 import urllib.request
 import xml.etree.ElementTree as ET
 from concurrent.futures import ThreadPoolExecutor
-from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
 from typing import Any, Iterable
@@ -21,22 +20,16 @@ from typing import Any, Iterable
 logger = logging.getLogger(__name__)
 
 
-@dataclass(frozen=True)
-class DeepSeekSettings:
-    api_key: str
-    base_url: str
-    model: str
-    source: str
-    temperature: float = 0.1
-    max_tokens: int = 1200
-    thinking_enabled: bool = False
+from ..configuration.deepseek_settings import (
+    DEFAULT_BASE_URL, DEFAULT_MODEL, DeepSeekSettings, resolve_settings,
+)
 
 
 class NodeGraphReviewService:
     """Review a visible project node graph without executing its generated script."""
 
-    DEFAULT_BASE_URL = "https://api.deepseek.com"
-    DEFAULT_MODEL = "deepseek-v4-flash"
+    DEFAULT_BASE_URL = DEFAULT_BASE_URL
+    DEFAULT_MODEL = DEFAULT_MODEL
     TIMEOUT_SECONDS = 35
     CONTRACT_FILENAME = "CoronaBlocksDocument.internal-ai-contract.xml"
     MAX_TASKS = 32
@@ -398,111 +391,7 @@ class NodeGraphReviewService:
 
     @classmethod
     def _resolve_settings(cls, purpose: str | None = None) -> DeepSeekSettings:
-        def lookup_editor_configuration() -> tuple[Any, dict[str, Any], dict[str, Any]]:
-            provider: Any = None
-            raw_provider: dict[str, Any] = {}
-            raw_settings: dict[str, Any] = {}
-            try:
-                from Quasar.ai_service.entrance import get_ai_entrance
-
-                collector = get_ai_entrance().collector
-                raw = getattr(collector, "AI_SETTINGS", {})
-                raw_settings = raw if isinstance(raw, dict) else {}
-                purpose_config = (
-                    raw_settings.get(purpose)
-                    if purpose and isinstance(raw_settings.get(purpose), dict)
-                    else {}
-                )
-                provider_name = str(purpose_config.get("provider") or "deepseek").strip()
-                providers = getattr(collector.AIConfig, "providers", {}) or {}
-                provider = providers.get(provider_name) if hasattr(providers, "get") else None
-                raw_providers = raw_settings.get("providers")
-                if isinstance(raw_providers, list):
-                    raw_provider = next(
-                        (
-                            item
-                            for item in raw_providers
-                            if isinstance(item, dict)
-                            and str(item.get("name") or "").strip() == provider_name
-                        ),
-                        {},
-                    )
-                elif isinstance(raw_providers, dict):
-                    candidate = raw_providers.get(provider_name)
-                    raw_provider = candidate if isinstance(candidate, dict) else {}
-            except Exception as exc:
-                logger.debug(
-                    "DeepSeek editor configuration lookup failed: %s",
-                    type(exc).__name__,
-                )
-            return provider, raw_provider, raw_settings
-
-        provider, raw_provider, raw_settings = lookup_editor_configuration()
-
-        def read_provider(name: str) -> str:
-            value = getattr(provider, name, "") if provider is not None else ""
-            return str(value or raw_provider.get(name, "") or "").strip()
-
-        editor_key = read_provider("api_key")
-        if not editor_key:
-            # Review/generation can also be used before plugin initialization.
-            # Lazily register the editor-owned settings before falling back to env.
-            try:
-                from ..configuration.local_secrets import load_ai_setting
-
-                load_ai_setting()
-            except Exception as exc:
-                logger.debug(
-                    "DeepSeek editor settings lazy-load failed: %s",
-                    type(exc).__name__,
-                )
-            provider, raw_provider, raw_settings = lookup_editor_configuration()
-            editor_key = read_provider("api_key")
-
-        purpose_config = (
-            raw_settings.get(purpose)
-            if purpose and isinstance(raw_settings.get(purpose), dict)
-            else {}
-        )
-
-        def as_float(value: Any, default: float) -> float:
-            try:
-                return float(value)
-            except (TypeError, ValueError):
-                return default
-
-        def as_int(value: Any, default: int) -> int:
-            try:
-                parsed = int(value)
-            except (TypeError, ValueError):
-                return default
-            return parsed if parsed > 0 else default
-
-        if purpose == "node_graph":
-            model = (
-                str(purpose_config.get("model") or "").strip()
-                or read_provider("model")
-                or cls.DEFAULT_MODEL
-            )
-            temperature = as_float(purpose_config.get("temperature"), 0.05)
-            max_tokens = as_int(purpose_config.get("max_tokens"), 12000)
-            thinking_enabled = purpose_config.get("thinking") is True
-        else:
-            model = read_provider("model") or cls.DEFAULT_MODEL
-            temperature = 0.1
-            max_tokens = 1200
-            thinking_enabled = False
-
-        base_url = read_provider("base_url") or cls.DEFAULT_BASE_URL
-        return DeepSeekSettings(
-            editor_key,
-            base_url,
-            model,
-            "editor-ai-setting" if editor_key else "unconfigured",
-            temperature,
-            max_tokens,
-            thinking_enabled,
-        )
+        return resolve_settings(purpose)
 
     @classmethod
     def _call_deepseek(cls, settings: DeepSeekSettings, prompt: str) -> str:

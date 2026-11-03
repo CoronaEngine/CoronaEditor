@@ -8,12 +8,10 @@ Vue transport、引擎对象或角色脚本运行时的第二个 owner。
 
 | 目录 | 类型 | canonical 职责 | 删除/迁移条件 |
 |---|---|---|---|
-| `AITool/` | active AI/Agent | AI 对话、Agent、模型调用、场景生成和节点图工作流；配置 owner 在 `configuration/` | AITool 业务迁移到明确 runtime/service owner 后删除；Quasar 不在本次整理范围 |
+| `AITool/` | active AI service | DeepSeek 对话、节点图审查/生成和白菜助手上下文；配置 owner 在 `configuration/` | 保留当前前端功能和任务生命周期 |
 | `AITool/configuration/` | active config owner | `.env`、API key 和本地 AITool 配置加载 | 所有调用方迁移到新的 secret/config owner 后删除 |
-| `AITool/cai_extensions/` | active AI extension | Agent、MCP 工具、场景组合和生成 workflow 扩展 | 对应 workflow/runtime 完整替代后删除 |
-| `AITool/services/` | active orchestration | 编辑器侧 AI 请求、对话、协作、生成和 Agent runtime 报告编排 | 对应 service owner 完整替代并通过集成回归 |
-| `AITool/utils/` | removed compatibility code | 配置统一由 `configuration/` 负责，媒体统一由 `services/media_storage.py` 负责 | 已删除 |
-| `AITool/Quasar/` | external submodule | 外部 AI 子模块内容 | 本次迁移不修改；按其自身 upstream 生命周期处理 |
+| `AITool/services/` | active orchestration | 四个前端业务服务，直接调用 DeepSeek 官方 API | 对应 service owner 完整替代并通过集成回归 |
+| `AITool/utils/`、`AITool/cai_extensions/`、`AITool/Quasar/` | removed compatibility code | 旧工具、配置桥接与 Quasar 子模块已删除 | 禁止重新引入旧 Agent 启动链 |
 | `FileManager/` | native aggregate + service facade | `files.*` 负责文件事实和操作；`main.py` 仅转发公共 contract，旧 Scene/Actor 文件绑定 adapter 已删除 | 外部旧宿主应迁移到 `files.*`，不得重新引入文件插件兼容层 |
 | `MainView/` | native lifecycle + service adapter | native `main.*` 负责项目/场景生命周期；`main.py` 只做 service 编排，不持有 Python Scene 生命周期 | 保持 adapter 与 manifest 一致 |
 | `ProjectArchive/` | scene.ini loading facade | `main.py` 负责加载策略和诊断，parser 归 `runtime/archive` | 保留按需加载服务，无旧格式迁移 |
@@ -32,7 +30,7 @@ Vue transport、引擎对象或角色脚本运行时的第二个 owner。
   插件源码、Vue bundle、日志或通用 service；
 - `SceneTools`、`MainView` 和 `ProjectArchive` 不得重新引入 Python Scene 事实或
   compatibility 实现；场景操作必须走 manifest；
-- `AITool/Quasar` 是外部子模块，明确不修改其内容、不把其内部目录加入本仓迁移 owner；
+- AI 配置与密钥刷新只由本地 `configuration/` 管理，不加载外部 Agent 或模型框架；
 - 新增插件功能必须先确定公共 manifest/service owner、生命周期、测试 owner 和删除条件。
 
 ## 删除条件与验证

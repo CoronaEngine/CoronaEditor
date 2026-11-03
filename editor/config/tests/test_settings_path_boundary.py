@@ -28,7 +28,7 @@ def test_production_python_code_does_not_import_settings_from_utils():
     violations = []
     for root in roots:
         for path in root.rglob("*.py"):
-            if "tests" in path.parts or "Quasar" in path.parts:
+            if "tests" in path.parts:
                 continue
             source = path.read_text(encoding="utf-8")
             if "from utils.settings import" in source:

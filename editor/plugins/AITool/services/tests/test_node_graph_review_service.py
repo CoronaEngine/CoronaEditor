@@ -1,21 +1,16 @@
-import importlib.util
 import io
 import json
 import pathlib
 import shutil
 import tempfile
-import sys
 import time
-import types
 import unittest
 from unittest import mock
 
-MODULE_PATH = pathlib.Path(__file__).resolve().parents[1] / "node_graph_review_service.py"
-SPEC = importlib.util.spec_from_file_location("node_graph_review_service_under_test", MODULE_PATH)
-MODULE = importlib.util.module_from_spec(SPEC)
-sys.modules[SPEC.name] = MODULE
-SPEC.loader.exec_module(MODULE)
+from editor.plugins.AITool.services import node_graph_review_service as MODULE
+from editor.plugins.AITool.configuration import deepseek_settings, local_secrets
 
+MODULE_PATH = pathlib.Path(MODULE.__file__)
 NodeGraphReviewService = MODULE.NodeGraphReviewService
 DeepSeekSettings = MODULE.DeepSeekSettings
 
@@ -941,46 +936,22 @@ class NodeGraphReviewServiceTests(unittest.TestCase):
 
 
     def test_node_graph_settings_use_ai_setting_only(self):
-        provider = types.SimpleNamespace(
-            api_key="editor-secret",
-            base_url="https://configured.example",
-            model="provider-model",
-        )
-        collector = types.SimpleNamespace(
-            AI_SETTINGS={
-                "node_graph": {
-                    "provider": "deepseek",
-                    "model": "configured-node-model",
-                    "temperature": 0.07,
-                    "max_tokens": 7777,
-                    "thinking": True,
-                },
-                "providers": [{
-                    "name": "deepseek",
-                    "api_key": "editor-secret",
-                    "base_url": "https://configured.example",
-                }],
+        options = {
+            "model": "provider-model",
+            "node_graph": {
+                "model": "configured-node-model", "temperature": 0.07,
+                "max_tokens": 7777, "thinking": True,
             },
-            AIConfig=types.SimpleNamespace(providers={"deepseek": provider}),
-        )
-        entrance = types.ModuleType("Quasar.ai_service.entrance")
-        entrance.get_ai_entrance = lambda: types.SimpleNamespace(collector=collector)
-        quasar = types.ModuleType("Quasar")
-        quasar.__path__ = []
-        ai_service = types.ModuleType("Quasar.ai_service")
-        ai_service.__path__ = []
-        modules = {
-            "Quasar": quasar,
-            "Quasar.ai_service": ai_service,
-            "Quasar.ai_service.entrance": entrance,
         }
-
-        with mock.patch.dict(sys.modules, modules):
+        with (
+            mock.patch.object(deepseek_settings, "load_model_options", return_value=options),
+            mock.patch.object(local_secrets, "_api_key", "editor-secret"),
+        ):
             node_settings = NodeGraphReviewService._resolve_settings("node_graph")
             review_settings = NodeGraphReviewService._resolve_settings()
 
         self.assertEqual("editor-secret", node_settings.api_key)
-        self.assertEqual("https://configured.example", node_settings.base_url)
+        self.assertEqual("https://api.deepseek.com/v1", node_settings.base_url)
         self.assertEqual("configured-node-model", node_settings.model)
         self.assertEqual(0.07, node_settings.temperature)
         self.assertEqual(7777, node_settings.max_tokens)
@@ -988,7 +959,7 @@ class NodeGraphReviewServiceTests(unittest.TestCase):
         self.assertEqual("editor-ai-setting", node_settings.source)
 
         self.assertEqual("editor-secret", review_settings.api_key)
-        self.assertEqual("https://configured.example", review_settings.base_url)
+        self.assertEqual("https://api.deepseek.com/v1", review_settings.base_url)
         self.assertEqual("provider-model", review_settings.model)
         self.assertEqual(0.1, review_settings.temperature)
         self.assertEqual(1200, review_settings.max_tokens)

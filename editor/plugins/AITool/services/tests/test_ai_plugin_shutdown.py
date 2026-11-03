@@ -205,11 +205,11 @@ def test_cleanup_continues_after_one_shutdown_failure(runtime):
         service.shutdown.assert_called_once()
 
 
-def test_configuration_bridges_are_installed_before_settings_collection(monkeypatch):
-    from plugins.AITool.cai_extensions import register
+def test_local_settings_are_loaded_before_model_options(monkeypatch):
+    from plugins.AITool.configuration import deepseek_settings
 
     calls = []
-    monkeypatch.setattr(register, "install", lambda: calls.append("paths"))
-    monkeypatch.setattr(local_secrets, "load_ai_setting", lambda: calls.append("settings"))
+    monkeypatch.setattr(local_secrets, "load_ai_setting", lambda: calls.append("secrets"))
+    monkeypatch.setattr(deepseek_settings, "load_model_options", lambda: calls.append("models"))
     AITool._configure_runtime()
-    assert calls == ["paths", "settings"]
+    assert calls == ["secrets", "models"]

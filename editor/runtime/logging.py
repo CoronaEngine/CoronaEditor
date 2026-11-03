@@ -43,12 +43,6 @@ _DEFAULT_QUIET_LOGGERS = {
 # 即便根 logger 是 INFO，也希望这些业务模块默认 DEBUG 起来便于排查。
 # 可以通过环境变量 CORONA_VERBOSE_LOGGERS=name1=DEBUG,name2=INFO 覆盖。
 _DEFAULT_VERBOSE_LOGGERS = {
-    "ai_modules": logging.DEBUG,
-    "ai_workflow": logging.DEBUG,
-    "ai_tools": logging.DEBUG,
-    "ai_agent": logging.DEBUG,
-    "ai_service": logging.INFO,
-    "cai_extensions": logging.DEBUG,
     "plugins.AITool": logging.DEBUG,
 }
 

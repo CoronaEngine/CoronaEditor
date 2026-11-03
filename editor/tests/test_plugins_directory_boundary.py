@@ -95,13 +95,9 @@ def test_active_plugins_have_local_boundary_documents():
         assert "删除条件" in source, directory
 
 
-def test_quasar_is_explicitly_outside_the_repository_migration_scope():
-    boundary = (PLUGINS_ROOT / "BOUNDARY.md").read_text(encoding="utf-8")
-    quasar = PLUGINS_ROOT / "AITool" / "Quasar"
-
-    assert quasar.is_dir()
-    assert "不修改" in boundary
-    assert "外部子模块" in boundary
+def test_quasar_and_its_bridge_are_retired():
+    assert not (PLUGINS_ROOT / "AITool" / "Quasar").exists()
+    assert not any((PLUGINS_ROOT / "AITool" / "cai_extensions").rglob("*.py"))
 
 
 def test_unreferenced_scene_tools_helper_is_removed_after_native_migration():

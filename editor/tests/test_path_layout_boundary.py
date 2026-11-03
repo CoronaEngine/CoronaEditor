@@ -16,7 +16,7 @@ class PathLayoutBoundaryTests(unittest.TestCase):
         violations = []
         for base in (root / "api", root / "config", root / "plugins", root / "runtime", root / "script_runtime"):
             for path in base.rglob("*.py"):
-                if "tests" in path.parts or "Quasar" in path.parts:
+                if "tests" in path.parts:
                     continue
                 tree = ast.parse(path.read_text(encoding="utf-8-sig"), filename=str(path))
                 for node in ast.walk(tree):

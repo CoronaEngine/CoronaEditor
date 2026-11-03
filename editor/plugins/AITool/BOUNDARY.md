@@ -9,9 +9,7 @@
 |---|---|---|---|
 | `configuration/` | AITool configuration owner | `.env`、API key 和本地配置读取 | 不保存密钥到源码、日志或 Vue bundle |
 | `services/` | AITool service owner | 节点检查、聊天、生成和 Cabbage 上下文四个服务 | 不直接操作 `Actor`/`Scene`，不定义公共 manifest |
-| `cai_extensions/` | AITool configuration bridge | 向 Quasar 注入编辑器路径与应用配置 | 不注册 Agent、MCP 工具、工作流或网络 worker |
 | `compat/`、`utils/` | removed compatibility code | 目录和旧导入入口已删除；配置统一由 `configuration/` 负责 | 不得重新创建旧入口 |
-| `Quasar/` | 外部子模块 | 上游 AI runtime 内容 | 本仓迁移不修改 |
 
 ## 依赖与生命周期
 
@@ -24,7 +22,7 @@
 - API key 只能由 `configuration/` 从 `.env` 或受控本地配置读取，日志不得输出秘钥。
 - 基础 API 在 runtime ready 前必须保留 `initializing` 语义；初始化失败进入
   `degraded`，不得无界重试。
-- 初始化先安装配置桥接，再加载设置和四个服务。初始化期间关闭或失败必须释放已创建
+- 初始化先加载本地密钥与模型设置，再加载四个服务。初始化期间关闭或失败必须释放已创建
   的服务，不得发布迟到的结果；重复关闭不重复释放服务。
 - `ai.submitRequest` 是唯一 AI manifest 方法。支持节点检查、聊天和生成的异步操作、
   Cabbage 上下文/任务/评分操作及 `ai.settings.get/set`；不再接受旧通用聊天请求。
@@ -34,5 +32,36 @@
 
 Agent Runtime、Agent Collaboration、LANChat AI 编排及旧聊天/媒体链已经退役，其专属
 测试随功能移除。Actor 物理契约与原生同步测试必须保留；禁止恢复旧工具注册入口。
-Quasar 仍提供模型配置收集，配置桥接与密钥刷新验证完成前不能移除子模块及其依赖。
+Quasar 子模块、配置桥接和专属依赖已移除；当前服务直接使用标准库调用 DeepSeek 官方 API。
 项目上下文、用户密钥和媒体数据不属于源码清理范围。
+
+## DeepSeek 配置
+
+`configuration/deepseek_settings.py` 是模型配置 owner。未提供覆盖时，模型保持
+`deepseek-v4-flash`；审查/评分使用 0.1/1200，聊天使用 0.25/1400，目标规划使用
+0.25/3600，节点生成使用 0.05/12000（temperature/max_tokens）。默认关闭 thinking。
+现有 HTTP 请求、提示词、超时和业务校验由四个服务保留。
+
+可选的 `editor/deepseek_settings.json` 仅存放非密钥参数，启动时读取一次。例如迁移原
+provider.model 和 node_graph 设置时，使用：
+
+```json
+{
+  "model": "deepseek-v4-flash",
+  "node_graph": {
+    "model": "deepseek-v4-flash",
+    "temperature": 0.05,
+    "max_tokens": 12000,
+    "thinking": false
+  }
+}
+```
+
+节点生成模型优先于全局模型；空值回退、数字转换和 thinking 仅接受布尔 true 的语义保持
+不变。只连接 DeepSeek 官方地址，不提供 provider 注册或第三方 base_url 覆盖。
+旧 CORONA_LLM_MODEL/PROVIDER 环境变量原本不控制这些服务，现在也不读取。
+
+密钥仍来自 `editor/.env`，进程环境优先，依次读取 `CORONA_DEEPSEEK_API_KEY` 和
+`DEEPSEEK_API_KEY`。设置页保存时更新两个别名及当前密钥，新请求立即使用新值；已有请求
+保留其配置快照，模型参数不会随密钥刷新。读取/保存接口只返回 configured 和 masked_key。
+不监听外部文件编辑；修改模型配置后需重新启动编辑器。文件不应包含 api_key。

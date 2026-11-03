@@ -1,0 +1,3 @@
+# Local AI credentials and optional model overrides.
+editor/.env
+editor/deepseek_settings.json
