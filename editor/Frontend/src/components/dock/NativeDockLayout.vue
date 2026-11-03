@@ -18,6 +18,7 @@ const hosts = createNativePanelHosts({
       width: panel.width, height: panel.height, dockingPos: panel.dockZone });
   },
   close: (tabId, id) => appService.closePanelTab(tabId, id),
+  focus: tabId => appService.focusPanelTab(tabId),
   onError: (error, id) => { console.error('[NativeDock]', error); if (id) store.closePanel(id); },
 });
 const stop = watch(() => Object.entries(store.panels)
@@ -28,5 +29,9 @@ function closed(payload) {
   if (hosts.closed(payload.panelId, payload.tabId)) store.closePanel(payload.panelId);
 }
 coronaEventBus.on('panel-closed', closed);
-onUnmounted(() => { stop(); coronaEventBus.off('panel-closed', closed); hosts.dispose(); });
+const focusPanel = id => { void hosts.focusPanel(id).catch(error => console.error('[NativeDock] focus failed', error)); };
+coronaEventBus.on('native-panel-focus', focusPanel);
+onUnmounted(() => {
+  stop(); coronaEventBus.off('panel-closed', closed); coronaEventBus.off('native-panel-focus', focusPanel); hosts.dispose();
+});
 </script>

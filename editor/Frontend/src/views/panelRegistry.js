@@ -29,6 +29,8 @@ const LightFieldCalibrationPanel = defineAsyncComponent(
 );
 
 export const PANEL_COMPONENTS = Object.freeze({
+  SceneControls: defineAsyncComponent(() => import('@/views/sidebar/SceneControls.vue')),
+  CabbageTasks: defineAsyncComponent(() => import('@/views/sidebar/CabbageTasks.vue')),
   SceneTools: SceneBar,
   LightFieldCalibration: LightFieldCalibrationPanel,
   Object: ObjectPanel,

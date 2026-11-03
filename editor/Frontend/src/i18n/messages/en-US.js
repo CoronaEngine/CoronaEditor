@@ -36,6 +36,8 @@ export default {
     yes: 'Yes',
   },
   plugins: {
+    SceneControls: 'Scene controls',
+    CabbageTasks: 'AI tasks',
     SceneTools: 'Scene Manager',
     LightFieldCalibration: 'Light Field 3D UI Calibration',
     Object: 'Object',

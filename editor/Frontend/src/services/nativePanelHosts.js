@@ -1,6 +1,6 @@
 // One browser per panel. Geometry and docking live in ImGui; this controller only
 // reconciles Web-owned open/close intent and protects asynchronous world teardown.
-export function createNativePanelHosts({ open, close, onError = console.error }) {
+export function createNativePanelHosts({ open, close, focus = async () => {}, onError = console.error }) {
   const hosts = new Map();
   let disposed = false;
   function reconcile(panels) {
@@ -38,5 +38,13 @@ export function createNativePanelHosts({ open, close, onError = console.error })
     return true;
   }
   function dispose() { disposed = true; reconcile([]); }
-  return { reconcile, closed, dispose };
+  async function focusPanel(id) {
+    const host = hosts.get(id);
+    if (!host) return false;
+    await host.pending;
+    if (disposed || hosts.get(id) !== host || !host.wanted || host.tabId === undefined) return false;
+    await focus(host.tabId);
+    return true;
+  }
+  return { reconcile, closed, dispose, focusPanel };
 }

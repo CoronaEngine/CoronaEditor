@@ -119,6 +119,8 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n';
 import DockTitleBar from '@/components/ui/DockTitleBar.vue';
 import { useDockPanel } from '@/composables/useDockPanel.js';
+import { isCurrentWindowEvent } from '@/services/appService.js';
+import { coronaEventBus } from '@/utils/eventBus.js';
 import { useCabbageAssistantStore } from '@/stores/cabbageAssistantStore.js';
 import { aiService } from '@/services/aiService.js';
 import { reviewScopeId } from '@/services/nodeGraphReviewService.js';
@@ -529,7 +531,6 @@ function resetChatForProjectStorageChange(event) {
 }
 
 function focusResidentComposer() {
-  if (!props.resident) return;
   nextTick(() => {
     const composer = composerInputRef.value;
     if (!composer) return;
@@ -540,11 +541,15 @@ function focusResidentComposer() {
     }
   });
 }
+const focusDockComposer = payload => {
+  if (isCurrentWindowEvent(payload) && payload.panelId === 'CabbageChatPanel') focusResidentComposer();
+};
 
 watch(() => assistant.messages.length, scrollToBottom);
 watch(streamingContent, scrollToBottom);
 
 onMounted(() => {
+  coronaEventBus.on('creative-panel-open', focusDockComposer);
   if (props.resident) {
     window.addEventListener('cabbage-chat-focus-request', focusResidentComposer);
   }
@@ -559,6 +564,7 @@ onMounted(() => {
 });
 
 onBeforeUnmount(() => {
+  coronaEventBus.off('creative-panel-open', focusDockComposer);
   window.removeEventListener('cabbage-chat-focus-request', focusResidentComposer);
   window.removeEventListener('corona-active-project-changed', resetChatForProjectChange);
   window.removeEventListener('storage', resetChatForProjectStorageChange);

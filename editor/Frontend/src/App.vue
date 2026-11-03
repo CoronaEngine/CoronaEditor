@@ -5,6 +5,7 @@ import { useDockStore } from '@/stores/dockStore.js';
 import { getPluginComponent } from '@/views/panelRegistry.js';
 import DockLayout from '@/components/dock/DockLayout.vue';
 import NativeDockLayout from '@/components/dock/NativeDockLayout.vue';
+import CabbageGuidanceOverlay from '@/components/ui/CabbageGuidanceOverlay.vue';
 import DockPanel from '@/components/dock/DockPanel.vue';
 import { editorApi } from '@/api/editorApi.js';
 import { appService } from '@/services/appService.js';
@@ -299,6 +300,7 @@ onUnmounted(() => {
 </script>
 
 <template>
+  <CabbageGuidanceOverlay v-if="worldReady && editorUiAllowed() && !isLauncherRoute" :key="worldModeState.projectPath" />
   <NativeDockLayout v-if="nativeDocking && isEditorRoute && worldReady" :key="worldModeState.projectPath" />
   <DockLayout v-else-if="isEditorRoute && worldReady" :key="worldModeState.projectPath" :component-resolver="getPluginComponent" />
   <div v-else-if="mayRenderRoute" :key="isLauncherRoute ? route.path : worldModeState.projectPath" :class="isStandalonePanel ? 'standalone-route-shell' : null">

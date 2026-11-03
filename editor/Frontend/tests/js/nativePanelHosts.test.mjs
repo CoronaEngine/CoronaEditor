@@ -40,3 +40,28 @@ test('an old close event cannot close a replacement panel', async () => {
   assert.equal(hosts.closed('Object', 1), false);
   assert.equal(hosts.closed('Object', 2), true);
 });
+
+test('focusing a newly opened dock waits for its browser without recreating it', async () => {
+  let reply, opens = 0;
+  const focused = [];
+  const hosts = createNativePanelHosts({ open: () => { opens++; return new Promise(resolve => { reply = resolve; }); },
+    close: async () => {}, focus: async id => focused.push(id) });
+  hosts.reconcile([{ id: 'CabbageChatPanel' }]);
+  const focus = hosts.focusPanel('CabbageChatPanel');
+  await tick(); reply({ tab_id: 22 });
+  assert.equal(await focus, true);
+  assert.deepEqual(focused, [22]);
+  assert.equal(opens, 1);
+});
+test('a late focus request cannot revive a closed world', async () => {
+  let reply;
+  const focused = [], closed = [];
+  const hosts = createNativePanelHosts({ open: () => new Promise(resolve => { reply = resolve; }),
+    close: async id => closed.push(id), focus: async id => focused.push(id) });
+  hosts.reconcile([{ id: 'SceneControls' }]);
+  const focus = hosts.focusPanel('SceneControls');
+  await tick(); hosts.dispose(); reply({ tab_id: 23 });
+  assert.equal(await focus, false);
+  assert.deepEqual(focused, []);
+  assert.deepEqual(closed, [23]);
+});

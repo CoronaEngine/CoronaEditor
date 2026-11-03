@@ -36,9 +36,13 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted } from 'vue';
 import { useI18n } from 'vue-i18n';
-import { guidanceService as guidance } from '@/services/cabbageGuidanceService.js';
+import { guidanceService as guidance, attachNativeGuidance } from '@/services/cabbageGuidanceService.js';
+import { useRoute } from 'vue-router';
+import { PLUGIN_MANIFEST } from '@/config/pluginManifest.js';
 
 const { t, locale } = useI18n();
+const route = useRoute();
+let detachGuidance = null;
 const step = computed(() => guidance.state.guidance?.steps?.[guidance.state.stepIndex] || null);
 const localizedStepText = computed(() => {
   const current = step.value || {};
@@ -88,8 +92,16 @@ function onKeydown(event) {
   }
 }
 
-onMounted(() => window.addEventListener('keydown', onKeydown, true));
-onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown, true));
+onMounted(() => {
+  window.addEventListener('keydown', onKeydown, true);
+  detachGuidance = attachNativeGuidance(route.path === '/' ? 'MainPage'
+    : PLUGIN_MANIFEST.find(panel => panel.routePath === route.path)?.id || '');
+});
+onBeforeUnmount(() => {
+  window.removeEventListener('keydown', onKeydown, true);
+  detachGuidance?.();
+  void guidance.stop({ restorePanelState: false });
+});
 </script>
 
 <style scoped>

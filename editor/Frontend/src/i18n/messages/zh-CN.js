@@ -36,6 +36,8 @@ export default {
     yes: '是',
   },
   plugins: {
+    SceneControls: '场景控制',
+    CabbageTasks: 'AI 任务',
     SceneTools: '场景管理',
     LightFieldCalibration: '光场 3D UI 标定',
     Object: '对象',

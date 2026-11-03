@@ -138,6 +138,8 @@ onUnmounted(() => {
 // routePath -> panelId（与 useDockPanel.getPanelIdFromRoute 保持一致）。redock 需要把
 // panelId 带进 panel-closed 广播，主窗口据此用 dockStore.popIn 恢复对应 DOM 面板。
 const ROUTE_TO_PANEL_ID = {
+  '/SceneControls': 'SceneControls',
+  '/CabbageTasks': 'CabbageTasks',
   '/SceneBar': 'SceneTools',
   '/Object': 'Object',
   '/Pet': 'AITool',

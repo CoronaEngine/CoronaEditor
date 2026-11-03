@@ -4,6 +4,18 @@
  */
 export const PLUGIN_MANIFEST = [
   {
+    id: 'SceneControls', routePath: '/SceneControls',
+    displayNameKey: 'plugins.SceneControls', displayName: '场景控制',
+    pageType: 'view', defaultDock: 'left', defaultWidth: 380, defaultHeight: 350,
+    autoInit: false, defaultOpenMode: 'docked',
+  },
+  {
+    id: 'CabbageTasks', routePath: '/CabbageTasks',
+    displayNameKey: 'plugins.CabbageTasks', displayName: 'AI 任务',
+    pageType: 'plugin', defaultDock: 'left', defaultWidth: 420, defaultHeight: 420,
+    autoInit: false, defaultOpenMode: 'docked',
+  },
+  {
     id: 'SceneTools',
     routePath: '/SceneBar',
     displayNameKey: 'plugins.SceneTools',
@@ -119,7 +131,7 @@ export const PLUGIN_MANIFEST = [
     displayNameKey: 'plugins.CabbageChatPanel',
     displayName: 'AI 创作助手',
     pageType: 'plugin',
-    defaultDock: 'right',
+    defaultDock: 'left',
     defaultWidth: 420,
     defaultHeight: 600,
     autoInit: false,

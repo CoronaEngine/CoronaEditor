@@ -8,6 +8,8 @@ import { appService } from '../services/appService.js';
 import { getPluginComponent } from '../views/panelRegistry.js';
 
 const routes = [
+  { path: '/SceneControls', name: 'SceneControls', component: getPluginComponent('SceneControls') },
+  { path: '/CabbageTasks', name: 'CabbageTasks', component: getPluginComponent('CabbageTasks') },
   {
     path: '/',
     name: 'MainPage',

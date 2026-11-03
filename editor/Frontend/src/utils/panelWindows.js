@@ -3,6 +3,8 @@ import { appService } from '@/services/appService.js';
 import { getPluginManifest, PLUGIN_MANIFEST } from '@/config/pluginManifest.js';
 
 export const FLOATING_PANEL_IDS = [
+  'SceneControls',
+  'CabbageTasks',
   'SceneTools',
   'Object',
   'NodeGraphPanel',

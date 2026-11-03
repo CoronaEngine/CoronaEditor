@@ -35,6 +35,8 @@ function getPanelIdFromRoute() {
   const hash = window.location.hash || '';
   const path = hash.replace('#', '').split('?')[0];
   const map = {
+    '/SceneControls': 'SceneControls',
+    '/CabbageTasks': 'CabbageTasks',
     '/SceneBar': 'SceneTools',
     '/Object': 'Object',
     '/Pet': 'AITool',

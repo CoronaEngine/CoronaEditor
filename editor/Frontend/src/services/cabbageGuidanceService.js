@@ -2,9 +2,14 @@
 import { useDockStore } from '@/stores/dockStore.js';
 import { closeFloatingPanel, openFloatingPanel } from '@/utils/panelWindows.js';
 import { getPluginManifest } from '@/config/pluginManifest.js';
+import { appService, isCurrentWindowEvent } from './appService.js';
+import { coronaEventBus } from '../utils/eventBus.js';
+import { createNativeGuidanceRelay } from './nativeGuidanceRelay.js';
 
 const PANEL_ZONES = Object.freeze({
   MainPage: 'center',
+  SceneControls: 'left',
+  CabbageChatPanel: 'left',
   SceneTools: 'right',
   Object: 'right',
   EditorSettings: 'right',
@@ -65,6 +70,32 @@ let exactTargetMissingTicks = 0;
 let exactTargetPrepareTicks = 0;
 let fromTargetPrepareTicks = 0;
 let lifecycleGuardsAttached = false;
+let nativeRelay = null;
+let nativePanelId = '';
+
+export function attachNativeGuidance(panelId) {
+  if (typeof window.coronaBridge?.dockCommand !== 'function') return () => {};
+  nativePanelId = panelId;
+  const send = (event, payload) => { void appService.crossTabBroadcast(event, payload).catch(() => {}); };
+  const relay = createNativeGuidanceRelay({ panelId, send,
+    open: id => send('creative-panel-open', { panelId: id }),
+    show: source => start(source, { local: true }),
+  });
+  nativeRelay = relay;
+  const handlers = {
+    'creative-guidance-request': payload => { if (isCurrentWindowEvent(payload)) void relay.receiveRequest(payload); },
+    'creative-guidance-ready': payload => { if (isCurrentWindowEvent(payload)) relay.receiveReady(payload); },
+    'creative-guidance-accepted': payload => { if (isCurrentWindowEvent(payload)) relay.receiveAccepted(payload); },
+  };
+  for (const [event, handler] of Object.entries(handlers)) coronaEventBus.on(event, handler);
+  relay.ready();
+  return () => {
+    relay.dispose();
+    if (nativeRelay === relay) { nativeRelay = null; nativePanelId = ''; }
+    for (const [event, handler] of Object.entries(handlers)) coronaEventBus.off(event, handler);
+    void stop({ restorePanelState: false });
+  };
+}
 
 function safeId(value) {
   return String(value || '').replace(/["\\]/g, '\\$&');
@@ -234,6 +265,18 @@ function stopRectTracking() {
 
 async function ensurePanel(panelId, selectorKey = '') {
   if (!panelId) return false;
+  if (nativePanelId === panelId) {
+    restoreState = null;
+    const selector = SELECTOR_KEYS[String(selectorKey || '')];
+    // App's overlay can mount before the lazy route component finishes loading.
+    for (let attempt = 0; attempt < 60; attempt++) {
+      if (nativePanelId !== panelId) return false;
+      window.dispatchEvent(new CustomEvent('cabbage-guidance-prepare', { detail: { panelId, selectorKey } }));
+      if (selector ? document.querySelector(selector) : document.querySelector('[data-guidance]')) return true;
+      await wait(50);
+    }
+    return false;
+  }
   if (panelId === 'MainPage') {
     restoreState = null;
     window.dispatchEvent(new CustomEvent('cabbage-guidance-prepare', {
@@ -313,7 +356,7 @@ const LEGACY_TUTORIAL_GUIDANCE = Object.freeze({
   },
   'tutorial.adjust_lighting': {
     panelId: 'MainPage',
-    steps: [stepFor('scene-lighting', 'click', '在页面左上角切换光照，或修改光照方向的任意轴。')],
+    steps: [stepFor('scene-lighting', 'click', '在“场景控制”面板中切换光照，或修改光照方向的任意轴。')],
   },
   'tutorial.adjust_physics': {
     panelId: 'Object',
@@ -774,7 +817,9 @@ function guidanceForTask(source = {}) {
 
 function panelIdForTarget(target = {}) {
   const selectorKey = String(target.selectorKey || '');
-  if (['main-viewport', 'scene-shortcut', 'node-shortcut', 'scene-lighting', 'scene-light-x', 'preview-start', 'preview-stop'].includes(selectorKey)) return 'MainPage';
+  if (['scene-lighting', 'scene-light-x'].includes(selectorKey)) return 'SceneControls';
+  if (selectorKey.startsWith('cabbage-chat-')) return 'CabbageChatPanel';
+  if (['main-viewport', 'scene-shortcut', 'node-shortcut', 'preview-start', 'preview-stop'].includes(selectorKey)) return 'MainPage';
   if (selectorKey.startsWith('scene-')) return 'SceneTools';
   if (selectorKey.startsWith('settings-')) return 'EditorSettings';
   if (selectorKey.startsWith('object-')) return 'Object';
@@ -885,10 +930,14 @@ function detachLifecycleGuards() {
   window.removeEventListener('beforeunload', handlePageUnload);
 }
 
-async function start(source) {
+async function start(source, { local = false } = {}) {
   const guidance = guidanceRegistry.resolve(source);
   if (!guidance) return false;
   if (state.active || state.preparing) await stop();
+  if (!local && nativeRelay && guidance.panelId !== nativePanelId) {
+    nativeRelay.request(guidance);
+    return true;
+  }
   const token = ++lifecycleToken;
   state.preparing = true;
   attachLifecycleGuards();

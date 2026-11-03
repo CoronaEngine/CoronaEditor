@@ -8,16 +8,20 @@ import { compile } from '@vue/compiler-ssr';
 import { renderToString } from '@vue/server-renderer';
 import { visionRenderModes, visionDenoisers } from '../../src/utils/visionRenderModes.js';
 
-const source = fs.readFileSync(new URL('../../src/views/layout/MainPage.vue', import.meta.url), 'utf8');
+const source = fs.readFileSync(new URL('../../src/views/sidebar/SceneControls.vue', import.meta.url), 'utf8');
 const { descriptor } = parse(source);
 const { code } = compile(descriptor.template.content, { mode: 'function' });
 const ssrRender = new Function('require', code)(createRequire(import.meta.url));
 
 async function renderMain(settings = {}) {
+  if (settings.currentMainCameraId) settings.cameraId = settings.currentMainCameraId();
   const noop = () => {};
   const app = createSSRApp({
     ssrRender,
     setup: () => ({
+      ready: true, error: "", isDocked: true, act: noop, select: noop, closePanel: noop,
+      activeMenu: settings.activeMenu ?? null, toggleMenu: noop, translate: key => key, visionDenoisers,
+      state: { available: true, sceneId: "scene.ini", cameraId: "camera-1",
       nativeViewportCursorEnabled: false, viewportUiMode: 'mono',
       translate: key => key, sceneLightSettings: { enabled: true, direction: { x: 0, y: -1, z: 0 } },
       sceneLightBusy: false, showDialog: false, projectResourceLoadStatus: null, showLocalModal: false,
@@ -39,15 +43,16 @@ async function renderMain(settings = {}) {
       mainRenderModeOptions: [{ value: 'native', backend: 'native', label: 'Native' }, ...visionRenderModes],
       selectMainRenderMode: noop, toggleMainVisionAccumulation: noop, toggleMainVisionDenoise: noop,
       ...settings,
+      },
     }),
   });
-  for (const name of ['FrameTimingOverlay', 'CabbageReviewAssistant', 'CabbageChatPanel', 'CabbageGuidanceOverlay', 'PtSettings', 'ReblurSettings', 'RelaxSettings']) {
+  for (const name of ['FrameTimingOverlay', 'CabbageReviewAssistant', 'CabbageChatPanel', 'CabbageGuidanceOverlay', 'PtSettings', 'ReblurSettings', 'RelaxSettings', 'RestirSettings']) {
     app.component(name, { render: () => null });
   }
   return renderToString(app);
 }
 
-test('main viewport actually renders a reachable mode selector and both independent checkboxes', async () => {
+test('docked scene controls render a reachable mode selector and both independent checkboxes', async () => {
   const html = await renderMain();
   assert.match(html, /<button[^>]*aria-label="渲染模式"[^>]*aria-expanded="false"/);
   assert.match(html, /Vision ReSTIR/);

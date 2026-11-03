@@ -317,178 +317,7 @@
       />
     </div>
 
-    <aside
-      class="scene-quick-controls"
-      :aria-label="translate('layout.sceneControls')"
-      @mousedown.stop
-      @pointerdown.stop
-      @click.stop
-      @wheel.stop
-    >
-      <section class="scene-quick-render" aria-label="渲染设置" data-guidance="render-settings"
-        :inert="creativeRenderDefaultsBusy" :aria-busy="creativeRenderDefaultsBusy">
-        <div class="scene-quick-render-mode">
-          <span>渲染模式</span>
-          <!-- CEF's offscreen renderer paints PET_VIEW only, so keep the menu in the page. -->
-          <div
-            class="scene-quick-render-menu"
-            @keydown.esc.stop="activeMenu = null; $refs.mainRenderModeButton?.focus()"
-          >
-            <button
-              ref="mainRenderModeButton"
-              type="button"
-              class="scene-quick-render-trigger"
-              aria-label="渲染模式"
-              aria-haspopup="menu"
-              :aria-expanded="activeMenu === 'render'"
-              :disabled="!currentMainCameraId()"
-              @click="toggleMenu('render')"
-              @keydown.down.prevent="activeMenu = 'render'"
-            >
-              <span>{{ mainRenderModeLabel }}</span>
-              <span aria-hidden="true">▾</span>
-            </button>
-            <div v-if="activeMenu === 'render'" class="scene-quick-render-dropdown" role="menu" aria-label="渲染模式选项">
-              <button
-                v-for="mode in mainRenderModeOptions"
-                :key="mode.value"
-                type="button"
-                role="menuitemradio"
-                :aria-checked="mode.value === (mainRenderBackend === 'vision' ? mainVisionRenderMode : 'native')"
-                :disabled="mode.backend === 'vision' && !visionAvailable"
-                @click="selectMainRenderMode(mode.value)"
-              >
-                {{ mode.label }}
-              </button>
-            </div>
-          </div>
-        </div>
-        <div class="scene-quick-render-mode">
-          <span>降噪类型</span>
-          <div
-            class="scene-quick-render-menu"
-            @keydown.esc.stop="activeMenu = null; $refs.mainDenoiserButton?.focus()"
-          >
-            <button
-              ref="mainDenoiserButton"
-              type="button"
-              class="scene-quick-render-trigger"
-              aria-label="降噪类型"
-              aria-haspopup="menu"
-              :aria-expanded="activeMenu === 'denoiser'"
-              :disabled="mainRenderBackend !== 'vision' || mainVisionRenderMode === 'ssat' || mainVisionDenoiserBusy || !currentMainCameraId()"
-              @click="toggleMenu('denoiser')"
-              @keydown.down.prevent="activeMenu = 'denoiser'"
-            >
-              <span>{{ mainVisionRenderMode === 'ssat' ? 'SSAT' : visionDenoisers.find(item => item.value === mainVisionDenoiser)?.label }}</span>
-              <span aria-hidden="true">▾</span>
-            </button>
-            <div v-if="activeMenu === 'denoiser'" class="scene-quick-render-dropdown" role="menu" aria-label="降噪类型选项">
-              <button
-                v-for="denoiser in visionDenoisers"
-                :key="denoiser.value"
-                type="button"
-                role="menuitemradio"
-                :aria-checked="denoiser.value === mainVisionDenoiser"
-                @click="selectMainVisionDenoiser(denoiser.value)"
-              >
-                {{ denoiser.label }}
-              </button>
-            </div>
-          </div>
-        </div>
-        <PtSettings :scene-id="currentMainSceneId()" :camera-id="currentMainCameraId() || ''"
-          :enabled="mainRenderBackend === 'vision' && mainVisionRenderMode === 'path_tracing'" />
-        <RestirSettings :scene-id="currentMainSceneId()" :camera-id="currentMainCameraId() || ''"
-          :enabled="mainRenderBackend === 'vision' && mainVisionRenderMode === 'restir'" />
-        <ReblurSettings :scene-id="currentMainSceneId()" :camera-id="currentMainCameraId() || ''"
-          :enabled="mainRenderBackend === 'vision' && mainVisionRenderMode !== 'ssat' && mainVisionDenoiser === 'reblur' && !mainVisionDenoiserBusy" />
-        <RelaxSettings :scene-id="currentMainSceneId()" :camera-id="currentMainCameraId() || ''"
-          :enabled="mainRenderBackend === 'vision' && mainVisionRenderMode !== 'ssat' && mainVisionDenoiser === 'relax' && !mainVisionDenoiserBusy" />
-        <div class="scene-quick-render-options">
-          <label title="累积 PT / ReSTIR 样本">
-            <input
-              type="checkbox"
-              aria-label="累积样本"
-              :checked="mainVisionAccumulation"
-              :disabled="mainRenderBackend !== 'vision' || mainVisionRenderMode === 'ssat' || mainVisionAccumulationBusy || !currentMainCameraId()"
-              @change="toggleMainVisionAccumulation"
-            />
-            <span>累积样本</span>
-          </label>
-          <label title="启用所选降噪算法">
-            <input
-              type="checkbox"
-              aria-label="降噪"
-              :checked="mainVisionDenoise"
-              :disabled="mainRenderBackend !== 'vision' || mainVisionRenderMode === 'ssat' || mainVisionDenoiseBusy || !currentMainCameraId()"
-              @change="toggleMainVisionDenoise"
-            />
-            <span>降噪</span>
-          </label>
-          <label title="ReSTIR Stable Plane">
-            <input
-              type="checkbox"
-              aria-label="Stable Plane"
-              :checked="mainVisionStablePlanes"
-              :disabled="mainRenderBackend !== 'vision' || mainVisionRenderMode !== 'restir' || mainVisionStablePlanesBusy || !currentMainCameraId()"
-              @change="toggleMainVisionStablePlanes"
-            />
-            <span>Stable Plane</span>
-          </label>
-        </div>
-        <p v-if="creativeRenderDefaultsError || mainVisionAccumulationError || mainVisionDenoiseError || mainVisionDenoiserError || mainVisionStablePlanesError" role="alert" class="text-red-300 text-xs">
-          {{ creativeRenderDefaultsError || mainVisionAccumulationError || mainVisionDenoiseError || mainVisionDenoiserError || mainVisionStablePlanesError }}
-        </p>
-      </section>
-      <label class="scene-quick-camera-speed" data-guidance="camera-speed">
-        <span>{{ translate('editorSettings.cameraSpeed') }}</span>
-        <input
-          type="range"
-          min="0.01"
-          max="2"
-          step="0.01"
-          :value="cameraSpeed"
-          :aria-label="translate('editorSettings.cameraSpeed')"
-          :title="translate('editorSettings.cameraSpeed')"
-          @input="setCameraSpeedFromPanel($event.target.value)"
-        />
-        <strong>{{ cameraSpeed.toFixed(2) }}</strong>
-      </label>
-      <section
-        class="scene-quick-lighting"
-        data-guidance="scene-lighting"
-        :data-assistant-title="translate('layout.sceneLighting')"
-        :data-assistant-description="translate('layout.sceneLightingDescription')"
-      >
-        <div class="scene-quick-lighting-header">
-          <span>{{ translate('layout.sceneLighting') }}</span>
-          <label class="scene-quick-light-toggle">
-            <input
-              v-model="sceneLightSettings.enabled"
-              type="checkbox"
-              :disabled="sceneLightBusy"
-              @change="updateSceneLight"
-            />
-            <span>{{ sceneLightSettings.enabled ? translate('common.yes') : translate('common.no') }}</span>
-          </label>
-        </div>
-        <div class="scene-quick-direction" :class="{ disabled: !sceneLightSettings.enabled || sceneLightBusy }">
-          <span class="scene-quick-direction-label">{{ translate('layout.lightDirection') }}</span>
-          <label v-for="axis in ['x', 'y', 'z']" :key="axis">
-            <span>{{ axis.toUpperCase() }}</span>
-            <input
-              v-model.number="sceneLightSettings.direction[axis]"
-              type="number"
-              step="0.1"
-              :disabled="!sceneLightSettings.enabled || sceneLightBusy"
-              :data-guidance="axis === 'x' ? 'scene-light-x' : undefined"
-              @change="updateSceneLight(axis)"
-            />
-          </label>
-        </div>
-      </section>
-    </aside>
+
 
     <div
       v-if="projectResourceLoadStatus?.loading"
@@ -591,7 +420,7 @@
           pending: dockShortcutPending.has(shortcut.id),
         }"
         :aria-busy="dockShortcutPending.has(shortcut.id)"
-        :data-guidance="shortcut.id === 'SceneTools' ? 'scene-shortcut' : 'node-shortcut'"
+        :data-guidance="shortcut.guidance || (shortcut.id === 'SceneTools' ? 'scene-shortcut' : 'node-shortcut')"
         :title="`${isShortcutOpen(shortcut.id) ? '关闭' : '打开'}${shortcut.label}`"
         @click.stop="toggleDockShortcut(shortcut.id, { source: 'user' })"
       >
@@ -600,34 +429,12 @@
       </button>
     </nav>
 
-    <aside
-      class="cabbage-resident-stack"
-      aria-label="包菜任务与答疑"
-      @mousedown.stop
-      @pointerdown.stop
-      @click.stop
-      @wheel.stop
-    >
-      <CabbageReviewAssistant
-        resident
-        class="cabbage-resident-tasks"
-        :tasks="cabbageAssistant.tasks"
-        :attention-token="cabbageAssistant.attentionToken"
-      />
-      <div v-if="!cabbageChatDetached" class="cabbage-resident-chat">
-        <CabbageChatPanel resident @detach="detachResidentCabbageChat" />
-      </div>
-    </aside>
-    <CabbageGuidanceOverlay />
+
   </div>
 </template>
 
 <script setup>
 import FrameTimingOverlay from '@/components/ui/FrameTimingOverlay.vue';
-import PtSettings from '@/components/ui/PtSettings.vue';
-import RestirSettings from '@/components/ui/RestirSettings.vue';
-import ReblurSettings from '@/components/ui/ReblurSettings.vue';
-import RelaxSettings from '@/components/ui/RelaxSettings.vue';
 import { computed, ref, onMounted, onUnmounted, reactive, watch, nextTick } from 'vue';
 import { useRouter } from 'vue-router';
 import { useI18n } from 'vue-i18n';
@@ -671,9 +478,6 @@ import {
   isNativeViewportCursorEnabled,
 } from '@/utils/viewportUiMode.js';
 import { createServiceInitializationRetry } from '@/utils/serviceInitialization.js';
-import CabbageReviewAssistant from '@/components/ui/CabbageReviewAssistant.vue';
-import CabbageChatPanel from '@/views/sidebar/CabbageChatPanel.vue';
-import CabbageGuidanceOverlay from '@/components/ui/CabbageGuidanceOverlay.vue';
 import { reviewScopeId, subscribeNodeGraphReviews } from '@/services/nodeGraphReviewService.js';
 import { useCabbageAssistantStore } from '@/stores/cabbageAssistantStore.js';
 import {
@@ -689,6 +493,7 @@ import { flushProjectNodeGraphBeforeRun } from '@/services/nodeGraphRuntimeServi
 import { cancelActiveNodeGraphGeneration } from '@/services/nodeGraphGenerationService.js';
 import { setActorContext } from '@/blockly/composables/useActorContext.js';
 import { closeTutorialSessionChannel } from '@/services/cabbageTutorialSessionService.js';
+import { provideCreativePanelState } from '@/services/creativePanelState.js';
 
 const { error: logError, warn: logWarn } = useErrorHandler('MainPage');
 
@@ -708,15 +513,14 @@ const { t: translate } = useI18n();
 const dockStore = useDockStore();
 const cabbageAssistant = useCabbageAssistantStore();
 const dockShortcuts = [
+  { id: 'SceneControls', label: '场景控制', icon: '控', guidance: 'controls-shortcut' },
+  { id: 'CabbageTasks', label: 'AI 任务', icon: '任', guidance: 'tasks-shortcut' },
+  { id: 'CabbageChatPanel', label: 'AI 对话', icon: 'AI', guidance: 'chat-shortcut' },
   { id: 'SceneTools', label: '场景管理', icon: '景' },
   { id: 'NodeGraphPanel', label: '节点', icon: '点' },
 ];
 const dockShortcutPending = reactive(new Set());
 const isShortcutOpen = (id) => Boolean(dockStore.panels[id]?.open);
-const cabbageChatDetached = computed(() => {
-  const panel = dockStore.panels.CabbageChatPanel;
-  return Boolean(panel?.open && panel.mode === 'external');
-});
 const openDockedPanel = (id, { preserveZone = false } = {}) => {
   const panel = dockStore.panels[id];
   const manifest = PLUGIN_MANIFEST.find((item) => item.id === id);
@@ -728,33 +532,25 @@ const openDockedPanel = (id, { preserveZone = false } = {}) => {
   dockStore.openPanel(id);
   nextTick(() => window.dispatchEvent(new Event('resize')));
 };
-const detachResidentCabbageChat = async () => {
-  if (cabbageAssistant.chatBusy || cabbageChatDetached.value) return;
-  const panelId = 'CabbageChatPanel';
-  const manifest = PLUGIN_MANIFEST.find((item) => item.id === panelId);
-  if (!manifest) return;
-  try {
-    const result = await appService.createDetachedPanel({
-      panelId,
-      routePath: '#' + (manifest.routePath || ''),
-      width: Math.max(420, Number(manifest.defaultWidth) || 420),
-      height: Math.max(640, Number(manifest.defaultHeight) || 640),
-      x: 120,
-      y: 120,
-    });
-    const tabId = result?.tab_id ?? result?.data?.tab_id;
-    dockStore.setExternal(panelId, tabId);
-  } catch (error) {
-    logError('Failed to detach resident Cabbage chat', error);
-  }
-};
-
 const recordPanelOpened = (id, source = 'user') => cabbageContextService.recordEvent({
   type: 'panel_opened',
   category: 'panel',
   success: true,
   details: { panelId: id, source },
 });
+
+const handleCreativePanelOpen = async payload => {
+  if (!viewCurrent() || (typeof window.coronaBridge?.dockCommand === 'function' && !isCurrentWindowEvent(payload))) return;
+  if (!PLUGIN_MANIFEST.some(panel => panel.id === payload.panelId)) return;
+  const panel = dockStore.panels[payload.panelId];
+  if (panel?.mode === 'external') {
+    await appService.focusPanelTab(panel.externalTabId);
+  } else {
+    openDockedPanel(payload.panelId, { preserveZone: true });
+    await nextTick();
+    if (viewCurrent()) coronaEventBus.emit('native-panel-focus', payload.panelId);
+  }
+};
 
 const toggleDockShortcut = async (id, { source = 'user' } = {}) => {
   const wasOpen = Boolean(dockStore.panels[id]?.open);
@@ -3220,6 +3016,7 @@ onMounted(async () => {
 
   // 跨窗口事件监听：panel / loading / viewport 等 UI 本地通道
   coronaEventBus.on('panel-redock-request', handlePanelRedockRequest);
+  coronaEventBus.on('creative-panel-open', handleCreativePanelOpen);
   coronaEventBus.on('panel-closed', handlePanelClosed);
   coronaEventBus.on('loading-show', showLoading);
   coronaEventBus.on('loading-update', updateLoading);
@@ -3307,6 +3104,7 @@ onUnmounted(() => {
   closeTutorialSessionChannel();
   coronaEventBus.off('model-node-selection', handleModelNodeGizmoSelection);
   coronaEventBus.off('panel-redock-request', handlePanelRedockRequest);
+  coronaEventBus.off('creative-panel-open', handleCreativePanelOpen);
   coronaEventBus.off('panel-closed', handlePanelClosed);
   for (const timer of pendingPanelRedocks.values()) window.clearTimeout(timer);
   pendingPanelRedocks.clear();
@@ -3373,6 +3171,36 @@ onUnmounted(() => {
   document.removeEventListener('mouseup', onMouseUp);
   document.removeEventListener('contextmenu', onContextMenu);
 });
+provideCreativePanelState(() => ({
+  sceneId: currentMainSceneId(), cameraId: currentMainCameraId(),
+  cameraHandle: cameraBindingState.value.cameraHandle,
+  available: !creativeRenderDefaultsBusy.value && Boolean(cameraBindingState.value.cameraHandle),
+  mainRenderBackend: mainRenderBackend.value, mainRenderModeLabel: mainRenderModeLabel.value,
+  mainRenderModeOptions, visionAvailable: visionAvailable.value,
+  mainVisionRenderMode: mainVisionRenderMode.value, mainVisionDenoiser: mainVisionDenoiser.value,
+  mainVisionAccumulation: mainVisionAccumulation.value, mainVisionDenoise: mainVisionDenoise.value,
+  mainVisionStablePlanes: mainVisionStablePlanes.value,
+  mainVisionAccumulationBusy: mainVisionAccumulationBusy.value, mainVisionDenoiseBusy: mainVisionDenoiseBusy.value,
+  mainVisionDenoiserBusy: mainVisionDenoiserBusy.value, mainVisionStablePlanesBusy: mainVisionStablePlanesBusy.value,
+  mainVisionAccumulationError: mainVisionAccumulationError.value, mainVisionDenoiseError: mainVisionDenoiseError.value,
+  mainVisionDenoiserError: mainVisionDenoiserError.value, mainVisionStablePlanesError: mainVisionStablePlanesError.value,
+  creativeRenderDefaultsBusy: creativeRenderDefaultsBusy.value, creativeRenderDefaultsError: creativeRenderDefaultsError.value,
+  cameraSpeed: cameraSpeed.value, sceneGridEnabled: sceneGridEnabled.value, viewportUiMode: viewportUiMode.value,
+  sceneLightSettings, sceneLightBusy: sceneLightBusy.value,
+}), {
+  selectMainRenderMode, selectMainVisionDenoiser, toggleMainVisionAccumulation,
+  toggleMainVisionDenoise, toggleMainVisionStablePlanes, setCameraSpeedFromPanel,
+  setSceneLightEnabled: async enabled => {
+    sceneLightSettings.enabled = Boolean(enabled);
+    await updateSceneLight();
+  },
+  setSceneLightDirection: async (axis, value) => {
+    if (!['x', 'y', 'z'].includes(axis) || !Number.isFinite(value)) return;
+    sceneLightSettings.direction[axis] = value;
+    await updateSceneLight(axis);
+  },
+}, viewCurrent);
+
 </script>
 
 <style scoped>
@@ -3384,217 +3212,6 @@ onUnmounted(() => {
 .viewport-cursor-hidden,
 .viewport-cursor-hidden * {
   cursor: none !important;
-}
-
-.scene-quick-controls {
-  position: absolute;
-  top: 12px;
-  left: 12px;
-  z-index: 2147483000;
-  width: min(356px, calc(100% - 24px));
-  padding: 9px;
-  border: 1px solid rgba(179, 153, 93, 0.42);
-  border-radius: 4px;
-  background: rgba(12, 18, 14, 0.94);
-  box-shadow:
-    inset 0 0 24px rgba(0, 0, 0, 0.55),
-    0 10px 30px rgba(0, 0, 0, 0.45),
-    0 0 18px rgba(179, 153, 93, 0.06);
-  backdrop-filter: blur(8px);
-  color: #e8ede3;
-  clip-path: polygon(12px 0, 100% 0, 100% calc(100% - 12px), calc(100% - 12px) 100%, 0 100%, 0 12px);
-  pointer-events: auto;
-}
-
-.scene-quick-render {
-  padding-bottom: 9px;
-  margin-bottom: 9px;
-  border-bottom: 1px solid #4d4024;
-  font-size: 11px;
-}
-
-.scene-quick-render-mode,
-.scene-quick-render-options,
-.scene-quick-render-options label {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-}
-
-.scene-quick-render-mode {
-  justify-content: space-between;
-  font-family: var(--ce-font-display);
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  color: #e6d5a7;
-}
-
-.scene-quick-render-menu {
-  position: relative;
-  min-width: 0;
-  flex: 0 1 180px;
-}
-
-.scene-quick-render-trigger {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  width: 100%;
-  padding: 4px 6px;
-  border: 1px solid #4d4024;
-  border-radius: 2px;
-  background: #101711;
-  color: #e8ede3;
-}
-
-.scene-quick-render-dropdown {
-  position: absolute;
-  top: calc(100% + 4px);
-  left: 0;
-  right: 0;
-  z-index: 1;
-  padding: 4px;
-  border: 1px solid #8a7440;
-  border-radius: 2px;
-  background: #101711;
-  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.6);
-}
-
-.scene-quick-render-dropdown button {
-  display: block;
-  width: 100%;
-  padding: 7px 8px;
-  border-radius: 3px;
-  text-align: left;
-}
-
-.scene-quick-render-dropdown button[aria-checked='true'] {
-  color: #e6d5a7;
-  background: #1d2820;
-}
-
-.scene-quick-render-dropdown button:not(:disabled):hover,
-.scene-quick-render-dropdown button:not(:disabled):focus-visible {
-  background: #2b362d;
-  color: #e6d5a7;
-}
-
-.scene-quick-render-options {
-  margin-top: 8px;
-  gap: 18px;
-}
-
-.scene-quick-render-options input {
-  accent-color: #b3995d;
-}
-
-.scene-quick-render input:disabled,
-.scene-quick-render button:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.scene-quick-camera-speed {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  padding-bottom: 9px;
-  margin-bottom: 9px;
-  border-bottom: 1px solid #4d4024;
-  font-size: 11px;
-}
-
-.scene-quick-camera-speed span {
-  white-space: nowrap;
-}
-
-.scene-quick-camera-speed input {
-  flex: 1;
-  min-width: 0;
-  accent-color: #b3995d;
-  cursor: pointer;
-}
-
-.scene-quick-camera-speed input:focus-visible {
-  outline: 2px solid #b3995d;
-  outline-offset: 3px;
-}
-
-.scene-quick-camera-speed strong {
-  min-width: 32px;
-  text-align: right;
-  font-variant-numeric: tabular-nums;
-}
-
-.scene-quick-lighting-header,
-.scene-quick-direction,
-.scene-quick-light-toggle,
-.scene-quick-direction label {
-  display: flex;
-  align-items: center;
-}
-
-.scene-quick-lighting {
-  margin: 0;
-}
-
-.scene-quick-lighting-header {
-  justify-content: space-between;
-  color: #eadfbd;
-  font-size: 11px;
-  font-weight: 700;
-}
-
-.scene-quick-light-toggle {
-  gap: 5px;
-  color: #bfb493;
-  font-size: 10px;
-  font-weight: 500;
-}
-
-.scene-quick-light-toggle input {
-  accent-color: #b3995d;
-}
-
-.scene-quick-direction {
-  min-width: 0;
-  margin-top: 7px;
-  gap: 5px;
-}
-
-.scene-quick-direction.disabled {
-  opacity: 0.5;
-}
-
-.scene-quick-direction-label {
-  flex: 0 0 auto;
-  margin-right: 2px;
-  color: #a99d80;
-  font-size: 10px;
-}
-
-.scene-quick-direction label {
-  min-width: 0;
-  flex: 1 1 0;
-  gap: 3px;
-  color: #91876e;
-  font-size: 9px;
-}
-
-.scene-quick-direction input {
-  width: 100%;
-  min-width: 0;
-  padding: 4px 5px;
-  border: 1px solid #4d4024;
-  border-radius: 4px;
-  outline: none;
-  background: #0c120e;
-  color: #e8ede3;
-  font-size: 10px;
-}
-
-.scene-quick-direction input:focus {
-  border-color: #b3995d;
 }
 
 .dock-shortcut-bar {
@@ -3616,36 +3233,8 @@ onUnmounted(() => {
 @keyframes dock-shortcut-pulse { from { opacity: .48; } to { opacity: 1; } }
 .dock-shortcut-icon { display:grid; place-items:center; width:19px; height:19px; border-radius:4px; background:#0e0d09; color:#d6b66b; font-size:10px; font-weight:700; }
 
-.cabbage-resident-stack {
-  position: absolute;
-  left: 12px;
-  bottom: 12px;
-  z-index: 2147482500;
-  width: min(418px, calc(100% - 24px));
-  max-height: calc(100% - 24px);
-  display: flex;
-  flex-direction: column;
-  gap: 9px;
-  pointer-events: auto;
-}
-.cabbage-resident-tasks {
-  min-height: 0;
-  flex: 1 1 auto;
-}
-.cabbage-resident-chat {
-  height: clamp(340px, 52vh, 500px);
-  min-height: 320px;
-  flex: 0 1 auto;
-  overflow: hidden;
-}
 @media (max-width: 720px) {
-  .scene-quick-controls { width: min(330px, calc(100% - 24px)); }
   .dock-shortcut-bar { max-width: calc(100vw - 32px); overflow-x: auto; }
   .dock-shortcut-button { padding: 7px 8px; white-space: nowrap; }
-  .cabbage-resident-stack { width: min(390px, calc(100% - 24px)); }
-}
-@media (max-height: 680px) {
-  .cabbage-resident-stack { max-height: calc(100% - 16px); bottom: 8px; }
-  .cabbage-resident-chat { height: clamp(270px, 48vh, 370px); min-height: 250px; }
 }
 </style>
