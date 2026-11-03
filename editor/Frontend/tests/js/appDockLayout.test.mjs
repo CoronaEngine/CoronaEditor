@@ -8,7 +8,6 @@ import { babelParse, compileScript, parse } from 'vue/compiler-sfc';
 import { compile } from '@vue/compiler-ssr';
 import { renderToString } from '@vue/server-renderer';
 import * as manifests from '../../src/config/pluginManifest.js';
-import { createNativePanelHosts } from '../../src/services/nativePanelHosts.js';
 import { createDockOverlayStyles } from '../../src/components/dock/dockOverlayLayout.js';
 
 const require = createRequire(import.meta.url);
@@ -56,9 +55,6 @@ async function renderApp({ path = '/', standalone = false } = {}) {
   const appService = {
     setEditorUiEnabled: asyncNoop,
     readEditorUiPolicy: async () => ({ enabled: true }),
-    createDockedPanel: async () => ({ tab_id: 12 }),
-    closePanelTab: asyncNoop,
-    focusPanelTab: asyncNoop,
   };
   const route = { path, matched: [{}], query: standalone ? { standalone: '1' } : {} };
   const empty = { render: () => null };
@@ -70,7 +66,6 @@ async function renderApp({ path = '/', standalone = false } = {}) {
     '@/stores/dockStore.js': { useDockStore: () => useDockStore(pinia) },
     '@/config/pluginManifest.js': manifests,
     '@/services/appService.js': { appService },
-    '@/services/nativePanelHosts.js': { createNativePanelHosts },
     '@/services/editorWindowSession.js': { EDITOR_UI_POLICY_KEY: 'policy' },
     '@/services/worldModeService.js': {
       LAUNCHER_ROUTES: new Set(['/StartScreen', '/NewGame', '/JoinGame', '/RecentGames']),
@@ -91,9 +86,6 @@ async function renderApp({ path = '/', standalone = false } = {}) {
   modules['@/components/dock/DockPanel.vue'] = { default: panel };
   modules['@/components/dock/DockLayout.vue'] = {
     default: component('components/dock/DockLayout.vue', modules, window),
-  };
-  modules['@/components/dock/NativeDockLayout.vue'] = {
-    default: component('components/dock/NativeDockLayout.vue', modules, window),
   };
   const App = component('App.vue', modules, window);
   const scope = Vue.effectScope();
