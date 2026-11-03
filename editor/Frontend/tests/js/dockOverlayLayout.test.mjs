@@ -53,3 +53,11 @@ test('hidden side docks do not reserve overlay space', () => {
   assert.equal(styles.bottom.left, '0px');
   assert.equal(styles.bottom.right, '0px');
 });
+
+test('side docks and resize handles leave the editor menu accessible', () => {
+  const styles = createDockOverlayStyles({ topInset: 40, leftWidth: 360, rightWidth: 400 });
+  for (const region of ['left', 'right', 'leftSeparator', 'rightSeparator']) {
+    assert.equal(styles[region].top, '40px');
+  }
+  assert.deepEqual(styles.viewport, { inset: '0' });
+});

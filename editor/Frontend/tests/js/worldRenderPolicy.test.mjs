@@ -38,12 +38,12 @@ function creative({ newProject = false, cameraId = 'camera-2', reply } = {}) {
 }
 
 for (const newProject of [false, true]) {
-  test(`${newProject ? 'new' : 'continued'} creative worlds select Native even with a saved Vision camera`, async () => {
+  test(`${newProject ? 'new' : 'continued'} creative worlds select Vision and retain the saved tracing algorithm`, async () => {
     const { host, calls } = creative({ newProject });
     assert.equal(await host.initializeCreativeRenderMode(), true);
-    assert.deepEqual(calls, [['native', 'scene.ini', 'camera-2']]);
-    assert.equal(host.mainRenderBackend.value, 'native');
-    assert.equal(host.mainVisionRenderMode.value, 'restir', 'inactive Vision preferences are retained');
+    assert.deepEqual(calls, [['vision', 'scene.ini', 'camera-2']]);
+    assert.equal(host.mainRenderBackend.value, 'vision');
+    assert.equal(host.mainVisionRenderMode.value, 'restir', 'saved tracing preferences are retained');
     assert.equal(host.bindings, 1);
     assert.equal(host.creativeRenderDefaultsBusy.value, false);
   });
@@ -52,14 +52,14 @@ for (const newProject of [false, true]) {
 test('first creative entry selects the active camera before a snapshot is bound', async () => {
   const { host, calls } = creative({ cameraId: null });
   assert.equal(await host.initializeCreativeRenderMode(), true);
-  assert.deepEqual(calls, [['native', 'scene.ini', null]]);
+  assert.deepEqual(calls, [['vision', 'scene.ini', null]]);
 });
 
-test('a rejected Native selection does not bind the saved Vision viewport', async () => {
-  const { host } = creative({ reply: () => ({ mode: 'vision' }) });
+test('a rejected Vision selection does not bind a Native viewport as successful ray tracing', async () => {
+  const { host } = creative({ reply: () => ({ mode: 'native' }) });
   assert.equal(await host.initializeCreativeRenderMode(), false);
   assert.equal(host.bindings, 0);
-  assert.match(host.creativeRenderDefaultsError.value, /Native/);
+  assert.match(host.creativeRenderDefaultsError.value, /Vision/);
 });
 
 test('stale world selection cannot start or finish rendering initialization', async () => {
@@ -78,21 +78,21 @@ test('stale world selection cannot start or finish rendering initialization', as
   await Promise.resolve();
   assert.equal(drained, false, 'a world switch must wait for the outstanding backend command');
   current = false;
-  resolve({ mode: 'native' });
+  resolve({ mode: 'vision' });
   assert.equal(await pending, false);
   await draining;
 });
 
-test('Native backend errors propagate instead of silently continuing with Vision', async () => {
+test('Vision backend errors propagate instead of silently continuing with Native', async () => {
   const api = { sceneTools: { setRenderBackend: async () => { throw new Error('bridge unavailable'); } } };
   await assert.rejects(initializeWorldRenderBackend({ api, sceneId: 'scene.ini', isCurrent: () => true }), /bridge unavailable/);
 });
 
-test('restored camera windows select Native before they become visible', async () => {
+test('restored Native camera windows select Vision before they become visible', async () => {
   const node = babelParse(source, { sourceType: 'module' }).program.body.find(node =>
     node.type === 'VariableDeclaration' && node.declarations.some(item => item.id.name === 'restoreCameraViews'));
-  const cameras = [{ camera_id: 'saved-camera', render_backend: 'vision', view_open: true },
-    { camera_id: 'closed-camera', render_backend: 'vision', view_open: false }];
+  const cameras = [{ camera_id: 'saved-camera', render_backend: 'native', view_open: true },
+    { camera_id: 'closed-camera', render_backend: 'native', view_open: false }];
   const calls = [];
   const restore = new Function('initializeWorldRenderBackend', 'editorApi', 'appService', `
     const viewCurrent = () => true, logError = error => { throw error; };
@@ -103,5 +103,5 @@ test('restored camera windows select Native before they become visible', async (
     setRenderBackend: async (...args) => { calls.push(['backend', ...args]); return { mode: args[0] }; },
   } }, { createCameraView: async camera => calls.push(['open', camera.camera_id]) });
   await restore('scene.ini');
-  assert.deepEqual(calls, [['backend', 'native', 'scene.ini', 'saved-camera'], ['open', 'saved-camera']]);
+  assert.deepEqual(calls, [['backend', 'vision', 'scene.ini', 'saved-camera'], ['open', 'saved-camera']]);
 });

@@ -24,6 +24,7 @@ function buildDefaultPanels() {
 export const useDockStore = defineStore('dock', {
   state: () => ({
     panels: buildDefaultPanels(),
+    defaultLayoutInitialized: false,
     leftWidth: 360,
     rightWidth: 400,
     bottomHeight: 320,
@@ -64,6 +65,7 @@ export const useDockStore = defineStore('dock', {
 
   actions: {
     clearSession() {
+      this.defaultLayoutInitialized = false;
       this.draggingId = null;
       this.dragOverZone = null;
       for (const panel of Object.values(this.panels)) {
@@ -185,7 +187,8 @@ export const useDockStore = defineStore('dock', {
     },
 
     initDefaultLayout() {
-      if (!editorUiAllowed()) return;
+      if (!editorUiAllowed() || this.defaultLayoutInitialized) return;
+      this.defaultLayoutInitialized = true;
       for (const p of PLUGIN_MANIFEST) {
         if (p.autoInit && this.panels[p.id]) {
           this.panels[p.id].open = true;

@@ -2,8 +2,7 @@
   <div class="relative flex flex-col flex-1 min-h-0 h-full w-full" tabindex="0">
     <!-- 顶部菜单栏 -->
     <div
-      v-if="false"
-      class="w-full bg-[#202b22] text-gray-200 border-b border-gray-700 h-10 flex items-center px-4 space-x-6 text-sm shadow-md"
+      class="relative z-40 shrink-0 w-full bg-[#202b22] text-gray-200 border-b border-gray-700 h-10 flex items-center px-4 space-x-6 text-sm shadow-md"
     >
       <!-- 项目菜单 -->
       <div class="relative">
@@ -439,7 +438,6 @@ import { computed, ref, onMounted, onUnmounted, reactive, watch, nextTick } from
 import { useRouter } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import { DEFAULT_SCENE_NAME } from '@/utils/constants.js';
-import { resolveOpenedProjectScene } from '@/utils/projectSceneLifecycle.js';
 import {
   normalizeVisionRenderMode, visionAccumulationFromCamera, visionDenoiseFromCamera, visionStablePlanesFromCamera, visionRenderModes,
   visionDenoisers, visionDenoiserFromCamera,
@@ -451,7 +449,7 @@ import {
 import { appService, isCurrentWindowEvent } from '@/services/appService.js';
 import { worldModeState } from '@/services/worldModeService.js';
 import { initializeWorldRenderBackend } from '@/services/worldRenderPolicy.js';
-import { projectLauncherService } from '@/services/projectLauncherService.js';
+import { projectLauncherService, resolveOpenedProjectScene } from '@/services/projectLauncherService.js';
 import { useErrorHandler } from '@/composables/useErrorHandler.js';
 import { useDockStore } from '@/stores/dockStore.js';
 import { PLUGIN_MANIFEST } from '@/config/pluginManifest.js';
@@ -604,7 +602,7 @@ const cameraState = ref({
 });
 
 const cameraBindingState = ref({
-  sceneId: DEFAULT_SCENE_NAME,
+  sceneId: null,
   cameraId: null,
   cameraName: null,
   cameraHandle: null,
@@ -999,7 +997,7 @@ let tutorialPreviewObservedRunning = false;
 const visionAvailable = ref(false);
 const creativeRenderDefaultsBusy = ref(true);
 const creativeRenderDefaultsError = ref('');
-const mainRenderBackend = ref('native');
+const mainRenderBackend = ref('vision');
 const mainVisionRenderMode = ref('path_tracing');
 const mainVisionAccumulation = ref(false);
 const mainVisionAccumulationBusy = ref(false);
@@ -1255,8 +1253,8 @@ const toggleMenu = (menu) => {
   }
 };
 
-// Apply Native both before first binding and after restoring camera windows,
-// which can recreate the camera from an archive that still remembers Vision.
+// Apply Vision both before first binding and after restoring camera windows,
+// which can recreate the camera from an archive that still remembers Native.
 const initializeCreativeRenderMode = async () => {
   const sceneId = currentMainSceneId();
   const cameraId = currentMainCameraId();
@@ -1268,9 +1266,9 @@ const initializeCreativeRenderMode = async () => {
   creativeRenderDefaultsError.value = '';
   try {
     if (!await initializeWorldRenderBackend({ api: editorApi, sceneId, cameraId, isCurrent: current })) return false;
-    pendingMainRenderSelection = { sceneId, cameraId, backend: 'native',
+    pendingMainRenderSelection = { sceneId, cameraId, backend: 'vision',
       visionMode: mainVisionRenderMode.value, expiresAt: Date.now() + 3000 };
-    mainRenderBackend.value = 'native';
+    mainRenderBackend.value = 'vision';
     await syncSceneCameraBinding(sceneId, { preservePose: true });
     return true;
   } catch (error) {
@@ -2142,6 +2140,7 @@ const finishScratchClickFromPick = (payload, result) => {
 };
 
 const onMouseDown = (event) => {
+  if (!viewportPickSurfaceRef.value?.contains(event.target)) return;
   if (cameraControls.pointerDown(event)) {
     mouseRotateStartForward = [...cameraState.value.forward];
     mouseRotateMoved = false;
@@ -3036,21 +3035,6 @@ onMounted(async () => {
   coronaEventBus.on('model-node-selection', handleModelNodeGizmoSelection);
   coronaEventBus.on('viewport-ui-calibration-changed', applyViewportUiCalibration);
 
-  // Primary work docks start hidden. If this main CEF page is reused, close any native
-  // floating tab left by the previous project before resetting the shortcut state.
-  for (const panelId of [
-    ...dockShortcuts.map((item) => item.id),
-    'Object',
-    'CabbageChatPanel',
-  ]) {
-    const panelState = dockStore.panels[panelId];
-    if (panelState?.mode === 'external') {
-      await closeFloatingPanel(dockStore, panelId);
-      if (!viewCurrent()) return;
-    } else {
-      dockStore.closePanel(panelId);
-    }
-  }
   await syncSceneCameraBinding(initialSceneId);
   if (!viewCurrent()) return;
   broadcastViewportControlsState();

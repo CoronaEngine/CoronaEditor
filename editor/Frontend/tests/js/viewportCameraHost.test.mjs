@@ -38,7 +38,7 @@ const declarations = babelParse(descriptor.scriptSetup.content, { sourceType: 'm
 // Execute the real creative camera host declarations with unrelated services stubbed.
 // No duplicate handlers or movement algorithms live in this test.
 const names = new Set([
-  'cameraState', 'cameraBindingState', 'cameraSpeed', 'mouseSensitivity',
+  'cameraState', 'cameraBindingState', 'cameraSpeed', 'mouseSensitivity', 'viewportPickSurfaceRef',
   'cameraMovementGestures', 'movementAxisGroups', 'mouseRotateStartForward', 'mouseRotateMoved',
   'cameraControls', 'isRealtimeCameraInputActive', 'scheduleCameraUpdate',
   'vectorDistance', 'scratchMouseButton', 'sendScratchPointerEvent', 'handleWheel',
@@ -72,7 +72,8 @@ const makeHost = new Function('deps', `
   ${hostSource}
   return { ${[...names].join(', ')} };
 `);
-const input = (props = {}) => ({ preventDefault() {}, stopPropagation() {}, ...props });
+const viewportTarget = {};
+const input = (props = {}) => ({ target: viewportTarget, preventDefault() {}, stopPropagation() {}, ...props });
 const snapshot = (handle = 12, position = [0, 0, 0]) => ({ status: 'success', scene: 'scene.ini', active_camera_name: 'main', cameras: [
   { handle, name: 'main', position, forward: [0, 0, 1], world_up: [0, 1, 0], fov: 60 },
 ] });
@@ -97,6 +98,7 @@ function mountCreative(t, { native = true } = {}) {
     refreshSceneCameraBinding: () => { refreshes++; }, syncSceneCameraBinding() {},
     broadcastViewportControlsState() {}, getEditorControlsState: () => ({}),
   });
+  page.viewportPickSurfaceRef.value = { contains: target => target === viewportTarget };
   page.applySceneSnapshot('scene.ini', snapshot());
   function step(next) {
     time = next;
@@ -414,9 +416,9 @@ async function mountStory(t, { pendingInit = null, sceneSnapshot = { data: snaps
     step(next) { time = next; const callbacks = [...frames.values()]; frames.clear(); for (const cb of callbacks) cb(time); } };
 }
 
-test('story selects Native before binding its viewport', async t => {
+test('story selects Vision before binding its viewport', async t => {
   const h = await mountStory(t);
-  assert.deepEqual(h.renderRequests, [{ mode: 'native', scene: 'scene.ini', camera: null, viewportBound: false }]);
+  assert.deepEqual(h.renderRequests, [{ mode: 'vision', scene: 'scene.ini', camera: null, viewportBound: false }]);
   assert.ok(h.calls.some(call => call[0] === 'setCameraViewport'));
 });
 

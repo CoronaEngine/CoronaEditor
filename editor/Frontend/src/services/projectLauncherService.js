@@ -15,6 +15,11 @@ const superseded = () => ({ ok: false, status: 'superseded' });
 export const projectOpenResult = (result) => result?.data ?? result;
 export const isProjectOpenSuperseded = (result) => projectOpenResult(result)?.status === 'superseded';
 
+export const resolveOpenedProjectScene = (payload = {}) => {
+  const route = payload?.scene?.path;
+  return typeof route === 'string' ? route.trim() : '';
+};
+
 // Consumers may recover a failed open only while its selection still owns the launcher.
 export const getProjectSelectionVersion = () => selectionVersion;
 

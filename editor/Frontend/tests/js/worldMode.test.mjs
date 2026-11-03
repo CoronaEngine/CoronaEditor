@@ -5,10 +5,20 @@ import test from 'node:test';
 import { createWorldModeController, createWorldModeRouteGuard, normalizeWorldMode, normalizeProjectPath, unwrapProjectInfo, worldModeService } from '../../src/services/worldModeService.js';
 import { editorApi, Bridge } from '../../src/api/editorApi.js';
 import { appService } from '../../src/services/appService.js';
-import { projectLauncherService, stopWorldRuntimeBeforeOpen } from '../../src/services/projectLauncherService.js';
+import { projectLauncherService, resolveOpenedProjectScene, stopWorldRuntimeBeforeOpen } from '../../src/services/projectLauncherService.js';
 
 const deferred = () => { let resolve, reject; const promise = new Promise((yes, no) => { resolve = yes; reject = no; }); return { promise, resolve, reject }; };
 const info = (path, mode) => ({ data: { project_path: path, mode } });
+
+test('opens the single materialized scene', () => {
+  assert.equal(resolveOpenedProjectScene({ scene: { path: 'scene.ini' } }), 'scene.ini');
+  assert.equal(resolveOpenedProjectScene({ scene: { path: ' scene.ini ' } }), 'scene.ini');
+});
+
+test('does not restore old scene lists or active indexes', () => {
+  assert.equal(resolveOpenedProjectScene({ scenes: [{ path: 'old.scene' }], active_index: 8 }), '');
+  assert.equal(resolveOpenedProjectScene({}), '');
+});
 
 test('only an explicit story marker selects story; legacy and multiplayer stay creative', () => {
   assert.equal(normalizeWorldMode('story'), 'story');

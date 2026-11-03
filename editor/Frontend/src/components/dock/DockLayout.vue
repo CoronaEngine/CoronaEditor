@@ -115,6 +115,7 @@ const overlayStyles = computed(() => createDockOverlayStyles({
   rightWidth: rightWidth.value,
   bottomHeight: bottomHeight.value,
   separatorSize: DOCK_SEPARATOR_SIZE,
+  topInset: 40,
 }));
 
 function getComponent(panelId) {
@@ -201,14 +202,13 @@ onUnmounted(() => {
 }
 
 .dock-viewport-region {
+  /* Keep the main menu and its dropdowns above the sibling dock zones. */
   position: absolute;
-  z-index: 0;
   background: transparent;
   display: flex;
   min-width: 0;
   min-height: 0;
   overflow: hidden;
-  contain: layout style;
 }
 
 .dock-zone {

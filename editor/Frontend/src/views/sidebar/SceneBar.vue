@@ -565,7 +565,7 @@ import { editorApi } from '@/api/editorApi.js';
 import { appService } from '@/services/appService.js';
 import { resourceService } from '@/services/resourceService.js';
 import { DEFAULT_SCENE_NAME } from '@/utils/constants.js';
-import { resolveOpenedProjectScene } from '@/utils/projectSceneLifecycle.js';
+import { resolveOpenedProjectScene } from '@/services/projectLauncherService.js';
 import { emptySceneTreeSettlement, resolveSceneTreeSnapshot } from '@/utils/sceneTreeSnapshot.js';
 import { useErrorHandler } from '@/composables/useErrorHandler.js';
 import { setActorContext } from '@/blockly/composables/useActorContext.js';
