@@ -2,15 +2,12 @@
  * AI, node-graph review/generation, and Cabbage workflow facade.
  *
  * The public C++ contract remains owned by `src/api/editorApi.js`; this file
- * only adapts legacy response shapes and operation names used by panels.
+ * adapts response shapes and operation names used by panels.
  */
 
 import { editorApi } from '../api/editorApi.js';
 
 export const aiService = {
-  sendMessageToAIStream: (payload) => editorApi.ai.sendMessageToAIStream(payload),
-  readLocalFileAsBase64: (filePath) => editorApi.ai.readLocalFileAsBase64(filePath),
-  generateHint: (elementType, context = {}) => editorApi.ai.generateHint(elementType, context),
   startNodeGraphReview: async (payload) => {
     const response = await editorApi.ai.submitRequest({
       operation: 'node_graph.review.start',
@@ -22,13 +19,6 @@ export const aiService = {
     const response = await editorApi.ai.submitRequest({
       operation: 'node_graph.review.status',
       taskId: String(taskId || ''),
-    });
-    return response?.data ?? response;
-  },
-  chatAboutNodeGraph: async (payload) => {
-    const response = await editorApi.ai.submitRequest({
-      operation: 'node_graph.review.chat',
-      payload: payload || {},
     });
     return response?.data ?? response;
   },
@@ -130,10 +120,4 @@ export const aiService = {
     });
     return response?.data ?? response;
   },
-};
-
-export const aiClient = {
-  chatStream: (request) => editorApi.ai.chatStream(request),
-  cancelRequest: (requestId) => editorApi.ai.cancelRequest(requestId),
-  getRequestStatus: (requestId) => editorApi.ai.getRequestStatus(requestId),
 };

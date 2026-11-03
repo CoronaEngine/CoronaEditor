@@ -711,30 +711,6 @@ class NodeGraphReviewChatService:
             state["updatedAt"] = time.time()
             return {"success": True, "status": "cancelling", "taskId": task_key}
 
-    def chat(self, payload: Any) -> dict[str, Any]:
-        """Backward-compatible one-shot response for callers that have not adopted polling."""
-        started = self.start(payload)
-        if started.get("success") is not True:
-            return started
-        task_id = started["taskId"]
-        deadline = time.monotonic() + self.TIMEOUT_SECONDS + 5
-        while time.monotonic() < deadline:
-            result = self.status(task_id)
-            if result.get("status") == "completed":
-                return {
-                    "success": True,
-                    "status": "ok",
-                    "message": result.get("content", ""),
-                    "needsShowcase": result.get("needsShowcase") is True,
-                    "guidanceIntent": str(result.get("guidanceIntent") or ""),
-                    "steps": list(result.get("steps") or []),
-                }
-            if result.get("status") in {"cancelled", "error"}:
-                return self._error(result.get("error") or "AI_CHAT_FAILED", result.get("message") or "包菜答疑失败。")
-            time.sleep(0.1)
-        self.cancel(task_id)
-        return self._error("AI_TIMEOUT", "DeepSeek 响应超时，请稍后再试。")
-
     def shutdown(self) -> None:
         with self._lock:
             for state in self._tasks.values():

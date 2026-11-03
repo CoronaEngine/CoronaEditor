@@ -901,18 +901,20 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
             with self.subTest(snippet=snippet):
                 self.assertIn(snippet, bridge_source)
 
-    def test_editor_api_method_manifest_explicitly_defines_acronym_wrapper_paths(self):
+    def test_ai_manifest_only_exposes_current_request_entrypoint(self):
         source = self._editor_api_source()
         bridge_source = self._frontend_bridge_source()
 
         self.assertIn(
-            'EDITOR_API_METHOD_SCHEMA_WRAPPED(AITool, send_message_to_ai_stream, kAnyPayloadParam, '
-            '"ai.sendMessageToAIStream", "ai.send_message_to_ai_stream", EditorApiValueType::Any)',
+            'EDITOR_API_METHOD_SCHEMA_WRAPPED(AITool, submit_request, kObjectPayloadParam, '
+            '"ai.submitRequest", "ai.submit_request", EditorApiValueType::Any)',
             source,
         )
-        self.assertIn("sendMessageToAIStream: (payload) =>", bridge_source)
-        self.assertIn("call_manifest_editor_api('ai.sendMessageToAIStream', [payload])", bridge_source)
-        self.assertNotIn("'AITool.send_message_to_ai_stream': 'ai.sendMessageToAiStream'", bridge_source)
+        self.assertIn("call_manifest_editor_api('ai.submitRequest', [payload || {}])", bridge_source)
+        self.assertEqual(source.count("EDITOR_API_METHOD_SCHEMA_WRAPPED(AITool,"), 1)
+        for retired in ("sendMessageToAIStream", "readLocalFileAsBase64", "generateHint"):
+            self.assertNotIn(retired, source)
+            self.assertNotIn(retired, bridge_source)
 
     def test_python_wrapper_paths_are_validated_against_cpp_manifest(self):
         python_api_source = (
@@ -2809,9 +2811,6 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
 
         expected = {
             "AITool.submit_request": ("kObjectPayloadParam", "EditorApiValueType::Any"),
-            "AITool.generate_hint": ("kAiToolGenerateHintParams", "EditorApiValueType::Any"),
-            "AITool.read_local_file_as_base64": ("kPathParam", "EditorApiValueType::Any"),
-            "AITool.send_message_to_ai_stream": ("kAnyPayloadParam", "EditorApiValueType::Any"),
             "ScratchTool.execute_python_code": ("kScratchExecutePythonCodeParams", "EditorApiValueType::Any"),
             "ScratchTool.get_game_preview_status": ("kNoParams", "EditorApiValueType::Any"),
             "ScratchTool.get_script_status": ("kNoParams", "EditorApiValueType::Any"),
@@ -2842,14 +2841,7 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
 
         for snippet in (
             "ai: {",
-            "sendMessageToAIStream: (payload) => call_manifest_editor_api('ai.sendMessageToAIStream', [payload])",
-            "readLocalFileAsBase64: (filePath) => call_manifest_editor_api('ai.readLocalFileAsBase64', [filePath])",
-            "generateHint: (elementType, context = {}) =>",
-            "call_manifest_editor_api('ai.generateHint', [elementType, context || {}])",
             "submitRequest: (payload) => call_manifest_editor_api('ai.submitRequest', [payload || {}])",
-            "chatStream: (request) => editorApi.ai.submitRequest(request || {})",
-            "cancelRequest: (requestId) =>",
-            "getRequestStatus: (requestId) =>",
             "scratch: {",
             "executePythonCode: (code, mode, sceneName, actorName, targetType = 'actor') =>",
             "saveBlocklyTarget: (payload) => call_manifest_editor_api('scratch.saveBlocklyTarget', [payload || {}])",
@@ -2863,10 +2855,6 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
             "sendKeyEvent: (key, modifiers, displayKey) =>",
             "sendKeyUpEvent: (key, displayKey) =>",
             "sendMouseEvent: (eventType, button, x, y, viewportX, viewportY, viewportWidth, viewportHeight, pickedActor = '') =>",
-            "sendMessageToAIStream: (payload) => editorApi.ai.sendMessageToAIStream(payload)",
-            "readLocalFileAsBase64: (filePath) => editorApi.ai.readLocalFileAsBase64(filePath)",
-            "generateHint: (elementType, context = {}) => editorApi.ai.generateHint(elementType, context)",
-            "chatStream: (request) => editorApi.ai.chatStream(request)",
             "executePythonCode: (code, mode, sceneName, actorName, targetType = 'actor') =>\n    editorApi.scratch.executePythonCode",
             "saveBlocklyTarget: (payload) => editorApi.scratch.saveBlocklyTarget(payload)",
             "startGamePreview: (payload = { scope: 'project' }) => editorApi.scratch.startGamePreview(payload)",
@@ -2909,9 +2897,6 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
         self.assertGreater(end, start)
         ai_section = bridge_source[start:end]
 
-        self.assertIn("call_manifest_editor_api('ai.sendMessageToAIStream'", ai_section)
-        self.assertIn("call_manifest_editor_api('ai.readLocalFileAsBase64'", ai_section)
-        self.assertIn("call_manifest_editor_api('ai.generateHint'", ai_section)
         self.assertIn("call_manifest_editor_api('ai.submitRequest'", ai_section)
         self.assertNotIn("AITool.", ai_section)
 

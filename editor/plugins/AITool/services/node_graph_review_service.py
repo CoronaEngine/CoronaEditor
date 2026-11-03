@@ -445,7 +445,7 @@ class NodeGraphReviewService:
 
         editor_key = read_provider("api_key")
         if not editor_key:
-            # Review/generation can run before the LAN-chat worker finishes warm-up.
+            # Review/generation can also be used before plugin initialization.
             # Lazily register the editor-owned settings before falling back to env.
             try:
                 from ..configuration.local_secrets import load_ai_setting

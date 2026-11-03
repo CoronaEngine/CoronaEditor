@@ -507,26 +507,7 @@ const editorApiStatic = {
     closeProcess: () => call_manifest_editor_api('app.closeProcess', []),
   },
   ai: {
-    sendMessageToAIStream: (payload) => call_manifest_editor_api('ai.sendMessageToAIStream', [payload]),
-    readLocalFileAsBase64: (filePath) => call_manifest_editor_api('ai.readLocalFileAsBase64', [filePath]),
-    generateHint: (elementType, context = {}) =>
-      call_manifest_editor_api('ai.generateHint', [elementType, context || {}]),
     submitRequest: (payload) => call_manifest_editor_api('ai.submitRequest', [payload || {}]),
-    chatStream: (request) => editorApi.ai.submitRequest(request || {}),
-    cancelRequest: (requestId) =>
-      editorApi.ai.submitRequest(
-        {
-          operation: 'request.cancel',
-          request_id: requestId,
-        },
-      ),
-    getRequestStatus: (requestId) =>
-      editorApi.ai.submitRequest(
-        {
-          operation: 'request.status',
-          request_id: requestId,
-        },
-      ),
   },
   files: {
     getProjectInfo: () => call_manifest_editor_api('files.getProjectInfo', []),

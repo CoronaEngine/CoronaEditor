@@ -214,11 +214,14 @@ def load_ai_setting():
         load_dotenv_file(_ENV_FILE)
 
         from Quasar.ai_service.entrance import get_ai_entrance
-        from Quasar.ai_agent.executor import reset_cached_agent
 
         entrance = get_ai_entrance()
         summary = _apply_to_collector(entrance.collector)
         logger.info("AITool API key environment overrides applied: %s", summary)
-        reset_cached_agent()
+        # Refresh an existing cache without importing the retired agent chain.
+        executor = sys.modules.get("Quasar.ai_agent.executor")
+        reset_cached_agent = getattr(executor, "reset_cached_agent", None)
+        if callable(reset_cached_agent):
+            reset_cached_agent()
     except Exception as exc:
         logger.warning("AITool local settings load failed: %s", exc)

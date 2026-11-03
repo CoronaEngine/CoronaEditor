@@ -26,8 +26,8 @@
 
 ### 世界界面会话
 
-`worldModeService.js` 负责剧情/创造模式的 Web 判定；只读取原生项目元数据及现有
-`ai.readLocalFileAsBase64` Python 文件能力，不保存或迁移项目。只有明确的 `world.type=story`
+`worldModeService.js` 负责剧情/创造模式的 Web 判定；通过
+`projectSettings.getActiveProjectInfo` 读取原生项目元数据，不保存或迁移项目。只有明确的 `mode=story`
 进入剧情模式，缺省及历史模式仍为创造模式，读取失败则阻止进入世界。
 
 `editorWindowSession.js` 负责 UI 策略、窗口请求登记、跨窗口会话令牌与过期事件过滤，
@@ -45,6 +45,10 @@
 协调。它们可以组合 `aiService` 等 facade，但不能成为 manifest contract 或引擎状态 owner。
 
 ### Cabbage UI 状态
+
+`aiService.js` 只通过 `ai.submitRequest` 调用节点检查、聊天、节点生成、Cabbage 上下文、
+目标规划和画像评分。聊天和生成使用 start/status/cancel 操作；旧通用聊天、提示及读文件
+接口已从 Vue、Python 和原生 manifest 同步移除。LANChat 房间及原生网络同步接口独立保留。
 
 `cabbageAssistantContextService.js`、`cabbageGuidanceService.js`、
 `cabbageTutorialSessionService.js` 负责面板上下文、引导和教程会话；它们不定义 AI 密钥、

@@ -4,7 +4,7 @@
     <Purpose lang="zh-CN">这是 CoronaEngine 包菜答疑使用的项目级节点积木能力与生成合同。宿主会提供用户指令、当前世界上下文、完整现有节点图和本文档；AI 只能返回完整、可见、可校验的 JSON 节点图。</Purpose>
     <Purpose lang="en-US">Project-global node graph capability and generation contract used by Cabbage Q&amp;A. The host sends the user instruction, current world context, complete current graph, and this file; the model may return only a complete visible JSON node graph.</Purpose>
     <FixedTarget targetId="node_graph:project:global" targetType="project" scriptKind="node_graph" actorBinding="none" />
-    <SupportedOperations values="create extend edit delete" queryRoute="node_graph.review.chat" />
+    <SupportedOperations values="create extend edit delete" queryRoute="node_graph.review.chat.start" />
     <SourceOfTruth>Nodes, edges, Blockly workspaces, Boolean edge conditions, global data blocks, and node x/y layout are the complete visible logic source. The model must not hide gameplay in text or code.</SourceOfTruth>
     <NoPythonFromModel>The model must not produce Python. After validation and atomic application, CoronaEngine calls nodeGraphToCode on the visible workspace and saves the compiled Python itself.</NoPythonFromModel>
     <HostApplicationApi function="applyGeneratedNodeGraph" accepts="JSON object" atomic="true" staleResponseRejected="true">The host validates and compiles the complete result before changing the editor. Invalid, stale, cancelled, or cross-world results leave the current project graph unchanged.</HostApplicationApi>
