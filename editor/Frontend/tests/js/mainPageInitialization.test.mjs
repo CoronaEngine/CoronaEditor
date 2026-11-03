@@ -35,6 +35,11 @@ const makeComponent = new Function('modules', 'window', 'document', 'requestAnim
 
 function mountMainPage(t, visionMode = 'path_tracing') {
   const calls = [], errors = [], mounted = [], unmounted = [], observed = [];
+  const dock = {
+    panels: { SceneControls: { open: true, mode: 'docked' }, SceneTools: { open: true, mode: 'docked' } },
+    initDefaultLayout() {},
+    closePanel(id) { if (this.panels[id]) this.panels[id].open = false; },
+  };
   const frames = new Map();
   let sequence = 0;
   const requestFrame = callback => { frames.set(++sequence, callback); return sequence; };
@@ -112,9 +117,7 @@ function mountMainPage(t, visionMode = 'path_tracing') {
     '@/composables/useErrorHandler.js': { useErrorHandler: () => ({
       error: (...args) => errors.push(args), warn: (...args) => errors.push(args),
     }) },
-    '@/stores/dockStore.js': { useDockStore: () => ({
-      panels: {}, initDefaultLayout: noop, closePanel: noop,
-    }) },
+    '@/stores/dockStore.js': { useDockStore: () => dock },
     '@/stores/cabbageAssistantStore.js': { useCabbageAssistantStore: () => ({
       clearForProjectChange: noop, hydrateContext: noop,
     }) },
@@ -136,10 +139,13 @@ function mountMainPage(t, visionMode = 'path_tracing') {
   }
   const component = makeComponent(modules, window, document, requestFrame, cancelFrame, ResizeObserver);
   const page = component.setup({}, { expose() {} });
-  const surface = { getBoundingClientRect: () => ({ left: 0, top: 0, width: 1536, height: 825 }) };
+  const surface = {
+    contains: target => target === surface,
+    getBoundingClientRect: () => ({ left: 0, top: 0, width: 1536, height: 825 }),
+  };
   page.viewportPickSurfaceRef.value = surface;
   t.after(() => { for (const hook of unmounted) hook(); });
-  return { page, calls, errors, observed, surface,
+  return { page, calls, errors, observed, surface, dock,
     async mount() { for (const hook of mounted) await hook(); },
     flushFrames() {
       const pending = [...frames.values()];
@@ -148,6 +154,32 @@ function mountMainPage(t, visionMode = 'path_tracing') {
     },
   };
 }
+
+test('world entry retains the initialized scene controls and scene manager', async t => {
+  const h = mountMainPage(t);
+  await h.mount();
+  assert.equal(h.dock.panels.SceneControls.open, true);
+  assert.equal(h.dock.panels.SceneTools.open, true);
+  assert.deepEqual(h.errors, []);
+});
+
+test('right dragging a DOM panel does not rotate the viewport camera', async t => {
+  const h = mountMainPage(t);
+  await h.mount();
+  const forward = [...h.page.cameraState.value.forward];
+  h.page.onMouseDown({ target: {}, button: 2, clientX: 10, clientY: 10 });
+  h.page.onMouseMove({ buttons: 2, clientX: 80, clientY: 40 });
+  assert.deepEqual(h.page.cameraState.value.forward, forward);
+});
+
+test('right dragging from the viewport still rotates the camera', async t => {
+  const h = mountMainPage(t);
+  await h.mount();
+  const forward = [...h.page.cameraState.value.forward];
+  h.page.onMouseDown({ target: h.surface, button: 2, clientX: 10, clientY: 10 });
+  h.page.onMouseMove({ buttons: 2, clientX: 80, clientY: 40 });
+  assert.notDeepEqual(h.page.cameraState.value.forward, forward);
+});
 
 for (const visionMode of ['path_tracing', 'restir']) {
 test(`external scene entry defaults to Vision and preserves saved ${visionMode}`, async t => {

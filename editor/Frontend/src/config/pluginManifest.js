@@ -7,7 +7,7 @@ export const PLUGIN_MANIFEST = [
     id: 'SceneControls', routePath: '/SceneControls',
     displayNameKey: 'plugins.SceneControls', displayName: '场景控制',
     pageType: 'view', defaultDock: 'left', defaultWidth: 380, defaultHeight: 350,
-    autoInit: false, defaultOpenMode: 'docked',
+    autoInit: true, defaultOpenMode: 'docked',
   },
   {
     id: 'CabbageTasks', routePath: '/CabbageTasks',
@@ -24,7 +24,7 @@ export const PLUGIN_MANIFEST = [
     defaultDock: 'right',
     defaultWidth: 360,
     defaultHeight: 540,
-    autoInit: false,
+    autoInit: true,
     defaultOpenMode: 'docked',
     defaultFloatPosition: 'right_top',
     minFloatWidth: 340,

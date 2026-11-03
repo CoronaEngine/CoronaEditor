@@ -4,7 +4,6 @@ import { useRoute, useRouter } from 'vue-router';
 import { useDockStore } from '@/stores/dockStore.js';
 import { getPluginComponent } from '@/views/panelRegistry.js';
 import DockLayout from '@/components/dock/DockLayout.vue';
-import NativeDockLayout from '@/components/dock/NativeDockLayout.vue';
 import CabbageGuidanceOverlay from '@/components/ui/CabbageGuidanceOverlay.vue';
 import DockPanel from '@/components/dock/DockPanel.vue';
 import { editorApi } from '@/api/editorApi.js';
@@ -30,11 +29,12 @@ const worldReady = computed(() => worldModeState.status === 'ready'
 const mayRenderRoute = computed(() => isLauncherRoute.value || (worldReady.value
   && (route.path === '/' || editorUiAllowed())));
 const isStandalonePanel = computed(() => route.query?.standalone === '1');
-const nativeDocking = typeof window.coronaBridge?.dockCommand === 'function';
 const nativeHost = computed(() => route.query?.nativeHost === '1');
 function closeNativePanel() { void appService.closeThisTab('').catch(error => console.error('[NativeDock] close failed', error)); }
 
-const centerPanels = computed(() => !nativeDocking && isEditorRoute.value && worldReady.value
+// dockCommand also exists on hosts that only support floating windows.
+// Main panels use DOM docking; explicit pop-outs keep the native transport.
+const centerPanels = computed(() => isEditorRoute.value && worldReady.value
   ? dockStore.panelsByZone('center') : []);
 const standaloneResizeHandles = [
   'n',
@@ -50,6 +50,7 @@ let appUnmounted = false;
 let projectOpenedToken = null;
 let refreshRevision = 0;
 let preparationRevision = 0;
+let lastReadyProjectKey = '';
 
 // Only the main surface controls native windows. Standalone pages independently
 // resolve the same native metadata before mounting their panel component.
@@ -58,11 +59,16 @@ watch(() => [worldModeState.status, worldModeState.revision, route.path, route.m
   const preparation = ++preparationRevision;
   const revision = worldModeState.revision;
   const opening = worldModeService.opening;
+  const projectKey = normalizeProjectPath(worldModeState.projectPath);
+  const refreshingCurrentProject = worldModeState.status === 'loading'
+    && Boolean(lastReadyProjectKey) && projectKey === lastReadyProjectKey
+    && !isLauncherRoute.value;
+  if (worldModeState.status === 'ready') lastReadyProjectKey = projectKey;
   preparedRevision.value = -1;
   try {
     if (!isStandalonePanel.value && typeof window.coronaBridge?.dockCommand === 'function') {
       const enabled = editorUiAllowed() && !isLauncherRoute.value;
-      if (!enabled) dockStore.clearSession();
+      if (!enabled && !refreshingCurrentProject) dockStore.clearSession();
       await appService.setEditorUiEnabled(enabled);
     } else if (isStandalonePanel.value && typeof window.coronaBridge?.dockCommand === 'function') {
       const policy = await appService.readEditorUiPolicy();
@@ -301,8 +307,7 @@ onUnmounted(() => {
 
 <template>
   <CabbageGuidanceOverlay v-if="worldReady && editorUiAllowed() && !isLauncherRoute" :key="worldModeState.projectPath" />
-  <NativeDockLayout v-if="nativeDocking && isEditorRoute && worldReady" :key="worldModeState.projectPath" />
-  <DockLayout v-else-if="isEditorRoute && worldReady" :key="worldModeState.projectPath" :component-resolver="getPluginComponent" />
+  <DockLayout v-if="isEditorRoute && worldReady" :key="worldModeState.projectPath" :component-resolver="getPluginComponent" />
   <div v-else-if="mayRenderRoute" :key="isLauncherRoute ? route.path : worldModeState.projectPath" :class="isStandalonePanel ? 'standalone-route-shell' : null">
     <router-view />
     <template v-if="isStandalonePanel && !nativeHost">

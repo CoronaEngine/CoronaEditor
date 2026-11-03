@@ -2,8 +2,7 @@
   <div class="relative flex flex-col flex-1 min-h-0 h-full w-full" tabindex="0">
     <!-- 顶部菜单栏 -->
     <div
-      v-if="false"
-      class="w-full bg-[#202b22] text-gray-200 border-b border-gray-700 h-10 flex items-center px-4 space-x-6 text-sm shadow-md"
+      class="relative z-40 shrink-0 w-full bg-[#202b22] text-gray-200 border-b border-gray-700 h-10 flex items-center px-4 space-x-6 text-sm shadow-md"
     >
       <!-- 项目菜单 -->
       <div class="relative">
@@ -2146,6 +2145,7 @@ const finishScratchClickFromPick = (payload, result) => {
 };
 
 const onMouseDown = (event) => {
+  if (!viewportPickSurfaceRef.value?.contains(event.target)) return;
   if (cameraControls.pointerDown(event)) {
     mouseRotateStartForward = [...cameraState.value.forward];
     mouseRotateMoved = false;
@@ -3040,21 +3040,6 @@ onMounted(async () => {
   coronaEventBus.on('model-node-selection', handleModelNodeGizmoSelection);
   coronaEventBus.on('viewport-ui-calibration-changed', applyViewportUiCalibration);
 
-  // Primary work docks start hidden. If this main CEF page is reused, close any native
-  // floating tab left by the previous project before resetting the shortcut state.
-  for (const panelId of [
-    ...dockShortcuts.map((item) => item.id),
-    'Object',
-    'CabbageChatPanel',
-  ]) {
-    const panelState = dockStore.panels[panelId];
-    if (panelState?.mode === 'external') {
-      await closeFloatingPanel(dockStore, panelId);
-      if (!viewCurrent()) return;
-    } else {
-      dockStore.closePanel(panelId);
-    }
-  }
   await syncSceneCameraBinding(initialSceneId);
   if (!viewCurrent()) return;
   broadcastViewportControlsState();

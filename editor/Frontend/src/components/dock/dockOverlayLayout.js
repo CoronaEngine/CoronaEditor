@@ -7,6 +7,7 @@ export function createDockOverlayStyles({
   rightWidth = 0,
   bottomHeight = 0,
   separatorSize = 4,
+  topInset = 0,
 } = {}) {
   const leftOffset = leftVisible
     ? Math.max(Number(leftWidth) || 0, 0) + Math.max(Number(separatorSize) || 0, 0)
@@ -19,24 +20,24 @@ export function createDockOverlayStyles({
     viewport: { inset: '0' },
     left: {
       left: '0',
-      top: '0',
+      top: pixelValue(topInset),
       bottom: '0',
       width: pixelValue(leftWidth),
     },
     leftSeparator: {
       left: pixelValue(leftWidth),
-      top: '0',
+      top: pixelValue(topInset),
       bottom: '0',
     },
     right: {
       right: '0',
-      top: '0',
+      top: pixelValue(topInset),
       bottom: '0',
       width: pixelValue(rightWidth),
     },
     rightSeparator: {
       right: pixelValue(rightWidth),
-      top: '0',
+      top: pixelValue(topInset),
       bottom: '0',
     },
     bottom: {

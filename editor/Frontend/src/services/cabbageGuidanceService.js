@@ -73,6 +73,10 @@ let lifecycleGuardsAttached = false;
 let nativeRelay = null;
 let nativePanelId = '';
 
+function isLocalDockPanel(panelId) {
+  return nativePanelId === 'MainPage' && useDockStore().panels[panelId]?.mode === 'docked';
+}
+
 export function attachNativeGuidance(panelId) {
   if (typeof window.coronaBridge?.dockCommand !== 'function') return () => {};
   nativePanelId = panelId;
@@ -83,7 +87,14 @@ export function attachNativeGuidance(panelId) {
   });
   nativeRelay = relay;
   const handlers = {
-    'creative-guidance-request': payload => { if (isCurrentWindowEvent(payload)) void relay.receiveRequest(payload); },
+    'creative-guidance-request': payload => {
+      if (!isCurrentWindowEvent(payload)) return;
+      if (isLocalDockPanel(payload.guidance?.panelId)) {
+        void start(payload.guidance, { local: true }).then(shown => {
+          if (shown) send('creative-guidance-accepted', { requestId: payload.requestId });
+        });
+      } else void relay.receiveRequest(payload);
+    },
     'creative-guidance-ready': payload => { if (isCurrentWindowEvent(payload)) relay.receiveReady(payload); },
     'creative-guidance-accepted': payload => { if (isCurrentWindowEvent(payload)) relay.receiveAccepted(payload); },
   };
@@ -934,7 +945,7 @@ async function start(source, { local = false } = {}) {
   const guidance = guidanceRegistry.resolve(source);
   if (!guidance) return false;
   if (state.active || state.preparing) await stop();
-  if (!local && nativeRelay && guidance.panelId !== nativePanelId) {
+  if (!local && nativeRelay && guidance.panelId !== nativePanelId && !isLocalDockPanel(guidance.panelId)) {
     nativeRelay.request(guidance);
     return true;
   }
