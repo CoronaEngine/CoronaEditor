@@ -607,7 +607,7 @@ const cameraState = ref({
 });
 
 const cameraBindingState = ref({
-  sceneId: DEFAULT_SCENE_NAME,
+  sceneId: null,
   cameraId: null,
   cameraName: null,
   cameraHandle: null,
