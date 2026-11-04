@@ -101,6 +101,10 @@ const MANIFEST_EVENTS = [
     payload: 'object',
     allowed_callers: CALLER_CEF,
   },
+  {
+    event: 'Test.extension', js_wrapper: 'events.onExtension',
+    payload: 'object', allowed_callers: CALLER_CEF,
+  },
 ];
 
 function createFakeCefHost() {
@@ -158,6 +162,16 @@ async function loadEditorApi() {
   const module = await import(`../../src/api/editorApi.js?fresh=${Date.now()}${Math.random()}`);
   return { editorApi: module.editorApi, host, limits: module.editorApiTransportLimits };
 }
+
+test('retired log subscription is absent before and after loading native events', async () => {
+  const { editorApi } = await loadEditorApi();
+  assert.equal(editorApi.events.onLogBatch, undefined);
+  const token = await editorApi.events.onActorChanged(() => {});
+  assert.equal(editorApi.events.onLogBatch, undefined);
+  await editorApi.off(token);
+  const extensionToken = await editorApi.events.onExtension(() => {});
+  await editorApi.off(extensionToken);
+});
 
 test('model node wrappers preserve actor and numeric node identity in native requests', async () => {
   const { editorApi, host } = await loadEditorApi();

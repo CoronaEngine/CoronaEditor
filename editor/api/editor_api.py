@@ -320,6 +320,8 @@ class _DynamicApiNamespace:
             setattr(self, name, _on_event)
             return _on_event
 
+        if self._wrapper_path == "events":
+            raise AttributeError(wrapper_path)
         namespace = _DynamicApiNamespace(wrapper_path)
         setattr(self, name, namespace)
         return namespace
@@ -462,10 +464,6 @@ class _EventsApi(_DynamicApiNamespace):
     @staticmethod
     def on_ai_chunk(callback):
         return _register_manifest_editor_api_event_callback("events.on_ai_chunk", callback)
-
-    @staticmethod
-    def on_log_batch(callback):
-        return _register_manifest_editor_api_event_callback("events.on_log_batch", callback)
 
     @staticmethod
     def on_actor_changed(callback):

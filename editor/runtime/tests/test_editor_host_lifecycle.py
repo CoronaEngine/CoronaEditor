@@ -3,7 +3,7 @@ import sys
 import unittest
 from pathlib import Path
 from types import ModuleType, SimpleNamespace
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 
 EDITOR_ROOT = Path(__file__).resolve().parents[2]
@@ -30,6 +30,20 @@ class CoronaEditorLifecycleTests(unittest.TestCase):
         }):
             spec.loader.exec_module(module)
         return module.CoronaEditor
+
+    def test_runtime_update_is_independent_of_the_retired_log_tool(self):
+        editor = self._load_editor()
+        self.assertFalse(hasattr(editor, "show_log_on_js"))
+        self.assertFalse(editor.emit_editor_event("log-batch", [[]]))
+        self.assertTrue(editor.initialize_runtime())
+        self.assertTrue(editor.start_runtime())
+        editor._scripts_initialized = True
+        editor.scripts_mgr = SimpleNamespace(update=Mock())
+        engine = SimpleNamespace(drain_input_events=Mock(return_value=[]))
+        with patch.object(editor, "_arm_runtime_watchdog"), patch.dict(sys.modules, {"CoronaEngine": engine}):
+            self.assertTrue(editor.update_runtime())
+        editor.scripts_mgr.update.assert_called_once()
+        engine.drain_input_events.assert_called_once_with()
 
     def test_shutdown_runtime_stops_services_and_clears_dispatch_state(self):
         editor = self._load_editor()
@@ -81,7 +95,7 @@ class CoronaEditorLifecycleTests(unittest.TestCase):
             EDITOR_ROOT / "runtime" / "editor_host.py"
         ).read_text(encoding="utf-8")
         update_start = source.index("    def _set_native_runtime_phase(cls, phase):")
-        update_end = source.index("\n    def show_log_on_js", update_start)
+        update_end = source.index("\ndef emit_editor_event(", update_start)
         update_body = source[update_start:update_end]
         for phase in (
             '"script_initialize"',

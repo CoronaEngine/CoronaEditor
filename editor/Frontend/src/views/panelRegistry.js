@@ -13,7 +13,6 @@ import { defineAsyncComponent } from 'vue';
 const SceneBar = defineAsyncComponent(() => import('@/views/sidebar/SceneBar.vue'));
 const ObjectPanel = defineAsyncComponent(() => import('@/views/sidebar/Object.vue'));
 const Pet = defineAsyncComponent(() => import('@/views/tools/Pet.vue'));
-const LogView = defineAsyncComponent(() => import('@/views/sidebar/LogView.vue'));
 const FileManager = defineAsyncComponent(() => import('@/views/sidebar/FileManager.vue'));
 const ProjectSettings = defineAsyncComponent(() => import('@/views/sidebar/ProjectSettings.vue'));
 const NodeGraphPanel = defineAsyncComponent(() => import('@/views/sidebar/NodeGraphPanel.vue'));
@@ -30,7 +29,6 @@ export const PANEL_COMPONENTS = Object.freeze({
   LightFieldCalibration: LightFieldCalibrationPanel,
   Object: ObjectPanel,
   AITool: Pet,
-  LogTool: LogView,
   FileManager,
   ProjectSettings,
   NodeGraphPanel,

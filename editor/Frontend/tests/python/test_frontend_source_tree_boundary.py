@@ -78,7 +78,6 @@ def test_panel_components_have_a_dedicated_registry_owner():
         "SceneBar",
         "ObjectPanel",
         "Pet",
-        "LogView",
         "FileManager",
         "ProjectSettings",
         "NodeGraphPanel",
@@ -118,10 +117,15 @@ def test_retired_panels_are_absent_and_node_graph_remains_registered():
     assert "Network: NetworkPanel" not in registry
     assert "id: 'Network'" not in manifest
 
+    assert "path: '/LogView'" not in router
+    assert "LogTool" not in manifest + registry
+
     assert "path: '/ScratchTool'" not in router
     assert "getPluginComponent('NodeGraphPanel')" in router
     for relative in (
         "views/sidebar/Network.vue",
+        "views/sidebar/LogView.vue",
+        "services/logService.js",
         "blockly/components/BlocklyWorkspace.vue",
         "blockly/components/Settings.vue",
         "blockly/components/Search.vue",

@@ -15,14 +15,11 @@
 `projectLauncherService.js`。
 
 `sceneService.js`、`projectService.js`、`scriptingService.js`、`fileService.js`、
-`projectSettingsService.js` 和 `logService.js` 均已迁移为 canonical service owner，
+`projectSettingsService.js` 均已迁移为 canonical service owner，
 直接组合 `editorApi`，不再通过兼容实现目录转发。
 
 `appService.js` 是 Dock、CameraView 窗口和进程操作的 canonical service owner，底层调用
 仍统一经过 `src/api/editorApi.js` 的 `Bridge`/`editorApi`。
-
-`logService.js` 仅保留历史 disabled no-op 语义，但实现归 active service owner；Active Vue
-页面不应调用它。
 
 ### 世界界面会话
 

@@ -24,12 +24,12 @@ test('world teardown closes a browser whose create reply arrives late', async ()
   const closed = [];
   const hosts = createNativePanelHosts({ open: () => new Promise(resolve => { reply = resolve; }),
     close: async (...args) => closed.push(args) });
-  hosts.reconcile([{ id: 'LogTool' }]);
+  hosts.reconcile([{ id: 'FileManager' }]);
   await tick();
   hosts.dispose();
   reply({ data: { tab_id: 19 } });
   await tick();
-  assert.deepEqual(closed, [[19, 'LogTool']]);
+  assert.deepEqual(closed, [[19, 'FileManager']]);
 });
 test('an old close event cannot close a replacement panel', async () => {
   let id = 0;

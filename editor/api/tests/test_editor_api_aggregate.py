@@ -23,6 +23,15 @@ from api.editor_api import (
 
 class EditorAggregateApiTest(unittest.TestCase):
 
+    def test_retired_log_event_has_no_python_subscription(self):
+        with patch("api.editor_api._CPP_EDITOR_API_METHODS", {}), patch(
+            "api.editor_api._CPP_EDITOR_API_EVENTS", {
+                "SceneTools.meshMoveResult": {"python_wrapper": "events.on_mesh_move_result"},
+            },
+        ):
+            self.assertFalse(hasattr(CoronaEditorApi.events, "on_log_batch"))
+            self.assertTrue(callable(CoronaEditorApi.events.on_mesh_move_result))
+
     def test_script_runtime_manifest_lookup_uses_script_channel(self):
         import api.editor_api as editor_api_module
 

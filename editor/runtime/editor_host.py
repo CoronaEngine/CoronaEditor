@@ -201,7 +201,6 @@ class CoronaEditor:
 
         event_mapping = {
             "ai-chunk": ("events.on_ai_chunk", lambda values: values[0] if len(values) > 0 else ""),
-            "log-batch": ("events.on_log_batch", lambda values: values[0] if len(values) > 0 else []),
             "scene-tree-changed": ("events.on_scene_tree_changed", lambda values: {
                 "scene": values[0] if len(values) > 0 else "",
             }),
@@ -239,10 +238,11 @@ class CoronaEditor:
             "import-asset-complete": ("events.on_network_asset_import_completed", lambda values: values[0] if len(values) > 0 else {}),
         }
         mapped_event = event_mapping.get(event_name)
-        if mapped_event:
-            event_wrapper, payload_factory = mapped_event
-            from api.editor_api import _emit_manifest_cpp_editor_api_event
-            _emit_manifest_cpp_editor_api_event(event_wrapper, payload_factory(args))
+        if mapped_event is None:
+            return False
+        event_wrapper, payload_factory = mapped_event
+        from api.editor_api import _emit_manifest_cpp_editor_api_event
+        _emit_manifest_cpp_editor_api_event(event_wrapper, payload_factory(args))
         return f"Editor event emitted: {event_name}"
 
     @classmethod
@@ -527,15 +527,6 @@ class CoronaEditor:
             # enter Python to arm a new timer; this outstanding timer still dumps
             # every Python thread without requiring the GIL.
             cls._arm_runtime_watchdog()
-
-    @classmethod
-    def show_log_on_js(cls):
-        """Backward-compatible C++ entry point for one runtime update."""
-        if not cls._runtime_initialized:
-            cls.initialize_runtime()
-        if not cls._runtime_started:
-            cls.start_runtime()
-        return cls.update_runtime()
 
 
 def emit_editor_event(event_name, args=None):

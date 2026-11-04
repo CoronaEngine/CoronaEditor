@@ -464,6 +464,8 @@ const create_dynamic_editor_api_namespace = (wrapperPath, target = {}) => {
         return current[property];
       }
       const childPath = wrapperPath ? `${wrapperPath}.${property}` : property;
+      // Only expose additional event subscriptions declared by the native manifest.
+      if (wrapperPath === 'events' && !editorApiEventSpecsByWrapper?.has(childPath)) return undefined;
       const dynamicMember = create_dynamic_editor_api_namespace(
         childPath,
         create_dynamic_editor_api_function(childPath),
@@ -490,7 +492,6 @@ const editorApiStatic = {
   },
   events: {
     onAiChunk: (callback) => register_manifest_editor_api_callback('events.onAiChunk', callback),
-    onLogBatch: (callback) => register_manifest_editor_api_callback('events.onLogBatch', callback),
     onActorChanged: (callback) => register_manifest_editor_api_callback('events.onActorChanged', callback),
     onActorSelectionChanged: (callback) => register_manifest_editor_api_callback('events.onActorSelectionChanged', callback),
     onActorTransformUpdated: (callback) => register_manifest_editor_api_callback('events.onActorTransformUpdated', callback),

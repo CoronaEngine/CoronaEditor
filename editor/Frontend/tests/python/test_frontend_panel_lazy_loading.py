@@ -31,7 +31,6 @@ EXPECTED_PANELS = {
     "SceneBar.vue",
     "Object.vue",
     "Pet.vue",
-    "LogView.vue",
     "FileManager.vue",
     "ProjectSettings.vue",
     "NodeGraphPanel.vue",

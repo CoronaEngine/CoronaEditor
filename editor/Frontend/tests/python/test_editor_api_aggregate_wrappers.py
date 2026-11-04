@@ -27,7 +27,6 @@ class EditorApiAggregateWrapperTests(unittest.TestCase):
             "projectLauncherService",
             "fileService",
             "projectSettingsService",
-            "logService",
         ):
             path = self.source_root / "services" / f"{name}.js"
             self.assertTrue(path.is_file(), name)

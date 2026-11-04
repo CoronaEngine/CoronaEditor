@@ -54,16 +54,6 @@ export const PLUGIN_MANIFEST = [
     defaultHeight: 200,
   },
   {
-    id: 'LogTool',
-    routePath: '/LogView',
-    displayNameKey: 'plugins.LogTool',
-    displayName: '日志工具',
-    pageType: 'view',
-    defaultDock: 'bottom',
-    defaultWidth: 1100,
-    defaultHeight: 200,
-  },
-  {
     id: 'FileManager',
     routePath: '/FileManager',
     displayNameKey: 'plugins.FileManager',

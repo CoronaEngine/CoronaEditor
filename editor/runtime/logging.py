@@ -48,7 +48,7 @@ _DEFAULT_VERBOSE_LOGGERS = {
 
 
 class CppLoggingHandler(logging.Handler):
-    """将 Python logging 转发到 C++ spdlog（CoronaEngine.send_log）。"""
+    """通过 CoronaEngine.send_log 写入引擎的原生日志。"""
 
     def emit(self, record: logging.LogRecord) -> None:
         try:

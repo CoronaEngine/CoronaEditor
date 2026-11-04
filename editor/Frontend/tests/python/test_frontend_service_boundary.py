@@ -16,7 +16,6 @@ EXPECTED_SERVICES = (
     "projectLauncherService.js",
     "fileService.js",
     "projectSettingsService.js",
-    "logService.js",
     "nodeGraphGenerationService.js",
     "nodeGraphReviewService.js",
     "nodeGraphRuntimeService.js",
@@ -80,7 +79,6 @@ def test_compatibility_facade_paths_in_services_are_thin_wrappers():
         "scriptingService.js",
         "fileService.js",
         "projectSettingsService.js",
-        "logService.js",
     ):
         source = (SERVICES_ROOT / service_name).read_text(encoding="utf-8")
         assert "../compat/" not in source, service_name

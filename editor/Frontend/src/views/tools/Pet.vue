@@ -31,7 +31,6 @@ const PET_HINTS = [
   '可以拖拽模型到场景里',
   '右键对象查看更多操作',
   '调整相机看看构图效果',
-  '打开日志面板检查运行状态',
 ];
 
 const hintState = reactive({ show: false, text: '' });

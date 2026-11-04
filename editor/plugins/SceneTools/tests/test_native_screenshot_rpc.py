@@ -82,7 +82,6 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
                 "aiService.js",
                 "fileService.js",
                 "lanChatService.js",
-                "logService.js",
                 "networkService.js",
                 "projectLauncherService.js",
                 "projectSettingsService.js",
@@ -1055,7 +1054,6 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
 
         expected_wrappers = (
             "events.onAiChunk",
-            "events.onLogBatch",
             "events.onActorChanged",
             "events.onActorSelectionChanged",
             "events.onActorTransformUpdated",
@@ -1521,55 +1519,8 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
                 )
                 self.assertNotIn(f"event === '{legacy_name}'", event_bus_source)
 
-    def test_log_batch_is_cpp_defined_event(self):
-        source = self._editor_api_source()
-        bridge_source = self._frontend_bridge_source()
-        python_api_source = (
-            self._repo_root()
-            / "editor"
-            / "api"
-            / "editor_api.py"
-        ).read_text(encoding="utf-8")
-        corona_editor_source = (
-            self._repo_root()
-            / "editor"
-            / "runtime"
-            / "editor_host.py"
-        ).read_text(encoding="utf-8")
-        log_view_source = (
-            self._repo_root()
-            / "editor"
-            / "Frontend"
-            / "src"
-            / "views"
-            / "sidebar"
-            / "LogView.vue"
-        ).read_text(encoding="utf-8")
-        event_bus_source = (
-            self._repo_root()
-            / "editor"
-            / "Frontend"
-            / "src"
-            / "utils"
-            / "eventBus.js"
-        ).read_text(encoding="utf-8")
-
-        for snippet in (
-            '{"Editor.logBatch", EditorApiValueType::Array, all_callers(), '
-            '"events.onLogBatch", "events.on_log_batch"}',
-            "onLogBatch: (callback) => register_manifest_editor_api_callback("
-            "'events.onLogBatch', callback)",
-            'return _register_manifest_editor_api_event_callback("events.on_log_batch", callback)',
-            '"log-batch": ("events.on_log_batch", lambda values: values[0] if len(values) > 0 else []),',
-        ):
-            with self.subTest(snippet=snippet):
-                self.assertIn(snippet, source + bridge_source + python_api_source + corona_editor_source)
-
-        self.assertIn("editorApi.events.onLogBatch(onLogBatch)", log_view_source)
-        self.assertIn("editorApi.off(logBatchCallbackToken)", log_view_source)
-        self.assertNotIn("coronaEventBus.on('log-batch'", log_view_source)
-        self.assertNotIn("coronaEventBus.off('log-batch'", log_view_source)
-        self.assertNotIn("event === 'log-batch'", event_bus_source)
+    def test_log_batch_is_absent_from_native_event_manifest(self):
+        self.assertNotIn('"Editor.logBatch"', self._editor_api_source())
 
     def test_ai_chunk_is_cpp_defined_event(self):
         source = self._editor_api_source()

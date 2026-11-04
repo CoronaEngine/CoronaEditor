@@ -61,11 +61,6 @@ const routes = [
     component: getPluginComponent('AITool'),
   },
   {
-    path: '/LogView',
-    name: 'LogView',
-    component: getPluginComponent('LogTool'),
-  },
-  {
     path: '/FileManager',
     name: 'FileManager',
     component: getPluginComponent('FileManager'),
