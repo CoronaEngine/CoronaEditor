@@ -329,13 +329,6 @@ async function pollStatus(requestId, taskId) {
   }
 }
 
-const DETAIL_GUIDANCE_PATTERN =
-  /(不理解|看不懂|不会|怎么做|怎么连接|放在哪里|为什么还是不行|一步一步|具体步骤|展示|演示)/i;
-
-function requestsDetailedGuidance(content = '') {
-  return DETAIL_GUIDANCE_PATTERN.test(String(content || ''));
-}
-
 function showcaseMessage(message) {
   if (!message?.needsShowcase || !message?.guidanceIntent) return;
   void guidanceService.start({
@@ -406,19 +399,13 @@ async function sendMessage() {
 
   activeRequestKind.value = 'chat';
   try {
-    const response = await aiService.startNodeGraphReviewChat({
+    const response = await aiService.startCabbageChat({
+      assistant,
       requestId,
       locale: locale.value,
-      worldId: assistant.worldId,
-      projectScopeId: assistant.projectScopeId,
-      graphRevision: assistant.graphRevision,
-      assistanceProfile: assistant.assistanceProfile,
       selectedTaskKey: messageContext.taskKey,
       tasks: contextTasks.value,
-      graphExcerpt: assistant.graphExcerpt,
-      projectContext: assistant.projectContext,
-      messages: assistant.messages.map(({ role, content: text }) => ({ role, content: text })),
-      detailGuidanceRequested: requestsDetailedGuidance(content),
+      content,
     });
     if (assistant.activeRequestId !== requestId) return;
     if (response?.success !== true || !String(response?.taskId || '').trim()) {

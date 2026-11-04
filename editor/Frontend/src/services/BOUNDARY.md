@@ -46,7 +46,8 @@
 ### Cabbage UI 状态
 
 `aiService.js` 只通过 `ai.submitRequest` 调用节点检查、聊天、节点生成、Cabbage 上下文、
-目标规划和画像评分。聊天和生成使用 start/status/cancel 操作；旧通用聊天、提示及读文件
+目标规划和画像评分。普通聊天在发送前取最近 24 条消息、前 20 个任务和前 80 个场景对象。
+Python 继续校验输入、序列化图摘要并组装模型消息。聊天和生成使用 start/status/cancel 操作；旧通用聊天、提示及读文件
 接口已从 Vue、Python 和原生 manifest 同步移除。LANChat 房间及原生网络同步接口独立保留。
 
 `cabbageAssistantContextService.js`、`cabbageGuidanceService.js`、
