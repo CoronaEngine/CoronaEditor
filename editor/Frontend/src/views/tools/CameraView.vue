@@ -559,10 +559,6 @@ const viewportGizmoController = createViewportGizmoController({
   }),
   getHitRect: getCameraViewHitRect,
   getRenderRect: getCameraRenderRect,
-  onDragEnd: (payload) => {
-    const actorName = String(payload?.actor || '');
-    if (actorName) editorApi.sceneTools.saveActor(sceneId, actorName).catch(() => {});
-  },
 });
 
 const refreshCameraViewActorPickIndex = async () => {

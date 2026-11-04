@@ -584,7 +584,7 @@ function reportNodeRunClicked() {
     category: 'tutorial',
     success: true,
     details: { source: 'user' },
-  });
+  }, { onSceneSave: !isProjectTarget.value });
 }
 function reportNodeRunStarted() {
   if (nodeRunLifecycle.active) return;
@@ -594,7 +594,7 @@ function reportNodeRunStarted() {
     category: 'runtime',
     success: true,
     details: { source: 'node_graph' },
-  });
+  }, { onSceneSave: !isProjectTarget.value });
 }
 function reportNodeRunTerminal(success, error = '') {
   if (nodeRunLifecycle.terminalReported) return;
@@ -606,8 +606,8 @@ function reportNodeRunTerminal(success, error = '') {
     category: 'runtime',
     success,
     details: { source: 'node_graph', error: String(error || '').slice(0, 500) },
-  });
-  if (!success) {
+  }, { onSceneSave: !isProjectTarget.value });
+  if (!success && isProjectTarget.value) {
     requestNodeGraphReview(0);
     window.dispatchEvent(new CustomEvent('cabbage-run-failed', {
       detail: { source: 'node_graph', error: String(error || ''), contextRecorded: true },

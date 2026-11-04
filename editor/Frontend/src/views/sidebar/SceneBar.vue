@@ -811,6 +811,8 @@ const SaveScene = async () => {
       return;
     const result = await editorApi.main.sceneSave(currentSceneName.value);
     const saved = result?.data ?? result;
+    if (!saved?.ok) throw new Error(saved?.message || "保存场景失败");
+    cabbageContextService.notifySceneSaved(saved.filepath);
     if (saved?.unresolved_actor_count > 0) {
       logWarn(`Scene saved with ${saved.unresolved_actor_count} unresolved actors`);
     }

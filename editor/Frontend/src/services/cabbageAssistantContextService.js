@@ -22,12 +22,18 @@ let writeChain = Promise.resolve();
 let activeScoreUpdateTaskId = '';
 const activeGoalPlanPolls = new Map();
 const pendingTransforms = new Map();
+const pendingActorEvents = [];
 const localSubscribers = new Set();
 const localPreWarningSubscribers = new Set();
 
 function getChannel() {
   if (typeof BroadcastChannel === 'undefined') return null;
-  if (!channel) channel = new BroadcastChannel(CHANNEL_NAME);
+  if (!channel) {
+    channel = new BroadcastChannel(CHANNEL_NAME);
+    channel.addEventListener('message', ({ data }) => {
+      if (data?.type === 'scene-saved') flushActorEvents(data.projectPath);
+    });
+  }
   return channel;
 }
 
@@ -319,8 +325,29 @@ async function initializeWorldTasksNow({ prompt = '', mode = 'story', waitForCom
   return trackGoalPlan(taskId, expectedScopeId);
 }
 
-export function recordEvent(event = {}) {
+function flushActorEvents(projectPath) {
+  if (projectPath.toLowerCase() !== currentProjectPath().toLowerCase()) return;
+  const events = pendingActorEvents.splice(0).filter(event =>
+    event.projectPath === currentProjectPath() && event.projectRevision === worldModeState.revision);
+  for (const event of events) enqueue(() => sendEvent(event));
+}
+
+function notifySceneSaved(filepath) {
+  if (!filepath) return;
+  const projectPath = filepath.replaceAll('\\', '/').replace(/\/[^/]+$/, '');
+  flushActorEvents(projectPath);
+  getChannel()?.postMessage({ type: 'scene-saved', projectPath });
+}
+
+export function recordEvent(event = {}, { onSceneSave = false } = {}) {
   const normalized = { ...clone(event, {}),projectPath:currentProjectPath(),projectRevision:worldModeState.revision, timestamp: Number(event.timestamp) || Date.now() };
+  if (onSceneSave) {
+    // Actor edits and trial runs must not modify the project's assistant document.
+    getChannel();
+    pendingActorEvents.push(normalized);
+    if (pendingActorEvents.length > 200) pendingActorEvents.shift();
+    return Promise.resolve({ success: true, status: 'queued' });
+  }
   if (['transform_position', 'transform_rotation', 'transform_scale'].includes(normalized.type)) {
     const key = transformKey(normalized);
     const previous = pendingTransforms.get(key);
@@ -499,6 +526,7 @@ export const cabbageContextService = {
   loadCurrentWorld,
   initializeWorldTasks,
   recordEvent,
+  notifySceneSaved,
   updateTask,
   appendMessage,
   requestProfileScoreUpdate,

@@ -445,16 +445,6 @@ const viewportGizmoController = createViewportGizmoController({
   getCameraBinding: () => cameraBindingState.value,
   getHitRect: getViewportHitRect,
   getRenderRect: getViewportRenderRect,
-  onDragEnd: (payload) => {
-    const sceneId =
-      String(payload?.sceneId || cameraBindingState.value.sceneId || '').trim();
-    const actorName = String(payload?.actor || '').trim();
-    if (sceneId && actorName) {
-      editorApi.sceneTools.saveActor(sceneId, actorName).catch((error) => {
-        logError('Failed to save gizmo actor transform', error);
-      });
-    }
-  },
 });
 
 const handleModelNodeGizmoSelection = (identity) => { if (identity) viewportGizmoController.clearTarget(); };

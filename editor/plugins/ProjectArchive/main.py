@@ -6,8 +6,13 @@ only the request facade and its load-policy/diagnostic mapping.
 
 from __future__ import annotations
 
+import configparser
+from pathlib import Path
+
 from runtime.archive.errors import ArchiveParseError
 from runtime.archive.parser import parse_archive
+from runtime.archive.portable import recover_scene, validate_assets
+from runtime.archive.writer import save_scene
 from runtime.plugin_base import PluginBase
 
 
@@ -36,7 +41,14 @@ class ProjectArchive(PluginBase):
                 ],
             }
         try:
+            source = Path(path)
+            if source.is_dir() or source.name == "scene.ini":
+                recover_scene((source if source.is_dir() else source.parent).resolve())
             snapshot = parse_archive(path)
+            if snapshot.get("archive_type") == "portable_scene":
+                missing = validate_assets(Path(snapshot["project_root"]), snapshot["extensions"]["ini_sections"],
+                                          verify_hashes=True)
+                snapshot["diagnostics"].extend(missing)
         except ArchiveParseError as exc:
             return {
                 "ok": False,
@@ -61,5 +73,19 @@ class ProjectArchive(PluginBase):
             "snapshot": snapshot,
             "diagnostics": diagnostics,
         }
+
+    @staticmethod
+    def save(request: dict) -> dict:
+        from script_runtime.blockly.main import ScratchTool
+
+        if ScratchTool.has_restore_snapshot():
+            return {"ok": False, "status": "run_active", "message": "请先停止脚本并恢复场景，再保存存档"}
+        try:
+            return save_scene(request)
+        except ArchiveParseError as exc:
+            return {"ok": False, "status": "error", "message": str(exc), "diagnostics": [exc.to_diagnostic()]}
+        except (KeyError, TypeError, ValueError, OSError, configparser.Error) as exc:
+            return {"ok": False, "status": "error", "message": str(exc)}
+
 
 __all__ = ["ProjectArchive"]

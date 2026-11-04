@@ -26,7 +26,8 @@ def test_native_init_is_singular_and_save_does_not_reload():
     save = source.split('{"scene_save",', 1)[1].split("void register_project_settings", 1)[0]
     assert "resolve_native_editor_scene_request" in save
     assert "reload_native_editor_scene" not in save
-    assert "persist_native_scene_common" in save
+    assert "save_editor_scene(*scene, false)" in save
+    assert "persist_native_scene_" not in source
 
 
 def test_adapters_and_ui_have_no_old_scene_lifecycle():

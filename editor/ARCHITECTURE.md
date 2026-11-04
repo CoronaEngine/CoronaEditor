@@ -5,8 +5,8 @@
 | 层 | 负责 | 不负责 |
 |---|---|---|
 | Vue | 页面、输入、临时 UI 状态、结果展示和 JS manifest adapter | 场景事实、AI 业务、引擎对象 |
-| C++ | 场景/Actor/资源/变换/revision、渲染和跨层 manifest handler | Python 业务流程 |
-| Python | Blockly 生成文件的按路径执行、输入与恢复、项目归档 | 保存场景事实或充当传统后端 |
+| C++ | 场景/Actor/资源的当前内存值、渲染和跨层 manifest handler | 在移动 Actor 或停止脚本时写入场景存档 |
+| Python | 项目场景存档解析、校验与显式保存，Blockly 生成文件的按路径执行、输入与恢复 | Blockly 图编辑与代码生成 |
 
 编辑器写操作必须经过 C++ manifest 聚合接口。底层引擎 API（例如 `camera()`、
 `geometry()`）只属于 C++ 内部实现；Vue 和普通 Python 不直接导入或暴露它们。

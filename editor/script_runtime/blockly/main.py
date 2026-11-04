@@ -303,7 +303,6 @@ class ScratchTool:
                 "code_path": _rel(code_path),
                 "revision": hashlib.sha256(code.encode("utf-8")).hexdigest(),
                 "workspace_path": _rel(workspace_path),
-                "updated_at": time.time(),
                 "enabled": bool(data.get("enabled", True)),
                 "runnable": bool(data.get("runnable", True)),
                 "validation_errors": [str(item) for item in validation_errors if str(item)],
@@ -314,9 +313,18 @@ class ScratchTool:
             # another panel can never interpret a temporarily truncated manifest as an
             # empty world and overwrite the user's graph.
             with cls._persistence_lock:
-                cls._atomic_write_text(code_path, code)
-                cls._atomic_write_json(workspace_path, data.get("workspace") or {})
                 manifest = cls._load_manifest(project_path)
+                previous = next((t for t in manifest["targets"] if t.get("id") == target_id), None)
+                workspace = data.get("workspace") or {}
+                if previous and all(previous.get(k) == v for k, v in target.items()):
+                    # Run revalidates a saved graph. Keep its archive revision (and files) untouched.
+                    if (code_path.is_file() and workspace_path.is_file()
+                            and code_path.read_bytes() == code.encode("utf-8")
+                            and workspace_path.read_bytes() == json.dumps(workspace, ensure_ascii=False, indent=2).encode("utf-8")):
+                        return {"status": "saved", "target": previous, "project_path": str(project_path)}
+                target["updated_at"] = time.time()
+                cls._atomic_write_text(code_path, code)
+                cls._atomic_write_json(workspace_path, workspace)
                 targets = [t for t in manifest.get("targets", []) if t.get("id") != target_id]
                 targets.append(target)
                 targets.sort(
@@ -420,6 +428,11 @@ class ScratchTool:
             set_editor_camera_input_enabled(not locked, reason="node_graph")
         except Exception:
             logger.debug("[ScratchTool] node graph editor camera input gate unavailable", exc_info=True)
+
+    @classmethod
+    def has_restore_snapshot(cls) -> bool:
+        with cls._exec_lock:
+            return cls._exec_state_snapshot is not None
 
     @classmethod
     def _capture_exec_snapshot(cls, resolved: dict[str, Any]) -> tuple[Optional[dict[str, Any]], str | None]:

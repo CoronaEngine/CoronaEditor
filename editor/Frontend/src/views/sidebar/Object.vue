@@ -577,7 +577,6 @@ async function applyTransform(operation, axis = '') {
   schedule(`save:${operation}`, async () => {
     try {
       await transformFlushPromise;
-      await editorApi.sceneTools.saveActor(selectedSceneName.value, selectedActorName.value);
       const eventType = operation === 'SetPosition'
         ? 'transform_position'
         : operation === 'SetRotation'
@@ -595,7 +594,7 @@ async function applyTransform(operation, axis = '') {
           value: axis ? Number(actor.transform[operation === 'SetPosition' ? 'position' : operation === 'SetRotation' ? 'rotation' : 'scale']?.[axis]) : null,
           source: 'property_panel',
         },
-      });
+      }, { onSceneSave: true });
     } catch (error) {
       logError('保存对象变换失败', error);
     }
@@ -796,7 +795,15 @@ async function saveActor() {
   if (!selectedActorName.value || saving.value) return;
   saving.value = true;
   try {
-    await editorApi.sceneTools.saveActor(selectedSceneName.value, selectedActorName.value);
+    if (transformFrameId !== null) {
+      window.cancelAnimationFrame(transformFrameId);
+      flushTransformUpdates();
+    }
+    await transformFlushPromise;
+    const result = await editorApi.sceneTools.saveActor(selectedSceneName.value, selectedActorName.value);
+    const saved = result?.data ?? result;
+    if (saved?.ok === false) throw new Error(saved.message || '保存对象失败');
+    cabbageContextService.notifySceneSaved(saved?.filepath);
   } catch (error) {
     logError('保存对象失败', error);
   } finally {

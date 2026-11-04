@@ -1824,9 +1824,9 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
             "set_linear_lock",
             "set_angular_lock",
             "camera_lock_position_offset",
-            "persist_native_scene_actors",
         ):
             self.assertIn(token, state)
+        self.assertNotIn("persist_native_scene_actors", state)
 
         create_start = source.find("apply_pending_network_actor_create(")
         create_end = source.find("apply_pending_network_actor_transform(", create_start)
@@ -2891,11 +2891,11 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
     def test_native_actor_save_load_preserves_common_optics_fields(self):
         source = self._handler_source()
         for snippet in (
-            '".optics.diffuse = "',
-            '".optics.metallic = "',
-            '".optics.roughness = "',
-            '".optics.emission = "',
-            '".material.texture = "',
+            'optics["diffuse"]',
+            'optics["metallic"]',
+            'optics["roughness"]',
+            'optics["emission"]',
+            'item["material"]["texture"]',
             'item.optics->set_diffuse',
             'item.optics->set_metallic',
             'item.optics->set_roughness',
@@ -2927,8 +2927,6 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
             "int actor_version{1};",
             'item["entity_id"] = actor.runtime_entity_id;',
             'item["actor_version"] = std::max(actor.actor_version, 1);',
-            '".runtime.entity_id = "',
-            '".runtime.actor_version = "',
         ):
             with self.subTest(snippet=snippet):
                 self.assertIn(snippet, source)
@@ -2956,28 +2954,12 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
             transform_body.group(0),
         )
 
-    def test_native_actor_serializer_does_not_reappend_owned_runtime_fields(self):
+    def test_native_actor_save_delivers_typed_values_to_the_python_writer(self):
         source = self._handler_source()
-        normalized_fields = re.search(
-            r"static const std::set<std::string> normalized_fields\{(.*?)\};",
-            source,
-            re.S,
-        )
-        self.assertIsNotNone(normalized_fields)
-
-        for field in (
-            "runtime.entity_id",
-            "runtime.asset_id",
-            "runtime.model_ref",
-            "runtime.entity_type",
-            "runtime.semantic_role",
-            "runtime.source_plan_id",
-            "runtime.source_batch_id",
-            "runtime.source_scene_version",
-            "runtime.actor_version",
-        ):
-            with self.subTest(field=field):
-                self.assertIn(f'"{field}"', normalized_fields.group(1))
+        save = source.split("NativeResult save_editor_scene", 1)[1].split("\n}", 1)[0]
+        self.assertIn('scene_to_json(scene)', save)
+        self.assertIn('invoke_python_script_service({"ProjectArchive", "save"', save)
+        self.assertNotIn('SceneDocumentStore', save)
 
     def test_actor_file_transfer_uses_runtime_asset_identity_without_wire_changes(self):
         source = self._network_system_source()
@@ -3008,9 +2990,9 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
     def test_native_camera_save_load_preserves_vision_render_settings(self):
         source = self._handler_source()
         for snippet in (
-            '".vision_spp = "',
-            '".vision_max_depth = "',
-            '".vision_denoise = "',
+            'item["vision_spp"]',
+            'item["vision_max_depth"]',
+            'item["vision_denoise"]',
             'section_value("vision_spp"',
             'section_value("vision_max_depth"',
             'section_value("vision_denoise"',
@@ -3259,7 +3241,7 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
         self.assertIn("enum class BodyType", hub)
         for value in ("Dynamic", "Kinematic", "Static", "Phantom"):
             self.assertIn("BodyType::" + value, hub)
-        self.assertIn(".mechanics.body_type", self._handler_source())
+        self.assertIn('item["body_type"]', self._handler_source())
         self.assertIn("set_body_type", self._handler_source())
         self.assertIn("normalizeBodyType", panel)
         self.assertIn("{ body_type: next }", panel)
@@ -3346,10 +3328,7 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
         self.assertIn("ActorLoadStatus", source)
         self.assertIn("UNSUPPORTED_RESOURCE_TYPE", source)
         self.assertIn('item.actor_type != "audio"', source)
-        self.assertIn("actor.persisted_snapshot.value(", source)
-        self.assertIn('"persisted_fields", nlohmann::json::object()', source)
         self.assertIn("actor.load_status != ActorLoadStatus::Loaded", source)
-        self.assertIn("allow_missing", source)
         self.assertIn('{"rebind_actor_resource"', source)
         self.assertIn("load_status = ActorLoadStatus::Loaded", source)
         self.assertIn('"decision_required"', source)
@@ -3582,12 +3561,11 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
     def test_retired_python_scene_writer_is_removed(self):
         self.assertFalse((self._repo_root() / 'editor/runtime/legacy/entities/scene.py').exists())
 
-    def test_portable_scene_has_one_native_transactional_save_path(self):
-        handlers = self._handler_source()
-        self.assertIn('SceneDocumentStore document_store(scene.project_root)', handlers)
-        self.assertIn('document_store.replace_sections(sections, write_diagnostics)', handlers)
-        self.assertIn('sections["scene"] = {"[scene]"}', handlers)
-        self.assertIn('scene_metadata["name"] = scene.name', handlers)
+    def test_actor_edits_have_no_implicit_native_save_path(self):
+        source = self._handler_source()
+        self.assertNotIn("persist_native_scene_", source)
+        self.assertIn("save_editor_scene(*scene, false)", source)
+        self.assertIn("save_editor_scene(*scene, true)", source)
 
     def test_portable_scene_validation_import_and_cleanup_apis_are_exposed(self):
         repo_root = self._repo_root()
@@ -3627,8 +3605,7 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
         start = source.index('{"scene_save"')
         end = source.index('registry.register_module("MainView"', start)
         body = source[start:end]
-        self.assertIn("PortableSceneValidationError", body)
-        self.assertIn('{"diagnostics", error.diagnostics()}', body)
+        self.assertIn('if (!saved.success || !saved.data.value("ok", false)) return saved', body)
         self.assertIn('{"ok", false}', body)
 
 

@@ -1,4 +1,6 @@
+import hashlib
 import tempfile
+import json
 import unittest
 from pathlib import Path
 from unittest.mock import patch
@@ -34,13 +36,19 @@ class ProjectArchiveServiceTests(unittest.TestCase):
                         "name = Missing",
                         "[actors]",
                         "missing.actor_guid = missing-guid",
-                        "missing.route = assets/missing.fbx",
+                        "missing.route = Assets/Models/missing/missing.fbx",
                         "",
                     ]
                 ),
                 encoding="utf-8",
             )
 
+            route = "Assets/Models/missing/missing.fbx"
+            (scene / "assets.manifest.json").write_text(json.dumps({
+                "format": "corona_scene_assets", "version": 1, "bundles": [{
+                    "main": route, "files": [{"path": route, "size": 1}], "dependencies": [],
+                }],
+            }), encoding="utf-8")
             result = ProjectArchive.parse({"path": str(scene), "load_policy": "prompt"})
 
             self.assertTrue(result["ok"])
@@ -89,10 +97,22 @@ class ProjectArchiveServiceTests(unittest.TestCase):
     def test_missing_texture_warning_still_requires_confirmation(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
-            (root / "model.obj").write_text("o model\n", encoding="utf-8")
+            model = "Assets/Models/probe/model.obj"
+            texture = "Assets/Images/probe/missing.png"
+            (root / model).parent.mkdir(parents=True)
+            content = b"o model\n"
+            (root / model).write_bytes(content)
+            (root / "assets.manifest.json").write_text(json.dumps({
+                "format": "corona_scene_assets", "version": 1, "bundles": [
+                    {"main": model, "sha256": hashlib.sha256(b"model.obj\0" + content).hexdigest(),
+                     "files": [{"path": model, "size": len(content), "sha256": hashlib.sha256(content).hexdigest()}],
+                     "dependencies": []},
+                    {"main": texture, "files": [{"path": texture, "size": 1}], "dependencies": []},
+                ],
+            }))
             (root / "scene.ini").write_text(
                 "[format]\ntype=corona_scene_folder\nversion=1\n"
-                "[actors]\nmodel.route=model.obj\nmodel.material.texture=missing.png\n",
+                f"[actors]\nmodel.route={model}\nmodel.material.texture={texture}\n",
                 encoding="utf-8",
             )
             for policy, status in (("prompt", "decision_required"), ("degraded", "ready_degraded")):
