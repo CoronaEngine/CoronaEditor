@@ -81,13 +81,6 @@ const routes = [
     component: getPluginComponent('ProjectSettings'),
   },
   {
-    path: '/ScratchTool',
-    name: 'ScratchTool',
-    // Lazy: the router is in every editor window's entry graph, and Blockly is the single
-    // largest dependency in the bundle.
-    component: () => import('../blockly/components/BlocklyWorkspace.vue'),
-  },
-  {
     path: '/CameraView',
     name: 'CameraView',
     component: () => import('../views/tools/CameraView.vue'),

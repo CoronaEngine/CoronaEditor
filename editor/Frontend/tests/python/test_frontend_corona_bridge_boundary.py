@@ -32,7 +32,6 @@ SANCTIONED = {
 # above. Recorded so the ratchet starts from the measured status quo rather than from zero.
 KNOWN_DEVIATIONS = {
     "App.vue",
-    "blockly/components/BlocklyWorkspace.vue",
     "services/projectLauncherService.js",
     "views/layout/MainPage.vue",
     "views/layout/StoryWorld.vue",

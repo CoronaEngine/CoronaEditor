@@ -1041,8 +1041,8 @@ test('HUD pins the boss plate top-center, vitals top-left and skills bottom-righ
 // 回归（UI 遮挡）：行囊（Tab 背包）恢复之后，「物品栏」与「小世界状态」条又各自贴底居中，
 // 两条的锚点完全相同，在某些视口上叠在一起；任何面板打开时物品栏还会盖在面板上。判定只有
 // 一条真值（hotbarVisible），模板 v-if 与滚轮换格共用它：物品栏只在「小世界 + 没有任何面板」
-// 时存在，状态条在顶部中央，调整物体的遮罩必须让点击穿到视口上。
-test('the item bar yields to every open panel, sits bottom-center, and the notice moved to the top', async t => {
+// 时存在，调整物体的遮罩必须让点击穿到视口上。
+test('the item bar yields to every open panel, sits bottom-center, and leaves the world label to the corner', async t => {
   const f = await fixture(t);
   let page = f.mount(); await page.mount(); await turn();
   clickWorld(page); await turn(); await turn();
@@ -1054,7 +1054,8 @@ test('the item bar yields to every open panel, sits bottom-center, and the notic
   assert.equal(p().roleRef.value, 'child');
   assert.equal(p().hotbarVisible.value, true);
   assert.ok(node('hotbar'), '小世界里物品栏必须渲染出来');
-  assert.ok(node('subworld-notice'), '小世界状态条必须渲染出来');
+  assert.equal(node('subworld-notice'), null);
+  assert.ok(node('world-indicator'));
 
   // 三类面板打开都必须让位——Tab 背包、先知对话、调整物体走的是同一条判定。
   for (const [label, key] of [['背包', 'inventoryOpen'], ['对话', 'dialogueOpen'], ['调整', 'adjustMode']]) {
@@ -1087,7 +1088,7 @@ test('the item bar yields to every open panel, sits bottom-center, and the notic
   };
   const declarations = selector => Object.assign({}, ...blocksFor(selector));
   for (const selector of ['.story-bottom-column', '.story-bottom-stack', '.hotbar',
-    '.subworld-notice', '.dialogue-overlay', '.dialogue-overlay-passive']) {
+    '.dialogue-overlay', '.dialogue-overlay-passive']) {
     assert.equal(blocksFor(selector).length, 1, `${selector} 只能有一份规则，锚点不得有第二份副本`);
   }
 
@@ -1109,9 +1110,6 @@ test('the item bar yields to every open panel, sits bottom-center, and the notic
     '状态条不再自己贴底：位置由 flex 列给出');
   assert.equal(declarations('.hotbar').position, 'static',
     '物品栏不再自己贴底：位置由 flex 列给出');
-  assert.equal(declarations('.subworld-notice').position, 'absolute');
-  assert.equal(declarations('.subworld-notice').left, '50%');
-  assert.equal(declarations('.subworld-notice').top, '18px');
   // 调整物体时遮罩不得挡住视口：只有面板本身还接指针。
   assert.equal(declarations('.dialogue-overlay-passive')['pointer-events'], 'none');
   assert.equal(declarations('.dialogue-overlay-passive > *')['pointer-events'], 'auto');
@@ -1130,7 +1128,7 @@ test('the bottom-centre channel is owned by one column, not two hand-tuned offse
   page.instance.feedback.value = '获得 世界碎片 ×1';
   page.instance.gameplayError.value = '保存失败，请重试';
   const tree = renderStory(proxyRefs(p()), []);
-  for (const panel of ['subworld-notice', 'world-indicator', 'story-bottom-column'])
+  for (const panel of ['world-indicator', 'story-bottom-column'])
     assert.ok(findNode(tree, item => item.props?.class === panel),
       `${panel} 应当渲染出来才能参与这项检查`);
   assert.equal(findNode(tree, item => item.props?.class === 'action-tips'), null,
@@ -1157,16 +1155,12 @@ test('the bottom-centre channel is owned by one column, not two hand-tuned offse
   assert.ok(barWidth > 300 && barWidth < 560, `物品栏宽 ${barWidth} 应当在底部正中留得下`);
   // 锚点之争：没有人可以和别人抢同一个位置。
   assert.deepEqual(collisionsFor(['.story-bottom-column', '.story-bottom-stack', '.hotbar',
-    '.subworld-notice', '.world-indicator', '.action-tips', '.action-cluster']), [],
+    '.world-indicator', '.action-tips', '.action-cluster']), [],
     '同一个视口里的 HUD 面板不得抢占同一个位置（抢占就是遮住了对方）');
-  // 顶部中央与底部中央必须真的分处两端：状态条在顶部，物品栏通道在底部。
-  const notice = styleAnchor('.subworld-notice');
-  assert.equal(notice.edge, 'top', '状态条必须贴在顶部，而不是又回到物品栏那条通道上');
-  assert.equal(notice.horizontal, 'center');
   assert.equal(styleAnchor('.story-bottom-column').edge, 'bottom');
 });
 
-// 顶部中央是「主世界归 Boss 血条、小世界归状态条」的共用位置，两者必须互斥；
+// 顶部中央在主世界显示 Boss 血条；
 // 底部中央归底部通道，左右两角归操作提示与战技群；这四角加一条通道不得有人抢占同一格。
 test('the shared HUD slots are occupied by exactly one panel per world', async t => {
   const f = await fixture(t);
@@ -1180,16 +1174,17 @@ test('the shared HUD slots are occupied by exactly one panel per world', async t
   assert.equal(has(bossTree, 'subworld-notice'), false, '主世界不得出现小世界状态条');
   assert.equal(has(mainTree, 'subworld-notice'), false);
   assert.equal(has(mainTree, 'hotbar'), false, '主世界没有物品栏');
-  // 小世界：状态条在顶部，物品栏在底部通道。
+  // 小世界使用右上角的世界指示器和底部物品栏。
   clickWorld(page); await turn(); await turn();
   page = f.mount(); await page.mount(); await turn(); await turn();
   const childTree = renderStory(proxyRefs(page.instance), []);
   assert.equal(page.instance.roleRef.value, 'child');
-  assert.equal(has(childTree, 'subworld-notice'), true, '小世界的顶部中央归状态条');
+  assert.equal(has(childTree, 'subworld-notice'), false);
+  assert.equal(has(childTree, 'world-indicator'), true);
   assert.equal(has(childTree, 'hotbar'), true, '小世界的底部通道里有物品栏');
   assert.equal(has(childTree, 'vitals-container'), false, '小世界不渲染战斗生命槽');
   // 四角 + 底部通道：同时存在的这些面板，谁都不许和别人抢同一个位置。
-  assert.deepEqual(collisionsFor(['.story-bottom-column', '.subworld-notice', '.world-indicator',
+  assert.deepEqual(collisionsFor(['.story-bottom-column', '.world-indicator',
     '.action-tips', '.action-cluster', '.vitals-container', '.boss-wrap']), [],
     '同一个视口里的 HUD 面板不得抢占同一个位置（抢占就是遮住了对方）');
 });

@@ -43,13 +43,6 @@
               </label>
             </fieldset>
           </fieldset>
-          <fieldset v-if="group.key === 'indirect'" disabled aria-label="GI 分辨率比例（暂不可用）">
-            <legend>分辨率比例（暂不可用）</legend>
-            <label title="原生默认比例为 2；当前尚未接入渲染，不能调整。">
-              <span>分辨率比例</span><input type="number" value="2" min="1" max="4" step="1" disabled readonly aria-label="GI 分辨率比例（暂不可用）" />
-            </label>
-            <p class="hint">当前尚未接入渲染，以上控件暂不可用。</p>
-          </fieldset>
         </fieldset>
       </fieldset>
       <p v-if="error" role="alert" class="error">{{ error }}</p>

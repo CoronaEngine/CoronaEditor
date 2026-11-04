@@ -1,21 +1,7 @@
 <template>
   <div
     class="cabbage-chat-shell flex h-full min-h-0 w-full flex-1 flex-col overflow-hidden rounded-lg relative"
-    :class="{ resident: props.resident }"
   >
-
-    <div v-if="props.resident" class="resident-chat-title">
-      <span>AI 创作助手</span>
-      <button
-        type="button"
-        class="resident-float-button"
-        :title="'弹出为可拖动窗口'"
-        :disabled="assistant.chatBusy"
-        @click.stop="emit('detach')"
-      >
-        &#x29C9;
-      </button>
-    </div>
 
     <div class="context-strip">
       <div class="context-title">当前任务</div>
@@ -128,12 +114,6 @@ import {
   publishCabbageAssistantContext,
   subscribeCabbageAssistantContext,
 } from '@/services/cabbageAssistantContextService.js';
-
-const props = defineProps({
-  resident: { type: Boolean, default: false },
-});
-
-const emit = defineEmits(['detach']);
 
 const assistant = useCabbageAssistantStore();
 const { locale } = useI18n();
@@ -518,7 +498,7 @@ function resetChatForProjectStorageChange(event) {
   if (event?.key === 'corona.activeProjectPath') resetChatForProjectChange();
 }
 
-function focusResidentComposer() {
+function focusComposer() {
   nextTick(() => {
     const composer = composerInputRef.value;
     if (!composer) return;
@@ -530,7 +510,7 @@ function focusResidentComposer() {
   });
 }
 const focusDockComposer = payload => {
-  if (isCurrentWindowEvent(payload) && payload.panelId === 'CabbageChatPanel') focusResidentComposer();
+  if (isCurrentWindowEvent(payload) && payload.panelId === 'CabbageChatPanel') focusComposer();
 };
 
 watch(() => assistant.messages.length, scrollToBottom);
@@ -538,9 +518,6 @@ watch(streamingContent, scrollToBottom);
 
 onMounted(() => {
   coronaEventBus.on('creative-panel-open', focusDockComposer);
-  if (props.resident) {
-    window.addEventListener('cabbage-chat-focus-request', focusResidentComposer);
-  }
   window.addEventListener('corona-active-project-changed', resetChatForProjectChange);
   window.addEventListener('storage', resetChatForProjectStorageChange);
   const currentProjectScopeId = () =>
@@ -553,7 +530,6 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   coronaEventBus.off('creative-panel-open', focusDockComposer);
-  window.removeEventListener('cabbage-chat-focus-request', focusResidentComposer);
   window.removeEventListener('corona-active-project-changed', resetChatForProjectChange);
   window.removeEventListener('storage', resetChatForProjectStorageChange);
   unsubscribeAssistantContext?.();
@@ -582,56 +558,6 @@ onBeforeUnmount(() => {
   box-shadow:
     inset 0 0 24px rgba(0, 0, 0, 0.45),
     0 18px 42px rgba(0, 0, 0, 0.34);
-}
-
-.cabbage-chat-shell.resident {
-  z-index: auto;
-}
-
-.resident-chat-title {
-  min-height: 38px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  padding: 0 7px 0 12px;
-  border-bottom: 1px solid rgba(179, 153, 93, 0.3);
-  background: linear-gradient(180deg, rgba(24, 34, 26, 0.96), rgba(12, 18, 14, 0.92));
-  color: #e6d5a7;
-  font-family: var(--ce-font-display);
-  font-size: 13px;
-  font-weight: 600;
-  letter-spacing: 0.1em;
-}
-
-.resident-float-button {
-  width: 24px;
-  height: 24px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex: 0 0 auto;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 4px;
-  background: rgba(255, 255, 255, 0.06);
-  color: #c9d2c2;
-  font-size: 14px;
-  line-height: 1;
-  transition:
-    background-color 140ms ease,
-    border-color 140ms ease,
-    color 140ms ease;
-}
-
-.resident-float-button:hover:not(:disabled) {
-  border-color: rgba(179, 153, 93, 0.36);
-  background: rgba(179, 153, 93, 0.18);
-  color: #ffffff;
-}
-
-.resident-float-button:disabled {
-  opacity: 0.38;
-  cursor: not-allowed;
 }
 
 .context-strip {

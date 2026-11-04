@@ -51,7 +51,7 @@
     </div>
 
     <div
-      v-if="showLocalModal"
+      v-if="importProgress"
       class="fixed inset-0 bg-black/70 flex items-center justify-center z-[9999]"
     >
       <div class="bg-[#263126] rounded-lg p-6 min-w-[300px] border border-[#b3995d]/30 shadow-2xl">
@@ -71,17 +71,17 @@
               ></path>
             </svg>
           </div>
-          <span class="text-[#e8ede3] font-medium">{{ localModalTitle }}</span>
+          <span class="text-[#e8ede3] font-medium">加载中</span>
         </div>
-        <div class="text-sm text-[#8d9e85] mb-2">{{ localModalMessage }}</div>
-        <div v-if="localModalProgress > 0" class="w-full bg-[#18221a] rounded-full h-2 mt-4">
+        <div class="text-sm text-[#8d9e85] mb-2">{{ importProgress.message }}</div>
+        <div v-if="importProgress.progress > 0" class="w-full bg-[#18221a] rounded-full h-2 mt-4">
           <div
             class="bg-[#b3995d] h-full rounded-full transition-all duration-300"
-            :style="{ width: localModalProgress + '%' }"
+            :style="{ width: importProgress.progress + '%' }"
           ></div>
         </div>
-        <div v-if="localModalProgress > 0" class="text-xs text-[#b3995d] text-center mt-2">
-          {{ Math.round(localModalProgress) }}%
+        <div v-if="importProgress.progress > 0" class="text-xs text-[#b3995d] text-center mt-2">
+          {{ Math.round(importProgress.progress) }}%
         </div>
       </div>
     </div>
@@ -209,10 +209,7 @@ const handleNodeGraphPanelOpenRequest = () => handleCreativePanelOpen({ panelId:
 
 
 
-const showLocalModal = ref(false);
-const localModalTitle = ref('');
-const localModalMessage = ref('');
-const localModalProgress = ref(0);
+const importProgress = ref(null);
 const projectResourceLoadStatus = ref(null);
 let projectResourceLoadPollTimer = null;
 
@@ -253,15 +250,15 @@ const viewportUiModeItems = [
   { mode: 'stereo3d', label: '3D UI', title: '光场屏立体 UI' },
 ];
 
-// 光场 3D UI 标定：dock 面板编辑后经 coronaEventBus 通知，这里用活动相机句柄下发；
+// 光场 3D UI 标定：标定面板通过共享存储同步修改，这里用活动相机句柄下发；
 // 切到 stereo3d 自动打开标定 dock 面板并推送当前值，切回 flat2d 关闭。
 const viewportUiCalibrationStore = createViewportUiCalibrationStore();
 const VIEWPORT_UI_CALIBRATION_PANEL = 'LightFieldCalibration';
-const applyViewportUiCalibration = (calibration) => {
+const applyViewportUiCalibration = () => {
   viewportUiCalibrationStore.applyToBridge({
     bridge: window.coronaBridge,
     cameraHandle: cameraBindingState.value.cameraHandle,
-    calibration: calibration ?? viewportUiCalibrationStore.get({}),
+    calibration: viewportUiCalibrationStore.get({}),
   });
 };
 const syncViewportUiCalibrationPanel = (mode) => {
@@ -809,7 +806,11 @@ function onActiveProjectChanged(event) {
   applyActualProjectChange(projectPath);
 }
 
-function onActiveProjectStorageChanged(event) {
+function onEditorStorageChanged(event) {
+  if (event?.key === viewportUiCalibrationStore.keyFor({}) && viewportUiMode.value === 'stereo3d') {
+    applyViewportUiCalibration();
+    return;
+  }
   if (event?.key !== ACTIVE_PROJECT_PATH_KEY) return;
   applyActualProjectChange(event?.newValue);
 }
@@ -2022,9 +2023,6 @@ const handleStartGamePreview = async (request = { scope: 'project' }) => {
       // Global run executes only node_graph:project:global.
       await flushProjectNodeGraphBeforeRun();
     } else {
-      if (typeof window.__coronaBlocklyFlushSave === 'function') {
-        await window.__coronaBlocklyFlushSave();
-      }
       if (typeof window.__coronaNodeGraphFlushSave === 'function') {
         await window.__coronaNodeGraphFlushSave();
       }
@@ -2310,26 +2308,12 @@ const unregisterEditorControls = () => {
   }
 };
 
-const showLoading = ({ title = '加载中', message = '请稍候...', progress = 0 } = {}) => {
-  localModalTitle.value = title;
-  localModalMessage.value = message;
-  localModalProgress.value = progress;
-  showLocalModal.value = true;
+const onSceneImportProgress = payload => {
+  importProgress.value = payload?.active && dockStore.panels.SceneTools?.open ? payload : null;
 };
-
-const updateLoading = ({ message, progress } = {}) => {
-  if (message !== undefined) localModalMessage.value = message;
-  if (progress !== undefined) localModalProgress.value = progress;
-};
-
-const hideLoading = () => {
-  showLocalModal.value = false;
-  setTimeout(() => {
-    localModalTitle.value = '';
-    localModalMessage.value = '';
-    localModalProgress.value = 0;
-  }, 300);
-};
+watch(() => dockStore.panels.SceneTools?.open, open => {
+  if (!open) importProgress.value = null;
+});
 
 const applyCameraPose = (pose = {}) => {
   const toVector3 = (value) => {
@@ -2450,9 +2434,7 @@ onMounted(async () => {
 
   // 跨窗口事件监听：panel / loading / viewport 等 UI 本地通道
   coronaEventBus.on('creative-panel-open', handleCreativePanelOpen);
-  coronaEventBus.on('loading-show', showLoading);
-  coronaEventBus.on('loading-update', updateLoading);
-  coronaEventBus.on('loading-hide', hideLoading);
+  coronaEventBus.on('scene-import-progress', onSceneImportProgress);
   coronaEventBus.on('camera-pose-request', applyCameraPose);
   coronaEventBus.on('viewport-controls-request', handleViewportControlsRequest);
   coronaEventBus.on('node-graph-panel-open-request', handleNodeGraphPanelOpenRequest);
@@ -2470,7 +2452,6 @@ onMounted(async () => {
     await subscribeWhileCurrent(editorApi.events.onViewportGizmoPointerResult, handleViewportGizmoPointerResult);
     if (!viewCurrent()) return;
   coronaEventBus.on('model-node-selection', handleModelNodeGizmoSelection);
-  coronaEventBus.on('viewport-ui-calibration-changed', applyViewportUiCalibration);
 
   await syncSceneCameraBinding(initialSceneId);
   if (!viewCurrent()) return;
@@ -2491,7 +2472,7 @@ onMounted(async () => {
   cabbageCandidateTimer = window.setInterval(() => promoteDueCabbageTasks(), 1000);
   window.addEventListener('cabbage-run-failed', onCabbageRunFailed);
   window.addEventListener('corona-active-project-changed', onActiveProjectChanged);
-  window.addEventListener('storage', onActiveProjectStorageChanged);
+  window.addEventListener('storage', onEditorStorageChanged);
 });
 
 onUnmounted(() => {
@@ -2517,13 +2498,11 @@ onUnmounted(() => {
   window.removeEventListener('cabbage-run-failed', onCabbageRunFailed);
   void cabbageContextService.flush();
   window.removeEventListener('corona-active-project-changed', onActiveProjectChanged);
-  window.removeEventListener('storage', onActiveProjectStorageChanged);
+  window.removeEventListener('storage', onEditorStorageChanged);
   closeTutorialSessionChannel();
   coronaEventBus.off('model-node-selection', handleModelNodeGizmoSelection);
   coronaEventBus.off('creative-panel-open', handleCreativePanelOpen);
-  coronaEventBus.off('loading-show', showLoading);
-  coronaEventBus.off('loading-update', updateLoading);
-  coronaEventBus.off('loading-hide', hideLoading);
+  coronaEventBus.off('scene-import-progress', onSceneImportProgress);
   coronaEventBus.off('camera-pose-request', applyCameraPose);
   coronaEventBus.off('viewport-controls-request', handleViewportControlsRequest);
   coronaEventBus.off('node-graph-panel-open-request', handleNodeGraphPanelOpenRequest);

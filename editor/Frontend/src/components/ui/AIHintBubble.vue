@@ -20,18 +20,11 @@
 
         <!-- Bubble -->
         <div class="relative max-w-[220px] bg-gradient-to-br from-green-50 to-green-100 text-gray-800 px-3 py-2 rounded-2xl rounded-tl-sm shadow-lg border border-green-200">
-          <!-- Loading state -->
-          <div v-if="loading" class="flex items-center gap-1 py-1">
-            <span class="w-2 h-2 bg-green-400 rounded-full animate-bounce" style="animation-delay: 0ms"></span>
-            <span class="w-2 h-2 bg-green-400 rounded-full animate-bounce" style="animation-delay: 150ms"></span>
-            <span class="w-2 h-2 bg-green-400 rounded-full animate-bounce" style="animation-delay: 300ms"></span>
-          </div>
-
           <!-- Hint text -->
-          <p v-else class="text-sm leading-relaxed">{{ hintText }}</p>
+          <p class="text-sm leading-relaxed">{{ hintText }}</p>
 
           <!-- Auto-hide progress bar -->
-          <div v-if="!loading" class="mt-1.5 h-0.5 bg-green-200 rounded-full overflow-hidden">
+          <div class="mt-1.5 h-0.5 bg-green-200 rounded-full overflow-hidden">
             <div
               class="h-full bg-green-400 rounded-full transition-all"
               :style="{ width: progressPercent + '%' }"
@@ -40,7 +33,6 @@
 
           <!-- Close button -->
           <button
-            v-if="!loading"
             class="absolute -top-1.5 -right-1.5 w-5 h-5 bg-white rounded-full shadow border border-gray-200 flex items-center justify-center hover:bg-gray-100 transition-colors"
             @click.stop="dismiss"
           >
@@ -58,7 +50,6 @@ import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue';
 const props = defineProps({
   show: { type: Boolean, default: false },
   hintText: { type: String, default: '' },
-  loading: { type: Boolean, default: false },
   anchorEl: { type: Object, default: null },
   autoHideMs: { type: Number, default: 6000 },
 });

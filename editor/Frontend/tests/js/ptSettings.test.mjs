@@ -38,7 +38,6 @@ test('loads effective PT values and submits only working parameters to the bound
   const f = fixture(); t.after(f.stop);
   f.state.open.value = true; await settle();
   assert.deepEqual(f.state.draft.value, { max_depth: 12, min_depth: 3, rr_threshold: 0.75 });
-  assert.deepEqual(f.state.adaptive.value, { enabled: false, threshold: 0.002, start_index: 256 });
   f.state.draft.value.max_depth = 8;
   f.state.draft.value.rr_threshold = 0;
   assert.equal(await f.state.apply(), true);
@@ -154,15 +153,14 @@ test('closing a panel waiting for its first GPU view cancels further reads', asy
   assert.equal(await f.state.apply(), false);
 });
 
-test('the actual panel renders the three PT inputs and disables the adaptive controls', async t => {
+test('the actual panel renders working PT inputs without adaptive placeholders', async t => {
   const f = fixture(); t.after(f.stop);
   f.state.open.value = true; await settle();
   const html = await renderPanel(f);
   assert.match(html, /<input(?=[^>]*aria-label="最大路径深度")(?=[^>]*value="12")(?=[^>]*max="128")[^>]*>/);
   assert.match(html, /<input(?=[^>]*aria-label="RR 起始深度")(?=[^>]*value="3")[^>]*>/);
   assert.match(html, /<input(?=[^>]*aria-label="RR 阈值")(?=[^>]*value="0.75")[^>]*>/);
-  assert.match(html, /<fieldset disabled aria-label="自适应采样（暂不可用）">/);
-  for (const label of ['启用自适应采样', '收敛阈值', '最少样本数']) assert.ok(html.includes(`aria-label="${label}"`));
+  assert.doesNotMatch(html, /自适应采样|收敛阈值|最少样本数/);
   assert.doesNotMatch(html, /<button type="submit" disabled/);
 });
 

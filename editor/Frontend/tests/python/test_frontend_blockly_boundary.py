@@ -14,7 +14,6 @@ EXPECTED_DIRECTORIES = (
     "generators",
     "i18n",
     "node-editor",
-    "store",
     "utils",
 )
 

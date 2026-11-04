@@ -195,8 +195,7 @@ test('renders the actual nested panel with independent switches, hints and bound
   assert.match(html, /<input(?=[^>]*aria-label="DI 最大递归次数")(?=[^>]*min="1")(?=[^>]*max="100")[^>]*>/);
   assert.match(html, /<input(?=[^>]*aria-label="GI 空间复用半径")(?=[^>]*value="12")[^>]*>/);
   assert.match(html, /可能需要重新编译/);
-  assert.match(html, /<input(?=[^>]*aria-label="GI 分辨率比例（暂不可用）")(?=[^>]*value="2")(?=[^>]*min="1")(?=[^>]*max="4")(?=[^>]*disabled)[^>]*>/);
-  assert.match(html, /当前尚未接入渲染/);
+  assert.doesNotMatch(html, /GI 分辨率比例|当前尚未接入渲染/);
   assert.doesNotMatch(html, /StablePlane|降噪|resize|GI ratio/);
   assert.doesNotMatch(html, /<button type="submit" disabled/);
   f.state.draft.value.direct.open = false;

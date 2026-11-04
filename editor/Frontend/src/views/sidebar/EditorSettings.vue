@@ -1,7 +1,7 @@
 <template>
   <main class="esc-panel">
 
-    <section class="esc-body" aria-labelledby="esc-menu-title">
+    <section class="esc-body">
 
       <section class="settings-section">
         <div class="section-heading">
@@ -427,12 +427,6 @@ onBeforeUnmount(() => {
   speedApplyTimer = null;
 });
 
-function handleContinue() {
-  confirmHome.value = false;
-  void appService.closeThisTab('EditorSettings');
-}
-
-
 function cancelHome() {
   confirmHome.value = false;
 }
@@ -498,55 +492,11 @@ function goHome() {
   scrollbar-color: rgba(140, 169, 111, 0.42) transparent;
 }
 
-.esc-header,
 .section-heading,
 .section-heading.split,
 .confirm-actions {
   display: flex;
   align-items: center;
-}
-
-.esc-header {
-  justify-content: space-between;
-  gap: 16px;
-  padding-bottom: 12px;
-  border-bottom: 1px solid var(--panel-border);
-}
-
-.esc-kicker {
-  margin: 0 0 4px;
-  color: var(--accent);
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0;
-  text-transform: uppercase;
-}
-
-.esc-header h2 {
-  margin: 0;
-  color: var(--text-main);
-  font-size: 24px;
-  font-weight: 700;
-  line-height: 1.15;
-}
-
-.esc-state {
-  max-width: 48%;
-  padding: 5px 9px;
-  border: 1px solid rgba(140, 169, 111, 0.42);
-  border-radius: 6px;
-  overflow: hidden;
-  color: var(--accent-strong);
-  background: rgba(140, 169, 111, 0.08);
-  font-size: 12px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.esc-state.offline {
-  color: var(--warn);
-  border-color: rgba(211, 170, 104, 0.42);
-  background: rgba(211, 170, 104, 0.08);
 }
 
 .status-line {
@@ -725,7 +675,6 @@ function goHome() {
   color: var(--text-muted);
 }
 
-
 .locale-field span {
   min-width: 0;
   overflow: hidden;
@@ -777,24 +726,8 @@ function goHome() {
   box-shadow: inset 0 0 0 1px rgba(179, 153, 93, 0.35);
 }
 
-.button-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
-}
-
-.button-grid.four,
-.button-grid.tools {
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-}
-
-.button-grid.render {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-}
-
 .home-button,
-.small-button,
-.text-button {
+.small-button {
   border: 1px solid var(--panel-border);
   border-radius: 7px;
   font: inherit;
@@ -807,17 +740,14 @@ function goHome() {
     box-shadow 160ms ease;
 }
 
-
 .apply-button {
   color: #eff7e8;
   border-color: rgba(140, 169, 111, 0.58);
   background: rgba(140, 169, 111, 0.18);
 }
 
-
 .home-button:hover:not(:disabled),
-.small-button:hover:not(:disabled),
-.text-button:hover:not(:disabled) {
+.small-button:hover:not(:disabled) {
   color: #f6f8f3;
   background: var(--panel-surface-hover);
   border-color: var(--panel-border-strong);
@@ -830,14 +760,12 @@ function goHome() {
 }
 
 .home-button:active:not(:disabled),
-.small-button:active:not(:disabled),
-.text-button:active:not(:disabled) {
+.small-button:active:not(:disabled) {
   transform: translateY(1px) scale(0.99);
 }
 
 .home-button:focus-visible,
 .small-button:focus-visible,
-.text-button:focus-visible,
 .field input:focus-visible {
   outline: 2px solid var(--accent-strong);
   outline-offset: 2px;
@@ -845,24 +773,9 @@ function goHome() {
 
 .home-button:disabled,
 .small-button:disabled,
-.text-button:disabled,
 .field input:disabled {
   cursor: not-allowed;
   opacity: 0.44;
-}
-
-.text-button {
-  min-height: 28px;
-  padding: 4px 8px;
-  color: var(--accent-strong);
-  background: transparent;
-  font-size: 12px;
-}
-
-.physics-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 8px;
 }
 
 .field {
@@ -965,26 +878,9 @@ function goHome() {
     padding: 16px;
   }
 
-  .button-grid.four,
-  .button-grid.tools {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .physics-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
 }
 
 @media (max-width: 430px) {
-  .esc-header {
-    align-items: flex-start;
-    flex-direction: column;
-    gap: 8px;
-  }
-
-  .esc-state {
-    max-width: 100%;
-  }
 
   .locale-field {
     align-items: stretch;
@@ -996,12 +892,5 @@ function goHome() {
     width: 100%;
   }
 
-  .button-grid,
-  .button-grid.four,
-  .button-grid.tools,
-  .button-grid.render,
-  .physics-grid {
-    grid-template-columns: 1fr;
-  }
 }
 </style>

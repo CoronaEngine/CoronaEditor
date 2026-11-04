@@ -3727,8 +3727,7 @@ onBeforeUnmount(() => {
 .ng-tool-card.macro {
   border-color: rgba(179, 153, 93, 0.55);
 }
-.ng-tool-icon,
-.ng-mini {
+.ng-tool-icon {
   display: grid;
   place-items: center;
   flex: 0 0 auto;
@@ -3762,74 +3761,7 @@ onBeforeUnmount(() => {
   line-height: 1.35;
   color: #8d9e85;
 }
-.ng-cat {
-  margin-bottom: 7px;
-  border: 1px solid #1b241d;
-  border-radius: 10px;
-  overflow: hidden;
-  background: #101711;
-}
-.ng-cat summary {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  padding: 8px;
-  list-style: none;
-  cursor: pointer;
-  font-size: 13px;
-  font-weight: 800;
-}
-.ng-cat summary::-webkit-details-marker {
-  display: none;
-}
-.ng-cat-dot {
-  width: 9px;
-  height: 9px;
-  border-radius: 50%;
-  background: #b3995d;
-}
-.ng-count {
-  margin-left: auto;
-  color: #8d9e85;
-  font-size: 11px;
-}
-.ng-block-list {
-  display: grid;
-  gap: 6px;
-  padding: 0 7px 8px;
-}
-.ng-block-chip {
-  display: grid;
-  grid-template-columns: 24px 1fr;
-  gap: 7px;
-  align-items: center;
-  text-align: left;
-  border: 1px solid #4a3d1d;
-  background: #121a14;
-  color: #fff3c8;
-  border-radius: 9px;
-  padding: 6px;
-  cursor: grab;
-}
-.ng-mini {
-  width: 24px;
-  height: 24px;
-  border-radius: 7px;
-  font-size: 12px;
-  background: #8d9e85;
-}
-.ng-block-chip b {
-  display: block;
-  font-size: 12px;
-  line-height: 1.2;
-}
-.ng-block-chip small {
-  display: block;
-  margin-top: 1px;
-  color: #8d9e85;
-  font-size: 10px;
-  word-break: break-all;
-}
+
 .ng-canvas {
   position: relative;
   overflow: hidden;
@@ -4006,31 +3938,7 @@ onBeforeUnmount(() => {
   border-radius: 50%;
   background: #b3995d;
 }
-.ng-node-type,
-.ng-node-name {
-  min-width: 0;
-  width: 100%;
-  border: 1px solid #4a3d1d;
-  border-radius: 7px;
-  background: #0c120e;
-  color: #fff3c8;
-  font-size: 12px;
-  padding: 4px 6px;
-}
-.ng-node-name {
-  margin-top: 8px;
-}
-.ng-node-fixed-name {
-  margin-top: 8px;
-  font-size: 14px;
-  font-weight: 900;
-  color: #e6d5a7;
-}
-.ng-node-hint {
-  margin-top: 7px;
-  color: #8d9e85;
-  font-size: 11px;
-}
+
 .ng-node.running {
   border-color: #facc15;
   box-shadow:

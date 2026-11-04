@@ -77,8 +77,7 @@ def test_entry_graph_does_not_eagerly_load_blockly():
 
     Measured: with an eager import in the entry graph, `dist/assets/index-*.js` is ~1030 kB
     and contains `FieldDropdown` / `WorkspaceSvg`. Every Blockly workspace loads the runtime
-    it needs itself (`BlocklyToolboxPalette.vue`, `MiniBlocklyWorkspace.vue`,
-    `BlocklyWorkspace.vue`), so the entry graph must stay free of it.
+    it needs itself (`BlocklyToolboxPalette.vue`, `MiniBlocklyWorkspace.vue`), so the entry graph must stay free of it.
     """
 
     offenders = []

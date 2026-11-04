@@ -24,7 +24,7 @@ async function renderMain(settings = {}) {
       state: { available: true, sceneId: "scene.ini", cameraId: "camera-1",
       nativeViewportCursorEnabled: false, viewportUiMode: 'mono',
       translate: key => key, sceneLightSettings: { enabled: true, direction: { x: 0, y: -1, z: 0 } },
-      sceneLightBusy: false, showDialog: false, projectResourceLoadStatus: null, showLocalModal: false,
+      sceneLightBusy: false, showDialog: false, projectResourceLoadStatus: null, importProgress: null,
       sceneAxisVectors: [], dockShortcuts: [], cabbageAssistant: { tasks: [], attentionToken: 0 },
       cabbageChatDetached: true, handleViewportFocus: noop, handleViewportPointer: noop,
       handleViewportPointerDown: noop, handleViewportPointerCancel: noop, handleViewportPointerLeave: noop,

@@ -1,6 +1,6 @@
 /**
  * 共享的 Actor 上下文状态
- * 用于在 Object.vue / SceneBar.vue（场景物体选择）和 BlocklyWorkspace.vue（积木编辑器）之间
+ * 用于在 Object.vue / SceneBar.vue（场景物体选择）和 NodeGraphPanel.vue（节点图）之间
  * 传递当前选中的 scene_name + actor_name。
  *
  * 使用模块级响应式变量 + localStorage 双写，兼容 CEF 多标签页架构下跨实例通信。
@@ -62,7 +62,7 @@ export function clearActorContext() {
 
 /**
  * 从 localStorage 同步上下文到模块级 ref。
- * 用于 BlocklyWorkspace 等跨标签页实例在挂载或运行前拉取最新状态。
+ * 用于节点图等跨标签页实例在挂载或运行前拉取最新状态。
  */
 export function syncActorContextFromStorage() {
   currentTargetType.value = localStorage.getItem(STORAGE_KEY_TARGET_TYPE) || 'actor';

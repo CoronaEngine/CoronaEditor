@@ -27,7 +27,6 @@ class EditorApiAggregateWrapperTests(unittest.TestCase):
             "projectLauncherService",
             "fileService",
             "projectSettingsService",
-            "resourceService",
             "logService",
         ):
             path = self.source_root / "services" / f"{name}.js"

@@ -22,7 +22,6 @@ const props = defineProps({
   initialState: { type: Object, default: () => ({}) },
   placeholder: { type: String, default: '将左侧微观积木拖入这里' },
   deleteMode: { type: Boolean, default: false },
-  showToolbox: { type: Boolean, default: false },
   workspaceRole: { type: String, default: 'node' },
 });
 
@@ -485,7 +484,7 @@ async function initBlockly() {
 
     const { createWorkspaceConfig } = await import('@/blockly/configs/workspaceConfig.js');
     const config = createWorkspaceConfig(t);
-    if (!props.showToolbox) delete config.toolbox;
+    delete config.toolbox;
     config.trashcan = true;
     config.contextMenu = true;
     config.zoom = { ...(config.zoom || {}), controls: false, wheel: true, startScale: 0.85 };

@@ -12,7 +12,7 @@
 使用对应的 `editorApi` namespace：
 
 `lanChatService.js`、`networkService.js`、`aiService.js`、
-`projectLauncherService.js`、`resourceService.js`。
+`projectLauncherService.js`。
 
 `sceneService.js`、`projectService.js`、`scriptingService.js`、`fileService.js`、
 `projectSettingsService.js` 和 `logService.js` 均已迁移为 canonical service owner，

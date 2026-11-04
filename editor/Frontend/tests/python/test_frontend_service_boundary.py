@@ -16,7 +16,6 @@ EXPECTED_SERVICES = (
     "projectLauncherService.js",
     "fileService.js",
     "projectSettingsService.js",
-    "resourceService.js",
     "logService.js",
     "nodeGraphGenerationService.js",
     "nodeGraphReviewService.js",
@@ -69,7 +68,6 @@ def test_canonical_services_delegate_to_editor_api():
         "networkService.js",
         "aiService.js",
         "projectLauncherService.js",
-        "resourceService.js",
     ):
         source = (SERVICES_ROOT / service_name).read_text(encoding="utf-8")
         assert "editorApi" in source, service_name

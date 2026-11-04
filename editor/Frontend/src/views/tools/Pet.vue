@@ -5,14 +5,12 @@
         ref="petImgRef"
         src="@/assets/cabbage.png"
         class="h-20 w-20 fixed left-10 bottom-10 z-50"
-        @contextmenu="openContextMenu($event)"
       />
 
       <AIHintBubble
         v-if="hintState.show"
         :show="hintState.show"
         :hint-text="hintState.text"
-        :loading="hintState.loading"
         :anchor-el="petImgRef"
         :auto-hide-ms="PET_HINT_AUTO_HIDE_MS"
         @close="dismissHint"
@@ -36,23 +34,18 @@ const PET_HINTS = [
   '打开日志面板检查运行状态',
 ];
 
-const hintState = reactive({ show: false, text: '', loading: false });
+const hintState = reactive({ show: false, text: '' });
 let hintIndex = 0;
 let hintTimer = null;
-
-const openContextMenu = (e) => e.preventDefault();
-
 
 // ── Timed local hint logic ──
 const dismissHint = () => {
   hintState.show = false;
   hintState.text = '';
-  hintState.loading = false;
 };
 
 const showTimedHint = async () => {
   hintState.show = false;
-  hintState.loading = false;
   hintState.text = PET_HINTS[hintIndex % PET_HINTS.length];
   hintIndex += 1;
   await nextTick();

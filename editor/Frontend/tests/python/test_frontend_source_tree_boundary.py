@@ -109,7 +109,7 @@ def test_join_game_loads_local_ip_without_starting_a_session():
     assert "loadLocalIp" in source
 
 
-def test_network_panel_is_not_registered_as_a_user_entrypoint():
+def test_retired_panels_are_absent_and_node_graph_remains_registered():
     router = (SRC_ROOT / "router" / "index.js").read_text(encoding="utf-8")
     registry = (SRC_ROOT / "views" / "panelRegistry.js").read_text(encoding="utf-8")
     manifest = (SRC_ROOT / "config" / "pluginManifest.js").read_text(encoding="utf-8")
@@ -117,3 +117,14 @@ def test_network_panel_is_not_registered_as_a_user_entrypoint():
     assert "path: '/Network'" not in router
     assert "Network: NetworkPanel" not in registry
     assert "id: 'Network'" not in manifest
+
+    assert "path: '/ScratchTool'" not in router
+    assert "getPluginComponent('NodeGraphPanel')" in router
+    for relative in (
+        "views/sidebar/Network.vue",
+        "blockly/components/BlocklyWorkspace.vue",
+        "blockly/components/Settings.vue",
+        "blockly/components/Search.vue",
+        "blockly/components/Trashcan.vue",
+    ):
+        assert not (SRC_ROOT / relative).exists()

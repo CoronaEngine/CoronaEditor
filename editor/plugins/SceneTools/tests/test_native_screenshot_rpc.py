@@ -87,7 +87,6 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
                 "projectLauncherService.js",
                 "projectSettingsService.js",
                 "projectService.js",
-                "resourceService.js",
                 "sceneService.js",
                 "scriptingService.js",
             },
@@ -1281,15 +1280,6 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
             / "runtime"
             / "editor_host.py"
         ).read_text(encoding="utf-8")
-        network_source = (
-            self._repo_root()
-            / "editor"
-            / "Frontend"
-            / "src"
-            / "views"
-            / "sidebar"
-            / "Network.vue"
-        ).read_text(encoding="utf-8")
         event_bus_source = (
             self._repo_root()
             / "editor"
@@ -1311,13 +1301,6 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
             with self.subTest(snippet=snippet):
                 self.assertIn(snippet, source + bridge_source + python_api_source + corona_editor_source)
 
-        self.assertIn(
-            "editorApi.events.onNetworkActorOwnershipClaimed(onNetworkActorOwnershipClaimed)",
-            network_source,
-        )
-        self.assertIn("editorApi.off(actorOwnershipClaimCallbackToken)", network_source)
-        self.assertNotIn("coronaEventBus.on('actor-ownership-claim'", network_source)
-        self.assertNotIn("coronaEventBus.off('actor-ownership-claim'", network_source)
         self.assertNotIn("event === 'actor-ownership-claim'", event_bus_source)
 
     def test_network_sync_pause_request_is_cpp_defined_event(self):
@@ -1334,15 +1317,6 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
             / "editor"
             / "runtime"
             / "editor_host.py"
-        ).read_text(encoding="utf-8")
-        network_source = (
-            self._repo_root()
-            / "editor"
-            / "Frontend"
-            / "src"
-            / "views"
-            / "sidebar"
-            / "Network.vue"
         ).read_text(encoding="utf-8")
         event_bus_source = (
             self._repo_root()
@@ -1365,13 +1339,6 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
             with self.subTest(snippet=snippet):
                 self.assertIn(snippet, source + bridge_source + python_api_source + corona_editor_source)
 
-        self.assertIn(
-            "editorApi.events.onNetworkSyncPauseRequested(onNetworkSyncPauseRequested)",
-            network_source,
-        )
-        self.assertIn("editorApi.off(networkSyncPauseCallbackToken)", network_source)
-        self.assertNotIn("coronaEventBus.on('network-sync-pause-request'", network_source)
-        self.assertNotIn("coronaEventBus.off('network-sync-pause-request'", network_source)
         self.assertNotIn("event === 'network-sync-pause-request'", event_bus_source)
 
     def test_network_file_sync_status_is_cpp_defined_event(self):
@@ -1388,15 +1355,6 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
             / "editor"
             / "runtime"
             / "editor_host.py"
-        ).read_text(encoding="utf-8")
-        network_source = (
-            self._repo_root()
-            / "editor"
-            / "Frontend"
-            / "src"
-            / "views"
-            / "sidebar"
-            / "Network.vue"
         ).read_text(encoding="utf-8")
         event_bus_source = (
             self._repo_root()
@@ -1421,13 +1379,6 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
             with self.subTest(snippet=snippet):
                 self.assertIn(snippet, source + bridge_source + python_api_source + corona_editor_source)
 
-        self.assertIn(
-            "editorApi.events.onNetworkFileSyncStatusChanged(onNetworkFileSyncStatusChanged)",
-            network_source,
-        )
-        self.assertIn("editorApi.off(networkFileSyncStatusCallbackToken)", network_source)
-        self.assertNotIn("coronaEventBus.on('file-sync-status'", network_source)
-        self.assertNotIn("coronaEventBus.off('file-sync-status'", network_source)
         self.assertNotIn("event === 'file-sync-status'", event_bus_source)
 
     def test_network_asset_import_complete_is_cpp_defined_event(self):
@@ -1444,15 +1395,6 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
             / "editor"
             / "runtime"
             / "editor_host.py"
-        ).read_text(encoding="utf-8")
-        network_source = (
-            self._repo_root()
-            / "editor"
-            / "Frontend"
-            / "src"
-            / "views"
-            / "sidebar"
-            / "Network.vue"
         ).read_text(encoding="utf-8")
         event_bus_source = (
             self._repo_root()
@@ -1474,13 +1416,6 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
             with self.subTest(snippet=snippet):
                 self.assertIn(snippet, source + bridge_source + python_api_source + corona_editor_source)
 
-        self.assertIn(
-            "editorApi.events.onNetworkAssetImportCompleted(onNetworkAssetImportCompleted)",
-            network_source,
-        )
-        self.assertIn("editorApi.off(networkAssetImportCompletedCallbackToken)", network_source)
-        self.assertNotIn("coronaEventBus.on('import-asset-complete'", network_source)
-        self.assertNotIn("coronaEventBus.off('import-asset-complete'", network_source)
         self.assertNotIn("event === 'import-asset-complete'", event_bus_source)
 
     def test_network_actor_sync_broadcast_is_cpp_defined_event(self):
@@ -1497,15 +1432,6 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
             / "editor"
             / "runtime"
             / "editor_host.py"
-        ).read_text(encoding="utf-8")
-        network_source = (
-            self._repo_root()
-            / "editor"
-            / "Frontend"
-            / "src"
-            / "views"
-            / "sidebar"
-            / "Network.vue"
         ).read_text(encoding="utf-8")
         event_bus_source = (
             self._repo_root()
@@ -1527,13 +1453,6 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
             with self.subTest(snippet=snippet):
                 self.assertIn(snippet, source + bridge_source + python_api_source + corona_editor_source)
 
-        self.assertIn(
-            "editorApi.events.onNetworkActorSyncBroadcastRequested(onNetworkActorSyncBroadcastRequested)",
-            network_source,
-        )
-        self.assertIn("editorApi.off(networkActorSyncBroadcastCallbackToken)", network_source)
-        self.assertNotIn("coronaEventBus.on('actor-sync-broadcast'", network_source)
-        self.assertNotIn("coronaEventBus.off('actor-sync-broadcast'", network_source)
         self.assertNotIn("event === 'actor-sync-broadcast'", event_bus_source)
 
     def test_network_actor_mutation_broadcasts_are_cpp_defined_events(self):
@@ -1551,15 +1470,6 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
             / "runtime"
             / "editor_host.py"
         ).read_text(encoding="utf-8")
-        network_source = (
-            self._repo_root()
-            / "editor"
-            / "Frontend"
-            / "src"
-            / "views"
-            / "sidebar"
-            / "Network.vue"
-        ).read_text(encoding="utf-8")
         event_bus_source = (
             self._repo_root()
             / "editor"
@@ -1569,14 +1479,13 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
             / "eventBus.js"
         ).read_text(encoding="utf-8")
 
-        for event_name, js_wrapper, python_wrapper, legacy_name, handler_name, token_name in (
+        for event_name, js_wrapper, python_wrapper, legacy_name, handler_name in (
             (
                 "Network.actorTransformSyncBroadcastRequested",
                 "events.onNetworkActorTransformSyncBroadcastRequested",
                 "events.on_network_actor_transform_sync_broadcast_requested",
                 "actor-transform-sync-broadcast",
                 "onNetworkActorTransformSyncBroadcastRequested",
-                "networkActorTransformSyncBroadcastCallbackToken",
             ),
             (
                 "Network.actorStateSyncBroadcastRequested",
@@ -1584,7 +1493,6 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
                 "events.on_network_actor_state_sync_broadcast_requested",
                 "actor-state-sync-broadcast",
                 "onNetworkActorStateSyncBroadcastRequested",
-                "networkActorStateSyncBroadcastCallbackToken",
             ),
             (
                 "Network.actorDeleteSyncBroadcastRequested",
@@ -1592,7 +1500,6 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
                 "events.on_network_actor_delete_sync_broadcast_requested",
                 "actor-delete-sync-broadcast",
                 "onNetworkActorDeleteSyncBroadcastRequested",
-                "networkActorDeleteSyncBroadcastCallbackToken",
             ),
         ):
             with self.subTest(event=event_name):
@@ -1612,10 +1519,6 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
                     f'"{legacy_name}": ("{python_wrapper}", lambda values: values[0] if len(values) > 0 else {{}}),',
                     corona_editor_source,
                 )
-                self.assertIn(f"editorApi.events.{handler_name}({handler_name})", network_source)
-                self.assertIn(f"editorApi.off({token_name})", network_source)
-                self.assertNotIn(f"coronaEventBus.on('{legacy_name}'", network_source)
-                self.assertNotIn(f"coronaEventBus.off('{legacy_name}'", network_source)
                 self.assertNotIn(f"event === '{legacy_name}'", event_bus_source)
 
     def test_log_batch_is_cpp_defined_event(self):
@@ -1910,23 +1813,6 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
         self.assertIn("const sceneName = payload?.scene ?? payload;", scene_bar_source)
         self.assertNotIn("coronaEventBus.on('scene-tree-changed', onSceneTreeChangedEvent)", scene_bar_source)
         self.assertNotIn("coronaEventBus.off('scene-tree-changed', onSceneTreeChangedEvent)", scene_bar_source)
-
-    def test_network_panel_uses_cpp_defined_scene_tree_changed_event_wrapper(self):
-        network_source = (
-            self._repo_root()
-            / "editor"
-            / "Frontend"
-            / "src"
-            / "views"
-            / "sidebar"
-            / "Network.vue"
-        ).read_text(encoding="utf-8")
-
-        self.assertIn("editorApi.events.onSceneTreeChanged(onSceneTreeChangedEvent)", network_source)
-        self.assertIn("editorApi.off(sceneTreeChangedCallbackToken)", network_source)
-        self.assertIn("const sceneName = payload?.scene ?? payload;", network_source)
-        self.assertNotIn("coronaEventBus.on('scene-tree-changed'", network_source)
-        self.assertNotIn("coronaEventBus.off('scene-tree-changed'", network_source)
 
     def test_network_host_session_seeds_native_editor_actors(self):
         source = self._handler_source()
@@ -2548,31 +2434,6 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
         self.assertIn('"resourceSearch.prepareIndex"', source)
         self.assertIn('"resourceSearch.rebuildIndex"', source)
 
-    def test_resource_search_apis_use_frontend_typed_wrappers(self):
-        bridge_source = self._frontend_bridge_source()
-
-        for snippet in (
-            "resourceSearch: {",
-            "prepareIndex: () =>",
-            "fuzzySearch: (query, topK = 20, typeFilter = null) =>",
-            "imageSearch: (imageB64, topK = 20, threshold = 10) =>",
-            "listTypes: () =>",
-            "rebuildIndex: () =>",
-            "getStats: () =>",
-            "markIndexDirty: (reason = 'frontend') =>",
-            "focusActor: (sceneName, actorName) =>",
-            "? editorApi.resourceSearch.prepareIndex(CURRENT_CALLER)",
-            "? editorApi.resourceSearch.fuzzySearch(query, topK, typeFilter, CURRENT_CALLER)",
-            "? editorApi.resourceSearch.imageSearch(imageB64, topK, threshold, CURRENT_CALLER)",
-            "? editorApi.resourceSearch.listTypes(CURRENT_CALLER)",
-            "? editorApi.resourceSearch.rebuildIndex(CURRENT_CALLER)",
-            "? editorApi.resourceSearch.getStats(CURRENT_CALLER)",
-            "? editorApi.resourceSearch.markIndexDirty(reason, CURRENT_CALLER)",
-            "? editorApi.resourceSearch.focusActor(sceneName, actorName, CURRENT_CALLER)",
-        ):
-            with self.subTest(snippet=snippet):
-                self.assertIn(snippet, bridge_source)
-
     def test_resource_search_frontend_wrappers_are_manifest_driven(self):
         bridge_source = self._frontend_bridge_source()
         start = bridge_source.find("resourceSearch: {")
@@ -2581,8 +2442,12 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
         self.assertGreater(end, start)
         resource_search_section = bridge_source[start:end]
 
-        self.assertIn("call_manifest_editor_api('resourceSearch.prepareIndex'", resource_search_section)
-        self.assertIn("call_manifest_editor_api('resourceSearch.focusActor'", resource_search_section)
+        for method in (
+            "prepareIndex", "fuzzySearch", "imageSearch", "listTypes",
+            "rebuildIndex", "getStats", "markIndexDirty", "focusActor",
+        ):
+            with self.subTest(method=method):
+                self.assertIn(f"call_manifest_editor_api('resourceSearch.{method}'", resource_search_section)
         self.assertNotIn("ResourceSearch.", resource_search_section)
 
     def test_network_editor_apis_have_explicit_schema(self):

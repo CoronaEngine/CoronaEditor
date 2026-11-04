@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import { EventEmitter } from 'node:events';
 import test from 'node:test';
 import * as Vue from 'vue';
 import { babelParse, compileScript, parse } from 'vue/compiler-sfc';
@@ -36,7 +37,7 @@ const makeComponent = new Function('modules', 'window', 'document', 'requestAnim
 function mountMainPage(t, visionMode = 'path_tracing') {
   const calls = [], errors = [], mounted = [], unmounted = [], observed = [];
   const dock = {
-    panels: { SceneControls: { open: false }, SceneTools: { open: false } },
+    panels: Vue.reactive({ SceneControls: { open: false }, SceneTools: { open: false } }),
     closePanel(id) { if (this.panels[id]) this.panels[id].open = false; },
   };
   const frames = new Map();
@@ -45,16 +46,23 @@ function mountMainPage(t, visionMode = 'path_tracing') {
   const cancelFrame = id => frames.delete(id);
   const noop = () => {};
   const asyncNoop = async () => {};
+  const bus = new EventEmitter();
+  const windowEvents = new EventEmitter();
+  const stored = new Map();
+  const calibration = viewportUiMode.createViewportUiCalibrationStore({
+    storage: { getItem: key => stored.get(key), setItem: (key, value) => stored.set(key, value) },
+  });
   const window = {
     localStorage: { getItem: () => 'D:/fixtures/kitchen/scene_v3.xml' },
     devicePixelRatio: 1,
-    addEventListener: noop, removeEventListener: noop,
+    addEventListener: windowEvents.on.bind(windowEvents), removeEventListener: windowEvents.off.bind(windowEvents),
     setInterval: () => ++sequence, clearInterval: noop,
     setTimeout: () => ++sequence, clearTimeout: noop,
     coronaBridge: {
       cameraMove: () => true,
       setCameraViewport: (...args) => { calls.push(['viewport', ...args]); return true; },
       setViewportUiMode: () => true,
+      setViewportUiCalibration: (...args) => { calls.push(['calibration', ...args]); return true; },
       setViewportGizmoTarget: () => true,
       setViewportSystemCursorHidden: () => true,
     },
@@ -101,7 +109,7 @@ function mountMainPage(t, visionMode = 'path_tracing') {
     '@/utils/visionRenderModes.js': visionRenderModes,
     '@/utils/viewportPick.js': viewportPick,
     '@/utils/viewportGizmo.js': viewportGizmo,
-    '@/utils/viewportUiMode.js': viewportUiMode,
+    '@/utils/viewportUiMode.js': { ...viewportUiMode, createViewportUiCalibrationStore: () => calibration },
     '@/utils/serviceInitialization.js': serviceInitialization,
     '@/config/pluginManifest.js': pluginManifest,
     '@/utils/viewportCameraController.js': { ...viewportCamera,
@@ -120,7 +128,7 @@ function mountMainPage(t, visionMode = 'path_tracing') {
     '@/stores/cabbageAssistantStore.js': { useCabbageAssistantStore: () => ({
       clearForProjectChange: noop, hydrateContext: noop,
     }) },
-    '@/utils/eventBus.js': { coronaEventBus: { on: noop, off: noop } },
+    '@/utils/eventBus.js': { coronaEventBus: bus },
     '@/services/nodeGraphReviewService.js': { reviewScopeId: value => value, subscribeNodeGraphReviews: () => noop },
     '@/services/cabbageAssistantContextService.js': {
       cabbageContextService: { loadCurrentWorld: asyncNoop, requestProfileScoreUpdate: asyncNoop, flush: asyncNoop },
@@ -144,7 +152,7 @@ function mountMainPage(t, visionMode = 'path_tracing') {
   };
   page.viewportPickSurfaceRef.value = surface;
   t.after(() => { for (const hook of unmounted) hook(); });
-  return { page, calls, errors, observed, surface, dock,
+  return { page, calls, errors, observed, surface, dock, bus, windowEvents, calibration,
     async mount() { for (const hook of mounted) await hook(); },
     flushFrames() {
       const pending = [...frames.values()];
@@ -200,3 +208,36 @@ test(`external scene entry defaults to Vision and preserves saved ${visionMode}`
   assert.deepEqual(h.errors, []);
 });
 }
+
+
+test('a native scene panel reports import progress and closing it clears the overlay', async t => {
+  const h = mountMainPage(t);
+  await h.mount();
+  h.dock.panels.SceneTools.open = true;
+  const progress = { active: true, message: '创建对象', progress: 55 };
+  h.bus.emit('scene-import-progress', progress);
+  assert.deepEqual(h.page.importProgress.value, progress);
+  h.bus.emit('scene-import-progress', { active: false });
+  assert.equal(h.page.importProgress.value, null);
+
+  h.bus.emit('scene-import-progress', progress);
+  h.dock.panels.SceneTools.open = false;
+  await Vue.nextTick();
+  h.bus.emit('scene-import-progress', progress);
+  assert.equal(h.page.importProgress.value, null);
+});
+
+test('calibration edits from a native panel update only an active stereo main viewport', async t => {
+  const h = mountMainPage(t);
+  await h.mount();
+  const values = h.calibration.set({}, { pe: 24, angle: 0.5, offset: 1, parallaxScale: 2 });
+  const changes = () => h.calls.filter(([kind]) => kind === 'calibration');
+  const event = { key: h.calibration.keyFor({}) };
+  h.windowEvents.emit('storage', event);
+  assert.equal(changes().length, 0);
+  h.page.viewportUiMode.value = 'stereo3d';
+  h.windowEvents.emit('storage', { key: 'unrelated' });
+  assert.equal(changes().length, 0);
+  h.windowEvents.emit('storage', event);
+  assert.deepEqual(changes(), [['calibration', 42, values.pe, values.angle, values.offset, values.parallaxScale]]);
+});

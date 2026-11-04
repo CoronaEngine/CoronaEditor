@@ -89,28 +89,18 @@
               @click="selectedRoom = room.id"
               @dblclick="handleJoinRoom(room)"
             >
-              <!-- 信号/锁 -->
+              <!-- 局域网房间 -->
               <div class="shrink-0 w-10 h-10 rounded-lg bg-[#222] flex items-center justify-center"
                    :class="selectedRoom === room.id ? 'text-[#d8b86c]' : 'text-gray-500'">
-                <svg v-if="room.locked" class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-                <svg v-else class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><line x1="12" y1="20" x2="12.01" y2="20"/></svg>
+                <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><line x1="12" y1="20" x2="12.01" y2="20"/></svg>
               </div>
 
               <!-- 房间信息 -->
               <div class="flex-1 min-w-0">
                 <div class="flex items-center gap-2">
                   <span class="text-base font-medium truncate">{{ room.name }}</span>
-                  <span v-if="room.locked" class="text-[10px] px-1.5 py-0.5 rounded bg-[#333] text-gray-400">密码</span>
                 </div>
                 <div class="text-xs text-gray-500 font-mono mt-0.5 truncate">{{ room.host }}:{{ room.port }} · 主机 {{ room.hostName }}</div>
-              </div>
-
-              <!-- 人数 -->
-              <div class="shrink-0 text-right">
-                <div class="text-base font-medium" :class="room.players >= room.maxPlayers ? 'text-red-400' : 'text-[#b9d39a]'">
-                  {{ room.players }}/{{ room.maxPlayers }}
-                </div>
-                <div class="text-[11px] text-gray-600">{{ room.ping }}ms</div>
               </div>
 
               <!-- 加入按钮（hover/选中显现） -->
@@ -119,7 +109,7 @@
                        bg-[#d8b86c] text-white hover:bg-[#95b86c]
                        opacity-0 group-hover:opacity-100"
                 :class="{ '!opacity-100': selectedRoom === room.id }"
-                :disabled="room.players >= room.maxPlayers || busy"
+                :disabled="busy"
                 @click.stop="handleJoinRoom(room)"
               >
                 加入
@@ -152,13 +142,6 @@
                      focus:border-[#d8b86c] outline-none transition-all placeholder:text-gray-600"
               placeholder="端口"
             />
-            <input
-              v-model="manual.password"
-              type="password"
-              class="w-32 bg-[#161616] border border-[#333] rounded-lg px-3 py-2.5 text-sm
-                     focus:border-[#d8b86c] outline-none transition-all placeholder:text-gray-600"
-              placeholder="密码(可选)"
-            />
             <button
               class="px-6 py-2.5 rounded-lg text-sm font-bold bg-[#3d3d3d] hover:bg-[#4d4d4d] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               :disabled="!manual.ip.trim() || busy"
@@ -184,44 +167,15 @@
             />
           </div>
 
-          <div class="grid grid-cols-2 gap-4">
-            <div class="space-y-2">
-              <label class="text-sm text-gray-400">访问密码（可选）</label>
-              <input
-                v-model="host.password"
-                type="password"
-                class="w-full bg-[#161616] border border-[#333] rounded-lg px-4 py-3 text-base
-                       focus:border-[#d8b86c] outline-none transition-all placeholder:text-gray-600"
-                placeholder="留空则公开"
-              />
-            </div>
-            <div class="space-y-2">
-              <label class="text-sm text-gray-400">端口</label>
-              <input
-                v-model="host.port"
-                type="text"
-                class="w-full bg-[#161616] border border-[#333] rounded-lg px-4 py-3 text-base font-mono
-                       focus:border-[#d8b86c] outline-none transition-all placeholder:text-gray-600"
-                placeholder="27960"
-              />
-            </div>
-          </div>
-
           <div class="space-y-2">
-            <label class="text-sm text-gray-400">最大人数</label>
-            <div class="flex gap-2">
-              <button
-                v-for="n in maxPlayerOptions"
-                :key="n"
-                class="flex-1 py-2.5 rounded-lg text-sm font-medium border transition-all"
-                :class="host.maxPlayers === n
-                  ? 'border-[#d8b86c] bg-[#d8b86c]/15 text-[#d8b86c]'
-                  : 'border-[#2a2a2a] bg-[#161616] text-gray-400 hover:border-[#3d3d3d]'"
-                @click="host.maxPlayers = n"
-              >
-                {{ n }} 人
-              </button>
-            </div>
+            <label class="text-sm text-gray-400">端口</label>
+            <input
+              v-model="host.port"
+              type="text"
+              class="w-full bg-[#161616] border border-[#333] rounded-lg px-4 py-3 text-base font-mono
+                     focus:border-[#d8b86c] outline-none transition-all placeholder:text-gray-600"
+              placeholder="27960"
+            />
           </div>
 
           <div class="rounded-lg bg-[#d8b86c]/[0.05] border border-[#d8b86c]/20 p-3 text-xs text-gray-400 flex items-start gap-2">
@@ -293,10 +247,9 @@ const errorMsg = ref('');
 const rooms = ref([]);
 let discoveryRefreshTimer = null;
 
-const manual = ref({ ip: '', port: '27960', password: '' });
+const manual = ref({ ip: '', port: '27960' });
 
-const maxPlayerOptions = [2, 4, 8, 16];
-const host = ref({ roomName: '', password: '', port: '27960', maxPlayers: 4 });
+const host = ref({ roomName: '', port: '27960' });
 
 const parsePort = (value) => {
   const port = Number(value);
@@ -381,10 +334,6 @@ const handleRefresh = () => {
           host: peer.ip,
           port: peer.port,
           hostName: peer.name,
-          players: 0,
-          maxPlayers: 999,
-          ping: '--',
-          locked: false,
         }));
       selectedRoom.value = rooms.value[0]?.id || null;
     })

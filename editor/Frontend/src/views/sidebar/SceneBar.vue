@@ -5,131 +5,7 @@
 
     <!-- 主内容区域 -->
     <div class="flex flex-col flex-1 min-h-0">
-      <div
-        v-if="RESOURCE_SEARCH_ENABLED"
-        class="flex items-center gap-1 px-2 py-1.5 bg-[#263126]/55 border-b border-[#18221a]"
-      >
-        <div class="relative flex-1">
-          <input
-            v-model="searchInput"
-            type="text"
-            placeholder="🔍 搜索资源(名称/中文/拼音,支持模糊)"
-            class="w-full pl-2 pr-7 py-1 text-xs bg-[#121a14] text-[#e8ede3] border border-[#3a3a3a] rounded focus:border-[#b3995d] focus:outline-none"
-            data-testid="resource-search-input"
-            @input="onSearchInput"
-            @keydown.enter="onSearchEnter"
-            @keydown.esc="onSearchClear"
-          />
-          <button
-            v-if="searchInput && !searchLoading"
-            class="absolute right-1 top-1/2 -translate-y-1/2 text-[#6f7f69] hover:text-[#aaa] text-xs"
-            data-testid="resource-search-clear"
-            @click="onSearchClear"
-          >
-            ✕
-          </button>
-          <span
-            v-if="searchLoading"
-            class="absolute right-1 top-1/2 -translate-y-1/2 text-[#b3995d] text-[10px] animate-pulse"
-          >
-            ⌛
-          </span>
-        </div>
-        <!-- 以图搜索 -->
-        <label
-          class="px-1.5 py-1 text-xs bg-[#2b362d] hover:bg-[#3a4a3c] rounded text-[#e8ede3] cursor-pointer flex items-center"
-          :class="{ 'opacity-50 pointer-events-none': searchLoading }"
-          title="以图搜索(本地 pHash)"
-          data-testid="resource-image-search"
-        >
-          🖼
-          <input
-            ref="imageInputRef"
-            type="file"
-            accept="image/*"
-            class="hidden"
-            @change="onImageSelected"
-          />
-        </label>
-        <!-- 重建索引 -->
-        <button
-          class="px-1.5 py-1 text-xs bg-[#2b362d] hover:bg-[#3a4a3c] rounded text-[#e8ede3]"
-          :class="{ 'opacity-50 pointer-events-none': searchLoading }"
-          title="重建索引"
-          data-testid="resource-rebuild"
-          @click="onRebuildIndex"
-        >
-          🔄
-        </button>
-      </div>
-
-      <!-- 搜索结果区(可切换) -->
-      <div
-        v-if="RESOURCE_SEARCH_ENABLED && searchActive"
-        class="scene-list-surface flex-1 overflow-y-auto"
-        data-testid="resource-search-results"
-      >
-        <!-- 错误提示 -->
-        <div
-          v-if="searchError"
-          class="m-2 p-2 text-xs text-red-300 bg-red-900/30 border border-red-700/50 rounded"
-          data-testid="resource-search-error"
-        >
-          ⚠ {{ searchError }}
-        </div>
-        <!-- 命中计数 -->
-        <div v-else class="px-2 py-1 text-[10px] text-[#8d9e85] border-b border-[#18221a]/30">
-          <span v-if="searchIndexing" class="text-[#b3995d]">正在准备资源索引...</span>
-          <template v-else>
-            找到
-            <span class="text-[#b3995d] font-bold">{{ searchResults.length }}</span>
-            项
-            <span v-if="searchLastQuery" class="ml-2">query=“{{ searchLastQuery }}”</span>
-            <span v-if="searchElapsedMs" class="ml-2 text-[#6f7f69]">{{ searchElapsedMs }}ms</span>
-          </template>
-        </div>
-        <!-- 命中列表 -->
-        <div
-          v-for="item in searchResults"
-          :key="item.path"
-          class="group flex items-center px-2 py-1 hover:bg-[#2b362d]/50 cursor-pointer border-l-2 border-transparent hover:border-[#b3995d] text-xs"
-          :class="{ 'bg-[#4b391c]/60': selectedItem === 'search:' + item.path }"
-          data-testid="resource-search-item"
-          @click="selectedItem = 'search:' + item.path"
-          @dblclick="OnLocateSearchItem(item)"
-        >
-          <span class="w-5 flex-shrink-0 text-center">
-            <span :class="typeColorClass(item.type)">{{ typeIcon(item.type) }}</span>
-          </span>
-          <span class="text-[#e8ede3] truncate flex-1 ml-1" :title="item.name">
-            {{ item.name }}
-          </span>
-          <span class="text-[10px] text-[#6f7f69] mr-1">
-            {{ item.type_label }}
-          </span>
-          <span v-if="item.score != null" class="text-[10px] text-[#b3995d] mr-1" :title="'相似度'">
-            {{ Math.round(item.score * 100) }}%
-          </span>
-          <button
-            class="w-5 h-5 flex items-center justify-center text-[#6f7f69] hover:text-[#b3995d] rounded opacity-0 group-hover:opacity-100"
-            title="定位到资源"
-            @click.stop="OnLocateSearchItem(item)"
-          >
-            ◎
-          </button>
-        </div>
-        <div
-          v-if="!searchError && !searchIndexing && searchResults.length === 0"
-          class="px-4 py-8 text-center text-[#6f7f69] text-xs"
-        >
-          暂无匹配结果
-        </div>
-      </div>
-
-      <!-- 原场景树(无搜索时显示) -->
-      <div v-show="!RESOURCE_SEARCH_ENABLED || !searchActive" class="flex flex-col flex-1 min-h-0">
-        <div class="flex items-center gap-2 p-2 bg-[#18221a]/50 border-b border-[#2b362d]"></div>
-
+      <div class="flex flex-col flex-1 min-h-0">
         <!-- 工具栏 -->
         <div
           class="flex items-center gap-1 px-2 py-1.5 bg-[#2b362d]/60 border-b border-[#18221a]/30"
@@ -139,6 +15,7 @@
             <button
               class="p-1.5 hover:bg-[#3a4a3c] rounded text-[#e8ede3] text-xs flex items-center gap-1"
               title="导入"
+              :disabled="importing"
               @click.stop="ToggleModelDropdown"
             >
               <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -174,12 +51,6 @@
                 @click.stop="HandleActorImport"
               >
                 👤 单位
-              </button>
-              <button
-                class="block w-full px-3 py-1.5 text-xs text-[#e8ede3] hover:bg-[#3a4a3c] text-left"
-                @click.stop="HandleSceneImport"
-              >
-                🎬 场景
               </button>
               <button
                 class="block w-full px-3 py-1.5 text-xs text-[#e8ede3] hover:bg-[#3a4a3c] text-left"
@@ -549,13 +420,12 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted, onUnmounted, computed } from 'vue';
+import { ref, reactive, onMounted, onUnmounted } from 'vue';
 import { useRoute } from 'vue-router';
 import ModelNodeHierarchy from '@/components/ui/ModelNodeHierarchy.vue';
 import { pickedNodeIdentity } from '@/utils/modelHierarchy.js';
 import { editorApi } from '@/api/editorApi.js';
 import { appService } from '@/services/appService.js';
-import { resourceService } from '@/services/resourceService.js';
 import { DEFAULT_SCENE_NAME } from '@/utils/constants.js';
 import { resolveOpenedProjectScene } from '@/services/projectLauncherService.js';
 import { emptySceneTreeSettlement, resolveSceneTreeSnapshot } from '@/utils/sceneTreeSnapshot.js';
@@ -600,16 +470,11 @@ const scheduleSceneTreeSettleRetry = (delayMs, sceneName) => {
   }, delayMs);
 };
 
-const showLoading = (title, message, progress = 0) => {
-  coronaEventBus.emit('loading-show', { title, message, progress });
-};
-
-const updateLoading = (message, progress) => {
-  coronaEventBus.emit('loading-update', { message, progress });
-};
-
-const hideLoading = () => {
-  coronaEventBus.emit('loading-hide');
+const importing = ref(false);
+const publishImportProgress = (active, message = '', progress = 0) => {
+  importing.value = active;
+  void appService.crossTabBroadcast('scene-import-progress', { active, message, progress })
+    .catch(error => logWarn('导入进度通知失败', error));
 };
 
 // 导入失败此前只走 console.error，用户侧完全没有反馈：模型不出现在场景栏，
@@ -617,7 +482,6 @@ const hideLoading = () => {
 const reportImportError = (label, error) => {
   logError(label, error);
   const detail = error instanceof Error ? error.message : error ? String(error) : '';
-  hideLoading();
   window.alert(detail ? `${label}：${detail}` : label);
 };
 
@@ -696,256 +560,6 @@ let actorSingleClickTimer = null;
 let actorFocusSeq = 0;
 let cameraListRefreshInFlight = false;
 let lastCameraListHoverRefreshAt = 0;
-
-// ===========================================================================
-//  资源智能搜索(场景栏新增功能)
-// ===========================================================================
-const RESOURCE_SEARCH_ENABLED = false;
-const searchInput = ref('');
-const searchLoading = ref(false);
-const searchIndexing = ref(false);
-const searchError = ref('');
-const searchResults = ref([]);
-const searchLastQuery = ref('');
-const searchElapsedMs = ref(0);
-const searchSeq = ref(0); // B-2 竞态保护
-const imageInputRef = ref(null);
-const SEARCH_DEBOUNCE_MS = 600;
-const SEARCH_INDEX_RETRY_MS = 250;
-const SEARCH_INDEX_MAX_RETRIES = 120;
-let searchDebounce = null;
-let searchIndexRetry = null;
-
-const searchActive = computed(() => {
-  if (!RESOURCE_SEARCH_ENABLED) return false;
-  return (
-    searchLoading.value ||
-    searchIndexing.value ||
-    searchResults.value.length > 0 ||
-    !!searchError.value ||
-    !!searchLastQuery.value
-  );
-});
-
-const typeIcon = (type) =>
-  ({
-    model: '📦',
-    actor: '👤',
-    scene: '🎬',
-    multimedia: '🎵',
-    terrain: '🏔',
-    script: '📜',
-    other: '📄',
-  })[type] || '📄';
-
-const typeColorClass = (type) =>
-  ({
-    model: 'text-[#e6d5a7]',
-    actor: 'text-[#ce9178]',
-    scene: 'text-[#c586c0]',
-    multimedia: 'text-[#dcdcaa]',
-    terrain: 'text-[#c9a958]',
-    script: 'text-[#8d9e85]',
-    other: 'text-[#808080]',
-  })[type] || 'text-[#808080]';
-
-const onSearchInput = () => {
-  if (!RESOURCE_SEARCH_ENABLED) return;
-  if (searchDebounce) clearTimeout(searchDebounce);
-  if (searchIndexRetry) {
-    clearTimeout(searchIndexRetry);
-    searchIndexRetry = null;
-  }
-  searchSeq.value++;
-  searchLoading.value = false;
-  searchIndexing.value = false;
-
-  if (!searchInput.value.trim()) {
-    searchResults.value = [];
-    searchError.value = '';
-    searchLastQuery.value = '';
-    searchElapsedMs.value = 0;
-    return;
-  }
-
-  searchDebounce = setTimeout(() => {
-    searchDebounce = null;
-    doFuzzySearch(searchInput.value);
-  }, SEARCH_DEBOUNCE_MS);
-};
-
-const onSearchEnter = () => {
-  if (!RESOURCE_SEARCH_ENABLED) return;
-  if (searchDebounce) {
-    clearTimeout(searchDebounce);
-    searchDebounce = null;
-  }
-  if (searchIndexRetry) {
-    clearTimeout(searchIndexRetry);
-    searchIndexRetry = null;
-  }
-  doFuzzySearch(searchInput.value);
-};
-
-const onSearchClear = () => {
-  if (!RESOURCE_SEARCH_ENABLED) return;
-  searchInput.value = '';
-  if (searchDebounce) {
-    clearTimeout(searchDebounce);
-    searchDebounce = null;
-  }
-  if (searchIndexRetry) {
-    clearTimeout(searchIndexRetry);
-    searchIndexRetry = null;
-  }
-  searchSeq.value++;
-  searchLoading.value = false;
-  searchIndexing.value = false;
-  searchResults.value = [];
-  searchError.value = '';
-  searchLastQuery.value = '';
-  searchElapsedMs.value = 0;
-};
-
-const doFuzzySearch = async (query, retryCount = 0) => {
-  if (!RESOURCE_SEARCH_ENABLED) return;
-  const mySeq = ++searchSeq.value;
-  if (!query || !query.trim()) {
-    searchResults.value = [];
-    searchError.value = '';
-    searchLastQuery.value = '';
-    return;
-  }
-  searchLoading.value = true;
-  searchIndexing.value = false;
-  searchError.value = '';
-  try {
-    const resp = await resourceService.fuzzySearch(query.trim(), 30);
-    if (mySeq !== searchSeq.value) return; // 已被新请求覆盖
-    if (resp && resp.success !== false && resp.data) {
-      const data = resp.data;
-      if (data.status === 'success' || data.status === 'ok') {
-        searchResults.value = Array.isArray(data.items) ? data.items : [];
-        searchLastQuery.value = query.trim();
-        searchElapsedMs.value = data.elapsed_ms || 0;
-      } else if (data.status === 'indexing') {
-        searchIndexing.value = true;
-        searchResults.value = [];
-        searchLastQuery.value = query.trim();
-        searchElapsedMs.value = 0;
-        if (retryCount < SEARCH_INDEX_MAX_RETRIES) {
-          searchIndexRetry = setTimeout(() => {
-            searchIndexRetry = null;
-            if (mySeq === searchSeq.value && searchInput.value.trim() === query.trim()) {
-              doFuzzySearch(query, retryCount + 1);
-            }
-          }, SEARCH_INDEX_RETRY_MS);
-        } else {
-          searchIndexing.value = false;
-          searchError.value = '资源索引准备超时，请稍后重试';
-        }
-      } else {
-        searchError.value = data.message || '搜索失败';
-        searchResults.value = [];
-      }
-    } else {
-      searchError.value = (resp && resp.error) || '搜索请求失败';
-      searchResults.value = [];
-    }
-  } catch (e) {
-    if (mySeq !== searchSeq.value) return;
-    searchError.value = e?.message || '网络错误';
-    searchIndexing.value = false;
-    searchResults.value = [];
-  } finally {
-    if (mySeq === searchSeq.value) searchLoading.value = false;
-  }
-};
-
-const onImageSelected = async (ev) => {
-  if (!RESOURCE_SEARCH_ENABLED) return;
-  const file = ev.target.files && ev.target.files[0];
-  if (!file) return;
-  // B-3 大图片走 base64 时限制大小(> 2MB 警告)
-  if (file.size > 5 * 1024 * 1024) {
-    searchError.value = `图片过大 (${(file.size / 1024 / 1024).toFixed(1)}MB),请使用 ≤ 2MB 的图片`;
-    return;
-  }
-  const mySeq = ++searchSeq.value;
-  searchLoading.value = true;
-  searchError.value = '';
-  try {
-    const dataUrl = await new Promise((resolve, reject) => {
-      const fr = new FileReader();
-      fr.onload = () => resolve(fr.result);
-      fr.onerror = () => reject(fr.error);
-      fr.readAsDataURL(file);
-    });
-    const resp = await resourceService.imageSearch(dataUrl, 30, 10);
-    if (mySeq !== searchSeq.value) return;
-    if (resp && resp.success !== false && resp.data) {
-      const data = resp.data;
-      if (data.status === 'success') {
-        searchResults.value = Array.isArray(data.items) ? data.items : [];
-        searchLastQuery.value = `[图] ${file.name}`;
-        searchElapsedMs.value = data.elapsed_ms || 0;
-      } else {
-        searchError.value = data.message || '以图搜索失败';
-        searchResults.value = [];
-      }
-    } else {
-      searchError.value = (resp && resp.error) || '以图搜索请求失败';
-      searchResults.value = [];
-    }
-  } catch (e) {
-    if (mySeq !== searchSeq.value) return;
-    searchError.value = e?.message || '图片读取失败';
-    searchResults.value = [];
-  } finally {
-    if (mySeq === searchSeq.value) searchLoading.value = false;
-    if (imageInputRef.value) imageInputRef.value.value = '';
-  }
-};
-
-const onRebuildIndex = async () => {
-  if (!RESOURCE_SEARCH_ENABLED) return;
-  const mySeq = ++searchSeq.value;
-  searchLoading.value = true;
-  searchError.value = '';
-  try {
-    const resp = await resourceService.rebuildIndex();
-    if (mySeq !== searchSeq.value) return;
-    if (resp && resp.success !== false && resp.data && resp.data.status === 'success') {
-      searchLastQuery.value = '[重建] 已安排后台刷新';
-    } else {
-      searchError.value = (resp && resp.data && resp.data.message) || '重建索引失败';
-    }
-  } catch (e) {
-    if (mySeq !== searchSeq.value) return;
-    searchError.value = e?.message || '重建索引失败';
-  } finally {
-    if (mySeq === searchSeq.value) searchLoading.value = false;
-  }
-};
-
-const OnLocateSearchItem = async (item) => {
-  if (!RESOURCE_SEARCH_ENABLED) return;
-  // 桥接 ResourceSearch.focus_actor → SceneTools.focus_actor
-  // 资源项的 path 形如 Scene/MyScene.actor 或 assets/xxx.fbx
-  // 我们尝试从 name 推断 actor,失败则回退到原行为
-  try {
-    const name = (item.name || '').trim();
-    const resp = await resourceService.focusActor(currentSceneName.value, name);
-    if (resp && resp.data && resp.data.status === 'success') {
-      selectedItem.value = name;
-      setActorContext(currentSceneName.value, name);
-    } else {
-      logWarn('定位资源失败', resp && resp.data && resp.data.message);
-    }
-  } catch (e) {
-    logError('定位资源失败', e);
-  }
-};
 
 const isMediaItem = (scene) => scene && (scene.type === 'video' || scene.type === 'audio');
 // audio Actor：type 为 audio 且有真实 handle（来自场景树），按 Actor 处理（可选中、可编辑变换）。
@@ -1373,7 +987,7 @@ const createActorFromSelectedFile = async (payload, actorType, logLabel) => {
     throw new Error(`${logLabel}: 未能获取所选文件路径`);
   }
 
-  updateLoading('创建对象', 55);
+  publishImportProgress(true, '创建对象', 55);
   const createResult = await editorApi.sceneTools.createActor(
     currentSceneName.value,
     selectedPath,
@@ -1391,7 +1005,7 @@ const createActorFromSelectedFile = async (payload, actorType, logLabel) => {
   if (actor?.name) {
     selectedItem.value = actor.name;
   }
-  updateLoading('导入完成', 100);
+  publishImportProgress(true, '导入完成', 100);
   if (actorType === 'model') {
     void cabbageContextService.recordEvent({
       type: 'model_imported',
@@ -1415,7 +1029,7 @@ const HandleFileImport = async () => {
     reportImportError('模型导入失败', '当前没有活动场景，请先打开或新建场景');
     return;
   }
-  showLoading('加载中', '请稍候...', 0);
+  publishImportProgress(true, '请稍候...');
   try {
     const result = await editorApi.main.importResourceFile(currentSceneName.value, 'model');
     const payload = unwrapBridgePayload(result);
@@ -1432,7 +1046,7 @@ const HandleFileImport = async () => {
   } catch (e) {
     reportImportError('模型导入失败', e);
   } finally {
-    hideLoading();
+    publishImportProgress(false);
   }
 };
 
@@ -1443,7 +1057,7 @@ const HandleUiImageImport = async () => {
     reportImportError('图片导入失败', '当前没有活动场景，请先打开或新建场景');
     return;
   }
-  showLoading('加载中', '请稍候...', 0);
+  publishImportProgress(true, '请稍候...');
   try {
     const result = await editorApi.main.importResourceFile(currentSceneName.value, 'ui_image');
     const payload = unwrapBridgePayload(result);
@@ -1459,7 +1073,7 @@ const HandleUiImageImport = async () => {
   } catch (e) {
     reportImportError('图片导入失败', e);
   } finally {
-    hideLoading();
+    publishImportProgress(false);
   }
 };
 
@@ -1469,7 +1083,7 @@ const HandleActorImport = async () => {
     reportImportError('Actor 导入失败', '当前没有活动场景，请先打开或新建场景');
     return;
   }
-  showLoading('加载中', '请稍候...', 0);
+  publishImportProgress(true, '请稍候...');
   try {
     const result = await editorApi.main.importResourceFile(currentSceneName.value, 'actor');
     const payload = unwrapBridgePayload(result);
@@ -1485,13 +1099,13 @@ const HandleActorImport = async () => {
   } catch (e) {
     reportImportError('Actor 导入失败', e);
   } finally {
-    hideLoading();
+    publishImportProgress(false);
   }
 };
 
 const HandleMultimediaImport = async () => {
   ShowModelDropdown.value = false;
-  showLoading('加载中', '请稍候...', 0);
+  publishImportProgress(true, '请稍候...');
   try {
     const result = await editorApi.main.importResourceFile(currentSceneName.value, 'multimedia');
     // 兼容包装型 { success, data } 与直返型两种形态
@@ -1528,12 +1142,13 @@ const HandleMultimediaImport = async () => {
       } else {
         await addMediaToList(media);
       }
-      updateLoading('导入完成', 100);
+      publishImportProgress(true, '导入完成', 100);
     }
   } catch (e) {
     reportImportError('音视频导入失败', e);
+  } finally {
+    publishImportProgress(false);
   }
-  hideLoading();
 };
 
 const addMediaToList = async (media) => {
@@ -1553,35 +1168,6 @@ const addMediaToList = async (media) => {
     sampleRate: media.sample_rate,
     channels: media.channels,
   });
-};
-
-const HandleSceneImport = async () => {
-  ShowModelDropdown.value = false;
-  showLoading('加载中', '请稍候...', 0);
-  try {
-    const result = await editorApi.main.importResourceFile(currentSceneName.value, 'scene');
-    const payload = unwrapBridgePayload(result);
-    const status = payload?.status;
-    if (result?.success === false || status === 'error') {
-      reportImportError('场景导入失败', payload?.message || result?.error || 'unknown error');
-      return;
-    }
-    if (status === 'canceled') {
-      return;
-    }
-
-    // 功能未实现时也要告诉用户，否则选完文件毫无反应。
-    logWarn(
-      'Scene JSON import is selected but native scene import is not implemented yet',
-      payload
-    );
-    reportImportError('场景导入', '场景 JSON 导入尚未实现');
-    await OnInitObjTree();
-  } catch (e) {
-    reportImportError('场景导入失败', e);
-  } finally {
-    hideLoading();
-  }
 };
 
 const DeleteActor = async (scene) => {
@@ -1649,11 +1235,6 @@ const OnInitObjTree = async () => {
 onMounted(async () => {
   coronaEventBus.on('model-node-picked', handleModelNodePick);
   const result = await editorApi.main.onInit();
-  if (RESOURCE_SEARCH_ENABLED) {
-    resourceService.prepareIndex().catch((error) => {
-      logWarn('资源索引预热失败', error);
-    });
-  }
   const queryString = window.location.hash?.split('?')[1] || window.location.search?.slice(1);
   const urlSceneName = queryString ? new URLSearchParams(queryString).get('sceneName') : null;
 
@@ -1759,14 +1340,6 @@ onUnmounted(() => {
       .off(nodeSelectionCallbackToken)
       .catch((error) => logError('Failed to unregister node selection callback', error));
   nodeSelectionCallbackToken = null;
-  if (searchDebounce) {
-    clearTimeout(searchDebounce);
-    searchDebounce = null;
-  }
-  if (searchIndexRetry) {
-    clearTimeout(searchIndexRetry);
-    searchIndexRetry = null;
-  }
   clearActorSingleClickTimer();
   actorFocusSeq++;
 

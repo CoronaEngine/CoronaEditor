@@ -2767,11 +2767,6 @@ onUnmounted(() => {
           </div>
         </section>
       </div>
-      <!-- 小世界状态：顶部中央（顶部中央只在小世界空闲，主世界归 Boss 血条） -->
-      <section v-if="!inventoryOpen && inSubworld" class="subworld-notice" aria-label="小世界状态">
-        <strong>{{ worldLabel }}</strong>
-        <span>此处为沙盒空间 · 无战斗目标</span>
-      </section>
 
       <!-- 先知不再使用 3D 模型：小世界右下角固定一个对话入口。 -->
       <button v-if="inSubworld && !inventoryOpen && !dialogueOpen && !adjustMode && !initializing"
@@ -3251,18 +3246,6 @@ onUnmounted(() => {
   clip-path: polygon(8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%, 0 8px);
   text-shadow: 0 1px 3px #000;
 }
-/* 小世界状态：顶部中央。放到这里的唯一原因是物品栏要占用底部中央（Minecraft 位置），
-   而顶部中央在小世界是空的（图例左上、世界铭牌右上、小世界没有首领血条）。 */
-/* 顶部中央的小世界状态条已隐藏：只保留右上角的世界指示器。 */
-.subworld-notice {
-  display: none;
-  position: absolute; top: 18px; left: 50%; transform: translateX(-50%);
-  display: grid; gap: 5px; justify-items: center; padding: 4px 12px; text-align: center; z-index: 3;
-  background: rgba(16, 14, 12, .82); border: 1px solid var(--gold-line);
-  clip-path: var(--shape); box-shadow: 0 8px 22px rgba(0, 0, 0, .55);
-}
-.subworld-notice strong { font-size: 12px; font-weight: 500; letter-spacing: 3px; color: var(--c-gold-bright); }
-.subworld-notice span { font-size: 10px; color: var(--c-paper-dim); }
 
 .dialogue-overlay {
   pointer-events: auto; position: absolute; inset: 0; z-index: 6;

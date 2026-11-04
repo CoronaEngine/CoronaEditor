@@ -1,8 +1,3 @@
-<!-- components/panels/LightFieldCalibrationPanel.vue
-     光场 3D UI 手动标定 dock 面板。暴露 Vision 光场语义参数 (pe/angle/offset) + UI 专有的
-     视差增益 parallaxScale。本面板不持有相机句柄（dock 面板拿不到 props）——改值后通过
-     coronaEventBus 发出 'viewport-ui-calibration-changed'，由 MainPage 通过视口快速通道
-     使用活动相机句柄下发；C++ 边界统一换算成 warp 的 ViewportUiCalibration。 -->
 <template>
   <div class="lfd-calib no-drag">
     <div class="lfd-calib__group">
@@ -64,9 +59,8 @@
 </template>
 
 <script setup>
-import { onMounted, reactive, toRaw } from 'vue';
+import { reactive, toRaw } from 'vue';
 import NumberInputWithSlider from '@/components/ui/NumberInputWithSlider.vue';
-import { coronaEventBus } from '@/utils/eventBus.js';
 import {
   createViewportUiCalibrationStore,
   normalizeLightFieldCalibration,
@@ -85,7 +79,6 @@ const fmt4 = (v) => Number(v).toFixed(4);
 const apply = () => {
   const calibration = { ...toRaw(form) };
   store.set(DESCRIPTOR, calibration);
-  coronaEventBus.emit('viewport-ui-calibration-changed', calibration);
 };
 
 const resetDefault = () => {
@@ -93,8 +86,6 @@ const resetDefault = () => {
   apply();
 };
 
-// 面板打开（挂载）即把当前标定推送一次，让 warp 立刻拿到值。
-onMounted(apply);
 </script>
 
 <style scoped>

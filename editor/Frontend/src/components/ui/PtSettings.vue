@@ -15,13 +15,6 @@
           <input v-model.number="draft[key]" type="number" :min="min" :max="max" :step="step" :aria-label="label" />
         </label>
       </fieldset>
-      <fieldset disabled aria-label="自适应采样（暂不可用）">
-        <legend>自适应采样（暂不可用）</legend>
-        <label><span>启用自适应采样</span><input type="checkbox" :checked="adaptive.enabled" aria-label="启用自适应采样" /></label>
-        <label><span>收敛阈值</span><input type="number" :value="adaptive.threshold" min="0" max="1" step="0.0001" aria-label="收敛阈值" /></label>
-        <label><span>最少样本数</span><input type="number" :value="adaptive.start_index" min="32" max="1024" step="1" aria-label="最少样本数" /></label>
-        <p class="hint">当前 PT 尚未接入自适应采样，以上控件暂不可用。</p>
-      </fieldset>
       <p v-if="error" role="alert" class="error">{{ error }}</p>
       <p v-else-if="saved" role="status" class="hint">已应用到当前相机</p>
       <footer><button type="button" :disabled="busy || !loaded" @click="reset">恢复默认值</button><button type="submit" :disabled="busy || !loaded">{{ busy ? '处理中…' : '应用' }}</button></footer>
@@ -36,7 +29,7 @@ import { editorApi } from '@/api/editorApi.js';
 import { ptGroups, usePtSettings } from '@/utils/ptSettings.js';
 const props = defineProps({ sceneId: { type: String, default: '' }, cameraId: { type: String, default: '' }, enabled: Boolean });
 const trigger = ref(null);
-const { open, busy, error, saved, draft, adaptive, loaded, apply, reset } = usePtSettings(props, editorApi.sceneTools);
+const { open, busy, error, saved, draft, loaded, apply, reset } = usePtSettings(props, editorApi.sceneTools);
 </script>
 
 <style scoped>

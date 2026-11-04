@@ -640,11 +640,11 @@ const syncViewportGizmoSelection = async (payload = {}) => {
   }
 };
 
-const applyViewportUiCalibration = (calibration) => {
+const applyViewportUiCalibration = () => {
   viewportUiCalibrationStore.applyToBridge({
     bridge: window.coronaBridge,
     cameraHandle: camera.value?.handle,
-    calibration: calibration ?? viewportUiCalibrationStore.get(viewportUiCalibrationDescriptor),
+    calibration: viewportUiCalibrationStore.get(viewportUiCalibrationDescriptor),
   });
 };
 
@@ -678,12 +678,6 @@ const selectViewportUiMode = (mode) => {
     viewportUiPointerController.hide();
   }
   syncViewportUiCalibration();
-};
-
-const handleViewportUiCalibrationChanged = (calibration) => {
-  if (viewportUiMode.value === 'stereo3d') {
-    applyViewportUiCalibration(calibration);
-  }
 };
 
 const handleViewportUiCalibrationStorage = (event) => {
@@ -1370,7 +1364,6 @@ onMounted(async () => {
   window.addEventListener('storage', handleViewportUiCalibrationStorage);
   window.addEventListener('blur', handleCameraViewBlur);
   coronaEventBus.on('model-node-selection', handleModelNodeGizmoSelection);
-  coronaEventBus.on('viewport-ui-calibration-changed', handleViewportUiCalibrationChanged);
   animationFrame = requestAnimationFrame(movementFrame);
   await pollPreviewHud();
   previewHudTimer = window.setInterval(pollPreviewHud, 250);
@@ -1411,7 +1404,6 @@ onBeforeUnmount(() => {
   window.removeEventListener('storage', handleViewportUiCalibrationStorage);
   window.removeEventListener('blur', handleCameraViewBlur);
   coronaEventBus.off('model-node-selection', handleModelNodeGizmoSelection);
-  coronaEventBus.off('viewport-ui-calibration-changed', handleViewportUiCalibrationChanged);
   viewportUiPointerController.dispose();
 });
 </script>
@@ -1486,7 +1478,7 @@ onBeforeUnmount(() => {
   color: #aaa;
   cursor: move;
 }
-.name-input, .control, .speed input, .resolution input, .button, .window-action, .cascade-toggle {
+.name-input, .control, .speed input, .resolution input, .button, .window-action {
   height: 24px;
   border: 1px solid #555;
   border-radius: 4px;
@@ -1547,17 +1539,6 @@ onBeforeUnmount(() => {
 .speed input { width: 54px; padding: 0 4px; }
 .resolution input { width: 58px; padding: 0 4px; }
 .button { padding: 0 8px; cursor: pointer; }
-.cascade-toggle {
-  width: 38px;
-  padding: 0;
-  cursor: pointer;
-}
-.cascade-toggle.active {
-  border-color: #f59e0b;
-  color: #fff7c2;
-  background: rgba(120, 80, 12, 0.78);
-}
-.cascade-toggle:disabled { opacity: 0.45; cursor: default; }
 .window-action { width: 24px; cursor: pointer; }
 .maximize { margin-left: auto; }
 .close { color: #ffb4b4; }

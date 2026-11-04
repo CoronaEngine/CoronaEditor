@@ -6,7 +6,6 @@ export const ptGroups = [{ label: '路径追踪', fields: [
   ['rr_threshold', 'RR 阈值', 1, 0, 1, 0.01, '路径贡献低于此阈值时允许随机终止；0 关闭随机终止。'],
 ] }];
 export const ptDefaults = { max_depth: 16, min_depth: 5, rr_threshold: 1 };
-export const ptAdaptiveDefaults = { enabled: false, threshold: 0.001, start_index: 128 };
 
 export function validatePtSettings(settings) {
   for (const group of ptGroups) {
@@ -23,7 +22,6 @@ export function validatePtSettings(settings) {
 export function usePtSettings(props, api) {
   const open = ref(false), busy = ref(false), error = ref(''), saved = ref(false);
   const draft = ref({ ...ptDefaults });
-  const adaptive = ref({ ...ptAdaptiveDefaults });
   const loaded = ref(false);
   let generation = 0;
   watch(() => [props.sceneId, props.cameraId, props.enabled, open.value], async (_, __, onCleanup) => {
@@ -33,7 +31,6 @@ export function usePtSettings(props, api) {
     error.value = ''; saved.value = false; busy.value = false;
     loaded.value = false;
     draft.value = { ...ptDefaults };
-    adaptive.value = { ...ptAdaptiveDefaults };
     if (!props.enabled || !props.cameraId) { open.value = false; return; }
     if (!open.value) return;
     busy.value = true;
@@ -54,7 +51,6 @@ export function usePtSettings(props, api) {
         if (token !== generation) return;
       }
       draft.value = { ...ptDefaults, ...response.settings };
-      adaptive.value = { ...ptAdaptiveDefaults, ...response.adaptive };
       // Native settings use float32; hide binary serialization noise in the inputs.
       for (const group of ptGroups) {
         for (const [key] of group.fields) {
@@ -97,5 +93,5 @@ export function usePtSettings(props, api) {
     }
   }
   function reset() { draft.value = { ...ptDefaults }; error.value = ''; saved.value = false; }
-  return { open, busy, error, saved, draft, adaptive, loaded, apply, reset };
+  return { open, busy, error, saved, draft, loaded, apply, reset };
 }
