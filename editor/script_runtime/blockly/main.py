@@ -8,22 +8,13 @@ import sys
 import tempfile
 import threading
 import time
+import uuid
 from typing import Any, Optional
 
-from runtime.editor_host import (
-    emit_editor_event,
-    get_editor_selection,
-    set_editor_camera_input_enabled,
-)
+from runtime.editor_host import set_editor_camera_input_enabled
 from runtime.project_context import get_active_project_path
-from runtime.scene_support import (
-    cancel_pending_auto_saves,
-    flush_pending_auto_saves,
-)
-from config.paths_config import get_default_paths
+from runtime.scene_support import cancel_pending_auto_saves
 from config.project_state import settings_manager
-
-core_path = get_default_paths()
 
 logger = logging.getLogger(__name__)
 
@@ -53,11 +44,12 @@ def _request_thread_stop(
 
 
 class ScratchTool:
-    generated_script_dir = core_path.generated_script_dir
-    os.makedirs(generated_script_dir, exist_ok=True)
 
     _exec_thread: Optional[threading.Thread] = None
     _exec_context_id: Optional[str] = None
+    # Receipts are owned by the serialized Python service dispatcher. Keep them
+    # for this host lifetime, including after a project or script finishes.
+    _file_requests: dict[str, tuple[tuple | None, str | None]] = {}
     _exec_lock = threading.RLock()
     _exec_state: dict[str, Any] = {
         "status": "idle",
@@ -89,30 +81,6 @@ class ScratchTool:
     _exec_input_locked = False
     _persistence_lock = threading.RLock()
     _shutdown_requested = False
-
-    _preview_lock = threading.RLock()
-    _preview_threads: list[dict[str, Any]] = []
-    _preview_status = "idle"
-    _preview_errors: list[str] = []
-    _preview_warnings: list[str] = []
-    _preview_state_snapshot: Optional[dict[str, Any]] = None
-    _preview_input_locked = False
-    _preview_restart_generation = 0
-    _preview_restart_in_progress = False
-    _preview_restart_lock = threading.Lock()
-    _preview_scope = "project"
-    _preview_scene_name = ""
-    _preview_results: dict[str, dict[str, Any]] = {}
-    _preview_started_count = 0
-    _preview_blockly_count = 0
-    _preview_node_graph_count = 0
-    _preview_stop_thread: Optional[threading.Thread] = None
-    _preview_restore_status = "idle"
-    _preview_restore_error = ""
-    _preview_restored = False
-    _preview_stopped_count = 0
-    _preview_restore_pending = False
-    _preview_restore_in_progress = False
 
     # ------------------------------------------------------------------
     # Project Blockly persistence
@@ -286,16 +254,6 @@ class ScratchTool:
             return payload
         raise TypeError("payload must be an object")
 
-    @staticmethod
-    def _with_context_prelude(code: str, target_type: str, scene_name: str, actor_name: str) -> str:
-        target_type = "actor" if target_type == "model" else target_type
-        prelude = "from script_runtime.engine import corona_engine as _CE\n"
-        if target_type == "project":
-            prelude += "_CE.set_project_global()\n"
-        elif scene_name and actor_name:
-            prelude += f"_CE.set_target({scene_name!r}, {actor_name!r})\n"
-        return prelude + (code or "")
-
     @classmethod
     def save_blockly_target(cls, payload: dict | str) -> dict:
         """Save generated Python and workspace JSON for one Blockly or node-graph target."""
@@ -327,9 +285,8 @@ class ScratchTool:
             code_path = blockly_dir / f"{prefix}_{digest}.py"
             workspace_path = blockly_dir / f"{prefix}_{digest}.blockly.json"
 
-            code = cls._with_context_prelude(
-                str(data.get("code") or ""), target_type, scene_name, actor_name
-            )
+            # The execution context supplies the target before the module is loaded.
+            code = str(data.get("code") or "")
 
             def _rel(path: Path) -> str:
                 return path.relative_to(project_path).as_posix()
@@ -344,6 +301,7 @@ class ScratchTool:
                 "scene_name": scene_name,
                 "actor_name": actor_name,
                 "code_path": _rel(code_path),
+                "revision": hashlib.sha256(code.encode("utf-8")).hexdigest(),
                 "workspace_path": _rel(workspace_path),
                 "updated_at": time.time(),
                 "enabled": bool(data.get("enabled", True)),
@@ -444,7 +402,7 @@ class ScratchTool:
 
 
     # ------------------------------------------------------------------
-    # Legacy single-code execution
+    # Single-file execution
     # ------------------------------------------------------------------
     @classmethod
     def _replace_exec_state(cls, **updates) -> dict:
@@ -505,47 +463,88 @@ class ScratchTool:
             return False, error
 
     @classmethod
-    def execute_python_code(
-        cls,
-        code: str,
-        index: int,
-        scene_name: str = "",
-        actor_name: str = "",
-        target_type: str = "actor",
-    ) -> dict:
+    def run_file(cls, request: dict) -> dict:
+        """Start the exact saved revision selected by the native Scripts endpoint."""
+        request_id = request.get("requestId")
+        if not isinstance(request_id, str) or not 0 < len(request_id) <= 128:
+            return {"status": "error", "message": "A script requestId is required"}
+        identity = tuple(request.get(key) for key in (
+            "project_path", "path", "revision", "target_type", "scene_name", "actor_name"))
+        if request_id in cls._file_requests:
+            previous, run_id = cls._file_requests[request_id]
+            if run_id and previous != identity:
+                return {"status": "error", "code": "REQUEST_CONFLICT", "message": "Script requestId was reused"}
+            return cls.get_file_run(request)
+        try:
+            root = Path(request["project_path"]).resolve(strict=True)
+            path = (root / request["path"]).resolve(strict=True)
+            if not path.is_relative_to(root) or path.suffix != ".py":
+                raise ValueError("Script must be a .py file in the active project")
+            source = path.read_bytes()
+            if hashlib.sha256(source).hexdigest() != request.get("revision"):
+                return {"status": "error", "code": "SCRIPT_CHANGED", "message": "脚本已更改，请重新保存并运行"}
+            # Compile the verified bytes; a concurrent save cannot change this run.
+            program = compile(source, str(path), "exec")
+        except (KeyError, TypeError, ValueError, OSError, SyntaxError) as exc:
+            return {"status": "error", "message": str(exc)}
+        result = cls._start_single(request.get("scene_name", ""), request.get("actor_name", ""),
+                                   request.get("target_type", "actor"), filepath=path, program=program,
+                                   request_id=request_id)
+        if result.get("runId"):
+            cls._file_requests[request_id] = (identity, result["runId"])
+            result["requestId"] = request_id
+        return result
+
+    @classmethod
+    def get_file_run(cls, request: dict) -> dict:
+        request_id = request.get("requestId")
+        record = cls._file_requests.get(request_id)
+        if record is None:
+            return {"status": "unknown", "requestId": request_id}
+        _, run_id = record
+        if run_id is None:
+            return {"status": "cancelled", "requestId": request_id}
+        with cls._exec_lock:
+            state = cls._exec_state if run_id == cls._exec_state.get("runId") else {}
+            return {"status": state.get("status", "finished"), "runId": run_id,
+                    "requestId": request_id, "snapshotCaptured": bool(state.get("snapshotCaptured"))}
+
+    @classmethod
+    def stop_file(cls, request: dict) -> dict:
+        run_id = request.get("runId")
+        request_id = request.get("requestId")
+        if request_id and not run_id:
+            # A close can overtake a delayed start. Remember cancellation so a
+            # late delivery or retry cannot launch a script for a closed panel.
+            record = cls._file_requests.setdefault(request_id, (None, None))
+            run_id = record[1]
+            if not run_id or run_id != cls._exec_state.get("runId"):
+                return {"status": "stopped", "requestId": request_id}
+        if not run_id or run_id != cls._exec_state.get("runId"):
+            return {"status": "error", "code": "STALE_RUN", "message": "脚本运行实例已更改"}
+        return cls.stop_script_execution(request.get("restore_state", True))
+
+    @classmethod
+    def _start_single(cls, scene_name, actor_name, target_type, *, filepath, program, request_id) -> dict:
         if cls._shutdown_requested:
             return {"status": "error", "message": "Scratch runtime is shutting down"}
         try:
             from script_runtime.engine import corona_engine as corona_engine_scratch
 
-            with cls._preview_lock:
-                live_preview_threads = sum(
-                    1 for info in cls._preview_threads
-                    if info.get("thread") and info["thread"].is_alive()
-                )
-                preview_status = cls._preview_status
-                preview_scope = cls._preview_scope
-                preview_has_snapshot = cls._preview_state_snapshot is not None
-                preview_active = bool(
-                    preview_has_snapshot
-                    or live_preview_threads
-                    or preview_status in ("starting", "running", "stopping")
-                )
-            if preview_active:
-                message = "全局运行或项目预览正在进行，请先停止并恢复后再运行单物体脚本"
-                logger.warning(
-                    "[ScratchTool] rejected single execution during preview: "
-                    "status=%s scope=%s snapshot=%s live_threads=%d scene=%s actor=%s",
-                    preview_status, preview_scope, preview_has_snapshot,
-                    live_preview_threads, scene_name, actor_name,
-                )
-                return {
-                    "status": "error",
-                    "message": message,
-                    "outcome": "preview_running",
-                    "previewStatus": preview_status,
-                    "previewScope": preview_scope,
-                }
+            with cls._exec_lock:
+                active_thread = bool(cls._exec_thread and cls._exec_thread.is_alive())
+                if active_thread:
+                    return {
+                        "status": "error",
+                        "message": "上一次节点图脚本仍在结束中，请稍后重试",
+                        "outcome": "execution_finishing",
+                    }
+                if cls._exec_state_snapshot is not None:
+                    return {
+                        "status": "error",
+                        "message": "上一次节点图运行仍保留可恢复快照，请先停止并恢复或重新加载编辑器",
+                        "outcome": "snapshot_pending",
+                    }
 
             requested_scene = scene_name or ""
             requested_actor = actor_name or ""
@@ -588,37 +587,6 @@ class ScratchTool:
             target_type = resolved.get("target_type", target_type)
             scene_name = resolved.get("scene_name", scene_name)
             actor_name = resolved.get("actor_name", actor_name)
-
-            with cls._exec_lock:
-                active_thread = bool(cls._exec_thread and cls._exec_thread.is_alive())
-                previous_status = str(cls._exec_state.get("status") or "idle")
-                previous_outcome = str(cls._exec_state.get("outcome") or "")
-                if active_thread:
-                    return {
-                        "status": "error",
-                        "message": "上一次节点图脚本仍在结束中，请稍后重试",
-                        "outcome": "execution_finishing",
-                    }
-                # A failed execution is terminal.  Its diagnostic remains visible in
-                # _exec_state, but a stale pre-run snapshot must never make the Run
-                # button unusable after the graph has been fixed.  Restore failures
-                # are intentionally retained so the user can retry restoration.
-                retryable_terminal = previous_status in ("error", "completed") or previous_outcome in (
-                    "error", "startup_error", "binding_error", "snapshot_error"
-                )
-                restore_failed = str(cls._exec_state.get("restoreStatus") or "") == "error"
-                if retryable_terminal and not restore_failed:
-                    cls._exec_state_snapshot = None
-                    cls._exec_thread = None
-                    cls._exec_context_id = None
-                    cls._exec_state.update(snapshotCaptured=False, inputLocked=False)
-                    cls._set_exec_input_locked(False)
-                if cls._exec_state_snapshot is not None:
-                    return {
-                        "status": "error",
-                        "message": "上一次节点图运行仍保留可恢复快照，请先停止并恢复或重新加载编辑器",
-                        "outcome": "snapshot_pending",
-                    }
             state_snapshot, snapshot_error = cls._capture_exec_snapshot(resolved)
             if state_snapshot is None:
                 message = f"无法创建运行前场景快照: {snapshot_error or '未知错误'}"
@@ -635,37 +603,16 @@ class ScratchTool:
             with cls._exec_lock:
                 cls._exec_state_snapshot = state_snapshot
 
-            filename = f"blockly_code{'_' + str(index) if index else ''}.py"
-            filepath = cls.generated_script_dir / filename
-
-            for old_file in os.listdir(cls.generated_script_dir):
-                if old_file.startswith("blockly_code") and old_file.endswith(".py"):
-                    try:
-                        os.remove(cls.generated_script_dir / old_file)
-                    except Exception:
-                        pass
-
-            final_code = cls._with_context_prelude(code, target_type, scene_name, actor_name)
-            with open(filepath, "w", encoding="utf-8") as f:
-                f.write(final_code)
-
-            old_thread = None
-            old_context = None
-            with cls._exec_lock:
-                if cls._exec_thread and cls._exec_thread.is_alive():
-                    old_thread = cls._exec_thread
-                    old_context = cls._exec_context_id
-            if old_thread is not None:
-                if not _request_thread_stop(old_thread, timeout=0.5, context_id=old_context):
-                    raise RuntimeError("previous Blockly script did not stop cooperatively")
-
-            context_id = cls._target_id(target_type, scene_name, actor_name)
+            run_id = uuid.uuid4().hex
+            context_id = run_id
             started_at = time.time()
             cls._replace_exec_state(
                 status="starting",
                 outcome="",
                 error="",
                 contextId=context_id,
+                runId=run_id,
+                requestId=request_id,
                 sceneName=scene_name,
                 actorName=actor_name,
                 targetType=target_type,
@@ -699,7 +646,7 @@ class ScratchTool:
                         "actor_name": actor_name,
                         "_resolved": resolved,
                     },
-                    single_exec=True,
+                    program=program,
                 )
                 if outcome == "stop_restore":
                     # Do not restore from the script thread: the stop coordinator
@@ -729,13 +676,9 @@ class ScratchTool:
                             outcome=outcome,
                             finishedAt=time.time(),
                         )
-                    if outcome in ("completed", "error"):
-                        cls._exec_state_snapshot = None
-                        cls._exec_state["snapshotCaptured"] = False
                     cls._set_exec_input_locked(False)
                     if cls._exec_thread is threading.current_thread():
                         cls._exec_thread = None
-                        cls._exec_context_id = None
 
             with cls._exec_lock:
                 cls._exec_context_id = context_id
@@ -747,6 +690,7 @@ class ScratchTool:
             return {
                 "status": "started",
                 "filepath": str(filepath),
+                "runId": run_id,
                 "contextId": context_id,
                 "sceneName": scene_name,
                 "actorName": actor_name,
@@ -761,7 +705,7 @@ class ScratchTool:
             cls._set_exec_input_locked(False)
             with cls._exec_lock:
                 cls._exec_state_snapshot = None
-            logger.exception("[ScratchTool] execute_python_code failed")
+            logger.exception("[ScratchTool] file startup failed")
             cls._replace_exec_state(
                 status="error", outcome="startup_error", error=str(exc), finishedAt=time.time()
             )
@@ -866,16 +810,8 @@ class ScratchTool:
         with cls._exec_lock:
             exec_thread = cls._exec_thread
             exec_context = cls._exec_context_id
-        with cls._preview_lock:
-            preview_infos = list(cls._preview_threads)
-            preview_contexts = {
-                str((info.get("target") or {}).get("id") or "")
-                for info in preview_infos
-                if (info.get("target") or {}).get("id")
-            }
-        context_ids = {value for value in preview_contexts | {exec_context or ""} if value}
+        context_ids = {exec_context} if exec_context else set()
         threads = [exec_thread] if exec_thread else []
-        threads.extend(info.get("thread") for info in preview_infos if info.get("thread"))
         threads.extend(corona_engine_scratch.active_child_threads(context_ids or None))
         pending = cls._wait_for_threads(
             list({thread for thread in threads if thread}),
@@ -888,7 +824,6 @@ class ScratchTool:
             for context_id in context_ids:
                 corona_engine_scratch.isolate_context(context_id, reason)
             cls._set_exec_input_locked(False)
-            cls._set_preview_input_locked(False)
             return {
                 "service": "ScratchTool",
                 "state": "stop_timeout",
@@ -896,7 +831,6 @@ class ScratchTool:
                 "pending_threads": sorted({thread.name for thread in pending}),
             }
         cls._set_exec_input_locked(False)
-        cls._set_preview_input_locked(False)
         return {
             "service": "ScratchTool",
             "state": "stopped",
@@ -908,14 +842,7 @@ class ScratchTool:
     def snapshot(cls) -> dict:
         with cls._exec_lock:
             exec_thread = cls._exec_thread
-        with cls._preview_lock:
-            preview_threads = [
-                info.get("thread") for info in cls._preview_threads if info.get("thread")
-            ]
-        alive = [
-            thread.name for thread in [exec_thread, *preview_threads]
-            if thread and thread.is_alive()
-        ]
+        alive = [exec_thread.name] if exec_thread and exec_thread.is_alive() else []
         return {
             "service": "ScratchTool",
             "state": "stop_requested" if cls._shutdown_requested else "ready",
@@ -979,221 +906,8 @@ class ScratchTool:
         return state
 
     # ------------------------------------------------------------------
-    # Project preview
+    # File execution helpers
     # ------------------------------------------------------------------
-    @classmethod
-    def _set_preview_input_locked(cls, locked: bool) -> None:
-        with cls._preview_lock:
-            cls._preview_input_locked = bool(locked)
-        try:
-            # CoronaEditor owns the reason-based lock set and propagates the aggregate
-            # state to the native camera-follow controller.  Do not call the native
-            # setter directly here, otherwise another active lock could be released.
-            set_editor_camera_input_enabled(not locked, reason="game_preview")
-        except Exception:
-            logger.debug("[ScratchTool] editor camera input gate unavailable", exc_info=True)
-
-    @staticmethod
-    def _scene_names_match(left: Any, right: Any) -> bool:
-        def tokens(value: Any) -> set[str]:
-            text = str(value or "").strip().replace("\\", "/").casefold()
-            if not text:
-                return set()
-            name = text.rsplit("/", 1)[-1]
-            stem = name.rsplit(".", 1)[0]
-            return {text, name, stem}
-        return bool(tokens(left) & tokens(right))
-
-    @classmethod
-    def _preview_payload_locked(cls) -> dict[str, Any]:
-        targets = [dict(item) for item in cls._preview_results.values()]
-        targets.sort(key=lambda item: (item.get("scene_name", ""), item.get("actor_name", ""), item.get("script_kind", "")))
-        running_count = sum(1 for item in targets if item.get("status") in ("starting", "running"))
-        completed_count = sum(1 for item in targets if item.get("status") == "completed")
-        error_count = sum(1 for item in targets if item.get("status") == "error")
-        payload = {
-            "status": cls._preview_status,
-            "scope": cls._preview_scope,
-            "scene_name": cls._preview_scene_name,
-            "started_count": cls._preview_started_count,
-            "running_count": running_count,
-            "completed_count": completed_count,
-            "error_count": error_count,
-            "blockly_count": cls._preview_blockly_count,
-            "node_graph_count": cls._preview_node_graph_count,
-            "targets": targets,
-            "errors": list(cls._preview_errors),
-            "warnings": list(cls._preview_warnings),
-            "input_locked": cls._preview_input_locked,
-            "has_snapshot": cls._preview_state_snapshot is not None,
-            "restart_generation": cls._preview_restart_generation,
-            "restore_status": cls._preview_restore_status,
-            "restore_error": cls._preview_restore_error,
-            "restored": cls._preview_restored,
-            "stopped_count": cls._preview_stopped_count,
-            "restore_pending": cls._preview_restore_pending,
-            "stop_pending": bool(
-                (cls._preview_stop_thread and cls._preview_stop_thread.is_alive())
-                or cls._preview_restore_pending
-                or cls._preview_restore_in_progress
-            ),
-        }
-        payload.update({
-            "sceneName": payload["scene_name"],
-            "startedCount": payload["started_count"],
-            "runningCount": payload["running_count"],
-            "completedCount": payload["completed_count"],
-            "errorCount": payload["error_count"],
-            "blocklyCount": payload["blockly_count"],
-            "nodeGraphCount": payload["node_graph_count"],
-            "inputLocked": payload["input_locked"],
-            "hasSnapshot": payload["has_snapshot"],
-        })
-        return payload
-
-    @classmethod
-    def start_game_preview(cls, payload: dict | str | None = None) -> dict:
-        if cls._shutdown_requested:
-            return {"status": "error", "message": "Scratch runtime is shutting down"}
-        data = cls._normalize_payload(payload)
-        scope = str(data.get("scope") or "project").strip().lower()
-        requested_scene = str(data.get("scene_name") or data.get("sceneName") or "").strip()
-        if scope not in ("project", "scene"):
-            return {"status": "error", "message": f"unsupported preview scope: {scope}"}
-        if scope == "scene" and not requested_scene:
-            return {"status": "error", "message": "scene preview requires scene_name"}
-
-        logger.info(
-            "[ScratchTool] preview start requested: scope=%s scene=%s",
-            scope, requested_scene,
-        )
-        with cls._exec_lock:
-            single_active = bool(
-                (cls._exec_thread and cls._exec_thread.is_alive())
-                or cls._exec_state_snapshot is not None
-                or cls._exec_state.get("status") in ("starting", "running")
-            )
-        if single_active:
-            return {
-                "status": "error",
-                "message": "单物体脚本正在运行，请先停止后再启动全局运行",
-                "outcome": "single_script_running",
-            }
-        with cls._preview_lock:
-            preview_active = bool(
-                cls._preview_state_snapshot is not None
-                or any(info.get("thread") and info["thread"].is_alive() for info in cls._preview_threads)
-                or cls._preview_status in ("starting", "running", "stopping")
-            )
-        if preview_active:
-            return {"status": "error", "message": "已有预览或全局运行正在进行，请先停止并恢复"}
-
-        try:
-            project_path = cls._active_project_path().resolve()
-        except Exception as exc:
-            logger.exception("[ScratchTool] preview project resolution failed")
-            return {"status": "error", "message": str(exc)}
-
-        from script_runtime.engine import corona_engine as corona_engine_scratch
-        corona_engine_scratch.clear_runtime_state_snapshots()
-        try:
-            flush_pending_auto_saves()
-            targets, warnings = cls._prepare_preview_targets(
-                scope, requested_scene, project_path
-            )
-            flush_pending_auto_saves()
-        except Exception as exc:
-            logger.exception("[ScratchTool] start_game_preview prepare failed")
-            return {"status": "error", "message": str(exc)}
-
-        with cls._preview_lock:
-            cls._preview_scope = scope
-            cls._preview_scene_name = requested_scene if scope == "scene" else ""
-            cls._preview_errors = []
-            cls._preview_warnings = list(warnings)
-            cls._preview_threads = []
-            cls._preview_started_count = len(targets)
-            cls._preview_blockly_count = sum(1 for item in targets if cls._normalize_script_kind(item.get("script_kind")) == "blockly")
-            cls._preview_node_graph_count = sum(1 for item in targets if cls._normalize_script_kind(item.get("script_kind")) == "node_graph")
-            cls._preview_results = {}
-            for target in targets:
-                cls._preview_results[target["id"]] = {
-                    "id": target["id"],
-                    "target_type": target.get("target_type", "actor"),
-                    "script_kind": cls._normalize_script_kind(target.get("script_kind")),
-                    "scene_name": target.get("scene_name", ""),
-                    "actor_name": target.get("actor_name", ""),
-                    "requested_scene_name": target.get("requested_scene_name", target.get("scene_name", "")),
-                    "requested_actor_name": target.get("requested_actor_name", target.get("actor_name", "")),
-                    "binding_mode": target.get("binding_mode", ""),
-                    "status": "starting",
-                    "outcome": "",
-                    "error": "",
-                    "started_at": 0.0,
-                    "finished_at": 0.0,
-                }
-            cls._preview_status = "starting" if targets else "idle"
-            cls._preview_state_snapshot = None
-            cls._preview_restart_generation = 0
-            cls._preview_restart_in_progress = False
-            cls._preview_stop_thread = None
-            cls._preview_restore_status = "idle"
-            cls._preview_restore_error = ""
-            cls._preview_restored = False
-            cls._preview_stopped_count = 0
-            cls._preview_restore_pending = False
-            cls._preview_restore_in_progress = False
-
-        if not targets:
-            cls._set_preview_input_locked(False)
-            target_label = "项目全局节点图" if scope == "project" else "当前场景脚本"
-            message = f"没有可运行的{target_label}"
-            if warnings:
-                message += f"：{warnings[0]}"
-            logger.warning(
-                "[ScratchTool] preview start rejected: scope=%s scene=%s reason=%s",
-                scope, requested_scene, message,
-            )
-            with cls._preview_lock:
-                cls._preview_status = "error"
-                cls._preview_errors = [message]
-                payload = cls._preview_payload_locked()
-                payload["message"] = message
-                payload["outcome"] = "no_runnable_targets"
-                return payload
-
-        try:
-            state_snapshot = cls._create_scoped_preview_snapshot(
-                scope, targets, project_path
-            )
-        except Exception as exc:
-            logger.exception("[ScratchTool] preview state snapshot failed")
-            with cls._preview_lock:
-                cls._preview_status = "error"
-                cls._preview_errors.append(f"创建预览状态快照失败: {exc}")
-                return {**cls._preview_payload_locked(), "message": f"创建预览状态快照失败: {exc}"}
-
-        with cls._preview_lock:
-            cls._preview_state_snapshot = state_snapshot
-            cls._preview_status = "running"
-        cls._set_preview_input_locked(True)
-
-        pending_threads = []
-        for target in targets:
-            code_path = project_path / target["code_path"]
-            thread = threading.Thread(
-                target=cls._run_preview_target,
-                args=(code_path, target),
-                daemon=True,
-                name=f"blockly-preview-{cls._target_digest(target['id'])}",
-            )
-            pending_threads.append({"thread": thread, "target": target})
-        with cls._preview_lock:
-            cls._preview_threads = list(pending_threads)
-            for info in pending_threads:
-                info["thread"].start()
-            return cls._preview_payload_locked()
-
     @staticmethod
     def _wait_for_threads(threads: list[threading.Thread], timeout: float) -> list[threading.Thread]:
         """在统一截止时间内等待线程，避免按物体逐个累计超时。"""
@@ -1210,603 +924,7 @@ class ScratchTool:
         return pending
 
     @classmethod
-    def _finalize_game_preview_stop(cls, infos: list[dict[str, Any]]) -> None:
-        """后台停止所有预览线程，确认结束后再恢复场景。"""
-        from script_runtime.engine import corona_engine as corona_engine_scratch
-
-        with cls._preview_lock:
-            # A target's main thread may have completed and removed itself from
-            # _preview_threads while a clone/broadcast child thread is still alive.
-            # Keep every started preview context in the stop set, otherwise that
-            # orphan child can continue changing actors while restoration runs.
-            context_ids = {str(value) for value in cls._preview_results if str(value)}
-        context_ids.update({
-            str((info.get("target") or {}).get("id") or "")
-            for info in infos
-            if (info.get("target") or {}).get("id")
-        })
-        main_threads = [info.get("thread") for info in infos if info.get("thread")]
-        try:
-            corona_engine_scratch.request_stop_all()
-            child_threads = corona_engine_scratch.active_child_threads(context_ids)
-            pending = cls._wait_for_threads(main_threads + child_threads, 1.25)
-
-            # 广播/克隆处理器可能在主线程退出期间新建，再抓取一次。
-            child_threads = corona_engine_scratch.active_child_threads(context_ids)
-            pending = list({thread for thread in pending + child_threads if thread and thread.is_alive()})
-            if pending:
-                for context_id in context_ids:
-                    corona_engine_scratch.isolate_context(
-                        context_id,
-                        "preview threads missed cooperative stop deadline: "
-                        + ", ".join(sorted({thread.name for thread in pending})),
-                    )
-
-            if pending:
-                names = ", ".join(sorted({thread.name for thread in pending}))
-                message = f"仍有 {len(pending)} 个脚本线程未停止: {names}"
-                with cls._preview_lock:
-                    cls._preview_threads = [
-                        info for info in cls._preview_threads
-                        if info.get("thread") and info["thread"].is_alive()
-                    ]
-                    cls._preview_status = "error"
-                    cls._preview_restore_status = "error"
-                    cls._preview_restore_error = message
-                    if message not in cls._preview_errors:
-                        cls._preview_errors.append(message)
-                logger.error("[ScratchTool] %s", message)
-                return
-
-            with cls._preview_lock:
-                cls._preview_threads = []
-                cls._preview_stopped_count = len(infos)
-                # Native Editor APIs are safest when invoked from the bridge/status
-                # request thread. The background coordinator only terminates script
-                # threads; the next status poll performs restoration synchronously.
-                cls._preview_restore_pending = True
-                cls._preview_restore_status = "pending"
-                cls._preview_status = "stopping"
-        except Exception as exc:
-            logger.exception("[ScratchTool] stop_game_preview finalize failed")
-            with cls._preview_lock:
-                cls._preview_status = "error"
-                cls._preview_restore_status = "error"
-                cls._preview_restore_error = str(exc)
-                message = f"停止并恢复失败: {exc}"
-                if message not in cls._preview_errors:
-                    cls._preview_errors.append(message)
-        finally:
-            with cls._preview_lock:
-                cls._preview_stop_thread = None
-                keep_locked = bool(
-                    cls._preview_state_snapshot is not None
-                    and (
-                        cls._preview_restore_pending
-                        or cls._preview_restore_in_progress
-                        or (
-                            cls._preview_restore_status == "error"
-                            and any(info.get("thread") and info["thread"].is_alive() for info in cls._preview_threads)
-                        )
-                    )
-                )
-            if not keep_locked:
-                cls._set_preview_input_locked(False)
-
-    @classmethod
-    def stop_game_preview(cls) -> dict:
-        from script_runtime.engine import corona_engine as corona_engine_scratch
-
-        with cls._preview_lock:
-            cls._prune_preview_locked()
-            existing_stopper = cls._preview_stop_thread
-            if existing_stopper and existing_stopper.is_alive():
-                cls._preview_status = "stopping"
-                return cls._preview_payload_locked()
-            if cls._preview_restore_pending or cls._preview_restore_in_progress:
-                cls._preview_status = "stopping"
-                return cls._preview_payload_locked()
-
-            infos = list(cls._preview_threads)
-            has_snapshot = cls._preview_state_snapshot is not None
-            context_ids = {str(value) for value in cls._preview_results if str(value)}
-            context_ids.update({
-                str((info.get("target") or {}).get("id") or "")
-                for info in infos
-                if (info.get("target") or {}).get("id")
-            })
-            child_threads = corona_engine_scratch.active_child_threads(context_ids)
-            if not infos and not child_threads and not has_snapshot:
-                cls._preview_status = "stopped"
-                cls._preview_restore_status = "restored"
-                cls._preview_restore_error = ""
-                cls._preview_restored = False
-                cls._set_preview_input_locked(False)
-                return cls._preview_payload_locked()
-
-            cls._preview_status = "stopping"
-            cls._preview_restore_status = "stopping"
-            cls._preview_restore_error = ""
-            cls._preview_restored = False
-            cls._preview_restore_pending = False
-            stopper = threading.Thread(
-                target=cls._finalize_game_preview_stop,
-                args=(infos,),
-                daemon=True,
-                name="blockly-preview-stop",
-            )
-            cls._preview_stop_thread = stopper
-
-        corona_engine_scratch.request_stop_all()
-        stopper.start()
-        with cls._preview_lock:
-            return cls._preview_payload_locked()
-
-    @classmethod
-    def get_game_preview_status(cls) -> dict:
-        from script_runtime.engine import corona_engine as corona_engine_scratch
-        with cls._preview_lock:
-            cls._prune_preview_locked()
-            should_restore = cls._preview_restore_pending and not cls._preview_restore_in_progress
-        if should_restore:
-            cls._complete_preview_restore()
-        with cls._preview_lock:
-            live_threads = any(
-                info.get("thread") and info["thread"].is_alive()
-                for info in cls._preview_threads
-            )
-            stop_thread_alive = bool(
-                cls._preview_stop_thread and cls._preview_stop_thread.is_alive()
-            )
-            preview_work_active = bool(
-                live_threads
-                or stop_thread_alive
-                or cls._preview_restore_pending
-                or cls._preview_restore_in_progress
-            )
-        if not preview_work_active:
-            # Terminal/idle previews must never keep the editor camera disabled.
-            # Call even when the Python flag is already false to re-sync native state.
-            cls._set_preview_input_locked(False)
-        with cls._preview_lock:
-            status = cls._preview_payload_locked()
-        status["worker_active"] = preview_work_active
-        status["workerActive"] = preview_work_active
-        status["runtime_states"] = corona_engine_scratch.runtime_state_snapshots()
-        return status
-
-    @classmethod
-    def _complete_preview_restore(cls) -> None:
-        """Restore the scene on the bridge/status thread after scripts stop."""
-        from script_runtime.engine import corona_engine as corona_engine_scratch
-
-        with cls._preview_lock:
-            if not cls._preview_restore_pending or cls._preview_restore_in_progress:
-                return
-            cls._preview_restore_pending = False
-            cls._preview_restore_in_progress = True
-            cls._preview_restore_status = "restoring"
-            cls._preview_status = "stopping"
-
-        restored = False
-        restore_error: str | None = None
-        try:
-            restored, restore_error = cls._restore_preview_state_snapshot()
-            if not restored and not restore_error:
-                restore_error = "The runtime scene snapshot was lost; restoration cannot continue"
-            if restored and not restore_error:
-                corona_engine_scratch.clear_runtime_state_snapshots()
-        except Exception as exc:
-            logger.exception("[ScratchTool] preview restore completion failed")
-            restore_error = str(exc)
-        finally:
-            with cls._preview_lock:
-                cls._preview_restore_in_progress = False
-                cls._preview_restored = bool(restored and not restore_error)
-                cls._preview_restore_error = restore_error or ""
-                cls._preview_restore_status = "error" if restore_error else "restored"
-                cls._preview_status = "error" if restore_error else "stopped"
-                if restore_error:
-                    message = f"场景恢复失败: {restore_error}"
-                    if message not in cls._preview_errors:
-                        cls._preview_errors.append(message)
-            # Never leave camera input locked after all script threads have stopped.
-            # The snapshot is retained on failure so the user can retry restoration.
-            cls._set_preview_input_locked(False)
-
-    @classmethod
-    def _prepare_preview_targets(
-        cls,
-        scope: str = "project",
-        requested_scene: str = "",
-        project_path: Optional[Path] = None,
-    ) -> tuple[list[dict], list[str]]:
-        project_path = (project_path or cls._active_project_path()).resolve()
-        manifest = cls._load_manifest(project_path)
-        targets: list[dict] = []
-        warnings: list[str] = []
-        project_graph_found = False
-        from script_runtime.engine import corona_engine as corona_engine_scratch
-
-        for raw in manifest.get("targets", []):
-            target = dict(raw)
-            target["script_kind"] = cls._normalize_script_kind(
-                target.get("script_kind")
-            )
-            target_type = (
-                "actor"
-                if target.get("target_type") == "model"
-                else target.get("target_type")
-            )
-            target["target_type"] = target_type
-
-            if scope == "project":
-                is_global_project_graph = (
-                    target.get("id") == "node_graph:project:global"
-                    and target_type == "project"
-                    and target["script_kind"] == "node_graph"
-                )
-                if not is_global_project_graph:
-                    continue
-                project_graph_found = True
-            else:
-                if target_type != "actor":
-                    continue
-                if not cls._scene_names_match(
-                    target.get("scene_name", ""), requested_scene
-                ):
-                    continue
-
-            if not target.get("enabled", True):
-                warnings.append(
-                    f"项目全局节点图已禁用，已跳过: {target.get('id')}"
-                )
-                continue
-            if not target.get("runnable", True):
-                errors = target.get("validation_errors") or ["脚本配置无效"]
-                warnings.append(
-                    f"节点图不可运行，已跳过: {target.get('id')} "
-                    f"({'; '.join(map(str, errors))})"
-                )
-                continue
-            code_path = target.get("code_path")
-            if not code_path or not (project_path / code_path).exists():
-                warnings.append(f"节点图生成代码不存在，已跳过: {target.get('id')}")
-                continue
-
-            if scope == "project":
-                targets.append(target)
-                continue
-            if target_type != "actor":
-                warnings.append(f"未知节点图目标，已跳过: {target.get('id')}")
-                continue
-
-            requested_target_scene = str(target.get("scene_name") or "")
-            requested_actor = str(target.get("actor_name") or "")
-            resolved = corona_engine_scratch.resolve_runtime_target(
-                "actor", requested_target_scene, requested_actor
-            )
-            if resolved.get("status") != "ok":
-                warnings.append(
-                    f"目标绑定失败，已跳过: {requested_target_scene}/{requested_actor} "
-                    f"({resolved.get('message') or '未知错误'})"
-                )
-                continue
-            if not cls._scene_names_match(
-                resolved.get("scene_name", ""), requested_scene
-            ):
-                warnings.append(
-                    f"目标绑定到了其他场景，已跳过: {requested_target_scene}/{requested_actor} "
-                    f"-> {resolved.get('scene_name', '')}"
-                )
-                continue
-            target.update({
-                "requested_scene_name": requested_target_scene,
-                "requested_actor_name": requested_actor,
-                "scene_name": resolved.get("scene_name", requested_target_scene),
-                "actor_name": resolved.get("actor_name", requested_actor),
-                "binding_mode": resolved.get("binding_mode", ""),
-                "_resolved": resolved,
-            })
-            targets.append(target)
-
-        if scope == "project" and not project_graph_found:
-            warnings.append('当前项目还没有已保存的全局节点图')
-
-        targets.sort(key=lambda item: (
-            0 if item.get("target_type") == "project" else 1,
-            item.get("scene_name", ""),
-            item.get("actor_name", ""),
-            item.get("script_kind", ""),
-        ))
-        return targets, warnings
-
-    @classmethod
-    def _create_scoped_preview_snapshot(
-        cls,
-        scope: str,
-        targets: list[dict],
-        project_path: Optional[Path] = None,
-    ) -> dict[str, Any]:
-        from script_runtime.engine import corona_engine as corona_engine_scratch
-        snapshots: list[dict[str, Any]] = []
-        seen: set[tuple[str, str]] = set()
-        for target in targets:
-            if target.get("target_type") != "actor":
-                continue
-            resolved = target.get("_resolved") or {}
-            key = (str(resolved.get("binding_mode") or ""), str(resolved.get("scene_name") or target.get("scene_name") or ""))
-            if key in seen:
-                continue
-            seen.add(key)
-            snapshots.append(corona_engine_scratch.capture_runtime_scene_state(
-                scene_name=key[1],
-                scene=resolved.get("scene"),
-                binding_mode=key[0],
-            ))
-        snapshot: dict[str, Any] = {"kind": "runtime", "scope": scope, "snapshots": snapshots}
-        if scope == "project" and any(item.get("target_type") == "project" for item in targets):
-            snapshot["project_scene"] = cls._create_preview_state_snapshot(project_path)
-        return snapshot
-
-    @classmethod
-    def _create_preview_state_snapshot(
-        cls, project_path: Optional[Path] = None
-    ) -> dict[str, Any]:
-        from api.editor_api import get_script_runtime_editor_api
-
-        current = cls._manifest_payload(get_script_runtime_editor_api().scene.get_snapshot())
-        if not current or not current.get("project_path"):
-            raise RuntimeError("Current scene is unavailable for preview")
-        current_root = Path(current["project_path"]).resolve()
-        if project_path is not None and current_root != Path(project_path).resolve():
-            raise RuntimeError("Current scene belongs to a different project")
-        # Pin the snapshot to its project. A later restore must fail if another
-        # project has replaced the current scene, even though both use scene.ini.
-        route = str(current_root / "scene.ini")
-        native_state = cls._create_native_preview_scene_state(route, current)
-        if native_state is None:
-            raise RuntimeError(f"native preview snapshot unavailable for {route}")
-        return {"route": route, "state": native_state}
-
-    @staticmethod
-    def _manifest_payload(result: Any) -> dict[str, Any] | None:
-        if not isinstance(result, dict) or result.get("status") in ("error", "failed"):
-            return None
-        payload = result.get("data")
-        return payload if isinstance(payload, dict) else result
-
-    @classmethod
-    def _create_native_preview_scene_state(
-        cls, route: str, scene_payload: dict[str, Any] | None = None
-    ) -> dict[str, Any] | None:
-        try:
-            from api.editor_api import get_script_runtime_editor_api
-
-            scene_api = get_script_runtime_editor_api().scene
-            if scene_payload is None:
-                scene_payload = cls._manifest_payload(scene_api.get_snapshot(route))
-            environment_payload = cls._manifest_payload(scene_api.get_environment(route))
-            if scene_payload is None or environment_payload is None:
-                return None
-
-            cameras = {}
-            for camera in scene_payload.get("cameras") or []:
-                if not isinstance(camera, dict) or not camera.get("name"):
-                    continue
-                cameras[str(camera["name"])] = {
-                    key: camera.get(key)
-                    for key in (
-                        "position", "forward", "world_up", "fov", "output_mode",
-                        "width", "height",
-                    )
-                    if key in camera
-                }
-
-            actors = {}
-            for actor in scene_payload.get("actors") or []:
-                if not isinstance(actor, dict) or not actor.get("name"):
-                    continue
-                geometry = actor.get("geometry") or {}
-                mechanics = actor.get("mechanics") or {}
-                actors[str(actor["name"])] = {
-                    "position": geometry.get("position"),
-                    "rotation": geometry.get("rotation"),
-                    "scale": geometry.get("scale"),
-                    "visible": actor.get("visible"),
-                    "mass": mechanics.get("mass"),
-                    "restitution": mechanics.get("restitution"),
-                    "damping": mechanics.get("damping"),
-                    "physics_enabled": mechanics.get("physics_enabled"),
-                    "collision_enabled": actor.get("collision_enabled"),
-                }
-            return {
-                "binding_mode": "native_editor",
-                "environment": environment_payload,
-                "actors": actors,
-                "cameras": cameras,
-                "enabled": None,
-                "simulation_enabled": None,
-            }
-        except Exception as exc:
-            logger.debug("[ScratchTool] native preview snapshot unavailable for %s: %s", route, exc)
-            return None
-
-    @classmethod
-    def _restore_preview_state_snapshot(
-        cls, clear_snapshot: bool = True
-    ) -> tuple[bool, str | None]:
-        with cls._preview_lock:
-            snapshot = cls._preview_state_snapshot
-        if not snapshot:
-            return False, None
-
-        try:
-            cancel_pending_auto_saves()
-            if snapshot.get("kind") == "runtime":
-                from script_runtime.engine import corona_engine as corona_engine_scratch
-                for runtime_snapshot in snapshot.get("snapshots") or []:
-                    corona_engine_scratch.restore_runtime_scene_state(runtime_snapshot)
-                project_scene = snapshot.get("project_scene") or {}
-            else:
-                project_scene = snapshot
-
-            if project_scene:
-                route = project_scene["route"]
-                scene_state = project_scene["state"]
-                if scene_state.get("binding_mode") != "native_editor":
-                    raise RuntimeError(f"non-native preview snapshot is unsupported: {route}")
-                cls._restore_native_preview_scene_state(route, scene_state)
-
-            cls._notify_preview_state_restored()
-            if clear_snapshot:
-                with cls._preview_lock:
-                    cls._preview_state_snapshot = None
-            logger.info("[ScratchTool] current scene preview state restored")
-            return True, None
-        except Exception as exc:
-            logger.exception("[ScratchTool] preview state restore failed")
-            return False, str(exc)
-
-    @classmethod
-    def _restore_native_preview_scene_state(
-        cls, route: str, scene_state: dict[str, Any]
-    ) -> None:
-        from api.editor_api import get_script_runtime_editor_api
-
-        editor_api = get_script_runtime_editor_api()
-        scene_api = editor_api.scene
-        if cls._manifest_payload(
-            scene_api.set_environment(route, scene_state.get("environment") or {})
-        ) is None:
-            raise RuntimeError(f"native environment restore failed: {route}")
-
-        viewport_api = getattr(editor_api, "viewport", None)
-        set_camera_pose = getattr(viewport_api, "set_camera_pose", None)
-        if callable(set_camera_pose):
-            for camera_name, camera_state in (scene_state.get("cameras") or {}).items():
-                if cls._manifest_payload(
-                    set_camera_pose(route, camera_name, camera_state)
-                ) is None:
-                    raise RuntimeError(f"native camera restore failed: {route}/{camera_name}")
-
-        set_actor_transform = getattr(scene_api, "set_actor_transform", None)
-        if callable(set_actor_transform):
-            for actor_name, actor_state in (scene_state.get("actors") or {}).items():
-                transform = {
-                    key: actor_state.get(key)
-                    for key in ("position", "rotation", "scale")
-                    if actor_state.get(key) is not None
-                }
-                if not transform:
-                    continue
-                if cls._manifest_payload(
-                    set_actor_transform(route, actor_name, transform)
-                ) is None:
-                    raise RuntimeError(f"native actor restore failed: {route}/{actor_name}")
-
-    @staticmethod
-    def _notify_preview_state_restored() -> None:
-        try:
-            selected_scene, selected_actor = get_editor_selection()
-            emit_editor_event("scene-tree-changed", ["scene.ini"])
-            if selected_scene and selected_actor:
-                emit_editor_event("actor-change", ["actor", selected_scene, selected_actor])
-            elif selected_scene:
-                emit_editor_event("actor-change", ["scene", selected_scene, ""])
-        except Exception:
-            logger.exception("[ScratchTool] failed to notify frontend after preview state restore")
-
-
-    @classmethod
-    def _run_preview_target(cls, code_path: Path, target: dict) -> None:
-        context_id = target.get("id", "")
-        current_thread = threading.current_thread()
-        with cls._preview_lock:
-            observed_generation = cls._preview_restart_generation
-            result = cls._preview_results.get(context_id)
-            if result is not None:
-                result.update(status="running", started_at=time.time())
-
-        outcome = "completed"
-        try:
-            while True:
-                outcome = cls._run_code_file(code_path, target, single_exec=False)
-                if outcome in ("stop_restore", "game_end"):
-                    # Reuse the exact global stop button flow. Game-over/win exits
-                    # must also restore the editor scene automatically; otherwise the
-                    # pre-run snapshot remains active and the viewport stays in-game.
-                    cls.stop_game_preview()
-                    break
-                if outcome == "restart":
-                    with cls._preview_restart_lock:
-                        with cls._preview_lock:
-                            if cls._preview_restart_generation == observed_generation:
-                                cls._preview_restart_in_progress = True
-                                cls._preview_restart_generation += 1
-                                should_restore = True
-                            else:
-                                should_restore = False
-                        if should_restore:
-                            from script_runtime.engine import corona_engine as corona_engine_scratch
-                            corona_engine_scratch.request_stop_all()
-                            restored, error = cls._restore_preview_state_snapshot(clear_snapshot=False)
-                            if error:
-                                with cls._preview_lock:
-                                    cls._preview_errors.append(f"restart: {error}")
-                            elif not restored:
-                                logger.warning("[ScratchTool] restart requested without preview snapshot")
-                            with cls._preview_lock:
-                                cls._preview_restart_in_progress = False
-                    with cls._preview_lock:
-                        observed_generation = cls._preview_restart_generation
-                    continue
-
-                while True:
-                    with cls._preview_lock:
-                        generation = cls._preview_restart_generation
-                        restarting = cls._preview_restart_in_progress
-                        status = cls._preview_status
-                    if restarting:
-                        time.sleep(0.02)
-                        continue
-                    break
-                if generation != observed_generation and status in ("running", "starting"):
-                    observed_generation = generation
-                    continue
-                break
-        finally:
-            should_unlock = False
-            with cls._preview_lock:
-                result = cls._preview_results.get(context_id)
-                if result is not None:
-                    if outcome == "error":
-                        result["status"] = "error"
-                    elif outcome in ("stopped", "restart", "stop_restore", "game_end"):
-                        result["status"] = "stopped"
-                    else:
-                        result["status"] = "completed"
-                    result["outcome"] = outcome
-                    result["finished_at"] = time.time()
-                cls._preview_threads = [
-                    info for info in cls._preview_threads
-                    if info.get("thread") is not current_thread
-                    and info.get("thread")
-                    and info["thread"].is_alive()
-                ]
-                if not cls._preview_threads and cls._preview_status in ("starting", "running"):
-                    # Keep the pre-run snapshot until explicit restore succeeds.
-                    # Clearing it when scripts finish makes a later stop unable to restore.
-                    # The stop action remains available while the snapshot exists.
-                    cls._preview_status = "completed"
-                    should_unlock = True
-            if should_unlock:
-                from script_runtime.engine import corona_engine as corona_engine_scratch
-                corona_engine_scratch.clear_runtime_state_snapshots()
-                cls._set_preview_input_locked(False)
-
-    @classmethod
-    def _run_code_file(cls, code_path: Path, target: dict, single_exec: bool) -> str:
+    def _run_code_file(cls, code_path: Path, target: dict, program) -> str:
         from script_runtime.engine import corona_engine as corona_engine_scratch
 
         context_id = target.get("id") or cls._target_id(
@@ -1838,11 +956,9 @@ class ScratchTool:
                 raise RuntimeError(f"无法加载积木脚本: {code_path}")
             module = importlib.util.module_from_spec(spec)
             sys.modules[module_name] = module
-            spec.loader.exec_module(module)
-            if single_exec:
-                cls._replace_exec_state(status="running", outcome="", error="")
-            if hasattr(module, "run"):
-                module.run()
+            exec(program, module.__dict__)
+            cls._replace_exec_state(status="running", outcome="", error="")
+            module.run()
             if corona_engine_scratch.has_runtime_handlers(ctx) and not ctx.stop_requested:
                 while not ctx.stop_requested:
                     corona_engine_scratch.wait(0.1)
@@ -1876,46 +992,18 @@ class ScratchTool:
         except Exception as exc:
             outcome = "error"
             logger.exception("[ScratchTool] script failed: %s", context_id)
-            if single_exec:
-                # Keep the public status running until the wrapper has released the
-                # runtime context, snapshot and input lock.  Otherwise the frontend
-                # can offer Run again while the failed worker is still cleaning up.
-                cls._replace_exec_state(
-                    outcome="error",
-                    error=str(exc),
-                    finishedAt=time.time(),
-                )
-            else:
-                with cls._preview_lock:
-                    message = f"{context_id}: {exc}"
-                    cls._preview_errors.append(message)
-                    result = cls._preview_results.get(context_id)
-                    if result is not None:
-                        result.update(status="error", outcome="error", error=str(exc), finished_at=time.time())
+            cls._replace_exec_state(outcome="error", error=str(exc), finishedAt=time.time())
         finally:
             snapshot = corona_engine_scratch.runtime_state_snapshot(ctx)
-            if single_exec:
-                cls._replace_exec_state(
-                    currentNodeId=snapshot.get("current_node_id", ""),
-                    currentNodeName=snapshot.get("current_node_name", ""),
-                    waitingEdgeId=snapshot.get("waiting_edge_id", ""),
-                    waitingEdgeName=snapshot.get("waiting_edge_name", ""),
-                )
+            cls._replace_exec_state(
+                currentNodeId=snapshot.get("current_node_id", ""),
+                currentNodeName=snapshot.get("current_node_name", ""),
+                waitingEdgeId=snapshot.get("waiting_edge_id", ""),
+                waitingEdgeName=snapshot.get("waiting_edge_name", ""),
+            )
             sys.modules.pop(module_name, None)
             corona_engine_scratch.release_context(ctx)
         return outcome
-
-    @classmethod
-    def _prune_preview_locked(cls) -> None:
-        cls._preview_threads = [
-            info for info in cls._preview_threads
-            if info.get("thread") and info["thread"].is_alive()
-        ]
-        if not cls._preview_threads and cls._preview_status in ("starting", "running"):
-            # Polling may converge thread state but must not destroy the restore snapshot.
-            # _restore_preview_state_snapshot() clears it only after successful restoration.
-            cls._preview_status = "completed"
-            cls._set_preview_input_locked(False)
 
     # ------------------------------------------------------------------
     # Input bridge

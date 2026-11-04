@@ -47,14 +47,6 @@ class PythonScriptServiceRegistryTests(unittest.TestCase):
         )
         self.assertFalse(hasattr(registry, "LEGACY_PYTHON_SCRIPT_SERVICES"))
 
-    def test_project_launcher_registry_uses_canonical_plugin_owner(self):
-        registry = self._load_registry()
-
-        self.assertEqual(
-            registry.PYTHON_SCRIPT_SERVICES["ProjectLauncher"],
-            ("plugins.ProjectLauncher.main", "ProjectLauncher"),
-        )
-
     def test_project_archive_registry_uses_plugin_owner(self):
         registry = self._load_registry()
 

@@ -36,15 +36,3 @@ def test_editor_api_exposes_native_main_init():
     source = EDITOR_API.read_text(encoding="utf-8")
     assert "def on_init(" in source
     assert '"main.on_init"' in source
-
-
-def test_main_view_on_init_does_not_create_legacy_python_scenes():
-    source = MAIN_VIEW.read_text(encoding="utf-8")
-    start = source.index("    def on_init")
-    end = source.index("    def scene_save", start)
-    init_source = source[start:end]
-
-    assert "CoronaEditorApi.main.on_init" in init_source
-    assert "get_or_create_scene(" not in init_source
-    assert "get_scene(" not in init_source
-    assert "set_enabled(" not in init_source

@@ -167,25 +167,6 @@
       @wheel="forwardScratchMouse('wheel', $event)"
       @contextmenu.prevent="forwardScratchMouse('contextmenu', $event)"
     />
-    <div v-if="previewHudStates.length" class="preview-hud">
-      <section v-for="state in previewHudStates" :key="state.context_id" class="preview-hud-card">
-        <div class="preview-hud-title">{{ state.actor_name || '项目全局' }}</div>
-        <div class="preview-hud-stats">
-          <span>分数 <b>{{ formatHudValue(state.score) }}</b></span>
-          <span>生命 <b>{{ formatHudValue(state.lives) }}</b></span>
-          <span v-if="state.countdown_active">倒计时 <b>{{ formatCountdown(state.countdown) }}</b></span>
-        </div>
-        <div v-if="state.game_state" class="preview-hud-state" :class="`state-${state.game_state}`">
-          {{ gameStateLabel(state.game_state) }}
-        </div>
-        <div v-for="([name, value]) in objectEntries(state.variables)" :key="`v-${name}`" class="preview-hud-row">
-          <span>{{ name }}</span><b>{{ formatHudValue(value) }}</b>
-        </div>
-        <div v-for="([name, value]) in objectEntries(state.lists)" :key="`l-${name}`" class="preview-hud-row list">
-          <span>{{ name }}</span><b>{{ formatHudValue(value) }}</b>
-        </div>
-      </section>
-    </div>
     <div v-if="errorText" class="error">{{ errorText }}</div>
   </div>
 </template>
@@ -243,9 +224,7 @@ const renderHeight = ref(540);
 const viewportUiMode = ref('flat2d');
 const visionAvailable = ref(false);
 const errorText = ref('');
-const previewHudStates = ref([]);
 const nodeGraphInputLocked = ref(false);
-const gamePreviewInputLocked = ref(false);
 const toolbarRef = ref(null);
 const inputLayerRef = ref(null);
 const backendMenuOpen = ref(false);
@@ -254,7 +233,7 @@ const denoiserMenuOpen = ref(false);
 const outputMenuOpen = ref(false);
 const borderlessFullscreen = ref(false);
 let borderlessTogglePending = false;
-let previewHudTimer = 0;
+let scriptInputTimer = 0;
 let scratchMouseMoveFrame = 0;
 let pendingScratchMouseMove = null;
 let actorPickIndex = new Map();
@@ -887,8 +866,6 @@ const rotateCamera = (dt) => {
 const isEditorInputLocked = () => {
   const locks = window.__coronaEditorInputLocks;
   return Boolean(
-    window.__coronaGamePreviewInputLocked ||
-    gamePreviewInputLocked.value ||
     (locks instanceof Set && locks.size > 0) ||
     nodeGraphInputLocked.value
   );
@@ -1303,31 +1280,9 @@ watch(() => backend.value === 'vision' && visionRenderMode.value !== 'ssat' &&
   visionDenoiser.value === 'reblur' && !visionDenoiserBusy.value,
 scheduleDragRegionSync, { flush: 'post' });
 
-const objectEntries = (value) => Object.entries(value || {});
-const formatHudValue = (value) => {
-  if (Array.isArray(value)) return `[${value.join(', ')}]`;
-  if (typeof value === 'number') return Number.isInteger(value) ? String(value) : value.toFixed(1);
-  if (value && typeof value === 'object') return JSON.stringify(value);
-  return String(value ?? '');
-};
-const formatCountdown = (value) => `${Math.max(0, Number(value) || 0).toFixed(1)}s`;
-const gameStateLabel = (state) => ({
-  win: '游戏胜利',
-  over: '游戏失败',
-  restart: '正在重新开始',
-}[state] || state);
-const pollPreviewHud = async () => {
+const pollScriptInputLock = async () => {
   try {
-  const payload = unwrap(await editorApi.scratch.getGamePreviewStatus()) || {};
-    previewHudStates.value = payload.has_snapshot ? (payload.runtime_states || []) : [];
-    gamePreviewInputLocked.value = Boolean(payload.input_locked ?? payload.inputLocked);
-    if (gamePreviewInputLocked.value) resetCameraInput();
-  } catch {
-    previewHudStates.value = [];
-    gamePreviewInputLocked.value = false;
-  }
-  try {
-  const scriptStatus = unwrap(await editorApi.scratch.getScriptStatus()) || {};
+    const scriptStatus = unwrap(await editorApi.scratch.getScriptStatus()) || {};
     nodeGraphInputLocked.value = Boolean(scriptStatus.inputLocked);
     if (nodeGraphInputLocked.value) resetCameraInput();
   } catch {
@@ -1359,8 +1314,8 @@ onMounted(async () => {
   window.addEventListener('blur', handleCameraViewBlur);
   coronaEventBus.on('model-node-selection', handleModelNodeGizmoSelection);
   animationFrame = requestAnimationFrame(movementFrame);
-  await pollPreviewHud();
-  previewHudTimer = window.setInterval(pollPreviewHud, 250);
+  await pollScriptInputLock();
+  scriptInputTimer = window.setInterval(pollScriptInputLock, 250);
 });
 
 onBeforeUnmount(() => {
@@ -1390,7 +1345,7 @@ onBeforeUnmount(() => {
     gizmoPointerResultCallbackToken = null;
   }
   window.clearTimeout(resizeTimer);
-  window.clearInterval(previewHudTimer);
+  window.clearInterval(scriptInputTimer);
   window.removeEventListener('resize', scheduleWindowSizeSync);
   window.removeEventListener('resize', scheduleDragRegionSync);
   window.removeEventListener('keydown', onKeyDown);
@@ -1536,64 +1491,6 @@ onBeforeUnmount(() => {
 .window-action { width: 24px; cursor: pointer; }
 .maximize { margin-left: auto; }
 .close { color: #ffb4b4; }
-.preview-hud {
-  position: absolute;
-  z-index: 3;
-  top: 76px;
-  right: 12px;
-  width: min(280px, 42vw);
-  display: grid;
-  gap: 8px;
-  pointer-events: none;
-}
-.camera-overlay.borderless .preview-hud { top: 44px; }
-.preview-hud-card {
-  padding: 10px 12px;
-  border: 1px solid rgba(147, 197, 253, 0.38);
-  border-radius: 8px;
-  background: rgba(9, 16, 27, 0.78);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
-  backdrop-filter: blur(5px);
-}
-.preview-hud-title {
-  margin-bottom: 7px;
-  color: #bfdbfe;
-  font-size: 12px;
-  font-weight: 800;
-}
-.preview-hud-stats {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px 12px;
-  font-size: 12px;
-}
-.preview-hud-stats b { color: #fef08a; font-size: 15px; }
-.preview-hud-state {
-  margin-top: 8px;
-  padding: 5px 8px;
-  border-radius: 5px;
-  background: rgba(59, 130, 246, 0.35);
-  text-align: center;
-  font-weight: 800;
-}
-.preview-hud-state.state-win { background: rgba(22, 163, 74, 0.48); }
-.preview-hud-state.state-over { background: rgba(185, 28, 28, 0.55); }
-.preview-hud-state.state-restart { background: rgba(217, 119, 6, 0.5); }
-.preview-hud-row {
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
-  margin-top: 5px;
-  color: #cbd5e1;
-  font-size: 11px;
-}
-.preview-hud-row b {
-  max-width: 65%;
-  overflow: hidden;
-  color: #fff;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
 .error {
   position: absolute;
   z-index: 3;

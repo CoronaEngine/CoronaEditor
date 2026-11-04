@@ -24,10 +24,10 @@ def test_cpp_editor_manifest_owner_is_outside_the_cef_host_directory():
 
 def test_blockly_runtime_and_generated_scripts_use_script_runtime():
     registry = (EDITOR_ROOT / "runtime" / "registry.py").read_text(encoding="utf-8")
-    runner = (EDITOR_ROOT / "script_runtime" / "runner.py").read_text(encoding="utf-8")
+    runner = (EDITOR_ROOT / "script_runtime" / "blockly" / "main.py").read_text(encoding="utf-8")
     assert (EDITOR_ROOT / "script_runtime" / "blockly" / "main.py").is_file()
     assert '"ScratchTool": (f"{_BLOCKLY_PACKAGE}.blockly.main", "ScratchTool")' in registry
-    assert "runtime/generated" in runner
+    assert "def run_file(" in runner
     assert "backend/runScript" not in runner
 
 

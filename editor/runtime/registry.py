@@ -16,14 +16,8 @@ logger = logging.getLogger(__name__)
 PYTHON_SCRIPT_SERVICES = {
     "ProjectArchive": ("plugins.ProjectArchive.main", "ProjectArchive"),
     "ScratchTool": (f"{_BLOCKLY_PACKAGE}.blockly.main", "ScratchTool"),
-    "MainView": ("plugins.MainView.main", "MainView"),
-    "ProjectLauncher": ("plugins.ProjectLauncher.main", "ProjectLauncher"),
-    "FileManager": ("plugins.FileManager.main", "FileManager"),
-    "ProjectSettings": ("plugins.ProjectSettings.main", "ProjectSettings"),
-    "SceneTools": ("plugins.SceneTools.main", "SceneTools"),
 }
 
-CORE_PYTHON_SCRIPT_SERVICES = set()
 # Normal editor startup inventory.
 ACTIVE_PYTHON_SCRIPT_SERVICES = (
     "ProjectArchive",
@@ -380,14 +374,6 @@ def _register_python_script_services(service_names):
 
 def register_python_script_services():
     return _register_python_script_services(PYTHON_SCRIPT_SERVICES)
-
-
-def register_core_python_script_services():
-    return _register_python_script_services(
-        name
-        for name in PYTHON_SCRIPT_SERVICES
-        if name in CORE_PYTHON_SCRIPT_SERVICES
-    )
 
 
 def register_active_python_script_services():

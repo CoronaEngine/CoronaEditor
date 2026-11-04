@@ -14,7 +14,6 @@ class PathsConfig:
 
     repo_root: Path
     frontend_dist: Path
-    generated_script_dir: Path
     autosave_dir: Path
     config_dir: Path
     assets_model_dir: Path
@@ -34,7 +33,6 @@ def get_default_paths() -> PathsConfig:
     return PathsConfig(
         repo_root=repo_root,
         frontend_dist=repo_root / "Frontend" / "dist" / "index.html",
-        generated_script_dir=repo_root / "runtime" / "generated",
         autosave_dir=autosave_dir,
         config_dir=config_dir,
         assets_model_dir=assets_model_dir,

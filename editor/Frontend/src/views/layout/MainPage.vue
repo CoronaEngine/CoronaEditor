@@ -144,7 +144,6 @@ import {
   subscribeCabbageAssistantContext,
   subscribeCabbagePreWarnings,
 } from '@/services/cabbageAssistantContextService.js';
-import { flushProjectNodeGraphBeforeRun } from '@/services/nodeGraphRuntimeService.js';
 import { cancelActiveNodeGraphGeneration } from '@/services/nodeGraphGenerationService.js';
 import { setActorContext } from '@/blockly/composables/useActorContext.js';
 import { closeTutorialSessionChannel } from '@/services/cabbageTutorialSessionService.js';
@@ -586,7 +585,7 @@ const cameraControls = createViewportCameraController({
   setSpeed: (speed) => { cameraSpeed.value = speed; },
   getSensitivity: () => mouseSensitivity.value,
   isCurrent: viewCurrent,
-  isInputLocked: () => document.hidden || isGamePreviewInputLocked(),
+  isInputLocked: () => document.hidden || isEditorInputLocked(),
   submitPose: () => {
     if (!sendCameraUpdateFast()) {
       const sceneId = currentSceneId.value || DEFAULT_SCENE_NAME;
@@ -597,11 +596,6 @@ const cameraControls = createViewportCameraController({
 const isRealtimeCameraInputActive = cameraControls.isInputActive;
 const scheduleCameraUpdate = cameraControls.scheduleUpdate;
 
-const previewRunning = ref(false);
-const previewBusy = ref(false);
-const previewStatusText = ref('');
-const previewDetails = ref({});
-let tutorialPreviewObservedRunning = false;
 const visionAvailable = ref(false);
 const creativeRenderDefaultsBusy = ref(true);
 const creativeRenderDefaultsError = ref('');
@@ -620,11 +614,9 @@ const mainVisionStablePlanes = ref(true);
 const mainVisionStablePlanesBusy = ref(false);
 const mainVisionStablePlanesError = ref('');
 const currentMainCamera = ref(null);
-let previewPollTimer = null;
 window.__coronaEditorInputLocks = window.__coronaEditorInputLocks instanceof Set
   ? window.__coronaEditorInputLocks
   : new Set();
-window.__coronaGamePreviewInputLocked = window.__coronaEditorInputLocks.size > 0;
 const EDITOR_CONTROLS_KEY = '__coronaEditorControls';
 
 // 物理参数状态
@@ -1404,7 +1396,7 @@ const handleKeyDown = (event) => {
       event.key || event.code || ''
     ).catch(() => {});
   }
-  if (isGamePreviewInputLocked()) {
+  if (isEditorInputLocked()) {
     resetRealtimeCameraInput();
     return;
   }
@@ -1436,7 +1428,7 @@ const handleKeyUp = (event) => {
       event.key || event.code || ''
     ).catch(() => {});
   }
-  if (isGamePreviewInputLocked()) {
+  if (isEditorInputLocked()) {
     resetRealtimeCameraInput();
     return;
   }
@@ -1460,10 +1452,9 @@ const handleKeyUp = (event) => {
   }
 };
 
-const isGamePreviewInputLocked = () => {
+const isEditorInputLocked = () => {
   const locks = window.__coronaEditorInputLocks;
   return Boolean(
-    window.__coronaGamePreviewInputLocked ||
     (locks instanceof Set && locks.size > 0)
   );
 };
@@ -1482,45 +1473,25 @@ const setEditorCameraInputLock = (reason, locked) => {
   window.__coronaEditorInputLocks = locks;
   if (locked) locks.add(reason);
   else locks.delete(reason);
-  window.__coronaGamePreviewInputLocked = locks.size > 0;
-  if (window.__coronaGamePreviewInputLocked) {
+  if (locks.size > 0) {
     resetRealtimeCameraInput();
   }
 };
 
-const setGamePreviewInputLocked = (locked) => {
-  setEditorCameraInputLock('game_preview', Boolean(locked));
-};
-
 function clearKnownEditorCameraInputLocks() {
   setEditorCameraInputLock('node_graph', false);
-  setEditorCameraInputLock('game_preview', false);
 }
 
 let cameraInputLockReconcileToken = 0;
 async function reconcileEditorCameraInputLocks() {
   const token = ++cameraInputLockReconcileToken;
-  const [scriptResult, previewResult] = await Promise.allSettled([
-    editorApi.scratch.getScriptStatus(),
-    editorApi.scratch.getGamePreviewStatus(),
-  ]);
-  if (!viewCurrent() || token !== cameraInputLockReconcileToken) return;
-
-  if (scriptResult.status === 'fulfilled') {
-    const scriptStatus = unwrapBridgeData(scriptResult.value) || {};
-    const scriptWorkerActive = Boolean(scriptStatus.threadAlive)
-      && ['starting', 'running', 'stopping'].includes(String(scriptStatus.status || ''));
-    setEditorCameraInputLock(
-      'node_graph',
-      scriptWorkerActive && Boolean(scriptStatus.inputLocked)
-    );
-  }
-  if (previewResult.status === 'fulfilled') {
-    const previewStatus = normalizePreviewDetails(unwrapBridgeData(previewResult.value) || {});
-    const previewWorkerActive = Boolean(previewStatus.workerActive || previewStatus.stopPending);
-    setGamePreviewInputLocked(
-      previewWorkerActive && Boolean(previewStatus.inputLocked)
-    );
+  try {
+    const result = await editorApi.scratch.getScriptStatus();
+    if (!viewCurrent() || token !== cameraInputLockReconcileToken) return;
+    const state = unwrapBridgeData(result) || {};
+    setEditorCameraInputLock('node_graph', Boolean(state.threadAlive && state.inputLocked));
+  } catch (error) {
+    logWarn('无法读取脚本输入状态', error);
   }
 }
 
@@ -1695,7 +1666,7 @@ const onMouseUp = (event) => {
 };
 
 const onContextMenu = (event) => {
-  if (isGamePreviewInputLocked()) return;
+  if (isEditorInputLocked()) return;
   event.preventDefault();
 };
 
@@ -1755,7 +1726,7 @@ const sendCameraUpdateFast = () => {
   if (!viewCurrent()) return;
   // During Blockly/node-graph execution the editor must not publish camera
   // poses. Keyboard/mouse events are still sent to Scratch by their handlers.
-  if (isGamePreviewInputLocked()) return true;
+  if (isEditorInputLocked()) return true;
   const handle = cameraBindingState.value.cameraHandle;
   if (!handle) return false;
   const bridge = window.coronaBridge;
@@ -1867,264 +1838,6 @@ const pollProjectResourceLoadStatus = async () => {
   }
 };
 
-const clearPreviewPoll = () => {
-  if (previewPollTimer) {
-    clearTimeout(previewPollTimer);
-    previewPollTimer = null;
-  }
-};
-
-const normalizePreviewDetails = (payload = {}) => ({
-  ...payload,
-  scope: payload.scope || 'project',
-  sceneName: payload.sceneName ?? payload.scene_name ?? '',
-  startedCount: Number(payload.startedCount ?? payload.started_count ?? 0),
-  runningCount: Number(payload.runningCount ?? payload.running_count ?? 0),
-  completedCount: Number(payload.completedCount ?? payload.completed_count ?? 0),
-  errorCount: Number(payload.errorCount ?? payload.error_count ?? 0),
-  blocklyCount: Number(payload.blocklyCount ?? payload.blockly_count ?? 0),
-  nodeGraphCount: Number(payload.nodeGraphCount ?? payload.node_graph_count ?? 0),
-  inputLocked: Boolean(payload.inputLocked ?? payload.input_locked),
-  hasSnapshot: Boolean(payload.hasSnapshot ?? payload.has_snapshot),
-  restoreStatus: payload.restoreStatus ?? payload.restore_status ?? 'idle',
-  restoreError: payload.restoreError ?? payload.restore_error ?? '',
-  restored: Boolean(
-    payload.restored
-    ?? ['restored', 'completed', 'success'].includes(String(payload.restoreStatus ?? payload.restore_status ?? '').toLowerCase())
-  ),
-  stopPending: Boolean(payload.stopPending ?? payload.stop_pending),
-  workerActive: Boolean(payload.workerActive ?? payload.worker_active),
-  errors: Array.isArray(payload.errors) ? payload.errors : [],
-  warnings: Array.isArray(payload.warnings) ? payload.warnings : [],
-  targets: Array.isArray(payload.targets) ? payload.targets : [],
-});
-
-const publishGamePreviewStatus = (details = {}) => {
-  if (!viewCurrent() || typeof window === 'undefined') return;
-  window.__coronaGamePreviewState = details;
-  window.dispatchEvent(new CustomEvent('corona-game-preview-status', { detail: details }));
-};
-
-const applyPreviewStatus = (payload = {}) => {
-  const details = normalizePreviewDetails(payload);
-  previewDetails.value = details;
-  const state = details.status || 'idle';
-  previewRunning.value = ['starting', 'running', 'stopping'].includes(state)
-    || details.runningCount > 0
-    || details.hasSnapshot;
-  setGamePreviewInputLocked(Boolean(details.inputLocked));
-  if (state === 'starting') previewStatusText.value = '正在启动脚本...';
-  else if (state === 'running') previewStatusText.value = `预览中 ${details.runningCount || details.startedCount}`;
-  else if (state === 'stopping') previewStatusText.value = '正在停止并恢复...';
-  else if (state === 'completed') previewStatusText.value = details.errorCount ? `已完成，${details.errorCount} 个脚本错误` : '脚本已完成';
-  else if (state === 'stopped') previewStatusText.value = '已停止并恢复';
-  else if (state === 'error') previewStatusText.value = details.restoreError ? `场景恢复失败：${details.restoreError}` : (details.errors[0] || details.message || '预览出错');
-  else previewStatusText.value = details.startedCount === 0 && details.warnings.length ? '没有可运行脚本' : '';
-  publishGamePreviewStatus(details);
-  if (state === 'running' && !tutorialPreviewObservedRunning) {
-    tutorialPreviewObservedRunning = true;
-    void cabbageContextService.recordEvent({
-      type: 'preview_started',
-      category: 'preview',
-      success: true,
-      details: { status: 'running' },
-    });
-  } else if (
-    state === 'stopped'
-    && tutorialPreviewObservedRunning
-    && details.restored
-    && !details.restoreError
-  ) {
-    tutorialPreviewObservedRunning = false;
-    void cabbageContextService.recordEvent({
-      type: 'preview_stopped',
-      category: 'preview',
-      success: true,
-      details: { status: 'stopped', restored: true, restoreError: '' },
-    });
-  }
-  return details;
-};
-
-const pollGamePreviewStatus = () => {
-  clearPreviewPoll();
-  const poll = async () => {
-    try {
-      const result = await editorApi.scratch.getGamePreviewStatus();
-      if (!viewCurrent()) return;
-      const details = applyPreviewStatus(unwrapBridgeData(result));
-      broadcastViewportControlsState();
-      if (previewRunning.value) previewPollTimer = setTimeout(poll, 700);
-      return details;
-    } catch (error) {
-      previewRunning.value = false;
-      previewDetails.value = {};
-      setGamePreviewInputLocked(false);
-      previewStatusText.value = '预览状态异常';
-      logError('查询预览状态失败', error);
-      return null;
-    }
-  };
-  previewPollTimer = setTimeout(poll, 300);
-};
-
-const normalizePreviewRequest = (request) => {
-  if (!request || typeof request !== 'object' || !['project', 'scene'].includes(request.scope)) {
-    return { scope: 'project' };
-  }
-  return {
-    scope: request.scope,
-    ...(request.scope === 'scene' ? { scene_name: request.scene_name || request.sceneName || '' } : {}),
-  };
-};
-
-const handleStartGamePreview = async (request = { scope: 'project' }) => {
-  if (previewBusy.value) return false;
-  const previewRequest = normalizePreviewRequest(request);
-  window.__coronaPreviewActionPendingCount = Number(window.__coronaPreviewActionPendingCount || 0) + 1;
-  window.__coronaPreviewActionPending = true;
-  window.__coronaPreviewPendingScope = previewRequest.scope;
-  previewBusy.value = true;
-  previewStatusText.value = previewRequest.scope === 'scene' ? '准备当前场景脚本...' : '准备项目预览...';
-  try {
-    // 本地 previewRunning 可能因跨面板广播延迟而滞后。启动前重新读取
-    // 后端真值，避免把一次有效点击误判为重复启动。
-    try {
-    const liveResult = await editorApi.scratch.getGamePreviewStatus();
-    if (!viewCurrent()) return false;
-    const live = applyPreviewStatus(unwrapBridgeData(liveResult));
-      const liveActive = ['starting', 'running', 'stopping'].includes(live.status)
-        || live.runningCount > 0
-        || live.hasSnapshot;
-      if (liveActive) {
-        broadcastViewportControlsState();
-        return live;
-      }
-    } catch (statusError) {
-      logWarn('启动前查询预览状态失败，将继续尝试启动', statusError);
-    }
-    publishGamePreviewStatus(normalizePreviewDetails({
-      status: 'starting',
-      scope: previewRequest.scope,
-      sceneName: previewRequest.scene_name || '',
-    }));
-    if (previewRequest.scope === 'project') {
-      // Global run executes only node_graph:project:global.
-      await flushProjectNodeGraphBeforeRun();
-    } else {
-      if (typeof window.__coronaNodeGraphFlushSave === 'function') {
-        await window.__coronaNodeGraphFlushSave();
-      }
-    }
-    if (!viewCurrent()) return false;
-    const result = await editorApi.scratch.startGamePreview(previewRequest);
-    if (!viewCurrent()) return false;
-    const payload = unwrapBridgeData(result);
-    const details = applyPreviewStatus(payload);
-    if (payload?.status === 'error') {
-      logError('开始预览失败', payload.message || details.errors[0]);
-      broadcastViewportControlsState();
-      return false;
-    }
-    if (previewRunning.value) pollGamePreviewStatus();
-    broadcastViewportControlsState();
-    return details;
-  } catch (error) {
-    previewRunning.value = false;
-    previewDetails.value = {};
-    setGamePreviewInputLocked(false);
-    previewStatusText.value = '预览启动失败';
-    logError('开始预览失败', error);
-    broadcastViewportControlsState();
-    return false;
-  } finally {
-    window.__coronaPreviewActionPendingCount = Math.max(0, Number(window.__coronaPreviewActionPendingCount || 1) - 1);
-    window.__coronaPreviewActionPending = window.__coronaPreviewActionPendingCount > 0;
-    if (!window.__coronaPreviewActionPending) window.__coronaPreviewPendingScope = '';
-    previewBusy.value = false;
-
-    broadcastViewportControlsState();
-  }
-};
-
-const handleStopGamePreview = async () => {
-  // 后端停止接口是幂等的。不要因为前端状态同步稍慢而挡住停止请求，
-  // 否则 Scene ID 不一致或跨窗口状态延迟时会出现“只能运行、不能停止”。
-  if (previewBusy.value) return false;
-  previewBusy.value = true;
-  previewStatusText.value = '正在停止并恢复...';
-  try {
-    const result = await editorApi.scratch.stopGamePreview();
-    const payload = unwrapBridgeData(result);
-    const details = applyPreviewStatus(payload);
-    if (details.status === 'stopping' || details.stopPending) {
-      pollGamePreviewStatus();
-    } else {
-      clearPreviewPoll();
-    }
-    if (details.restoreError && details.status !== 'stopping') {
-      logError('结束预览恢复失败', details.restoreError);
-      broadcastViewportControlsState();
-      return false;
-    }
-    broadcastViewportControlsState();
-    return details;
-  } catch (error) {
-    previewStatusText.value = '结束预览失败';
-    logError('结束预览失败', error);
-    // 即使本次 RPC 报错也继续轮询，后端可能已经收到停止请求。
-    pollGamePreviewStatus();
-    broadcastViewportControlsState();
-    return false;
-  } finally {
-    previewBusy.value = false;
-
-    broadcastViewportControlsState();
-  }
-};
-
-const handleRunProject = async () => {
-  try {
-    // 不传参数，运行整个项目
-    const result = await editorApi.main.runProject();
-
-    if (result.success) {
-      // TODO: 可以显示一个成功提示
-      return true;
-    } else {
-      logError('运行项目返回失败', result?.message);
-      return false;
-    }
-  } catch (error) {
-    logError('运行项目失败', error);
-    return false;
-  }
-};
-
-const handleRunCurrentScene = async () => {
-  try {
-    const sceneId = currentSceneId.value;
-
-    if (!sceneId) {
-      logError('没有当前场景');
-      return false;
-    }
-
-    const result = await editorApi.main.runProject(sceneId);
-
-    if (result.success) {
-      // TODO: 可以显示一个成功提示
-      return true;
-    } else {
-      logError('运行当前场景返回失败', result?.message);
-      return false;
-    }
-  } catch (error) {
-    logError('运行当前场景失败', error);
-    return false;
-  }
-};
-
 const getPhysicsSnapshot = () => ({
   gravityX: Number(physicsParams.value.gravityX),
   gravityY: Number(physicsParams.value.gravityY),
@@ -2196,10 +1909,6 @@ const currentMainRenderMode = () =>
 const getEditorControlsState = () => ({
   available: true,
   sceneId: currentSceneId.value || DEFAULT_SCENE_NAME,
-  previewRunning: previewRunning.value,
-  previewBusy: previewBusy.value,
-  previewStatusText: previewStatusText.value,
-  preview: previewDetails.value,
   visionAvailable: visionAvailable.value,
   renderMode: currentMainRenderMode(),
   renderLabel: mainRenderModeLabel.value,
@@ -2256,18 +1965,6 @@ const handleViewportControlsRequest = async (payload = {}) => {
     return;
   }
 
-  if (payload.action === 'startPreview') {
-    await handleStartGamePreview(payload.request || payload);
-    broadcastViewportControlsState();
-    return;
-  }
-
-  if (payload.action === 'stopPreview') {
-    await handleStopGamePreview();
-    broadcastViewportControlsState();
-    return;
-  }
-
   broadcastViewportControlsState();
 };
 
@@ -2280,10 +1977,6 @@ const registerEditorControls = () => {
       return getEditorControlsState();
     },
     applyPhysics: applyPhysicsFromSettings,
-    startPreview: handleStartGamePreview,
-    stopPreview: handleStopGamePreview,
-    runProject: handleRunProject,
-    runCurrentScene: handleRunCurrentScene,
     selectRenderMode: selectMainRenderMode,
     setViewportUiMode: setViewportUiModeFromPanel,
     setCameraSpeed: setCameraSpeedFromPanel,
@@ -2473,7 +2166,6 @@ onUnmounted(() => {
   void cancelActiveNodeGraphGeneration();
   cabbageWorldInitializationRetry.cancel();
   stopProjectResourceLoadPolling();
-  clearPreviewPoll();
   clearKnownEditorCameraInputLocks();
   unregisterEditorControls();
   unsubscribeNodeGraphReview?.();
@@ -2567,12 +2259,9 @@ provideCreativePanelState(() => ({
   creativeRenderDefaultsBusy: creativeRenderDefaultsBusy.value, creativeRenderDefaultsError: creativeRenderDefaultsError.value,
   cameraSpeed: cameraSpeed.value, sceneGridEnabled: sceneGridEnabled.value, viewportUiMode: viewportUiMode.value,
   sceneLightSettings, sceneLightBusy: sceneLightBusy.value,
-  previewRunning: previewRunning.value, previewBusy: previewBusy.value, previewStatusText: previewStatusText.value,
   physics: getPhysicsSnapshot(),
 }), {
-  startPreview: handleStartGamePreview, stopPreview: handleStopGamePreview,
   refreshPhysics: loadPhysicsParams, applyPhysics: applyPhysicsFromSettings,
-  runProject: handleRunProject, runCurrentScene: handleRunCurrentScene,
   selectMainRenderMode, selectMainVisionDenoiser, toggleMainVisionAccumulation,
   toggleMainVisionDenoise, toggleMainVisionStablePlanes, setCameraSpeedFromPanel,
   setSceneLightEnabled: async enabled => {

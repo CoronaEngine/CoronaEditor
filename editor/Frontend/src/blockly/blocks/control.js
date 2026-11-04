@@ -9,7 +9,7 @@ export const defineControlBlocks = () => {
       this.setPreviousStatement(true, null);
       this.setNextStatement(true, null);
       this.setStyle('control_blocks');
-      this.setTooltip('运行当前项目目录中的 Python 脚本，并调用脚本内的 run() 入口');
+      this.setTooltip('此积木已退役。请在节点图中替换此积木后再运行。');
       this.setHelpUrl('');
     },
   };

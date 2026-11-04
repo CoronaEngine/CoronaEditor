@@ -14,14 +14,6 @@ HANDLERS = (
 ).resolve()
 
 
-def test_main_view_uses_native_project_context_instead_of_settings_manager():
-    source = MAIN_VIEW.read_text(encoding="utf-8")
-    assert "settings_manager" not in source
-    assert "CoronaEditorApi.project_settings.get_active_project_info" in source
-    assert "_sync_project_field" not in source
-    assert "_save_project_field" not in source
-
-
 def test_native_scene_reload_persists_active_scene_index():
     source = HANDLERS.read_text(encoding="utf-8")
     start = source.index("void register_scene_tools_api_handlers")

@@ -132,20 +132,7 @@ test('late native panel completion is closed even after creative -> story -> cre
   await assert.rejects(appService.openNativePanel(nativePanel), /不允许/);
 });
 
-test('preview restoration finishes before script shutdown and times out safely', async () => {
-  const calls = [];
-  await stopWorldRuntimeBeforeOpen({
-    stopGamePreview: async () => ({ status: 'stopping' }),
-    getGamePreviewStatus: async () => { calls.push('restore'); return { status: 'stopped' }; },
-    stopScriptExecution: async (restore) => { calls.push(`script:${restore}`); return { status: 'stopped' }; },
-  }, { wait: async () => {} });
-  assert.deepEqual(calls, ['restore', 'script:true']);
-  await assert.rejects(stopWorldRuntimeBeforeOpen({
-    stopGamePreview: async () => ({ status: 'stopping' }),
-    getGamePreviewStatus: async () => ({ stop_pending: true }),
-    stopScriptExecution: assert.fail,
-  }, { wait: async () => {}, attempts: 2 }), /取消切换/);
-});
+
 
 test('project opening is serialized and stores only verified authoritative worlds', async (t) => {
   const first = deferred(), paths = [], saved = [];
@@ -176,19 +163,18 @@ test('project opening is serialized and stores only verified authoritative world
 });
 
 
-test('world cleanup accepts stopped scripts without a snapshot or restoration', async () => {
-  for (const wrap of [result => result, result => ({ data: result })]) {
-    const calls = [];
-    await stopWorldRuntimeBeforeOpen({
-      stopGamePreview: async () => { calls.push('preview'); return wrap({ status: 'stopped' }); },
-      getGamePreviewStatus: assert.fail,
-      stopScriptExecution: async (restore) => {
-        calls.push(`script:${restore}`);
-        return wrap({ status: 'stopped', restored: false, snapshotCaptured: false, restoreStatus: 'idle' });
-      },
-    });
-    assert.deepEqual(calls, ['preview', 'script:true']);
-  }
+function runningApi(stop) {
+  return { scratch: {getScriptStatus: async () => ({runId: 'current', snapshotCaptured: true})}, scripts: {stop} };
+}
+
+test('world cleanup skips an idle runtime and restores the current file by ID', async () => {
+  await stopWorldRuntimeBeforeOpen({scratch: {getScriptStatus: async () => ({status: 'idle'})}, scripts: {stop: assert.fail}});
+  const calls = [];
+  await stopWorldRuntimeBeforeOpen(runningApi(async (id, restore) => {
+    calls.push([id, restore]);
+    return {data: {status: 'stopped', restored: false}};
+  }));
+  assert.deepEqual(calls, [['current', true]]);
 });
 
 test('world cleanup still rejects real script restoration and stop failures', async (t) => {
@@ -201,11 +187,7 @@ test('world cleanup still rejects real script restoration and stop failures', as
   for (const failure of failures) {
     await t.test(JSON.stringify(failure), async () => {
       for (const wrap of [result => result, result => ({ data: result })]) {
-        await assert.rejects(stopWorldRuntimeBeforeOpen({
-          stopGamePreview: async () => wrap({ status: 'stopped' }),
-          getGamePreviewStatus: assert.fail,
-          stopScriptExecution: async () => wrap(failure),
-        }), /旧世界脚本尚未停止或恢复失败，已取消切换世界/);
+        await assert.rejects(stopWorldRuntimeBeforeOpen(runningApi(async () => wrap(failure))), /旧世界脚本尚未停止或恢复失败，已取消切换世界/);
       }
     });
   }
@@ -227,8 +209,8 @@ test('creative to story opens only after safe cleanup and can retry genuine fail
     worldModeService.invalidate();
   });
   t.mock.method(editorApi.projectSettings, 'getActiveProjectInfo', async () => info(activePath, activeMode));
-  t.mock.method(editorApi.scratch, 'stopGamePreview', async () => { calls.push('preview'); return { status: 'stopped' }; });
-  t.mock.method(editorApi.scratch, 'stopScriptExecution', async restore => { calls.push(`script:${restore}`); return { data: stopResult }; });
+  t.mock.method(editorApi.scratch, 'getScriptStatus', async () => ({ data: { runId: 'current', threadAlive: true } }));
+  t.mock.method(editorApi.scripts, 'stop', async (id, restore) => { calls.push(`script:${restore}`); return { data: stopResult }; });
   t.mock.method(editorApi.project, 'openProject', async path => {
     calls.push(`open:${path}`);
     activePath = path;
@@ -248,14 +230,14 @@ test('creative to story opens only after safe cleanup and can retry genuine fail
     stopResult = initialResult;
     if (initialResult !== idle) {
       await assert.rejects(projectLauncherService.openProject('story'), /已取消切换世界/);
-      assert.deepEqual(calls, ['preview', 'script:true']);
+      assert.deepEqual(calls, ['script:true']);
       assert.equal(activePath, 'creative');
       assert.equal(worldModeService.opening, false);
       calls.length = 0;
       stopResult = idle;
     }
     assert.equal((await projectLauncherService.openProject('story')).data.ok, true);
-    assert.deepEqual(calls, ['preview', 'script:true', 'open:story']);
+    assert.deepEqual(calls, ['script:true', 'open:story']);
     assert.equal(worldModeService.state.mode, 'story');
     assert.equal(worldModeService.state.projectPath, 'story');
     assert.equal(worldModeService.opening, false);
@@ -278,11 +260,7 @@ test('script cleanup reports concrete failures without treating restored=false a
   for (const [result, detail] of failures) {
     await t.test(JSON.stringify(result), async () => {
       for (const wrap of [value => value, value => ({ data: value })]) {
-        await assert.rejects(stopWorldRuntimeBeforeOpen({
-          stopGamePreview: async () => wrap({ status: 'stopped' }),
-          getGamePreviewStatus: assert.fail,
-          stopScriptExecution: async () => wrap(result),
-        }), error => {
+        await assert.rejects(stopWorldRuntimeBeforeOpen(runningApi(async () => wrap(result))), error => {
           assert.match(error.message, /旧世界脚本尚未停止或恢复失败，已取消切换世界/);
           assert.ok(error.message.includes(detail), error.message);
           return true;
@@ -290,12 +268,4 @@ test('script cleanup reports concrete failures without treating restored=false a
       }
     });
   }
-});
-
-test('preview cleanup preserves restoration diagnostics and never stops scripts after failure', async () => {
-  await assert.rejects(stopWorldRuntimeBeforeOpen({
-    stopGamePreview: async () => ({ data: { status: 'stopped', restore_error: 'preview scene restore failed' } }),
-    getGamePreviewStatus: assert.fail,
-    stopScriptExecution: assert.fail,
-  }), /旧世界预览.*preview scene restore failed/);
 });

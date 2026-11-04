@@ -162,13 +162,6 @@ class CoronaEditor:
                 logger.error("Python services still alive during shutdown: %s", alive)
         except Exception:
             logger.exception("Python service registry shutdown failed")
-        if cls.scripts_mgr is not None:
-            try:
-                cls.scripts_mgr.shutdown()
-            except Exception:
-                logger.exception("ScriptsManager shutdown failed")
-            cls.scripts_mgr = None
-        cls._scripts_initialized = False
         try:
             cls.unregister_script_dispatcher()
         except Exception:
@@ -391,8 +384,6 @@ class CoronaEditor:
     _follow_frame_count = 0
     _follow_logged_init = False
 
-    scripts_mgr = None
-    _scripts_initialized = False
 
     @classmethod
     def _set_native_runtime_phase(cls, phase):
@@ -453,40 +444,6 @@ class CoronaEditor:
         if cls._shutdown_requested or not cls._runtime_started:
             return False
         cls.checkpoint()
-        if not cls._scripts_initialized and cls.CoronaEngine is not None:
-            cls._set_native_runtime_phase("script_initialize")
-            init_start = _time.perf_counter()
-            try:
-                project_path = getattr(cls.CoronaEngine, 'active_project_path', None)
-                if not project_path:
-                    project_path = settings_manager.active_project_path
-
-                if project_path:
-                    from script_runtime.engine.host import initialize_scripts
-
-                    initialize_scripts(cls, project_path)
-            except Exception:
-                logger.exception("ScriptsManager initialization failed")
-            cls._warn_runtime_phase(
-                "script_initialize", (_time.perf_counter() - init_start) * 1000.0, 500.0)
-
-        cls.checkpoint()
-        if cls.scripts_mgr is not None:
-            cls._set_native_runtime_phase("script_update")
-            update_start = _time.perf_counter()
-            try:
-                import time as _time
-                now = _time.perf_counter()
-                delta = now - getattr(cls, '_last_script_update', now)
-                cls._last_script_update = now
-                cls.scripts_mgr.update(min(delta, 0.1))
-            except RuntimeError:
-                return False
-            except Exception:
-                logger.exception("Script runtime update failed")
-            cls._warn_runtime_phase(
-                "script_update", (_time.perf_counter() - update_start) * 1000.0, 50.0)
-
         # ── Input 事件队列消费：CEF InputInject → 队列 → Python─ ─
         # 每帧批量消费积攒的键盘/鼠标注入事件，消除逐事件 cefQuery 开销
         cls._set_native_runtime_phase("input_dispatch")

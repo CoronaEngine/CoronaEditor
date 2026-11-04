@@ -65,12 +65,8 @@ async function mountCreationPage(t, { stopResult = idle(), wrapped = true } = {}
     calls.push(['create', payload]);
     return wrap({ name: `创造世界_${++sequence}`, path: `creative-world-${sequence}` });
   });
-  t.mock.method(editorApi.scratch, 'stopGamePreview', async () => {
-    calls.push(['preview']);
-    return wrap({ status: 'stopped' });
-  });
-  t.mock.method(editorApi.scratch, 'getGamePreviewStatus', assert.fail);
-  t.mock.method(editorApi.scratch, 'stopScriptExecution', async restore => {
+  t.mock.method(editorApi.scratch, 'getScriptStatus', async () => wrap({ runId: 'current', snapshotCaptured: true }));
+  t.mock.method(editorApi.scripts, 'stop', async (id, restore) => {
     calls.push(['script', restore]);
     return wrap(await scriptResult);
   });
@@ -138,7 +134,7 @@ test('creation keeps the old world on real failures and the button can retry', a
       const h = await mountCreationPage(t, { stopResult });
       await h.page.handleCreate();
       assert.deepEqual(h.calls, [
-        ['create', { mode: 'creative', prompt: '' }], ['preview'], ['script', true], ['replace', '/StartScreen'],
+        ['create', { mode: 'creative', prompt: '' }], ['script', true], ['replace', '/StartScreen'],
       ]);
       assert.equal(h.activePath(), 'creative-world');
       assert.equal(h.alerts.length, 1);
@@ -150,7 +146,7 @@ test('creation keeps the old world on real failures and the button can retry', a
       h.calls.length = 0;
       await h.page.handleCreate();
       assert.deepEqual(h.calls, [
-        ['create', { mode: 'creative', prompt: '' }], ['preview'], ['script', true], ['open', 'creative-world-2'], ['route', '/'],
+        ['create', { mode: 'creative', prompt: '' }], ['script', true], ['open', 'creative-world-2'], ['route', '/'],
       ]);
       assert.equal(h.activePath(), 'creative-world-2');
       assert.equal(h.route(), '/');
@@ -169,7 +165,7 @@ test('creation waits for cleanup, disables duplicate requests, and respects serv
   const creation = h.page.handleCreate();
   await new Promise(resolve => setImmediate(resolve));
   assert.equal(h.page.creating.value, true);
-  assert.deepEqual(h.calls, [['create', { mode: 'creative', prompt: '' }], ['preview'], ['script', true]]);
+  assert.deepEqual(h.calls, [['create', { mode: 'creative', prompt: '' }], ['script', true]]);
   await h.page.handleCreate();
   assert.equal(h.calls.filter(([call]) => call === 'create').length, 1);
   stop.resolve(idle());

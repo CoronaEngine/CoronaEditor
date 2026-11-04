@@ -1565,33 +1565,6 @@
       },
       "outputChecks": []
     },
-    "control_run_project_script": {
-      "type": "control_run_project_script",
-      "category": "控制",
-      "shape": "statement",
-      "outputCheck": "",
-      "projectUsage": "project-safe",
-      "label": "运行项目脚本 Scripts/shooting_game.py",
-      "inputs": [],
-      "fields": [
-        {
-          "name": "PATH",
-          "kind": "string",
-          "required": true,
-          "emptyMeaning": ""
-        }
-      ],
-      "dynamic": false,
-      "capabilities": [],
-      "fieldSpecs": {
-        "PATH": {
-          "kind": "string",
-          "option_values": []
-        }
-      },
-      "inputSpecs": {},
-      "outputChecks": []
-    },
     "control_wait": {
       "type": "control_wait",
       "category": "控制",

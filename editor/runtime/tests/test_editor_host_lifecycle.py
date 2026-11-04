@@ -37,23 +37,18 @@ class CoronaEditorLifecycleTests(unittest.TestCase):
         self.assertFalse(editor.emit_editor_event("log-batch", [[]]))
         self.assertTrue(editor.initialize_runtime())
         self.assertTrue(editor.start_runtime())
-        editor._scripts_initialized = True
-        editor.scripts_mgr = SimpleNamespace(update=Mock())
         engine = SimpleNamespace(drain_input_events=Mock(return_value=[]))
         with patch.object(editor, "_arm_runtime_watchdog"), patch.dict(sys.modules, {"CoronaEngine": engine}):
             self.assertTrue(editor.update_runtime())
-        editor.scripts_mgr.update.assert_called_once()
         engine.drain_input_events.assert_called_once_with()
 
     def test_shutdown_runtime_stops_services_and_clears_dispatch_state(self):
         editor = self._load_editor()
         calls = []
-        scripts = SimpleNamespace(shutdown=lambda: calls.append("scripts"))
         registry = ModuleType("runtime.registry")
         registry.shutdown_python_script_services = (
             lambda timeout: calls.append(("services", timeout)) or [{"state": "stopped"}]
         )
-        editor.scripts_mgr = scripts
         editor.module_list = {"AITool": object(), "SceneTools": object()}
         editor._runtime_state = "running"
         editor._runtime_initialized = True
@@ -70,7 +65,7 @@ class CoronaEditorLifecycleTests(unittest.TestCase):
         self.assertEqual(result["services"], [{"state": "stopped"}])
         self.assertIn("python_threads", result)
         self.assertTrue(all("name" in item and "ident" in item for item in result["python_threads"]))
-        self.assertEqual(calls, [("services", 2.0), "scripts", "dispatcher"])
+        self.assertEqual(calls, [("services", 2.0), "dispatcher"])
         self.assertEqual(editor.module_list, {})
         self.assertEqual(editor._runtime_state, "stopped")
 
@@ -98,8 +93,6 @@ class CoronaEditorLifecycleTests(unittest.TestCase):
         update_end = source.index("\ndef emit_editor_event(", update_start)
         update_body = source[update_start:update_end]
         for phase in (
-            '"script_initialize"',
-            '"script_update"',
             '"input_dispatch"',
             '"idle"',
         ):

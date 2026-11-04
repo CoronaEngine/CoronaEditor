@@ -43,7 +43,6 @@ export const BLOCK_CATEGORY_MAP = {
   control_if: "\u63a7\u5236",
   control_reset_cooldown: "\u63a7\u5236",
   control_restart_level: "\u63a7\u5236",
-  control_run_project_script: "\u63a7\u5236",
   control_start_cooldown: "\u63a7\u5236",
   control_stop: "\u63a7\u5236",
   control_until: "\u63a7\u5236",

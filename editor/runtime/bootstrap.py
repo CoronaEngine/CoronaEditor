@@ -41,9 +41,6 @@ except Exception:
 
 editor = CoronaEditor
 editor.module_list["CoronaEditor"] = CoronaEditor
-from runtime.registry import register_core_python_script_services
-
-register_core_python_script_services()
 editor.register_script_dispatcher()
 atexit.register(editor.unregister_script_dispatcher)
 

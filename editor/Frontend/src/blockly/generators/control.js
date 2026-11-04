@@ -2,8 +2,7 @@ import { pythonGenerator } from 'blockly/python';
 
 export const defineControlGenerators = () => {
   pythonGenerator.forBlock['control_run_project_script'] = function (block) {
-    const scriptPath = String(block.getFieldValue('PATH') || '').trim();
-    return `CoronaEngine.run_project_script(${JSON.stringify(scriptPath)})\n`;
+    throw new Error('积木已退役，不能执行外部 Python 文件：' + block.getFieldValue('PATH'));
   };
 
   pythonGenerator.forBlock['control_wait'] = function (block) {

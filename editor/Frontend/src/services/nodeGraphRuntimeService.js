@@ -1,3 +1,4 @@
+import { startScriptFile } from './scriptFileService.js';
 import { editorApi } from '@/api/editorApi.js';
 import { appService } from '@/services/appService.js';
 import { cabbageContextService } from '@/services/cabbageAssistantContextService.js';
@@ -165,7 +166,8 @@ const backgroundRuntimeState = {
   updatedAt: 0,
 };
 let backgroundRunPollTimer = null;
-let backgroundOwnsExecution = false;
+let backgroundRunId = '';
+let backgroundRequestId = '';
 let backgroundLifecycleActive = false;
 let backgroundTerminalReported = false;
 let backgroundStateRequestInstalled = false;
@@ -177,7 +179,6 @@ function setBackgroundInputLocked(locked) {
   window.__coronaEditorInputLocks = locks;
   if (locked) locks.add(BACKGROUND_INPUT_LOCK);
   else locks.delete(BACKGROUND_INPUT_LOCK);
-  window.__coronaGamePreviewInputLocked = locks.size > 0;
 }
 
 function clearBackgroundRunPoll() {
@@ -255,14 +256,6 @@ function resetBackgroundRunLifecycle() {
   backgroundTerminalReported = false;
 }
 
-function scriptStatusNeedsStop(status = {}) {
-  const state = String(status.status || '').trim().toLowerCase();
-  return ['starting', 'running', 'stopping'].includes(state)
-    || Boolean(status.threadAlive)
-    || Boolean(status.inputLocked)
-    || Boolean(status.snapshotCaptured ?? status.hasSnapshot ?? status.has_snapshot);
-}
-
 function onBackgroundRuntimeStateRequest(payload = {}) {
   if (payload.targetId && payload.targetId !== GLOBAL_NODE_TARGET_ID) return;
   publishProjectNodeGraphRuntimeState({
@@ -312,27 +305,27 @@ async function loadPersistedProjectNodeGraph() {
     && normalizeProjectPath(responseProjectPath) !== normalizeProjectPath(currentProjectPath)) {
     throw new Error('当前世界已切换，已取消运行旧世界的节点图');
   }
-  return normalizePersistedGraph(response.workspace || {});
-}
-
-async function queryGamePreviewState() {
-  const preview = bridgeResult(await editorApi.scratch.getGamePreviewStatus()) || {};
-  const active = ['starting', 'running', 'stopping'].includes(String(preview.status || ''))
-    || Number(preview.runningCount ?? preview.running_count ?? 0) > 0
-    || Boolean(preview.hasSnapshot ?? preview.has_snapshot);
-  return { ...preview, active };
+  return { workspace: normalizePersistedGraph(response.workspace || {}), target: response.target, projectPath: responseProjectPath };
 }
 
 function startBackgroundRunPoll() {
   clearBackgroundRunPoll();
   backgroundRunPollTimer = window.setInterval(async () => {
-    if (!backgroundOwnsExecution || !backgroundRuntimeState.running) return;
+    if (!backgroundRunId || !backgroundRuntimeState.running) return;
     try {
       const status = bridgeResult(await editorApi.scratch.getScriptStatus()) || {};
+      if (status.runId !== backgroundRunId) {
+        clearBackgroundRunPoll();
+        backgroundRunId = backgroundRequestId = '';
+        setBackgroundInputLocked(false);
+        updateBackgroundRuntimeState({ running: false, busy: false, status: '已停止' });
+        uninstallBackgroundStateResponder();
+        return;
+      }
       const nextStatus = formatRuntimeState(status);
       setBackgroundInputLocked(Boolean(status.inputLocked));
       updateBackgroundRuntimeState({
-        running: ['starting', 'running'].includes(String(status.status || '')),
+        running: Boolean(status.snapshotCaptured) || ['starting', 'running'].includes(String(status.status || '')),
         busy: false,
         status: nextStatus,
         detail: formatRuntimeDetail(status),
@@ -343,17 +336,16 @@ function startBackgroundRunPoll() {
         else if (status.status === 'error') reportBackgroundRunTerminal(false, status.error || nextStatus);
         else resetBackgroundRunLifecycle();
         clearBackgroundRunPoll();
-        backgroundOwnsExecution = false;
+        if (!status.snapshotCaptured) backgroundRunId = backgroundRequestId = '';
         setBackgroundInputLocked(false);
         uninstallBackgroundStateResponder();
       }
     } catch (error) {
       reportBackgroundRunTerminal(false, error?.message || error);
       clearBackgroundRunPoll();
-      backgroundOwnsExecution = false;
       setBackgroundInputLocked(false);
       updateBackgroundRuntimeState({
-        running: false,
+        running: Boolean(backgroundRequestId),
         busy: false,
         status: '状态查询失败',
         detail: String(error?.message || error || ''),
@@ -369,38 +361,25 @@ export async function stopPersistedProjectNodeGraphRuntime({ restoreState = true
   clearBackgroundRunPoll();
   updateBackgroundRuntimeState({ busy: true, status: '正在停止并恢复...', detail: '' });
   try {
-    let shouldStop = backgroundOwnsExecution || backgroundRuntimeState.running;
-    if (!shouldStop) {
-      const status = bridgeResult(await editorApi.scratch.getScriptStatus()) || {};
-      const targetType = String(status.targetType || '').trim().toLowerCase();
-      shouldStop = (!targetType || targetType === 'project') && scriptStatusNeedsStop(status);
-    }
     let response = {};
-    if (shouldStop) {
-      response = bridgeResult(await editorApi.scratch.stopScriptExecution(Boolean(restoreState))) || {};
+    if (backgroundRunId || backgroundRequestId) {
+      response = bridgeResult(await editorApi.scripts.stop(backgroundRunId, restoreState, backgroundRequestId));
+      if (response.status === 'error' || response.restoreError) throw new Error(response.message || response.restoreError);
     }
-    let status = '已停止';
-    let detail = '';
-    if (restoreState && response.restored) status = '已停止并恢复运行前状态';
-    else if (restoreState && response.restoreError) {
-      status = `已停止，但场景恢复失败：${response.restoreError}`;
-      detail = String(response.restoreError);
-    }
-    backgroundOwnsExecution = false;
+    backgroundRunId = backgroundRequestId = '';
     setBackgroundInputLocked(false);
     resetBackgroundRunLifecycle();
     return updateBackgroundRuntimeState({
       running: false,
       busy: false,
-      status,
-      detail,
+      status: restoreState && response.restored ? '已停止并恢复运行前状态' : '已停止',
+      detail: '',
       currentNodeId: '',
     });
   } catch (error) {
-    backgroundOwnsExecution = false;
     setBackgroundInputLocked(false);
     updateBackgroundRuntimeState({
-      running: false,
+      running: Boolean(backgroundRequestId),
       busy: false,
       status: `停止节点图失败：${error?.message || error}`,
       detail: String(error?.message || error || ''),
@@ -418,7 +397,7 @@ export async function stopPersistedProjectNodeGraphRuntime({ restoreState = true
  */
 export async function togglePersistedProjectNodeGraphRuntime() {
   if (backgroundRuntimeState.busy) return normalizeRuntimeState(backgroundRuntimeState);
-  if (backgroundRuntimeState.running || backgroundOwnsExecution) {
+  if (backgroundRuntimeState.running || backgroundRequestId) {
     return stopPersistedProjectNodeGraphRuntime({ restoreState: true });
   }
 
@@ -434,38 +413,38 @@ export async function togglePersistedProjectNodeGraphRuntime() {
   });
 
   try {
-    const preview = await queryGamePreviewState();
-    if (preview.active) {
-      resetBackgroundRunLifecycle();
-      return updateBackgroundRuntimeState({
-        running: false,
-        busy: false,
-        status: preview.scope === 'scene' ? '当前节点图正在由全局运行执行' : '当前节点图正在由项目预览执行',
-        detail: '',
-      });
-    }
-
     await flushProjectNodeGraphBeforeRun();
-    const workspace = await loadPersistedProjectNodeGraph();
+    const { workspace, target, projectPath } = await loadPersistedProjectNodeGraph();
     const { nodeGraphToCode, validateNodeGraph } = await import('@/blockly/generators/index.js');
     const analysis = validateNodeGraph(workspace);
-    const code = nodeGraphToCode(workspace);
-    const warnings = Array.isArray(analysis?.warnings) ? analysis.warnings : [];
-    const response = bridgeResult(await editorApi.scratch.executePythonCode(code, 0, '', '', 'project'));
-    if (response?.outcome === 'preview_running') {
-      resetBackgroundRunLifecycle();
-      return updateBackgroundRuntimeState({
-        running: false,
-        busy: false,
-        status: response.previewScope === 'scene' ? '当前节点图正在由全局运行执行' : '当前节点图正在由项目预览执行',
-        detail: '',
-      });
+    let artifact = target;
+    if (!artifact?.revision) {
+      const saved = bridgeResult(await editorApi.scratch.saveBlocklyTarget({
+        ...target, project_path: projectPath, workspace, code: nodeGraphToCode(workspace),
+        target_type: 'project', script_kind: 'node_graph',
+      }));
+      if (saved.status !== 'saved') throw new Error(saved.message || '项目节点图保存失败');
+      artifact = saved.target;
     }
-    if (response?.status === 'error' || response?.success === false) {
+    if (artifact.runnable === false || artifact.enabled === false) throw new Error('项目节点图不可运行或已禁用');
+    const warnings = Array.isArray(analysis?.warnings) ? analysis.warnings : [];
+    backgroundRequestId = crypto.randomUUID();
+    const response = bridgeResult(await startScriptFile({
+      requestId: backgroundRequestId, path: artifact.code_path, revision: artifact.revision,
+      project_path: projectPath, target_type: 'project', scene_name: '', actor_name: '',
+    }));
+    if ((response?.status === 'error' && !response.runId) || response?.success === false) {
       throw new Error(response?.message || '后端拒绝执行节点图');
     }
 
-    backgroundOwnsExecution = true;
+    if (!response.runId) throw new Error('未创建运行实例');
+    if (['stopped', 'finished', 'completed'].includes(response.status) && !response.snapshotCaptured) {
+      backgroundRequestId = '';
+      resetBackgroundRunLifecycle();
+      uninstallBackgroundStateResponder();
+      return updateBackgroundRuntimeState({ running: false, busy: false, status: '本次运行已结束' });
+    }
+    backgroundRunId = response.runId;
     setBackgroundInputLocked(true);
     reportBackgroundRunStarted();
     const state = updateBackgroundRuntimeState({
@@ -479,13 +458,13 @@ export async function togglePersistedProjectNodeGraphRuntime() {
     return state;
   } catch (error) {
     clearBackgroundRunPoll();
-    backgroundOwnsExecution = false;
+    if (!error.scriptRunUnconfirmed) backgroundRequestId = '';
     setBackgroundInputLocked(false);
     reportBackgroundRunTerminal(false, error?.message || error);
     updateBackgroundRuntimeState({
-      running: false,
+      running: Boolean(backgroundRequestId),
       busy: false,
-      status: `执行失败：${error?.message || error}`,
+      status: backgroundRequestId ? '启动回执未确认，可点击停止并恢复' : `执行失败：${error?.message || error}`,
       detail: String(error?.message || error || ''),
       currentNodeId: '',
     });

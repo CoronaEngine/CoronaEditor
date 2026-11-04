@@ -219,7 +219,7 @@
     "globalVariablesWorkspace": {}
   }
 }</ExampleResult>
-  <Catalog generatedFrom="editor/Frontend/src/blockly/configs/toolboxConfig.js and registered Blockly definitions" blockCount="260" locked="true">
+  <Catalog generatedFrom="editor/Frontend/src/blockly/configs/toolboxConfig.js and registered Blockly definitions" blockCount="259" locked="true">
     <CatalogRules>
       <Rule>AI must preserve this Catalog and may use only listed Block type, Field name, Input name, check type, and dropdown value combinations.</Rule>
       <Rule>projectUsage=project-safe means suitable for the unbound project graph. projectUsage=actor-context means the block expects a current actor context and should normally be avoided here.</Rule>
@@ -281,9 +281,6 @@
       </Block>
       <Block type="node_when_exit" category="事件" shape="definition" projectUsage="project-safe" recommended="true" outputCheck="" dynamic="false" label="当离开当前节点时 执行 …" aiUse="Lifecycle root for cleanup performed when a macro node stops being active.">
         <Input name="DO" kind="statement" check="" />
-      </Block>
-      <Block type="control_run_project_script" category="控制" shape="statement" projectUsage="project-safe" recommended="false" outputCheck="" dynamic="false" label="运行项目脚本 Scripts/shooting_game.py">
-        <Field name="PATH" kind="string" defaultJson="&quot;Scripts/shooting_game.py&quot;" inputOwner="" />
       </Block>
       <Block type="control_wait" category="控制" shape="statement" projectUsage="project-safe" recommended="true" outputCheck="" dynamic="false" label="等待 1 秒" capabilities="timer">
         <Field name="SECONDS" kind="number" defaultJson="1" inputOwner="" />

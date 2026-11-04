@@ -11,13 +11,17 @@
         <span class="ng-badge">节点</span>
       </div>
       <div class="ng-modes">
+        <select aria-label="运行目标" :value="actorName" :disabled="runBusy || codeRunning"
+                @change="selectRunTarget">
+          <option value="">项目</option>
+          <option v-for="actor in sceneActorContext.actors" :key="actor.name" :value="actor.name">{{ actor.name }}</option>
+        </select>
         <button
           type="button"
           class="ng-run"
           data-guidance="node-run"
           :class="{ running: codeRunning }"
-          :disabled="runBusy || (globalPreviewActive && !codeRunning)"
-          :title="globalPreviewActive && !codeRunning ? globalPreviewRunLabel : ''"
+          :disabled="runBusy"
           @click.stop="handleRunButtonClick"
         >
           {{ codeRunning ? '停止' : '运行' }}
@@ -310,6 +314,7 @@
 <script setup>
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
 import MiniBlocklyWorkspace from '@/blockly/components/MiniBlocklyWorkspace.vue';
+import { startScriptFile } from '@/services/scriptFileService.js';
 import BlocklyToolboxPalette from '@/blockly/components/BlocklyToolboxPalette.vue';
 import { useErrorHandler } from '@/composables/useErrorHandler.js';
 import { editorApi } from '@/api/editorApi.js';
@@ -341,6 +346,7 @@ const props = defineProps({
   targetType: { type: String, default: 'actor' },
   reviewActive: { type: Boolean, default: true },
 });
+const emit = defineEmits(['select-target']);
 const { error: logError } = useErrorHandler('NodeGraphWorkspace');
 const cabbageAssistant = useCabbageAssistantStore();
 const NODE_WIDTH = 170,
@@ -374,18 +380,11 @@ const connectionPointer = reactive({ active: false, x: 0, y: 0 });
 const graph = reactive({ version: 1, nodes: [], edges: [], globalVariablesWorkspace: {} });
 const codeRunning = ref(false);
 const runBusy = ref(false);
-const globalPreviewActive = ref(false);
-const globalPreviewScope = ref('');
 const runStatus = ref('');
 const runDetail = ref('');
 const runDetailVisible = ref(false);
 const currentRunNodeId = ref('');
 const runWarnings = ref([]);
-const globalPreviewRunLabel = computed(() =>
-  globalPreviewScope.value === 'scene'
-    ? '当前节点图正在由全局运行执行'
-    : '当前节点图正在由项目预览执行'
-);
 const NODE_GRAPH_INPUT_LOCK = 'node_graph';
 function setEditorInputLock(reason, locked) {
   const locks = window.__coronaEditorInputLocks instanceof Set
@@ -394,7 +393,6 @@ function setEditorInputLock(reason, locked) {
   window.__coronaEditorInputLocks = locks;
   if (locked) locks.add(reason);
   else locks.delete(reason);
-  window.__coronaGamePreviewInputLocked = locks.size > 0;
 }
 function setNodeGraphInputLocked(locked) {
   setEditorInputLock(NODE_GRAPH_INPUT_LOCK, Boolean(locked));
@@ -506,8 +504,9 @@ let isLoading = false,
   macroPointerDrag = null,
   layoutResizeState = null,
   runPollTimer = null,
-  gamePreviewGuardTimer = null,
   startedRunForTarget = false,
+  fileRunId = '',
+  pendingFileRequest = '',
   panelClosing = false,
   panelCloseStopPromise = null,
   unregisterAiNodeGraphConsumer = null,
@@ -2352,6 +2351,21 @@ function currentTarget(projectPathOverride = '') {
     projectPath: projectPathOverride || loadedProjectPath || activeProjectPath.value || readActiveProjectPath(),
   };
 }
+async function selectRunTarget(event) {
+  const actorName = event.target.value;
+  event.target.value = props.actorName;
+  if (!initialLoadComplete || !(await saveNow())) return;
+  try {
+    const scene = bridgeResult(await editorApi.scene.getSnapshot(props.sceneName || ''));
+    const route = scene.scene || scene.id;
+    if (actorName && (!route || !scene.actors?.some(actor => actor.name === actorName))) {
+      throw new Error('运行目标已不在当前场景');
+    }
+    emit('select-target', { actorName, sceneName: route || '' });
+  } catch (error) {
+    runStatus.value = error.message;
+  }
+}
 async function saveNow(targetOverride = null, { force = false } = {}) {
   if (isLoading || (!initialLoadComplete && !force)) return false;
   if (!graphDirty && !force) return true;
@@ -2359,7 +2373,7 @@ async function saveNow(targetOverride = null, { force = false } = {}) {
     saveQueued = true;
     const currentSaveSucceeded = await saveInFlight;
     if (!currentSaveSucceeded) return false;
-    if (graphDirty) return saveNow(targetOverride, { force });
+    if (force || graphDirty) return saveNow(targetOverride, { force });
     return true;
   }
 
@@ -2419,7 +2433,7 @@ async function saveNow(targetOverride = null, { force = false } = {}) {
       saveLabel.value = runnable
         ? `已实时保存到当前世界 ${new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}`
         : `已实时保存（不可运行：${validationErrors[0]}）`;
-      return true;
+      return response;
     } catch (error) {
       graphDirty = true;
       logError('保存项目节点图失败', error);
@@ -2798,6 +2812,14 @@ function startRunPoll() {
     if (!codeRunning.value) return;
     try {
       const status = normalizeNodeGraphScriptStatus(await editorApi.scratch.getScriptStatus());
+      if (fileRunId && status.runId !== fileRunId) {
+        fileRunId = '';
+        clearRunPoll();
+        codeRunning.value = false;
+        startedRunForTarget = false;
+        setNodeGraphInputLocked(false);
+        return;
+      }
       currentRunNodeId.value = status?.currentNodeId || '';
       setNodeGraphInputLocked(Boolean(status?.inputLocked));
       runStatus.value = formatRunState(status);
@@ -2807,7 +2829,7 @@ function startRunPoll() {
         else if (status?.status === 'error') reportNodeRunTerminal(false, status?.error || runStatus.value);
         else resetNodeRunLifecycle();
         clearRunPoll();
-        codeRunning.value = false;
+        codeRunning.value = Boolean(fileRunId && status.snapshotCaptured);
         runBusy.value = false;
         startedRunForTarget = false;
         setNodeGraphInputLocked(false);
@@ -2824,34 +2846,14 @@ function startRunPoll() {
     }
   }, 300);
 }
-function scriptStatusBelongsToCurrentTarget(status = {}) {
-  const backendTargetType = String(status?.targetType || '').trim().toLowerCase();
-  return !backendTargetType || backendTargetType === normalizedTargetType.value;
-}
-function scriptStatusNeedsStop(status = {}) {
-  const state = String(status?.status || '').trim().toLowerCase();
-  return ['starting', 'running', 'stopping'].includes(state)
-    || Boolean(status?.threadAlive)
-    || Boolean(status?.inputLocked)
-    || Boolean(status?.snapshotCaptured ?? status?.hasSnapshot ?? status?.has_snapshot);
-}
-async function stopNodeGraphRun(statusText = '已停止', restoreState = false, verifyBackend = false) {
+async function stopNodeGraphRun(statusText = '已停止', restoreState = false) {
   clearRunPoll();
-  let shouldStop = startedRunForTarget || codeRunning.value || runBusy.value;
-  if (verifyBackend && !shouldStop) {
-    try {
-      const status = bridgeResult(await editorApi.scratch.getScriptStatus()) || {};
-      shouldStop = scriptStatusBelongsToCurrentTarget(status) && scriptStatusNeedsStop(status);
-    } catch (error) {
-      // This endpoint only controls the standalone node/script executor, not game preview.
-      // If status lookup fails while closing, stopping is the safer fallback.
-      shouldStop = true;
-      logError('关闭节点窗口前查询运行状态失败', error);
-    }
-  }
   try {
-    if (shouldStop) {
-      const response = bridgeResult(await editorApi.scratch.stopScriptExecution(Boolean(restoreState)));
+    if (fileRunId || pendingFileRequest) {
+      const response = bridgeResult(await editorApi.scripts.stop(fileRunId, true, pendingFileRequest));
+      if (response.status === 'error' || response.restoreError) throw new Error(response.message || response.restoreError);
+      fileRunId = '';
+      pendingFileRequest = '';
       if (restoreState) {
         if (response?.restored) {
           runStatus.value = '已停止并恢复运行前状态';
@@ -2871,7 +2873,7 @@ async function stopNodeGraphRun(statusText = '已停止', restoreState = false, 
     logError('停止节点图失败', error);
   } finally {
     startedRunForTarget = false;
-    codeRunning.value = false;
+    codeRunning.value = Boolean(fileRunId || pendingFileRequest);
     runBusy.value = false;
     currentRunNodeId.value = '';
     setNodeGraphInputLocked(false);
@@ -2884,67 +2886,12 @@ async function stopForPanelClose() {
     // Closing can be reported by the title bar, pagehide, beforeunload and both
     // parent/child unmount hooks. Keep one promise for the rest of this component
     // lifetime so the backend stop and input unlock are never issued repeatedly.
-    panelCloseStopPromise = stopNodeGraphRun('\u8282\u70b9\u7a97\u53e3\u5df2\u5173\u95ed\uff0c\u8fd0\u884c\u5df2\u505c\u6b62', false, true);
+    panelCloseStopPromise = stopNodeGraphRun('\u8282\u70b9\u7a97\u53e3\u5df2\u5173\u95ed\uff0c\u8fd0\u884c\u5df2\u505c\u6b62', false);
   }
   return panelCloseStopPromise;
 }
 
 defineExpose({ stopForPanelClose });
-
-function normalizeGamePreviewStatus(payload = {}) {
-  const status = payload?.data ?? payload ?? {};
-  const runningCount = Number(status.runningCount ?? status.running_count ?? 0);
-  const hasSnapshot = Boolean(status.hasSnapshot ?? status.has_snapshot);
-  const active = ['starting', 'running', 'stopping'].includes(status.status)
-    || runningCount > 0
-    || hasSnapshot;
-  return { ...status, active, scope: status.scope || 'project' };
-}
-function applyGamePreviewGuard(payload = {}) {
-  const preview = normalizeGamePreviewStatus(payload);
-  const previousLabel = globalPreviewRunLabel.value;
-  const wasPreviewMessage = runStatus.value === previousLabel;
-  globalPreviewActive.value = preview.active;
-  globalPreviewScope.value = preview.active ? preview.scope : '';
-  if (preview.active && !codeRunning.value) {
-    runStatus.value = globalPreviewRunLabel.value;
-    const errors = Array.isArray(preview.errors) ? preview.errors : [];
-    const warnings = Array.isArray(preview.warnings) ? preview.warnings : [];
-    runDetail.value = [...errors, ...warnings].filter(Boolean).join('\n');
-  } else if (!preview.active && wasPreviewMessage) {
-    runStatus.value = '';
-    runDetail.value = '';
-  }
-  return preview;
-}
-function onGamePreviewStatus(event) {
-  applyGamePreviewGuard(event?.detail || {});
-}
-function onViewportControlsState(state = {}) {
-  if (state?.preview && typeof state.preview === 'object') {
-    applyGamePreviewGuard(state.preview);
-  }
-}
-function startGamePreviewGuardPoll() {
-  if (gamePreviewGuardTimer) window.clearInterval(gamePreviewGuardTimer);
-  gamePreviewGuardTimer = window.setInterval(() => {
-    refreshGamePreviewGuard().catch(() => {});
-  }, 800);
-}
-async function refreshGamePreviewGuard() {
-  if (window.__coronaPreviewActionPending) {
-    return applyGamePreviewGuard({
-      status: 'starting',
-      scope: window.__coronaPreviewPendingScope || 'project',
-    });
-  }
-  try {
-    return applyGamePreviewGuard(await editorApi.scratch.getGamePreviewStatus());
-  } catch (error) {
-    logError('查询全局运行状态失败', error);
-    return { active: false, scope: '' };
-  }
-}
 
 function handleRunButtonClick() {
   if (!codeRunning.value) reportNodeRunClicked();
@@ -2965,13 +2912,6 @@ async function handleToggleRun() {
       reportNodeRunTerminal(false, runStatus.value);
       return;
     }
-    const preview = await refreshGamePreviewGuard();
-    if (panelClosing || !componentMounted) return;
-    if (preview.active) {
-      runStatus.value = globalPreviewRunLabel.value;
-      resetNodeRunLifecycle();
-      return;
-    }
     // A terminal error is a diagnostic, not a latch. Keep it visible until the
     // next click, then rebuild from the current workspaces and start a fresh run.
     clearRunPoll();
@@ -2983,49 +2923,47 @@ async function handleToggleRun() {
     runDetailVisible.value = false;
     setNodeGraphInputLocked(false);
     refreshEmbeddedWorkspaceStates();
-    await saveNow();
-    if (panelClosing || !componentMounted) return;
-    let code;
+    const runTarget = currentTarget();
     try {
       const snapshot = graphSnapshot();
       const analysis = validateNodeGraph(snapshot);
       runWarnings.value = analysis.warnings || [];
-      code = nodeGraphToCode(snapshot);
     } catch (error) {
       runStatus.value = `生成失败：${error?.message || error}`;
       reportNodeRunTerminal(false, error?.message || error);
       logError('生成节点图代码失败', error);
       return;
     }
+    const saved = await saveNow(runTarget, { force: true });
+    if (panelClosing || !componentMounted || storageKeyForTarget(currentTarget()) !== storageKeyForTarget(runTarget)) return;
+    if (!saved?.target?.runnable || !saved.target.revision) {
+      throw new Error(saved?.target?.validation_errors?.[0] || '未能保存可运行的脚本');
+    }
     runStatus.value = '启动中...';
+    const requestId = crypto.randomUUID();
+    pendingFileRequest = requestId;
     const response = bridgeResult(
-      await editorApi.scratch.executePythonCode(
-        code,
-        0,
-        isProjectTarget.value ? '' : props.sceneName || '',
-        isProjectTarget.value ? '' : props.actorName,
-        normalizedTargetType.value
-      )
+      await startScriptFile({
+        requestId,
+        project_path: saved.project_path, path: saved.target.code_path, revision: saved.target.revision,
+        target_type: saved.target.target_type, scene_name: saved.target.scene_name, actor_name: saved.target.actor_name,
+      })
     );
-    if (panelClosing || !componentMounted) {
-      await editorApi.scratch.stopScriptExecution(false).catch(() => {});
+    pendingFileRequest = '';
+    if (panelClosing || !componentMounted || storageKeyForTarget(currentTarget()) !== storageKeyForTarget(runTarget)) {
+      if (response.runId) await editorApi.scripts.stop(response.runId);
       setNodeGraphInputLocked(false);
       return;
     }
-    if (response?.outcome === 'preview_running') {
-      // A global preview owns this target. Treat the race as an ownership handoff
-      // instead of leaving a misleading node-graph execution error.
-      resetNodeRunLifecycle();
-      applyGamePreviewGuard({
-        status: response.previewStatus || 'running',
-        scope: response.previewScope || 'project',
-        runningCount: 1,
-      });
-      return;
-    }
-    if (response?.status === 'error' || response?.success === false) {
+    if ((response?.status === 'error' && !response.runId) || response?.success === false) {
       throw new Error(response?.message || '后端拒绝执行节点图');
     }
+    if (!response.runId) throw new Error('脚本运行实例未创建');
+    if (['stopped', 'finished', 'completed'].includes(response.status) && !response.snapshotCaptured) {
+      runStatus.value = '本次运行已结束';
+      return;
+    }
+    fileRunId = response.runId;
     startedRunForTarget = true;
     codeRunning.value = true;
     reportNodeRunStarted();
@@ -3034,11 +2972,13 @@ async function handleToggleRun() {
     startRunPoll();
   } catch (error) {
     startedRunForTarget = false;
-    codeRunning.value = false;
+    // After a lost acknowledgement the Stop button can still cancel by requestId.
+    if (!error.scriptRunUnconfirmed) pendingFileRequest = '';
+    codeRunning.value = Boolean(pendingFileRequest);
     clearRunPoll();
     currentRunNodeId.value = '';
     setNodeGraphInputLocked(false);
-    runStatus.value = `执行失败：${error?.message || error}`;
+    runStatus.value = pendingFileRequest ? '启动回执未确认，可点击停止并恢复' : `执行失败：${error?.message || error}`;
     reportNodeRunTerminal(false, error?.message || error);
     logError('执行节点图失败', error);
   } finally {
@@ -3403,14 +3343,7 @@ onMounted(async () => {
     });
     requestNodeGraphReview(500);
   }
-  window.addEventListener('corona-game-preview-status', onGamePreviewStatus);
   window.addEventListener('keydown', handleFullscreenKey);
-  coronaEventBus.on('viewport-controls-state', onViewportControlsState);
-  if (window.__coronaGamePreviewState) {
-    applyGamePreviewGuard(window.__coronaGamePreviewState);
-  }
-  refreshGamePreviewGuard();
-  startGamePreviewGuardPoll();
   registerNodeGraphFlusher();
   if (isProjectTarget.value) {
     unregisterProjectNodeGraphSaveHandler = registerProjectNodeGraphSaveHandler(saveNow);
@@ -3452,16 +3385,10 @@ onBeforeUnmount(() => {
   unregisterProjectNodeGraphSaveHandler = null;
   unregisterAiNodeGraphConsumer?.();
   unregisterAiNodeGraphConsumer = null;
-  window.removeEventListener('corona-game-preview-status', onGamePreviewStatus);
   window.removeEventListener('keydown', handleFullscreenKey);
   if (isFullscreen.value) {
     appService.redockPanel().catch(() => {});
     isFullscreen.value = false;
-  }
-  coronaEventBus.off('viewport-controls-state', onViewportControlsState);
-  if (gamePreviewGuardTimer) {
-    window.clearInterval(gamePreviewGuardTimer);
-    gamePreviewGuardTimer = null;
   }
   unregisterNodeGraphFlusher();
   if (saveTimer) clearTimeout(saveTimer);

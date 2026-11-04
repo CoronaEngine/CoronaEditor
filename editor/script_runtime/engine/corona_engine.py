@@ -22,7 +22,6 @@ import math as _math
 import os as _os
 from pathlib import Path as _Path
 import random as _random
-import runpy as _runpy
 import threading as _threading
 import time as _time
 from typing import Callable, Optional
@@ -987,31 +986,30 @@ def _snapshot_actor_key(data):
 def _native_restore_operation(scene_route, actor_name, operation, values):
     assert_engine_operation_allowed()
     action = f"Restore actor {actor_name} operation {operation}"
-    state_operations = {
-        "SetVisible": {"visible": bool(values[0])},
-    }
-    physics_operations = {
-        "SetMass": {"mass": float(values[0])},
-        "SetRestitution": {"restitution": float(values[0])},
-        "SetDamping": {"damping": float(values[0])},
-        "SetPhysicsEnabled": {"physics_enabled": bool(values[0])},
-        "SetCollision": {"collision_type": str(values[0])},
-        "SetLinearLock": {"linear_lock": [bool(item) for item in values[:3]]},
-        "SetAngularLock": {"angular_lock": [bool(item) for item in values[:3]]},
-    }
     from api.editor_api import get_script_runtime_editor_api
 
     scene_tools = get_script_runtime_editor_api().scene_tools
-    if operation in state_operations:
-        result = scene_tools.set_actor_state(
-            scene_route, actor_name, state_operations[operation]
-        )
-    elif operation in physics_operations:
-        result = scene_tools.set_actor_physics(
-            scene_route, actor_name, physics_operations[operation]
-        )
+    if operation == "SetVisible":
+        result = scene_tools.set_actor_state(scene_route, actor_name, {"visible": bool(values[0])})
     else:
-        raise RuntimeError(f"unsupported native actor operation: {operation}")
+        match operation:
+            case "SetMass":
+                field = {"mass": float(values[0])}
+            case "SetRestitution":
+                field = {"restitution": float(values[0])}
+            case "SetDamping":
+                field = {"damping": float(values[0])}
+            case "SetPhysicsEnabled":
+                field = {"physics_enabled": bool(values[0])}
+            case "SetCollision":
+                field = {"collision_type": str(values[0])}
+            case "SetLinearLock":
+                field = {"linear_lock": list(map(bool, values[:3]))}
+            case "SetAngularLock":
+                field = {"angular_lock": list(map(bool, values[:3]))}
+            case _:
+                raise RuntimeError(f"unsupported native actor operation: {operation}")
+        result = scene_tools.set_actor_physics(scene_route, actor_name, field)
     return _native_payload_or_raise(
         result,
         action,
@@ -1274,6 +1272,9 @@ def restore_runtime_scene_state(snapshot):
                     "Unable to read the current native scene while stopping"
                     + (f": {'; '.join(errors)}" if errors else "")
                 )
+            project = payload.get("project_path")
+            if project and _Path(current_payload.get("project_path") or "").resolve() != _Path(project).resolve():
+                raise RuntimeError("The active project changed; the preview snapshot was not restored")
             current = [
                 item for item in current_payload.get("actors", []) if isinstance(item, dict)
             ]
@@ -4778,35 +4779,6 @@ def object_randomize_mouse_pick(cx, cy, cz, sx, sy, sz):
 def object_delete_mouse_pick():
     name = _current_context().last_mouse_pick_object or mouse_pick_object()
     return bool(name) and object_delete(name)
-
-
-def run_project_script(script_path):
-    """Load a Python file inside the active project and call its run() entry point."""
-    check_stop()
-    try:
-        from runtime.project_context import get_active_project_path
-        project_root = get_active_project_path()
-    except Exception as exc:
-        raise RuntimeError("\u65e0\u6cd5\u53d6\u5f97\u5f53\u524d\u9879\u76ee\u8def\u5f84") from exc
-    if not project_root:
-        raise RuntimeError("\u6ca1\u6709\u6253\u5f00\u7684\u9879\u76ee\uff0c\u65e0\u6cd5\u8fd0\u884c\u9879\u76ee\u811a\u672c")
-
-    root = _Path(project_root).resolve()
-    target = (root / str(script_path or '')).resolve()
-    try:
-        target.relative_to(root)
-    except ValueError as exc:
-        raise RuntimeError(f"\u9879\u76ee\u811a\u672c\u5fc5\u987b\u4f4d\u4e8e\u5f53\u524d\u9879\u76ee\u76ee\u5f55\u5185: {script_path}") from exc
-    if target.suffix.lower() != '.py' or not target.is_file():
-        raise RuntimeError(f"\u627e\u4e0d\u5230\u9879\u76ee Python \u811a\u672c: {script_path}")
-
-    namespace = _runpy.run_path(str(target))
-    entry = namespace.get('run')
-    if not callable(entry):
-        raise RuntimeError(f"\u9879\u76ee\u811a\u672c\u7f3a\u5c11 run() \u5165\u53e3: {script_path}")
-    result = entry()
-    check_stop()
-    return result
 
 
 # ── Audio ──

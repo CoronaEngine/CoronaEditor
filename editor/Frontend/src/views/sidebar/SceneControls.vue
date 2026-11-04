@@ -11,17 +11,10 @@
       @click.stop
       @wheel.stop
     >
-      <div class="panel-commands">
-        <button data-guidance="preview-start" :disabled="state.previewRunning || state.previewBusy" @click="act('startPreview')">{{ translate('layout.previewStart') }}</button>
-        <button data-guidance="preview-stop" :disabled="!state.previewRunning || state.previewBusy" @click="act('stopPreview')">{{ translate('layout.previewStop') }}</button>
-        <span role="status">{{ state.previewStatusText }}</span>
-      </div>
       <details>
         <summary>{{ translate('layout.menuView') }}</summary>
         <div class="panel-commands">
           <button v-for="panel in toolPanels" :key="panel.id" @click="openTool(panel.id)">{{ translate(panel.displayNameKey) }}</button>
-          <button @click="act('runProject')">{{ translate('layout.runProject') }}</button>
-          <button @click="act('runCurrentScene')">{{ translate('layout.runCurrentScene') }}</button>
         </div>
       </details>
       <details @toggle="refreshPhysics">

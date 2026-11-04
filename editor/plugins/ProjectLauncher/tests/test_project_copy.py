@@ -4,7 +4,6 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from plugins.ProjectLauncher import main as project_launcher
 from api.editor_api import CoronaEditorApi
 from config.project_state import CoronaSettings
 from runtime import project_templates as project_utils
@@ -12,11 +11,6 @@ from runtime import project_templates as project_utils
 
 class ProjectCopyTests(unittest.TestCase):
 
-
-    def test_project_launcher_python_does_not_import_project_copy_or_vision_import(self):
-        source = Path(project_launcher.__file__).read_text(encoding="utf-8")
-        self.assertNotIn("ProjectCopy", source)
-        self.assertNotIn("vision_import", source)
 
     def test_settings_accepts_portable_scene_folder_without_project_ini(self):
         with tempfile.TemporaryDirectory() as temp_dir:

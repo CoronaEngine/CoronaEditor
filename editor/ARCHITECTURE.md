@@ -6,7 +6,7 @@
 |---|---|---|
 | Vue | 页面、输入、临时 UI 状态、结果展示和 JS manifest adapter | 场景事实、AI 业务、引擎对象 |
 | C++ | 场景/Actor/资源/变换/revision、渲染和跨层 manifest handler | Python 业务流程 |
-| Python | 角色脚本、Blockly/Scratch、项目归档和自动化 | 保存场景事实或充当传统后端 |
+| Python | Blockly 生成文件的按路径执行、输入与恢复、项目归档 | 保存场景事实或充当传统后端 |
 
 编辑器写操作必须经过 C++ manifest 聚合接口。底层引擎 API（例如 `camera()`、
 `geometry()`）只属于 C++ 内部实现；Vue 和普通 Python 不直接导入或暴露它们。
@@ -29,8 +29,8 @@ manifest。新增业务语义应先登记 manifest，再补 Vue/Python 薄 adapt
 | `api` | Python 公共契约 |
 | `config` | 路径和项目状态 |
 | `runtime` | host、registry、生命周期和运行时数据 |
-| `script_runtime` | 受限角色脚本与 Blockly |
-| `plugins` | 编辑器业务服务 |
+| `script_runtime` | Blockly 生成文件的受限执行环境 |
+| `plugins` | 项目存档服务和原生模板 |
 
 历史 `backend`、`CoronaCore`、`CoronaPlugin`、`utils`、`scripts` 目录已删除；仓内不再
 提供外部旧 import 兼容。旧项目应迁移到上述 canonical owner。

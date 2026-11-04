@@ -33,6 +33,6 @@ class PathLayoutBoundaryTests(unittest.TestCase):
             "api/editor_api.py",
             "runtime/registry.py",
             "runtime/editor_host.py",
-            "script_runtime/runner.py",
+            "script_runtime/blockly/main.py",
         ):
             self.assertTrue((root / relative).is_file(), relative)

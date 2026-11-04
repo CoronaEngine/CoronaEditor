@@ -47,22 +47,12 @@ function worldRuntimeCleanupError(kind, result) {
 
 // Finish restoring the OLD scene before native open replaces it. Never run a
 // stop/restore against the new story scene, and fail closed if workers persist.
-export async function stopWorldRuntimeBeforeOpen(api, {
-  wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms)), attempts = 40,
-} = {}) {
-  const unwrap = (result) => result?.data ?? result;
-  let preview = unwrap(await api.stopGamePreview());
-  const busy = (status) => status?.workerActive || status?.stopPending || status?.stop_pending
-    || status?.hasSnapshot || status?.has_snapshot
-    || ['starting', 'running', 'stopping'].includes(status?.status);
-  for (let i = 0; busy(preview) && i < attempts; i++) {
-    await wait(200);
-    preview = unwrap(await api.getGamePreviewStatus());
-  }
-  if (busy(preview) || preview?.restoreError || preview?.restore_error) {
-    throw worldRuntimeCleanupError('预览', preview);
-  }
-  const script = unwrap(await api.stopScriptExecution(true));
+export async function stopWorldRuntimeBeforeOpen(api = editorApi) {
+  const reply = await api.scratch.getScriptStatus();
+  const status = reply.data ?? reply;
+  if (!status.runId || !(status.threadAlive || status.snapshotCaptured || status.inputLocked)) return;
+  const response = await api.scripts.stop(status.runId, true);
+  const script = response.data ?? response;
   // restored=false is normal when no script ever ran or a prior stop already
   // consumed the snapshot. Only live work, retained snapshots, and real errors block opening.
   if (['error', 'starting', 'running', 'stopping'].includes(script?.status)
@@ -107,7 +97,7 @@ export const projectLauncherService = {
         await drainWorldSession();
         await withWorldTimeout(lanchat.finishWorldSession(), '关闭旧世界聊天室');
         if (runtimeCleanupRequired) {
-          await withWorldTimeout(stopWorldRuntimeBeforeOpen(editorApi.scratch), '停止旧世界运行');
+          await withWorldTimeout(stopWorldRuntimeBeforeOpen(), '停止旧世界运行');
           runtimeCleanupRequired = false;
         }
         if (!current()) return superseded();

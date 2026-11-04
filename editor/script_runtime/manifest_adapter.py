@@ -6,53 +6,6 @@ ScriptRuntime caller channel separate from the regular PythonScript channel.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import Any
-
-
-@dataclass(frozen=True)
-class ScriptRuntimeActorTarget:
-    """Value-only actor surface accepted by the script lifecycle."""
-
-    name: str
-    script_path: str = ""
-
-
-@dataclass(frozen=True)
-class ScriptRuntimeSceneTarget:
-    """Value-only scene surface accepted by ``ScriptsManager``."""
-
-    name: str
-    route: str
-    script_path: str
-    _actors: tuple[ScriptRuntimeActorTarget, ...]
-
-
-def scene_target_from_snapshot(snapshot: Any) -> ScriptRuntimeSceneTarget:
-    """Build a restricted Script Runtime target from a native scene value object."""
-    if not isinstance(snapshot, dict):
-        raise TypeError("native scene snapshot must be an object")
-
-    route = str(
-        snapshot.get("scene")
-        or snapshot.get("scene_id")
-        or snapshot.get("id")
-        or snapshot.get("route")
-        or ""
-    )
-    name = str(snapshot.get("scene_name") or snapshot.get("name") or route)
-    script_path = str(snapshot.get("script") or snapshot.get("script_path") or "")
-    actors = tuple(
-        ScriptRuntimeActorTarget(
-            name=str(item.get("name") or item.get("route") or ""),
-            script_path=str(item.get("script") or item.get("script_path") or ""),
-        )
-        for item in snapshot.get("actors", [])
-        if isinstance(item, dict)
-    )
-    return ScriptRuntimeSceneTarget(name, route, script_path, actors)
-
-
 class ScriptRuntimeSceneAdapter:
     def __init__(self, invoke_manifest):
         self._invoke_manifest = invoke_manifest

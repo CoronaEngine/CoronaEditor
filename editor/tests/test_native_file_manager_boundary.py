@@ -39,14 +39,3 @@ def test_native_file_manager_keeps_project_path_boundary_checks():
     assert "resolve_file_manager_project_path" in source
     assert "path_is_inside_project" in source
     assert "Unable to delete the project root" in source
-
-
-def test_file_manager_python_is_reduced_to_public_adapter():
-    source = FILE_MANAGER.read_text(encoding="utf-8")
-    assert "CoronaEditorApi.files" in source
-    assert "shutil.rmtree" not in source
-    assert "os.remove(" not in source
-    assert "legacy_file_scene_adapter" not in source
-    assert not (
-        EDITOR_ROOT / "plugins" / "FileManager" / "compat" / "legacy_file_manager.py"
-    ).exists()

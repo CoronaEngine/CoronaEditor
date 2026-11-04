@@ -579,7 +579,6 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
         source = self._editor_api_source()
         expected = {
             "AITool.submit_request": "kObjectPayloadParam",
-            "ScratchTool.execute_python_code": "kScratchExecutePythonCodeParams",
         }
         for api_name, params_name in expected.items():
             module, method = api_name.split(".", 1)
@@ -969,8 +968,7 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
         self.assertNotIn("EDITOR_API_METHOD(", registry_body)
         self.assertRegex(
             source,
-            r"EDITOR_API_METHOD_SCHEMA(?:_WRAPPED)?\(ScratchTool, execute_python_code, "
-            r"kScratchExecutePythonCodeParams, .*EditorApiValueType::Any\)",
+            r'EDITOR_API_METHOD_SCHEMA_WRAPPED_CALLERS\(Scripts, run_file, kObjectPayloadParam, ',
         )
         validation_start = source.find("NativeResult validate_editor_api_args")
         self.assertGreaterEqual(validation_start, 0)
@@ -2631,17 +2629,12 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
 
         expected = {
             "AITool.submit_request": ("kObjectPayloadParam", "EditorApiValueType::Any"),
-            "ScratchTool.execute_python_code": ("kScratchExecutePythonCodeParams", "EditorApiValueType::Any"),
-            "ScratchTool.get_game_preview_status": ("kNoParams", "EditorApiValueType::Any"),
             "ScratchTool.get_script_status": ("kNoParams", "EditorApiValueType::Any"),
             "ScratchTool.key_event": ("kScratchKeyEventParams", "EditorApiValueType::Any"),
             "ScratchTool.key_release": ("kScratchKeyReleaseParams", "EditorApiValueType::Any"),
             "ScratchTool.load_blockly_target": ("kObjectPayloadParam", "EditorApiValueType::Any"),
             "ScratchTool.mouse_event": ("kScratchMouseEventParams", "EditorApiValueType::Any"),
             "ScratchTool.save_blockly_target": ("kObjectPayloadParam", "EditorApiValueType::Any"),
-            "ScratchTool.start_game_preview": ("kObjectPayloadParam", "EditorApiValueType::Any"),
-            "ScratchTool.stop_game_preview": ("kNoParams", "EditorApiValueType::Any"),
-            "ScratchTool.stop_script_execution": ("kScratchStopScriptParams", "EditorApiValueType::Any"),
         }
         for api_name, (params_name, return_type) in expected.items():
             module, method = api_name.split(".", 1)
@@ -2663,21 +2656,13 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
             "ai: {",
             "submitRequest: (payload) => call_manifest_editor_api('ai.submitRequest', [payload || {}])",
             "scratch: {",
-            "executePythonCode: (code, mode, sceneName, actorName, targetType = 'actor') =>",
             "saveBlocklyTarget: (payload) => call_manifest_editor_api('scratch.saveBlocklyTarget', [payload || {}])",
             "loadBlocklyTarget: (payload) => call_manifest_editor_api('scratch.loadBlocklyTarget', [payload || {}])",
-            "startGamePreview: (payload = { scope: 'project' }) =>",
-            "stopGamePreview: () => call_manifest_editor_api('scratch.stopGamePreview', [])",
-            "getGamePreviewStatus: () => call_manifest_editor_api('scratch.getGamePreviewStatus', [])",
-            "stopScriptExecution: (restoreState = false) =>",
-            "call_manifest_editor_api('scratch.stopScriptExecution', [Boolean(restoreState)])",
             "getScriptStatus: () => call_manifest_editor_api('scratch.getScriptStatus', [])",
             "sendKeyEvent: (key, modifiers, displayKey) =>",
             "sendKeyUpEvent: (key, displayKey) =>",
             "sendMouseEvent: (eventType, button, x, y, viewportX, viewportY, viewportWidth, viewportHeight, pickedActor = '') =>",
-            "executePythonCode: (code, mode, sceneName, actorName, targetType = 'actor') =>\n    editorApi.scratch.executePythonCode",
             "saveBlocklyTarget: (payload) => editorApi.scratch.saveBlocklyTarget(payload)",
-            "startGamePreview: (payload = { scope: 'project' }) => editorApi.scratch.startGamePreview(payload)",
             "sendKeyEvent: (key, modifiers, displayKey) =>\n    editorApi.scratch.sendKeyEvent",
         ):
             with self.subTest(snippet=snippet):
@@ -2692,13 +2677,8 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
         scratch_section = bridge_source[start:end]
 
         expected_wrappers = (
-            "scratch.executePythonCode",
             "scratch.saveBlocklyTarget",
             "scratch.loadBlocklyTarget",
-            "scratch.startGamePreview",
-            "scratch.stopGamePreview",
-            "scratch.getGamePreviewStatus",
-            "scratch.stopScriptExecution",
             "scratch.getScriptStatus",
             "scratch.sendKeyEvent",
             "scratch.sendKeyUpEvent",
@@ -2724,12 +2704,9 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
         source = self._editor_api_source()
 
         expected = {
-            "MainView.get_menu_data": ("kNoParams", "EditorApiValueType::Object"),
             "MainView.import_resource_file": ("kMainViewImportResourceFileParams", "EditorApiValueType::Object"),
             "MainView.on_init": ("kPathOptionalParam", "EditorApiValueType::Object"),
-            "MainView.run_project": ("kPathOptionalParam", "EditorApiValueType::Object"),
             "MainView.scene_save": ("kSceneSaveParams", "EditorApiValueType::Object"),
-            "MainView.update_view_tool_state": ("kMainViewUpdateViewToolStateParams", "EditorApiValueType::Object"),
         }
         for api_name, (params_name, return_type) in expected.items():
             module, method = api_name.split(".", 1)
@@ -2746,17 +2723,11 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
 
         for snippet in (
             "main: {",
-            "getMenuData: () => call_manifest_editor_api('main.getMenuData', [])",
             "importResourceFile: (sceneName, fileType) =>",
             "onInit: (projectPath = '') =>",
-            "runProject: (scenePath = '') =>",
             "sceneSave: (sceneName) => call_manifest_editor_api('main.sceneSave', [sceneName])",
-            "updateViewToolState: (toolId, enabled) =>",
             "OnInit: (projectPath = window.localStorage?.getItem('corona.activeProjectPath') || '') =>\n    editorApi.main.onInit",
             "importResourceFileByDialog: (sceneName, fileType) =>\n    editorApi.main.importResourceFile",
-            "getMenuData: () => editorApi.main.getMenuData()",
-            "updateViewToolState: (toolId, enabled) =>\n    editorApi.main.updateViewToolState",
-            "runProject: (scenePath) =>\n    editorApi.main.runProject",
         ):
             with self.subTest(snippet=snippet):
                 self.assertIn(snippet, bridge_source)
@@ -2769,7 +2740,6 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
         self.assertGreater(end, start)
         main_section = bridge_source[start:end]
 
-        self.assertIn("call_manifest_editor_api('main.getMenuData'", main_section)
         self.assertIn("call_manifest_editor_api('main.sceneSave'", main_section)
         self.assertNotIn("MainView.", main_section)
 
@@ -3504,7 +3474,7 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
     def test_main_on_init_reuses_the_committed_scene_and_checks_requested_path(self):
         source = self._handler_source()
         start = source.index('{"on_init"', source.index("void register_main_view_api_handlers"))
-        end = source.index('{"run_project"', start)
+        end = source.index('{"scene_save"', start)
         handler = source[start:end]
         self.assertIn("auto& state = native_editor_state()", handler)
         self.assertIn("absolute_normalized_path(state.scene->project_root)", handler)
@@ -3609,15 +3579,6 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
         self.assertIn(".placeholder-warning", object_panel)
 
 
-    def test_project_settings_does_not_write_project_section_into_portable_scene(self):
-        repo_root = self._repo_root()
-        settings_source = (
-            repo_root / "editor" / "plugins" / "ProjectSettings" / "main.py"
-        ).read_text(encoding="utf-8")
-        self.assertIn("CoronaEditorApi.project_settings.get_active_project_info", settings_source)
-        self.assertIn("CoronaEditorApi.project_settings.save_active_project_info", settings_source)
-        self.assertNotIn("configparser", settings_source)
-
     def test_retired_python_scene_writer_is_removed(self):
         self.assertFalse((self._repo_root() / 'editor/runtime/legacy/entities/scene.py').exists())
 
@@ -3627,10 +3588,6 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
         self.assertIn('document_store.replace_sections(sections, write_diagnostics)', handlers)
         self.assertIn('sections["scene"] = {"[scene]"}', handlers)
         self.assertIn('scene_metadata["name"] = scene.name', handlers)
-        settings = (self._repo_root() / 'editor/plugins/ProjectSettings/main.py').read_text(encoding='utf-8')
-        self.assertIn('get_active_project_info', settings)
-        self.assertIn('save_active_project_info', settings)
-        self.assertNotIn('scene_save', settings)
 
     def test_portable_scene_validation_import_and_cleanup_apis_are_exposed(self):
         repo_root = self._repo_root()
@@ -3668,7 +3625,7 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
             self._engine_root() / "src" / "systems" / "ui" / "cef" / "cef_editor_native_api_handlers.cpp"
         ).read_text(encoding="utf-8")
         start = source.index('{"scene_save"')
-        end = source.index('{"update_view_tool_state"', start)
+        end = source.index('registry.register_module("MainView"', start)
         body = source[start:end]
         self.assertIn("PortableSceneValidationError", body)
         self.assertIn('{"diagnostics", error.diagnostics()}', body)

@@ -30,7 +30,7 @@ def test_native_init_is_singular_and_save_does_not_reload():
 
 
 def test_adapters_and_ui_have_no_old_scene_lifecycle():
-    paths = ["api/editor_api.py", "plugins/MainView/main.py", "plugins/SceneTools/main.py",
+    paths = ["api/editor_api.py",
              "Frontend/src/api/editorApi.js", "Frontend/src/services/sceneService.js",
              "Frontend/src/services/projectLauncherService.js",
              "Frontend/src/services/projectSettingsService.js"]

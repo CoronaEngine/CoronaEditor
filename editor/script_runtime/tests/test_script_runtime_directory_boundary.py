@@ -22,11 +22,11 @@ def test_script_runtime_has_a_local_boundary_inventory():
         "受限角色脚本运行时",
         "Blockly/Scratch",
         "manifest adapter",
-        "生成脚本 runner",
+        "scripts.runFile",
         "Scripts/blockly",
-        "runtime/generated",
+        "requestId",
         "编辑器公共 API",
-        "删除条件",
+        "runId",
     ):
         assert marker in source
     for path in (
@@ -34,7 +34,7 @@ def test_script_runtime_has_a_local_boundary_inventory():
         "blockly/",
         "manifest_adapter.py",
         "native_engine_adapter.py",
-        "runner.py",
+        "blockly/main.py",
     ):
         assert path in source
 
@@ -43,12 +43,12 @@ def test_script_runtime_has_explicit_restricted_entrypoints():
     manifest_adapter = (SCRIPT_RUNTIME_ROOT / "manifest_adapter.py").read_text(
         encoding="utf-8"
     )
-    runner = (SCRIPT_RUNTIME_ROOT / "runner.py").read_text(encoding="utf-8")
+    runner = (SCRIPT_RUNTIME_ROOT / "blockly/main.py").read_text(encoding="utf-8")
 
     assert "ScriptRuntimeEditorApi" in manifest_adapter
     assert "ScriptRuntimeSceneAdapter" in manifest_adapter
-    assert "run_generated_script" in runner
-    assert "runtime/generated" in runner
+    assert "def run_file(" in runner
+    assert "def execute_python_code(" not in runner
 
 
 def test_script_runtime_does_not_import_editor_plugins_or_legacy_backend():
@@ -75,12 +75,3 @@ def test_script_runtime_engine_is_not_the_editor_manifest_owner():
     assert "不得" in boundary
     assert "editorApi" not in engine
     assert "window.cefQuery" not in engine
-
-
-def test_blockly_preview_names_the_runtime_generated_output_owner_explicitly():
-    blockly = (SCRIPT_RUNTIME_ROOT / "blockly" / "main.py").read_text(
-        encoding="utf-8"
-    )
-
-    assert "generated_script_dir = core_path.generated_script_dir" in blockly
-    assert "\n    script_dir = core_path.generated_script_dir" not in blockly

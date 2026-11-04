@@ -158,13 +158,6 @@ function forwardScratchKey(event, released = false) {
   editorApi.scratch.sendKeyEvent(code, modifiers, displayKey).catch(() => {});
 }
 
-function isGamePreviewActive() {
-  const preview = window.__coronaGamePreviewState || {};
-  return ['starting', 'running', 'stopping'].includes(preview.status)
-    || Number(preview.runningCount ?? preview.running_count ?? 0) > 0
-    || Boolean(preview.hasSnapshot ?? preview.has_snapshot);
-}
-
 function isGameplayKey(event) {
   if (event.ctrlKey || event.metaKey || event.altKey) return false;
   const code = event.code || '';
@@ -175,9 +168,9 @@ function isGameplayKey(event) {
 }
 
 function consumeNativeGameplayDomEvent(event) {
-  if (!isGamePreviewActive() || isEditableTarget(event.target) || !isGameplayKey(event)) return;
+  if (!window.__coronaEditorInputLocks?.has('node_graph') || isEditableTarget(event.target) || !isGameplayKey(event)) return;
   // The native SDL event still reaches Scratch. Suppress only the mirrored DOM
-  // event so Space cannot click the still-focused preview button and WASD does
+  // event so Space cannot click the still-focused run button and WASD does
   // not trigger editor/browser shortcuts while a game is running.
   event.preventDefault();
   event.stopPropagation();

@@ -17,7 +17,7 @@ def test_editor_main_is_only_the_host_facing_startup_shim():
 def test_runtime_bootstrap_is_the_single_registration_owner():
     bootstrap = (RUNTIME_ROOT / "bootstrap.py").read_text(encoding="utf-8")
 
-    assert "register_core_python_script_services()" in bootstrap
+    assert "register_script_dispatcher()" in bootstrap
     assert "editor.register_script_dispatcher()" in bootstrap
     assert "from runtime.plugin_loader import reimport" in bootstrap
     assert "reimport()" in bootstrap

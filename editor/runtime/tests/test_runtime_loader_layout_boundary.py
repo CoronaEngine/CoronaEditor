@@ -22,7 +22,7 @@ def test_editor_entrypoint_implementation_lives_under_runtime():
 
     assert bootstrap.is_file()
     bootstrap_source = bootstrap.read_text(encoding="utf-8")
-    assert "register_core_python_script_services" in bootstrap_source
+    assert "register_script_dispatcher" in bootstrap_source
     assert "register_script_dispatcher" in bootstrap_source
     assert "from runtime.bootstrap import" in main_source
     assert "register_core_python_script_services" not in main_source

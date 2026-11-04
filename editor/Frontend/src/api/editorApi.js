@@ -342,7 +342,7 @@ const call_editor_api = async (apiName, args) => {
           }
         },
         onFailure: (error_code, error_message) => {
-          fail(new Error(`Editor API Error (${error_code}): ${error_message}`));
+          fail(Object.assign(new Error(`Editor API Error (${error_code}): ${error_message}`), { code: error_code }));
         },
       });
     } catch (error) {
@@ -655,22 +655,15 @@ const editorApiStatic = {
     setCameraPose: (sceneName, cameraName, camera) =>
       call_manifest_editor_api('viewport.setCameraPose', [sceneName, cameraName, camera]),
   },
+  scripts: {
+    runFile: (request) => call_manifest_editor_api('scripts.runFile', [request]),
+    getRun: (requestId) => call_manifest_editor_api('scripts.getRun', [{ requestId }]),
+    stop: (runId, restoreState = true, requestId) =>
+      call_manifest_editor_api('scripts.stop', [{ runId, requestId, restore_state: restoreState }]),
+  },
   scratch: {
-    executePythonCode: (code, mode, sceneName, actorName, targetType = 'actor') =>
-      call_manifest_editor_api('scratch.executePythonCode', [
-        code,
-        mode ?? 0,
-        sceneName ?? '',
-        actorName ?? '',
-        targetType || 'actor',
-      ]),
     saveBlocklyTarget: (payload) => call_manifest_editor_api('scratch.saveBlocklyTarget', [payload || {}]),
     loadBlocklyTarget: (payload) => call_manifest_editor_api('scratch.loadBlocklyTarget', [payload || {}]),
-    startGamePreview: (payload = { scope: 'project' }) =>
-      call_manifest_editor_api('scratch.startGamePreview', [payload || { scope: 'project' }]),
-    stopGamePreview: () => call_manifest_editor_api('scratch.stopGamePreview', []),
-    getGamePreviewStatus: () => call_manifest_editor_api('scratch.getGamePreviewStatus', []),
-    stopScriptExecution: (restoreState = false) => call_manifest_editor_api('scratch.stopScriptExecution', [Boolean(restoreState)]),
     getScriptStatus: () => call_manifest_editor_api('scratch.getScriptStatus', []),
     sendKeyEvent: (key, modifiers, displayKey) =>
       call_manifest_editor_api('scratch.sendKeyEvent', [key, modifiers || '', displayKey || key]),
@@ -797,16 +790,11 @@ const editorApiStatic = {
         : [sceneName, actorName, chains, expectedRevision]),
   },
   main: {
-    getMenuData: () => call_manifest_editor_api('main.getMenuData', []),
     importResourceFile: (sceneName, fileType) =>
       call_manifest_editor_api('main.importResourceFile', [sceneName, fileType]),
     onInit: (projectPath = '') =>
       call_manifest_editor_api('main.onInit', projectPath ? [projectPath] : []),
-    runProject: (scenePath = '') =>
-      call_manifest_editor_api('main.runProject', scenePath ? [scenePath] : []),
     sceneSave: (sceneName) => call_manifest_editor_api('main.sceneSave', [sceneName]),
-    updateViewToolState: (toolId, enabled) =>
-      call_manifest_editor_api('main.updateViewToolState', [toolId, !!enabled]),
   },
   projectSettings: {
     readProjectDocument: (request) => call_manifest_editor_api('projectSettings.readProjectDocument', [request]),

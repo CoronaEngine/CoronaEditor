@@ -4,7 +4,6 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from plugins.SceneTools.main import SceneTools
 from runtime.archive.parser import parse_archive
 
 
@@ -26,19 +25,6 @@ class VisionRestirPreferencesTests(unittest.TestCase):
             self.assertEqual(cameras[0].get("vision_restir_settings"), settings)
             self.assertEqual(cameras[1].get("vision_restir_settings"), {})
             self.assertEqual(cameras[0]["vision_pt_settings"], {"max_depth": 6})
-
-    def test_facade_forwards_nested_settings_reset_and_requested_feedback(self):
-        for settings in ({"direct": {"temporal": {"open": False}}}, {}):
-            with self.subTest(settings=settings):
-                accepted = {"status": "success", "pending": True, "settings": settings}
-                with patch("api.editor_api._invoke_manifest_cpp_api", return_value=accepted) as invoke:
-                    self.assertIs(SceneTools.set_restir_settings("scene.ini", "camera", settings), accepted)
-                    self.assertIs(SceneTools.get_restir_settings("scene.ini", "camera"), accepted)
-                self.assertEqual([call.args for call in invoke.call_args_list], [
-                    ("scene_tools.set_restir_settings", ["scene.ini", "camera", settings]),
-                    ("scene_tools.get_restir_settings", ["scene.ini", "camera"]),
-                ])
-
 
 if __name__ == "__main__":
     unittest.main()

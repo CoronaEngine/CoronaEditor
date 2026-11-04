@@ -34,21 +34,6 @@ def test_project_settings_save_is_owned_by_native_handler():
     assert "需要有效的 scene.ini" in section
 
 
-def test_project_settings_python_entry_is_only_a_manifest_adapter():
-    source = PLUGIN.read_text(encoding="utf-8")
-    assert "CoronaEditorApi.project_settings.get_active_project_info" in source
-    assert "CoronaEditorApi.project_settings.save_active_project_info" in source
-    assert "settings_manager" not in source
-    assert "configparser" not in source
-    assert not (
-        REPO_ROOT
-        / "plugins"
-        / "ProjectSettings"
-        / "compat"
-        / "legacy_project_settings.py"
-    ).exists()
-
-
 def test_python_editor_api_has_explicit_project_settings_namespace():
     source = PYTHON_API.read_text(encoding="utf-8")
     assert "class _ProjectSettingsApi" in source

@@ -3,9 +3,11 @@
     <NodeGraphWorkspace
       ref="workspaceRef"
       class="min-h-0 flex-1"
-      actor-name=""
+      :key="actorName"
+      :actor-name="actorName"
       :scene-name="sceneName"
-      target-type="project"
+      :target-type="actorName ? 'actor' : 'project'"
+      @select-target="selectTarget"
       :review-active="true"
     />
   </div>
@@ -19,6 +21,11 @@ import { coronaEventBus } from '@/utils/eventBus.js';
 
 // An empty route binds to the current scene until MainPage publishes its identity.
 const sceneName = ref('');
+const actorName = ref('');
+function selectTarget(target) {
+  sceneName.value = target.sceneName;
+  actorName.value = target.actorName;
+}
 const workspaceRef = ref(null);
 let closeStopPromise = null;
 

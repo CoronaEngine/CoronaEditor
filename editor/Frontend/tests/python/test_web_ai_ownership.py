@@ -11,7 +11,7 @@ def test_web_catalog_matches_the_canonical_xml():
     policy = json.loads((WEB / "aiPolicy.json").read_text(encoding="utf-8"))
     root = ET.parse(WEB / "aiBlockContract.xml").getroot()
     blocks = root.findall("./Catalog/Blocks/Block")
-    assert len(blocks) == len(policy["catalog"]) == 260
+    assert len(blocks) == len(policy["catalog"]) == 259
     for block in blocks:
         spec = policy["catalog"][block.attrib["type"]]
         assert spec["projectUsage"] == block.attrib["projectUsage"]

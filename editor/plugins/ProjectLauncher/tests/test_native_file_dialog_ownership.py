@@ -25,13 +25,7 @@ class NativeFileDialogOwnershipTests(unittest.TestCase):
         self.assertIn("Corona::API::import_media", handlers)
 
     def test_python_runtime_contains_no_editor_file_dialog_implementation(self):
-        production_files = (
-            EDITOR_ROOT / "plugins/MainView/main.py",
-            EDITOR_ROOT / "plugins/SceneTools/main.py",
-            EDITOR_ROOT / "plugins/ProjectLauncher/main.py",
-        )
-        combined = "\n".join(path.read_text(encoding="utf-8") for path in production_files)
-
+        combined = "\n".join(p.read_text(encoding="utf-8") for p in (EDITOR_ROOT / "plugins").rglob("*.py") if "tests" not in p.parts)
         self.assertNotIn("FileHandler", combined)
         self.assertNotIn("tkinter", combined)
         self.assertFalse((EDITOR_ROOT / "CoronaCore/utils/file_handler.py").is_file())

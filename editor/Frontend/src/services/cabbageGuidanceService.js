@@ -13,8 +13,6 @@ const SELECTOR_KEYS = Object.freeze({
   'scene-actor-list': '[data-guidance="scene-actor-list"]',
   'scene-lighting': '[data-guidance="scene-lighting"]',
   'scene-light-x': '[data-guidance="scene-light-x"]',
-  'preview-start': '[data-guidance="preview-start"]',
-  'preview-stop': '[data-guidance="preview-stop"]',
   'settings-viewport': '[data-guidance="settings-viewport"]',
   'settings-viewport-ui': '[data-guidance="settings-viewport-ui"]',
   'settings-camera-speed': '[data-guidance="settings-camera-speed"]',
@@ -587,20 +585,6 @@ const BASICS_TUTORIAL_GUIDANCE = Object.freeze({
     '\u70b9\u51fb\u8282\u70b9\u7a97\u53e3\u4e0a\u65b9\u7684\u201c\u8fd0\u884c\u201d\u6309\u94ae\u4e00\u6b21\u3002\u70b9\u51fb\u540e\uff0c\u6a21\u578b\u4f1a\u5148\u8df3\u5230 X=-3\uff0c\u7136\u540e\u4ee5\u6bcf\u79d2 2 \u4e2a\u5355\u4f4d\u7684\u901f\u5ea6\u6301\u7eed\u5411\u53f3\u79fb\u52a8\u3002\u4efb\u52a1\u5728\u4f60\u70b9\u51fb\u65f6\u7acb\u5373\u5b8c\u6210\u3002',
     { fallbackEn: 'Click Run once. The model will jump to X=-3 and then keep moving right at two units per second. The task completes immediately when you click.' },
   ),
-  start_preview: basicGuidance(
-    'SceneControls',
-    { kind: 'selector', selectorKey: 'preview-start' },
-    'click',
-    '点击“开始预览”，等到预览画面真正启动。',
-    { fallbackEn: 'Click Start Preview and wait until the preview is visibly running.' },
-  ),
-  stop_preview: basicGuidance(
-    'SceneControls',
-    { kind: 'selector', selectorKey: 'preview-stop' },
-    'click',
-    '点击“结束预览”，等待预览完全停止且场景恢复。',
-    { fallbackEn: 'Click End Preview and wait until preview stops completely and the scene is restored.' },
-  ),
   focus_ai_composer: basicGuidance(
     'MainPage',
     { kind: 'selector', selectorKey: 'cabbage-chat-input' },
@@ -725,7 +709,7 @@ function guidanceForTask(source = {}) {
 
 function panelIdForTarget(target = {}) {
   const selectorKey = String(target.selectorKey || '');
-  if (['scene-lighting', 'scene-light-x', 'preview-start', 'preview-stop'].includes(selectorKey)) return 'SceneControls';
+  if (['scene-lighting', 'scene-light-x'].includes(selectorKey)) return 'SceneControls';
   if (selectorKey.startsWith('cabbage-chat-')) return 'CabbageChatPanel';
   if (['main-viewport', 'scene-shortcut', 'node-shortcut'].includes(selectorKey)) return 'MainPage';
   if (selectorKey.startsWith('scene-')) return 'SceneTools';

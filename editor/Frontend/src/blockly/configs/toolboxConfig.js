@@ -30,7 +30,6 @@ export const TOOLBOX_CONFIG = {
       name: "\u63a7\u5236",
       categorystyle: 'control_category',
       contents: [
-        block('control_run_project_script'),
         block('control_wait'),
         block('control_wait2'),
         block('control_for'),

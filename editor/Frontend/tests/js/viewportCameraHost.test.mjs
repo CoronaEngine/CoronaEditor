@@ -16,8 +16,8 @@ const names = new Set([
   'cameraMovementGestures', 'movementAxisGroups', 'mouseRotateStartForward', 'mouseRotateMoved',
   'cameraControls', 'isRealtimeCameraInputActive', 'scheduleCameraUpdate',
   'vectorDistance', 'scratchMouseButton', 'sendScratchPointerEvent', 'handleWheel',
-  'handleKeyDown', 'handleKeyUp', 'isGamePreviewInputLocked', 'resetRealtimeCameraInput',
-  'setEditorCameraInputLock', 'setGamePreviewInputLocked',
+  'handleKeyDown', 'handleKeyUp', 'isEditorInputLocked', 'resetRealtimeCameraInput',
+  'setEditorCameraInputLock',
   'viewportCursorShape', 'handleMainViewportBlur', 'handleMainViewportVisibility',
   'onMouseDown', 'onMouseMove', 'onMouseUp', 'sendCameraUpdateFast', 'handleCameraMove',
   'coerceNumber', 'setCameraSpeedFromPanel', 'isVector3', 'sceneGridEnabledFromSnapshot', 'applySceneSnapshot',
@@ -110,7 +110,7 @@ test('creative host keeps panel controls, input refresh, analytics and script fo
   assert.ok(h.records.some(item => item.details.interaction === 'wheel'));
   assert.ok(h.records.some(item => item.details.axisGroup === 'left_right'));
   assert.deepEqual(h.scratch.map(call => call[0]), ['sendMouseEvent', 'sendMouseEvent', 'sendKeyEvent', 'sendKeyUpEvent']);
-  p.setGamePreviewInputLocked(true);
+  p.setEditorCameraInputLock('node_graph', true);
   const before = structuredClone(JSON.parse(JSON.stringify(p.cameraState.value)));
   p.handleKeyDown(input({ code: 'KeyW', key: 'w' }));
   p.handleWheel(input({ deltaY: -1 })); p.handleCameraMove('forward'); h.step(100);
