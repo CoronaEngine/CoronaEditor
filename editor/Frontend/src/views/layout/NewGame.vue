@@ -11,7 +11,7 @@
     <div class="relative z-10 flex-1 flex flex-col px-8 py-6 overflow-hidden">
 
       <!-- ① 上方：悬浮提示词层（漂浮 / 发光 / 可点击注入） -->
-      <div v-if="mode === 'creative'" class="relative h-44 shrink-0">
+      <div class="relative h-44 shrink-0">
         <button
           v-for="(hint, i) in floatingHints"
           :key="hint.text"
@@ -33,7 +33,6 @@
 
       <!-- ② 中间：标题 + 世界描述输入框（页面焦点） -->
       <div class="flex-1 flex flex-col items-center justify-center min-h-0">
-        <template v-if="mode === 'creative'">
         <h1 class="text-3xl font-light tracking-wide mb-2 text-center">
           你想创造一个怎样的
           <span class="text-[#d8b86c] font-medium">世界</span>？
@@ -52,30 +51,10 @@
             @keydown.ctrl.enter="handleCreate"
           ></textarea>
         </div>
-        </template>
-        <div v-else class="text-center">
-          <h1 class="text-3xl text-[#d8b86c]">山门神殿</h1>
-          <p class="mt-3 text-gray-400">进入主世界，挑战守门巨兽。每次进入都会开始新的一局。</p>
-        </div>
       </div>
 
-      <!-- ③ 底部：模式二选一 + 操作按钮 -->
+      <!-- ③ 底部：创建与返回 -->
       <div class="shrink-0 flex flex-col items-center gap-6 pb-2">
-        <!-- 模式二选一 -->
-        <div class="inline-flex p-1 rounded-xl bg-[#1a1a1a] border border-[#333]">
-          <button
-            v-for="m in modes"
-            :key="m.id"
-            class="px-8 py-2.5 rounded-lg text-base font-medium transition-all duration-300"
-            :class="mode === m.id
-              ? 'bg-[#d8b86c] text-white shadow-lg'
-              : 'text-gray-400 hover:text-white'"
-            @click="mode = m.id"
-          >
-            {{ m.label }}
-          </button>
-        </div>
-
         <!-- 操作按钮 -->
         <div class="w-full max-w-3xl flex items-center justify-between">
           <button
@@ -87,7 +66,7 @@
           </button>
 
           <button
-            :disabled="creating || (mode === 'creative' && !archiveReady)"
+            :disabled="creating || !archiveReady"
             class="px-14 py-3 bg-[#d8b86c] hover:bg-[#95b86c] disabled:bg-gray-700 disabled:cursor-not-allowed
                    rounded-lg font-bold text-base transition-all shadow-lg
                    inline-flex items-center gap-2"
@@ -95,7 +74,7 @@
           >
             <svg v-if="!creating" class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v18M3 12h18"/><path d="M5.6 5.6l1.4 1.4M17 17l1.4 1.4M18.4 5.6L17 7M7 17l-1.4 1.4"/></svg>
             <svg v-else class="w-5 h-5 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>
-            {{ mode === 'story' ? '开始剧情' : creating ? '创造中…' : (archiveReady ? '创造世界' : '存档服务正在初始化…') }}
+            {{ creating ? '创造中…' : (archiveReady ? '创造世界' : '存档服务正在初始化…') }}
           </button>
         </div>
       </div>
@@ -104,7 +83,7 @@
 </template>
 
 <script setup>
-import { onUnmounted, ref, watch } from 'vue';
+import { onMounted, onUnmounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { editorApi } from '@/api/editorApi.js';
 import { worldModeState } from '@/services/worldModeService.js';
@@ -117,7 +96,6 @@ import { translateUiText } from '@/i18n/domTranslator.js';
 const router = useRouter();
 
 const worldPrompt = ref('');
-const mode = ref('story'); // 'story' 剧情模式 | 'creative' 创造模式
 const creating = ref(false);
 const archiveReady = ref(false);
 const promptRef = ref(null);
@@ -134,13 +112,9 @@ const refreshArchiveReady = async () => {
   }
 };
 
-watch(mode, current => {
-  window.clearInterval(archiveStatusTimer);
-  archiveStatusTimer = null;
-  if (current === 'creative') {
-    void refreshArchiveReady();
-    archiveStatusTimer = window.setInterval(refreshArchiveReady, 250);
-  }
+onMounted(() => {
+  void refreshArchiveReady();
+  archiveStatusTimer = window.setInterval(refreshArchiveReady, 250);
 });
 
 onUnmounted(() => {
@@ -149,11 +123,6 @@ onUnmounted(() => {
     window.clearInterval(archiveStatusTimer);
   }
 });
-
-const modes = [
-  { id: 'story', label: '剧情模式' },
-  { id: 'creative', label: '创造模式' },
-];
 
 // 静态预设的悬浮提示词（点击注入输入框）；top/left 散布，dur/delay 错峰漂浮
 const floatingHints = [
@@ -205,10 +174,6 @@ const waitForPythonProjectActivation = async (expectedPath, timeoutMs = 7000) =>
 };
 
 const handleCreate = async () => {
-  if (mode.value === 'story') {
-    await router.push('/Story');
-    return;
-  }
   if (creating.value || !archiveReady.value) return;
   const prompt = worldPrompt.value.trim(); // 允许为空：无提示词也可创建
 
@@ -216,7 +181,7 @@ const handleCreate = async () => {
   try {
     // 后端自动命名 + 存到引擎 data 目录，返回 { name, path }
     const result = await editorApi.project.createWorldProject({
-      mode: mode.value,
+      mode: 'creative',
       prompt,
     });
     if (disposed) return;
@@ -233,10 +198,6 @@ const handleCreate = async () => {
       if (openResult?.ok) {
         const revision = worldModeState.revision;
         const current = () => !disposed && worldModeState.status === 'ready' && worldModeState.revision === revision;
-        if (worldModeState.mode === 'story') {
-          await router.push('/');
-          return;
-        }
         // Never send a world description or task request until Python confirms
         // that the newly created world is the active project. Otherwise the old
         // world can receive the new task plan and a stale node request can cross over.
@@ -248,7 +209,7 @@ const handleCreate = async () => {
             // creates or modifies the project node graph.
             await initializeWorldTasks({
               prompt,
-              mode: mode.value,
+              mode: 'creative',
               waitForCompletion: Boolean(prompt),
             });
           } catch (taskError) {

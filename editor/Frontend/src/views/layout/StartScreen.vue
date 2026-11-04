@@ -10,6 +10,9 @@
 
     <!-- 导航按钮（GSAP 控制居中/左移） -->
     <div ref="navContainer" class="nav-container">
+      <button type="button" class="nav-btn" @click="router.push('/Story')">
+        {{ t('start.testMode') }}
+      </button>
       <button
         v-for="item in navItems"
         :key="item.id"
@@ -45,6 +48,7 @@
 <script setup>
 import { ref, shallowRef, nextTick, onMounted, onUnmounted } from 'vue';
 import { useI18n } from 'vue-i18n';
+import { useRouter } from 'vue-router';
 import { appService } from '@/services/appService.js';
 import * as THREE from 'three';
 import gsap from 'gsap';
@@ -54,6 +58,7 @@ import RecentGames from './RecentGames.vue';
 import JoinGame from './JoinGame.vue';
 
 const { t } = useI18n();
+const router = useRouter();
 const canvasContainer = ref(null);
 const navContainer = ref(null);
 const panelRef = ref(null);

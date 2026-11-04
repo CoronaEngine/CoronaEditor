@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import test from 'node:test';
 import { setImmediate } from 'node:timers';
-import { ref, watch } from 'vue';
+import { compile, ref } from 'vue';
 import { babelParse, compileScript, parse } from 'vue/compiler-sfc';
 import { editorApi } from '../../src/api/editorApi.js';
 import * as launcher from '../../src/services/projectLauncherService.js';
@@ -34,10 +34,9 @@ const deferred = () => {
   return { promise, resolve };
 };
 
-async function mountCreationPage(t, { creative = true, stopResult = idle(), wrapped = true } = {}) {
+async function mountCreationPage(t, { stopResult = idle(), wrapped = true } = {}) {
   const calls = [], alerts = [], saves = [], mounted = [], unmounted = [];
-  let activePath = creative ? 'creative-world' : '';
-  let activeMode = creative ? 'creative' : '';
+  let activePath = 'creative-world';
   let route = '/NewGame';
   let sequence = 0;
   let scriptResult = stopResult;
@@ -61,10 +60,10 @@ async function mountCreationPage(t, { creative = true, stopResult = idle(), wrap
   });
   t.mock.method(console, 'error', () => {});
   t.mock.method(editorApi.project, 'getProjectLoadStatus', async () => wrap({ archive_service_ready: true }));
-  t.mock.method(editorApi.projectSettings, 'getActiveProjectInfo', async () => wrap({ project_path: activePath, mode: activeMode }));
+  t.mock.method(editorApi.projectSettings, 'getActiveProjectInfo', async () => wrap({ project_path: activePath, mode: 'creative' }));
   t.mock.method(editorApi.project, 'createWorldProject', async payload => {
     calls.push(['create', payload]);
-    return wrap({ name: `剧情世界_${++sequence}`, path: `story-world-${sequence}` });
+    return wrap({ name: `创造世界_${++sequence}`, path: `creative-world-${sequence}` });
   });
   t.mock.method(editorApi.scratch, 'stopGamePreview', async () => {
     calls.push(['preview']);
@@ -78,32 +77,30 @@ async function mountCreationPage(t, { creative = true, stopResult = idle(), wrap
   t.mock.method(editorApi.project, 'openProject', async path => {
     calls.push(['open', path]);
     activePath = path;
-    activeMode = 'story';
     return wrap({ ok: true, path });
   });
-  t.mock.method(lanchat, 'openRoom', assert.fail);
-  t.mock.method(lanchat, 'setWorkspaceMode', assert.fail);
+  t.mock.method(lanchat, 'openRoom', async () => {});
+  t.mock.method(lanchat, 'setWorkspaceMode', () => {});
   worldMode.worldModeService.invalidate();
-  if (creative) await worldMode.worldModeService.resolve(activePath, { force: true });
+  await worldMode.worldModeService.resolve(activePath, { force: true });
   const router = {
     push: async path => { calls.push(['route', path]); route = path; },
     replace: async path => { calls.push(['replace', path]); route = path; },
   };
   const component = makeComponent({
-    vue: { ref, watch, onMounted: hook => mounted.push(hook), onUnmounted: hook => unmounted.push(hook) },
+    vue: { ref, onMounted: hook => mounted.push(hook), onUnmounted: hook => unmounted.push(hook) },
     'vue-router': { useRouter: () => router },
     '@/api/editorApi.js': { editorApi },
     '@/services/worldModeService.js': worldMode,
     '@/services/projectLauncherService.js': launcher,
     '@/services/worldSessionLifecycle.js': lifecycle,
-    '@/services/cabbageAssistantContextService.js': { initializeWorldTasks: assert.fail },
+    '@/services/cabbageAssistantContextService.js': { initializeWorldTasks: async () => {} },
     '@/stores/lanchat.js': { default: lanchat },
     '@/i18n/domTranslator.js': { translateUiText: text => text },
   });
   const page = component.setup({}, { expose() {} });
   for (const hook of mounted) hook();
   await page.refreshArchiveReady();
-  assert.equal(page.mode.value, 'story');
   assert.match(descriptor.template.content, /@click="handleCreate"/);
   return {
     page, calls, alerts, saves,
@@ -113,13 +110,23 @@ async function mountCreationPage(t, { creative = true, stopResult = idle(), wrap
   };
 }
 
-test('story launches without creating a project, checking archives, or writing a save', async t => {
-  const h = await mountCreationPage(t, { creative: false });
-  h.page.archiveReady.value = false;
-  await h.page.handleCreate();
-  assert.deepEqual(h.calls, [['route', '/Story']]);
-  assert.deepEqual(h.saves, []);
-  assert.equal(h.activePath(), '');
+test('Test Mode is the first home button and opens the story without a project', async () => {
+  const home = parse(fs.readFileSync(new URL('../../src/views/layout/StartScreen.vue', import.meta.url), 'utf8'));
+  const routes = [];
+  const tree = compile(home.descriptor.template.content)({
+    t: key => key,
+    navItems: [{ id: 'panel-new', label: 'start.newGame' }],
+    activeNav: null, showPanel: false, handleNavClick: assert.fail,
+    router: { push: path => routes.push(path) },
+  }, []);
+  const nav = tree.children.find(child => child.props?.class === 'nav-container');
+  const buttons = nav.children.flatMap(child => Array.isArray(child.children) ? child.children : [child])
+    .filter(child => child.type === 'button');
+  assert.deepEqual(buttons.map(button => button.children), ['start.testMode', 'start.newGame']);
+  await buttons[0].props.onClick();
+  assert.deepEqual(routes, ['/Story']);
+  const guard = worldMode.createWorldModeRouteGuard({ controller: { resolve: assert.fail }, notify: assert.fail, closePanel: assert.fail });
+  assert.equal(await guard({ path: routes[0] }), true);
 });
 
 test('creation keeps the old world on real failures and the button can retry', async t => {
@@ -129,7 +136,6 @@ test('creation keeps the old world on real failures and the button can retry', a
   ]) {
     await t.test(stopResult.restoreError || stopResult.message, async t => {
       const h = await mountCreationPage(t, { stopResult });
-      h.page.mode.value = 'creative';
       await h.page.handleCreate();
       assert.deepEqual(h.calls, [
         ['create', { mode: 'creative', prompt: '' }], ['preview'], ['script', true], ['replace', '/StartScreen'],
@@ -144,9 +150,9 @@ test('creation keeps the old world on real failures and the button can retry', a
       h.calls.length = 0;
       await h.page.handleCreate();
       assert.deepEqual(h.calls, [
-        ['create', { mode: 'creative', prompt: '' }], ['preview'], ['script', true], ['open', 'story-world-2'], ['route', '/'],
+        ['create', { mode: 'creative', prompt: '' }], ['preview'], ['script', true], ['open', 'creative-world-2'], ['route', '/'],
       ]);
-      assert.equal(h.activePath(), 'story-world-2');
+      assert.equal(h.activePath(), 'creative-world-2');
       assert.equal(h.route(), '/');
       assert.equal(h.alerts.length, 1);
     });
@@ -156,7 +162,6 @@ test('creation keeps the old world on real failures and the button can retry', a
 test('creation waits for cleanup, disables duplicate requests, and respects service readiness', async t => {
   const stop = deferred();
   const h = await mountCreationPage(t, { stopResult: stop.promise });
-  h.page.mode.value = 'creative';
   h.page.archiveReady.value = false;
   await h.page.handleCreate();
   assert.deepEqual(h.calls, []);

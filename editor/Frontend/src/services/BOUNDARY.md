@@ -23,9 +23,10 @@
 
 ### 世界界面会话
 
-`worldModeService.js` 负责剧情/创造模式的 Web 判定；通过
-`projectSettings.getActiveProjectInfo` 读取原生项目元数据，不保存或迁移项目。只有明确的 `mode=story`
-进入剧情模式，缺省及历史模式仍为创造模式，读取失败则阻止进入世界。
+启动页的“测试模式”直接打开 `/Story`。每次进入时，`StoryWorld` 创建一局内存会话，退出即丢弃。
+“新建游戏”只创建创造世界。打开已有项目时，`worldModeService.js` 通过
+`projectSettings.getActiveProjectInfo` 读取项目元数据。显式标记 `mode=story` 的旧项目仍可进入剧情，
+其余项目按创造模式处理。独立的 `/Story` 入口无需读取项目元数据。
 
 `editorWindowSession.js` 负责 UI 策略、窗口请求登记、跨窗口会话令牌与过期事件过滤，
 通过 `appService.js` 复用已有 Dock 命令；localStorage 仅存临时 UI 协调信息，

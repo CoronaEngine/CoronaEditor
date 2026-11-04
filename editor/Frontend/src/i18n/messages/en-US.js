@@ -57,6 +57,7 @@ export default {
     dropHere: 'Drop here',
   },
   start: {
+    testMode: 'Test Mode',
     newGame: 'New Game',
     continueGame: 'Continue',
     joinGame: 'Join Game',

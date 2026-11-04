@@ -3349,11 +3349,14 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
         self.assertNotIn('data.value("mode"', create_body)
         self.assertNotIn("create_project_from_template_native", create_body)
 
-    def test_world_creation_updates_default_save_location_for_portable_migration(self):
+    def test_world_creation_rejects_story_before_writing_creative_archives(self):
         handler_source = self._handler_source()
         start = handler_source.index('{"create_world_project"')
         end = handler_source.index('{"create_multiplayer_project"', start)
         world_body = handler_source[start:end]
+        branch = world_body.index('if (world_type == "story")')
+        writes = world_body.index("std::filesystem::create_directories(base_dir)")
+        self.assertIn("return native_failure(", world_body[branch:writes])
         self.assertIn(
             'update_editor_settings_section("General", {{"default_path", path_to_utf8(base_dir)}})',
             world_body,
