@@ -46,7 +46,7 @@ async function renderMain(settings = {}) {
       },
     }),
   });
-  for (const name of ['FrameTimingOverlay', 'CabbageReviewAssistant', 'CabbageChatPanel', 'CabbageGuidanceOverlay', 'PtSettings', 'ReblurSettings', 'RelaxSettings', 'RestirSettings']) {
+  for (const name of ['CabbageReviewAssistant', 'CabbageChatPanel', 'CabbageGuidanceOverlay', 'PtSettings', 'ReblurSettings', 'RelaxSettings', 'RestirSettings']) {
     app.component(name, { render: () => null });
   }
   return renderToString(app);

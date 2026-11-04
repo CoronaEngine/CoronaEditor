@@ -23,6 +23,13 @@ from api.editor_api import (
 
 class EditorAggregateApiTest(unittest.TestCase):
 
+    def test_camera_frame_timing_has_no_callable_python_wrapper(self):
+        with patch("api.editor_api._CPP_EDITOR_API_METHODS", {}), patch(
+            "api.editor_api._CPP_EDITOR_API_EVENTS", {}
+        ):
+            scene_tools = type(CoronaEditorApi.scene_tools)()
+            self.assertFalse(callable(getattr(scene_tools, "get_frame_timing", None)))
+
     def test_retired_log_event_has_no_python_subscription(self):
         with patch("api.editor_api._CPP_EDITOR_API_METHODS", {}), patch(
             "api.editor_api._CPP_EDITOR_API_EVENTS", {

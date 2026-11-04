@@ -407,6 +407,8 @@ test('static namespaces resolve manifest methods but reject unknown members befo
 
   const before = host.requests.filter(entry => !entry.api.startsWith('EditorApi.')).length;
   await assert.rejects(() => editorApi.sceneTools.notARealMethod(), /not defined by C\+\+ manifest/);
+  assert.equal(Object.hasOwn(editorApi.sceneTools, 'getFrameTiming'), false);
+  await assert.rejects(() => editorApi.sceneTools.getFrameTiming('scene.ini', 'camera-1'), /not defined by C\+\+ manifest/);
   assert.equal(host.requests.filter(entry => !entry.api.startsWith('EditorApi.')).length, before);
 });
 

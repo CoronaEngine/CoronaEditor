@@ -1522,6 +1522,10 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
     def test_log_batch_is_absent_from_native_event_manifest(self):
         self.assertNotIn('"Editor.logBatch"', self._editor_api_source())
 
+    def test_camera_frame_timing_is_not_an_editor_api(self):
+        self.assertNotIn("get_frame_timing", self._editor_api_source())
+        self.assertNotIn('"get_frame_timing"', self._handler_source())
+
     def test_ai_chunk_is_cpp_defined_event(self):
         source = self._editor_api_source()
         bridge_source = self._frontend_bridge_source()

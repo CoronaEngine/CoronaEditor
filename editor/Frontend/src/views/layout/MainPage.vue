@@ -16,17 +16,7 @@
       @pointerleave="handleViewportPointerLeave"
       @click="handleViewportClick"
       @wheel.prevent="handleWheel"
-    >
-      <FrameTimingOverlay
-        class="main-frame-timing"
-        :scene-id="currentMainSceneId()"
-        :camera-id="currentMainCameraId() || ''"
-        :enabled="mainRenderBackend === 'vision'"
-        :render-mode="mainVisionRenderMode"
-      />
-    </div>
-
-
+    ></div>
 
     <div
       v-if="projectResourceLoadStatus?.loading"
@@ -109,7 +99,6 @@
 </template>
 
 <script setup>
-import FrameTimingOverlay from '@/components/ui/FrameTimingOverlay.vue';
 import { computed, ref, onMounted, onUnmounted, reactive, watch, nextTick } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { DEFAULT_SCENE_NAME } from '@/utils/constants.js';
@@ -2600,7 +2589,6 @@ provideCreativePanelState(() => ({
 </script>
 
 <style scoped>
-.main-frame-timing { bottom: 70px; right: 16px; }
 [data-viewport-pick-surface] {
   touch-action: none;
 }

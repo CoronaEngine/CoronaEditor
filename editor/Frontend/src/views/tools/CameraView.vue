@@ -137,12 +137,7 @@
       <button class="window-action maximize no-drag" aria-label="Toggle camera window fullscreen" @click="cycleWindowMode">[]</button>
       <button class="window-action close no-drag" aria-label="Close camera view" @click="closeView">x</button>
     </header>
-    <FrameTimingOverlay
-      :scene-id="sceneId"
-      :camera-id="cameraId"
-      :enabled="backend === 'vision'"
-      :render-mode="visionRenderMode"
-    />
+
     <div class="ui-mode-switch no-drag" @mousedown.stop @pointerdown.stop>
       <button
         v-for="item in viewportUiModeItems"
@@ -196,7 +191,6 @@
 </template>
 
 <script setup>
-import FrameTimingOverlay from '@/components/ui/FrameTimingOverlay.vue';
 import PtSettings from '@/components/ui/PtSettings.vue';
 import RestirSettings from '@/components/ui/RestirSettings.vue';
 import ReblurSettings from '@/components/ui/ReblurSettings.vue';
