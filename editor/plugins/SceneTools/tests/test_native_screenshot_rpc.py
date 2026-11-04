@@ -642,7 +642,7 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
         for snippet in (
             "getAppVersion: () => call_manifest_editor_api('project.getAppVersion', [])",
             "listActorTree: (sceneName) => call_manifest_editor_api('scene.listActorTree', [sceneName])",
-            "sceneSave: (sceneName) => call_manifest_editor_api('main.sceneSave', [sceneName])",
+            "sceneSave: (sceneName, session) => call_manifest_editor_api('main.sceneSave', [sceneName, { archive_session: session }])",
         ):
             with self.subTest(snippet=snippet):
                 self.assertIn(snippet, bridge_source)
@@ -1026,7 +1026,7 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
         bridge_source = self._frontend_bridge_source()
 
         for snippet in (
-            "off: (callbackToken)",
+            "off: async (callbackToken)",
             "events: {",
             "register_typed_editor_api_callback",
             "eventSpec?.js_wrapper !== wrapperName",
@@ -1076,59 +1076,15 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
             with self.subTest(event_prefix=event_prefix):
                 self.assertNotIn(event_prefix, events_section)
 
-    def test_scene_tree_changed_event_is_defined_and_emitted_by_cpp(self):
-        source = self._editor_api_source()
-        handler_source = self._handler_source()
-        bridge_source = self._frontend_bridge_source()
+    def test_tree_reads_are_scoped_and_revision_checked(self):
+        source = self._handler_source()
+        self.assertIn('query.at("known_revision") == scene->tree_revision', source)
+        self.assertIn('data["archive_session"] = scene->archive_session', source)
+        self.assertNotIn('emit_editor_api_event("SceneTools.sceneTreeChanged"', source)
 
-        for snippet in (
-            '{"SceneTools.sceneTreeChanged", EditorApiValueType::Object, all_callers(), '
-            '"events.onSceneTreeChanged", "events.on_scene_tree_changed"}',
-            "onSceneTreeChanged: (callback) => register_manifest_editor_api_callback("
-            "'events.onSceneTreeChanged', callback)",
-        ):
-            with self.subTest(snippet=snippet):
-                self.assertIn(snippet, source + bridge_source)
-
-        emit_body = re.search(
-            r"void emit_scene_tree_changed\(const std::string& scene_route\) \{.*?\n\}",
-            handler_source,
-            re.S,
-        )
-        self.assertIsNotNone(emit_body)
-        body = emit_body.group(0)
-        self.assertIn('emit_editor_api_event("SceneTools.sceneTreeChanged"', body)
-        self.assertIn('{"scene", scene_route}', body)
-        self.assertNotIn("__coronaEmit", body)
-        self.assertNotIn("scene-tree-changed", body)
-
-        event_bus_source = (
-            self._repo_root()
-            / "editor"
-            / "Frontend"
-            / "src"
-            / "utils"
-            / "eventBus.js"
-        ).read_text(encoding="utf-8")
-        self.assertNotIn("event === 'scene-tree-changed'", event_bus_source)
-
-    def test_actor_changed_event_is_emitted_by_cpp_callback_registry(self):
-        handler_source = self._handler_source()
-
-        emit_body = re.search(
-            r"void emit_actor_change\(const NativeContext& context,.*?\n\}",
-            handler_source,
-            re.S,
-        )
-        self.assertIsNotNone(emit_body)
-        body = emit_body.group(0)
-        self.assertIn('emit_editor_api_event("SceneTools.actorChanged"', body)
-        self.assertIn('{"actor_type", actor.actor_type}', body)
-        self.assertIn('{"scene", scene.route}', body)
-        self.assertIn('{"actor", actor.name}', body)
-        self.assertIn("(void)context;", body)
-        self.assertNotIn("__coronaEmit", body)
-        self.assertNotIn("actor-change", body)
+    def test_scene_mutations_do_not_dispatch_actor_state_to_either_client(self):
+        self.assertNotIn('emit_editor_api_event("SceneTools.actorChanged"', self._handler_source())
+        self.assertIn("if (pull_only_event(event_name)) return 0;", self._editor_api_source())
 
     def test_actor_selection_is_cpp_defined_api_and_event(self):
         source = self._editor_api_source()
@@ -1190,14 +1146,14 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
                 self.assertIn(snippet, source + bridge_source + python_api_source)
 
         self.assertIn('{"select_actor", [](const NativeRequest& request, const NativeContext&)', handler_source)
-        self.assertIn('emit_editor_api_event("SceneTools.actorSelectionChanged"', handler_source)
+        self.assertIn("scene->selection = payload;", handler_source)
         self.assertIn('{"actor_type", actor_type}', handler_source)
         self.assertIn('{"scene", scene_name}', handler_source)
         self.assertIn('{"actor", actor_name}', handler_source)
 
         self.assertIn("editorApi.sceneTools.selectActor(sceneId, type, actorName, {", main_page_source)
         self.assertIn(".selectActor(currentSceneName.value, scene.type || 'actor', scene.name)", scene_bar_source)
-        self.assertIn("editorApi.events.onActorSelectionChanged(handleSelection)", object_source)
+        self.assertIn("editorApi.scene.observe('selection', handleSelection)", object_source)
         self.assertIn("editorApi.off(selectionToken)", object_source)
         for source_name, frontend_source in (
             ("MainPage", main_page_source),
@@ -1255,7 +1211,7 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
             with self.subTest(snippet=snippet):
                 self.assertIn(snippet, source + bridge_source + python_api_source + corona_editor_source)
 
-        self.assertIn("editorApi.events.onActorTransformUpdated(handleTransform)", object_source)
+        self.assertIn("editorApi.scene.observe('transform', handleTransform)", object_source)
         self.assertIn("editorApi.off(transformToken)", object_source)
         self.assertNotIn("coronaEventBus.on('transform-update'", object_source)
         self.assertNotIn("coronaEventBus.off('transform-update'", object_source)
@@ -1561,20 +1517,11 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
 
         self.assertNotIn("event === 'ai-chunk'", event_bus_source)
 
-    def test_project_opened_event_is_emitted_by_cpp_callback_registry(self):
-        handler_source = self._handler_source()
-        start = handler_source.find('{"open_project", [](const NativeRequest& request, const NativeContext&)')
-        self.assertGreaterEqual(start, 0)
-        end = handler_source.find('{"open_project_file"', start)
-        self.assertGreater(end, start)
-        body = handler_source[start:end]
-
-        self.assertIn('emit_editor_api_event("ProjectLauncher.projectOpened"', body)
-        self.assertIn('{"path", state.project_path}', body)
-        self.assertLess(
-            body.find('emit_editor_api_event("ProjectLauncher.projectOpened"'),
-            body.rfind('return native_success({'),
-        )
+    def test_project_open_is_visible_through_active_scene_query(self):
+        source = self._handler_source()
+        self.assertIn('{"read_active_scene",', source)
+        self.assertIn('{"project_path", native_editor_state().project_path}', source)
+        self.assertNotIn('emit_editor_api_event("ProjectLauncher.projectOpened"', source)
 
     def test_lanchat_event_is_defined_and_emitted_by_cpp_callback_registry(self):
         source = self._editor_api_source()
@@ -1677,24 +1624,10 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
         )
         self.assertIsNotNone(focus_body)
         focus_source = focus_body.group(0)
-        self.assertIn('emit_editor_api_event("SceneTools.focusPoseResult", event_payload)', focus_source)
-        self.assertIn('event_payload["request_id"] = request_id;', focus_source)
-        self.assertIn("(void)frame;", focus_source)
-        self.assertNotIn("if (!frame)", focus_source)
-        self.assertNotIn("__coronaEmit", focus_source)
-        self.assertNotIn("focus-pose-result", focus_source)
+        self.assertIn('retain_viewport_result(frame, current_viewport_session(), "focusPoseResult"', focus_source)
+        self.assertIn('retain_viewport_result(frame, session, "actorPickResult"', realtime_source)
+        self.assertNotIn('emit_editor_api_event_to_frame(', realtime_source)
 
-        pick_body = re.search(
-            r"void send_viewport_pick_result\(const CefRefPtr<CefFrame>& frame,.*?\n\}",
-            realtime_source,
-            re.S,
-        )
-        self.assertIsNotNone(pick_body)
-        pick_source = pick_body.group(0)
-        self.assertIn('emit_editor_api_event_to_frame("SceneTools.actorPickResult", payload, frame)', pick_source)
-        self.assertNotIn("if (!frame)", pick_source)
-        self.assertNotIn("__coronaEmit", pick_source)
-        self.assertNotIn("actor-pick-result", pick_source)
 
     def test_realtime_focus_and_pick_frontend_consumers_use_cpp_defined_event_wrappers(self):
         scene_bar_source = (
@@ -1722,7 +1655,7 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
         self.assertNotIn("coronaEventBus.on('focus-pose-result'", scene_bar_source)
         self.assertNotIn("coronaEventBus.off('focus-pose-result'", scene_bar_source)
 
-        self.assertIn("subscribeWhileCurrent(editorApi.events.onActorPickResult, handleActorPickResult)", main_page_source)
+        self.assertIn("subscribeWhileCurrent(callback => editorApi.scene.observe('actorPickResult', callback), handleActorPickResult)", main_page_source)
         self.assertIn("editorApi.off(actorPickResultCallbackToken)", main_page_source)
         self.assertNotIn("coronaEventBus.on('actor-pick-result'", main_page_source)
         self.assertNotIn("coronaEventBus.off('actor-pick-result'", main_page_source)
@@ -1761,7 +1694,7 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
             / "SceneBar.vue"
         ).read_text(encoding="utf-8")
 
-        self.assertIn("editorApi.events.onSceneTreeChanged(onSceneTreeChangedEvent)", scene_bar_source)
+        self.assertIn("editorApi.scene.observe('tree', onSceneTreeChangedEvent)", scene_bar_source)
         self.assertIn("editorApi.off(sceneTreeChangedCallbackToken)", scene_bar_source)
         self.assertIn("const sceneName = payload?.scene ?? payload;", scene_bar_source)
         self.assertNotIn("coronaEventBus.on('scene-tree-changed', onSceneTreeChangedEvent)", scene_bar_source)
@@ -1881,7 +1814,7 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
             / "SceneBar.vue"
         ).read_text(encoding="utf-8")
 
-        self.assertIn("editorApi.events.onActorChanged(onActorChangeEvent)", scene_bar_source)
+        self.assertIn("editorApi.scene.observe('selection', onActorChangeEvent)", scene_bar_source)
         self.assertIn("editorApi.off(actorChangedCallbackToken)", scene_bar_source)
         self.assertIn("const type = payload?.actor_type ?? payload?.type ?? payload;", scene_bar_source)
         self.assertIn("const sceneId = payload?.scene ?? maybeSceneId;", scene_bar_source)
@@ -1909,7 +1842,7 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
         source = self._editor_api_source()
 
         expected = {
-            "SceneTools.list_scene_tree": ("kSceneNameParam", "EditorApiValueType::Object"),
+            "SceneTools.list_scene_tree": ("kReadTreeParams", "EditorApiValueType::Object"),
             "SceneTools.reload_scene": ("kSceneToolsReloadSceneParams", "EditorApiValueType::Object"),
             "SceneTools.create_camera_view": ("kSceneToolsCreateCameraViewParams", "EditorApiValueType::Object"),
             "SceneTools.open_camera_view": ("kSceneCameraParams", "EditorApiValueType::Object"),
@@ -1977,7 +1910,7 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
 
         for snippet in (
             "listActorTree: (sceneName) => call_manifest_editor_api('scene.listActorTree', [sceneName])",
-            "listSceneTree: (sceneName) => call_manifest_editor_api('sceneTools.listSceneTree', [sceneName])",
+            "listSceneTree: (sceneName, query) => call_manifest_editor_api('sceneTools.listSceneTree', query ? [sceneName, query] : [sceneName])",
             "createActor: (sceneName, objPath, actorType = 'model', actorData = null) =>",
             "call_manifest_editor_api('sceneTools.createActor',",
             "removeActor: (sceneName, actorName) =>",
@@ -2132,8 +2065,8 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
         self.assertNotIn("\n  sceneDatas: {", bridge_source)
         self.assertNotIn("sceneDatas.", bridge_source)
         self.assertIn("getScene: (sceneId) => editorApi.scene.getSnapshot(sceneId)", bridge_source)
-        self.assertIn("getActor: async (sceneName, actorName) =>", bridge_source)
-        self.assertIn("editorApi.scene.getSnapshot(sceneName)", bridge_source)
+        self.assertIn("getActor: async (sceneName, actorName, session) =>", bridge_source)
+        self.assertIn("editorApi.scene.readActor(session, actorName)", bridge_source)
 
     def test_scene_datas_legacy_manifest_is_removed(self):
         bridge_source = self._frontend_bridge_source()
@@ -2725,7 +2658,7 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
             "main: {",
             "importResourceFile: (sceneName, fileType) =>",
             "onInit: (projectPath = '') =>",
-            "sceneSave: (sceneName) => call_manifest_editor_api('main.sceneSave', [sceneName])",
+            "sceneSave: (sceneName, session) => call_manifest_editor_api('main.sceneSave', [sceneName, { archive_session: session }])",
             "OnInit: (projectPath = window.localStorage?.getItem('corona.activeProjectPath') || '') =>\n    editorApi.main.onInit",
             "importResourceFileByDialog: (sceneName, fileType) =>\n    editorApi.main.importResourceFile",
         ):
@@ -2957,8 +2890,8 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
     def test_native_actor_save_delivers_typed_values_to_the_python_writer(self):
         source = self._handler_source()
         save = source.split("NativeResult save_editor_scene", 1)[1].split("\n}", 1)[0]
-        self.assertIn('scene_to_json(scene)', save)
-        self.assertIn('invoke_python_script_service({"ProjectArchive", "save"', save)
+        self.assertIn('archive_scene_values(scene)', save)
+        self.assertIn('project_archive_call("save"', save)
         self.assertNotIn('SceneDocumentStore', save)
 
     def test_actor_file_transfer_uses_runtime_asset_identity_without_wire_changes(self):
@@ -3182,7 +3115,7 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
             "createViewportPickController",
             "indexActorsByHandle",
             "editorApi.sceneTools.listSceneTree(sceneId)",
-            "editorApi.events.onActorPickResult(handleCameraViewActorPickResult)",
+            "editorApi.scene.observe('actorPickResult', handleCameraViewActorPickResult)",
             "cameraViewPickController.pickAt(snapshot)",
             "pickedActor",
             "editorApi.off(actorPickResultCallbackToken)",
@@ -3279,7 +3212,7 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
             editor_root / "editor" / "Frontend" / "src" / "api" / "editorApi.js"
         ).read_text(encoding="utf-8")
         self.assertIn('#include "scene_folder.h"', handler_source)
-        self.assertIn('detect_scene_folder(project_dir)', handler_source)
+        self.assertIn('project_archive_call("project_info"', handler_source)
         self.assertIn('L"scene.ini;*.xml;*.pbrt"', handler_source)
         self.assertNotIn('L"*.json"', handler_source)
         self.assertIn('ProjectLauncher, open_project', api_source)
@@ -3297,7 +3230,7 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
         create_start = handler_source.index('{"create_project"')
         create_end = handler_source.index('{"create_world_project"', create_start)
         create_body = handler_source[create_start:create_end]
-        self.assertIn("create_scene_folder(target, name)", create_body)
+        self.assertIn("project_archive_call(\"create_project\"", create_body)
         self.assertNotIn('data.value("mode"', create_body)
         self.assertNotIn("create_project_from_template_native", create_body)
 
@@ -3564,7 +3497,7 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
     def test_actor_edits_have_no_implicit_native_save_path(self):
         source = self._handler_source()
         self.assertNotIn("persist_native_scene_", source)
-        self.assertIn("save_editor_scene(*scene, false)", source)
+        self.assertIn("save_editor_scene(*scene, false, metadata)", source)
         self.assertIn("save_editor_scene(*scene, true)", source)
 
     def test_portable_scene_validation_import_and_cleanup_apis_are_exposed(self):

@@ -14,6 +14,18 @@ class ScriptRuntimeSceneAdapter:
     def get_snapshot(self, scene_name=""):
         return self._invoke_manifest("scene.get_snapshot", [scene_name])
 
+    def read_active(self):
+        return self._invoke_manifest("scene.read_active_scene", [])
+
+    def read_actor(self, session, actor_guid):
+        return self._invoke_manifest("scene.read_actor", [{"archive_session": session, "actor": actor_guid}])
+
+    def read_transforms(self, session, actor_guids):
+        return self._invoke_manifest("scene.read_transforms", [{"archive_session": session, "actors": actor_guids}])
+
+    def read_archive(self, session):
+        return self._invoke_manifest("scene.read_archive_scene", [{"archive_session": session}])
+
     def get_environment(self, scene_name):
         return self._invoke_manifest("scene.get_environment", [scene_name])
 

@@ -40,7 +40,7 @@ class EditorApiAggregateWrapperTests(unittest.TestCase):
             "setActorTransform: (sceneName, actorName, transform)",
             "setActorPhysics: (sceneName, actorName, physics)",
             "setActorState: (sceneName, actorName, state)",
-            "saveActor: (sceneName, actorName)",
+            "saveActor: (sceneName, actorName, session)",
             "selectModelFile: (sceneName, actorName, fileType = 'model')",
             "setActorCameraLock: (sceneName, actorName, cameraLock)",
             "capture: (sceneName, cameraName, camera, outputPath)",

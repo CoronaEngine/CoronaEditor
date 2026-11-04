@@ -3290,8 +3290,8 @@ onMounted(async () => {
   // first graph paint. Some native bridge shutdown/startup transitions can make an
   // event registration noticeably slower than loading the saved graph itself.
   Promise.allSettled([
-    editorApi.events.onActorChanged(onNodeGraphActorChanged),
-    editorApi.events.onSceneTreeChanged(onNodeGraphSceneTreeChanged),
+    editorApi.scene.observe('selection', onNodeGraphActorChanged),
+    editorApi.scene.observe('tree', onNodeGraphSceneTreeChanged),
   ]).then((subscriptionResults) => {
     const [actorSubscription, sceneTreeSubscription] = subscriptionResults;
     if (actorSubscription.status === 'fulfilled') {

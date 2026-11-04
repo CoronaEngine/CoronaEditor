@@ -2111,17 +2111,17 @@ onMounted(async () => {
   coronaEventBus.on('viewport-controls-request', handleViewportControlsRequest);
   coronaEventBus.on('node-graph-panel-open-request', handleNodeGraphPanelOpenRequest);
   if (!viewCurrent()) return;
-  projectOpenedCallbackToken = await subscribeWhileCurrent(editorApi.events.onProjectOpened, onProjectOpenedEvent);
+  projectOpenedCallbackToken = await subscribeWhileCurrent(callback => editorApi.scene.observe('project', callback), onProjectOpenedEvent);
   if (!viewCurrent()) return;
   if (!viewCurrent()) return;
-  actorSelectionCallbackToken = await subscribeWhileCurrent(editorApi.events.onActorSelectionChanged, handleActorSelectionForObjectDock);
+  actorSelectionCallbackToken = await subscribeWhileCurrent(callback => editorApi.scene.observe('selection', callback), handleActorSelectionForObjectDock);
   if (!viewCurrent()) return;
-  actorTransformCallbackToken = await subscribeWhileCurrent(editorApi.events.onActorTransformUpdated, handleActorTransformForCabbage);
+  actorTransformCallbackToken = await subscribeWhileCurrent(callback => editorApi.scene.observe('transform', callback), handleActorTransformForCabbage);
   if (!viewCurrent()) return;
-  actorPickResultCallbackToken = await subscribeWhileCurrent(editorApi.events.onActorPickResult, handleActorPickResult);
+  actorPickResultCallbackToken = await subscribeWhileCurrent(callback => editorApi.scene.observe('actorPickResult', callback), handleActorPickResult);
   if (!viewCurrent()) return;
   gizmoPointerResultCallbackToken =
-    await subscribeWhileCurrent(editorApi.events.onViewportGizmoPointerResult, handleViewportGizmoPointerResult);
+    await subscribeWhileCurrent(callback => editorApi.scene.observe('viewportGizmoPointerResult', callback), handleViewportGizmoPointerResult);
     if (!viewCurrent()) return;
   coronaEventBus.on('model-node-selection', handleModelNodeGizmoSelection);
 

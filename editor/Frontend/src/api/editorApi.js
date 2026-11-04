@@ -1,3 +1,4 @@
+import { createSceneReader } from './sceneReader.js';
 /**
  * Bridge Utility for QWebChannel
  * 封装了与 C++ Editor API 的通信，支持 Promise 调用
@@ -479,10 +480,20 @@ const create_dynamic_editor_api_namespace = (wrapperPath, target = {}) => {
   });
 };
 
+export const sceneReader = createSceneReader(async (method, payload) => {
+  const result = await call_manifest_editor_api('scene.' + method, payload ? [payload] : []);
+  return result.data ?? result;
+});
+if (typeof document !== 'undefined') document.addEventListener?.('visibilitychange', () => sceneReader.visibilityChanged());
+if (typeof window !== 'undefined') {
+  window.addEventListener?.('pagehide', () => sceneReader.pause());
+  window.addEventListener?.('pageshow', () => sceneReader.resume());
+}
+
 const editorApiStatic = {
   listMethods: () => call_editor_api('EditorApi.list_methods', []),
   listEvents: () => call_editor_api('EditorApi.list_events', []),
-  off: (callbackToken) => unregister_callback(callbackToken),
+  off: async (callbackToken) => callbackToken < 0 ? sceneReader.off(callbackToken) : unregister_callback(callbackToken),
   editor: {
     listMethods: () => call_editor_api('EditorApi.list_methods', []),
     listEvents: () => call_editor_api('EditorApi.list_events', []),
@@ -630,21 +641,22 @@ const editorApiStatic = {
     openProjectFile: () => call_manifest_editor_api('project.openProjectFile', []),
   },
   scene: {
+    observe: async (kind, callback) => sceneReader.observe(kind, callback),
     listActorTree: (sceneName) => call_manifest_editor_api('scene.listActorTree', [sceneName]),
     getSnapshot: (sceneName = '') => call_manifest_editor_api('scene.getSnapshot', [sceneName]),
-    getActor: async (sceneName, actorName) => {
-      const result = await editorApi.scene.getSnapshot(sceneName);
-      const snapshot = result?.data ?? result ?? {};
-      const actor = Array.isArray(snapshot.actors)
-        ? snapshot.actors.find((item) => item?.name === actorName)
-        : null;
-      if (!actor) {
-        return {
-          success: false,
-          data: { status: 'error', message: `Actor not found: ${actorName}` },
-        };
+    readActive: () => call_manifest_editor_api('scene.readActive', []),
+    readActor: (session, actor) => call_manifest_editor_api('scene.readActor', [{ archive_session: session, actor }]),
+    readTransforms: (session, actors) => call_manifest_editor_api('scene.readTransforms', [{ archive_session: session, actors }]),
+    readArchive: session => call_manifest_editor_api('scene.readArchive', [{ archive_session: session }]),
+    takeViewportResults: session => call_manifest_editor_api('scene.takeViewportResults', [{ archive_session: session }]),
+    getActor: async (sceneName, actorName, session) => {
+      if (!session) {
+        const response = await editorApi.scene.readActive();
+        const state = response.data ?? response;
+        if (state.scene !== sceneName || !state.archive_session) throw new Error('PROJECT_CONTEXT_CHANGED');
+        session = state.archive_session;
       }
-      return { ...result, data: actor };
+      return editorApi.scene.readActor(session, actorName);
     },
     setActorTransform: (sceneName, actorName, transform) =>
       call_manifest_editor_api('scene.setActorTransform', [sceneName, actorName, transform]),
@@ -677,7 +689,7 @@ const editorApiStatic = {
       ]),
   },
   sceneTools: {
-    listSceneTree: (sceneName) => call_manifest_editor_api('sceneTools.listSceneTree', [sceneName]),
+    listSceneTree: (sceneName, query) => call_manifest_editor_api('sceneTools.listSceneTree', query ? [sceneName, query] : [sceneName]),
     getEnvironment: (sceneName) => call_manifest_editor_api('sceneTools.getEnvironment', [sceneName]),
     setEnvironment: (sceneName, state) =>
       call_manifest_editor_api('sceneTools.setEnvironment', [sceneName, state || {}]),
@@ -706,8 +718,8 @@ const editorApiStatic = {
       call_manifest_editor_api('sceneTools.setActorState', [sceneName, actorName, state]),
     setActorAnimation: (sceneName, actorName, animation, blendSeconds = 0.2) =>
       call_manifest_editor_api('sceneTools.setActorAnimation', [sceneName, actorName, animation, blendSeconds]),
-    saveActor: (sceneName, actorName) =>
-      call_manifest_editor_api('sceneTools.saveActor', [sceneName, actorName]),
+    saveActor: (sceneName, actorName, session) =>
+      call_manifest_editor_api('sceneTools.saveActor', [sceneName, actorName, { archive_session: session }]),
     selectModelFile: (sceneName, actorName, fileType = 'model') =>
       call_manifest_editor_api('sceneTools.selectModelFile', [sceneName, actorName, fileType]),
     setActorPhysics: (sceneName, actorName, physics) =>
@@ -794,7 +806,7 @@ const editorApiStatic = {
       call_manifest_editor_api('main.importResourceFile', [sceneName, fileType]),
     onInit: (projectPath = '') =>
       call_manifest_editor_api('main.onInit', projectPath ? [projectPath] : []),
-    sceneSave: (sceneName) => call_manifest_editor_api('main.sceneSave', [sceneName]),
+    sceneSave: (sceneName, session) => call_manifest_editor_api('main.sceneSave', [sceneName, { archive_session: session }]),
   },
   projectSettings: {
     readProjectDocument: (request) => call_manifest_editor_api('projectSettings.readProjectDocument', [request]),

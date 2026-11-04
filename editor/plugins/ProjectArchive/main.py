@@ -8,17 +8,30 @@ from __future__ import annotations
 
 import configparser
 from pathlib import Path
+from uuid import uuid4
 
 from runtime.archive.errors import ArchiveParseError
 from runtime.archive.parser import parse_archive
 from runtime.archive.portable import recover_scene, validate_assets
 from runtime.archive.writer import save_scene
+from runtime.archive.project import create_project, project_info, update_metadata, validate_project
 from runtime.plugin_base import PluginBase
 
 
 @PluginBase.register_web("ProjectArchive")
 class ProjectArchive(PluginBase):
     """Internal Script Service facade for the pure archive parser."""
+
+    create_project = staticmethod(create_project)
+    project_info = staticmethod(project_info)
+    validate_project = staticmethod(validate_project)
+
+    @staticmethod
+    def update_metadata(request):
+        from script_runtime.blockly.main import ScratchTool
+        if ScratchTool.has_restore_snapshot():
+            raise ValueError("请先停止脚本并恢复场景，再保存项目设置")
+        return update_metadata(request)
 
     @staticmethod
     def parse(payload: dict | str) -> dict:
@@ -45,6 +58,7 @@ class ProjectArchive(PluginBase):
             if source.is_dir() or source.name == "scene.ini":
                 recover_scene((source if source.is_dir() else source.parent).resolve())
             snapshot = parse_archive(path)
+            snapshot["archive_session"] = uuid4().hex
             if snapshot.get("archive_type") == "portable_scene":
                 missing = validate_assets(Path(snapshot["project_root"]), snapshot["extensions"]["ini_sections"],
                                           verify_hashes=True)

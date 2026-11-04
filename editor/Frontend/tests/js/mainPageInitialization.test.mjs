@@ -79,7 +79,7 @@ function mountMainPage(t, visionMode = 'path_tracing') {
       isVisionAvailable: async () => ({ data: { available: true } }),
       listCameraViews: async () => ({ data: { cameras: [] } }),
     },
-    scene: { getSnapshot: async scene => {
+    scene: { observe: async () => -1, getSnapshot: async scene => {
       calls.push(['snapshot', scene]);
       assert.equal(scene, 'scene_v3.xml');
       return { data: { scene, active_camera_name: 'KitchenCamera', actors: [], cameras: [{

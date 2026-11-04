@@ -30,4 +30,4 @@ def test_actor_physics_updates_revision_and_uses_existing_actor_changed_event():
     handler = HANDLER[start:end]
 
     assert "actor_version" in handler
-    assert "emit_actor_change(context" in handler
+    assert "++scene->tree_revision" in handler and "emit_actor_change(" not in handler

@@ -21,7 +21,7 @@ PLUGIN = (
 PYTHON_API = REPO_ROOT / "api" / "editor_api.py"
 
 
-def test_project_settings_save_is_owned_by_native_handler():
+def test_project_settings_save_uses_scoped_python_archive():
     source = HANDLERS.read_text(encoding="utf-8")
     start = source.index("void register_project_settings_api_handlers")
     end = source.index("void register_scene_tools_api_handlers", start)
@@ -29,9 +29,9 @@ def test_project_settings_save_is_owned_by_native_handler():
 
     assert '{"save_active_project_info", script_method}' not in section
     assert '{"save_active_project_info", []' in section
-    assert "detect_scene_folder" in section
-    assert 'replace_ini_section_from_map(portable->scene_file, "scene"' in section
-    assert "需要有效的 scene.ini" in section
+    assert "matches_archive_session(*scene, settings)" in section
+    assert 'project_archive_call("update_metadata"' in section
+    assert 'read_ini_file' not in section
 
 
 def test_python_editor_api_has_explicit_project_settings_namespace():

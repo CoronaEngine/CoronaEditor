@@ -126,6 +126,7 @@ const handleSave = async () => {
   saving.value = true;
   try {
     const payload = {
+      archive_session: form.value.archive_session,
       name: form.value.name,
       core_version: form.value.core_version,
     };

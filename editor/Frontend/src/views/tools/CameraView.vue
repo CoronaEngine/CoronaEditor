@@ -1293,10 +1293,10 @@ onMounted(async () => {
   try {
     await loadCamera();
     await refreshCameraViewActorPickIndex().catch(() => false);
-    actorPickResultCallbackToken = await editorApi.events.onActorPickResult(handleCameraViewActorPickResult);
-    actorSelectionCallbackToken = await editorApi.events.onActorSelectionChanged(syncViewportGizmoSelection);
+    actorPickResultCallbackToken = await editorApi.scene.observe('actorPickResult', handleCameraViewActorPickResult);
+    actorSelectionCallbackToken = await editorApi.scene.observe('selection', syncViewportGizmoSelection);
     gizmoPointerResultCallbackToken =
-      await editorApi.events.onViewportGizmoPointerResult(handleViewportGizmoPointerResult);
+      await editorApi.scene.observe('viewportGizmoPointerResult', handleViewportGizmoPointerResult);
     syncViewportUiMode();
     await syncWindowSize(true);
   } catch (error) {

@@ -77,9 +77,21 @@ def _actor_section(actors, original):
     return section
 
 
-def _camera_section(state):
-    section = {"count": len(state["cameras"]), "active_id": state["active_camera_id"]}
+def _camera_section(state, previous):
+    # Indexes change on reorder/delete. Only a matching camera ID inherits its extension fields.
+    old = {}
+    section = {}
+    for key, value in previous.items():
+        match = re.fullmatch(r"camera(\d+)\.(.+)", key)
+        if match:
+            old.setdefault(int(match[1]), {})[match[2]] = value
+        elif key not in {"count", "active_id"}:
+            section[key] = value
+    by_id = {fields.get("id", f'{state["id"]}#camera{index}'): fields for index, fields in old.items()}
+    section.update(count=len(state["cameras"]), active_id=state["active_camera_id"])
     for index, camera in enumerate(state["cameras"]):
+        for suffix, value in by_id.get(camera["id"], {}).items():
+            section[f"camera{index}.{suffix}"] = value
         for key in ("id", "name", "deletable", "position", "forward", "world_up", "fov", "output_mode",
                     "render_backend", "vision_render_mode", "vision_denoise", "vision_denoiser",
                     "vision_reblur_settings", "vision_pt_settings", "vision_restir_settings",
@@ -102,15 +114,19 @@ def save_scene(request):
     updates = {"actors": _actor_section(state["actors"], original["actors"] if "actors" in original else {})}
     if not request.get("actors_only"):
         updates.update({
-            "scene": {"name": state["name"]},
             "sun": {"enabled": _value(state["sun"]["enabled"]), "sun_direction": _vector(state["sun"]["direction"])},
             "grid": {"enabled": _value(state["grid"]["enabled"])},
             "physics": {k: _vector(v) if k == "gravity" else format(v, ".6f") for k, v in state["physics"].items()},
-            "camera": _camera_section(state),
+            "camera": _camera_section(state, original["camera"] if "camera" in original else {}),
             "terrain": state["terrain"], "scripts": {"path": state["script"]},
         })
-        if state["core_version"]:
-            updates["scene"]["core_version"] = state["core_version"]
+        if request.get("metadata"):
+            updates["scene"] = request["metadata"]
+    replace_sections(path, original, updates)
+    return {"ok": True, "status": "success", "filepath": str(path)}
+
+
+def replace_sections(path, original, updates):
     for name, fields in updates.items():
         # actors/camera are complete collections; deleted objects must disappear.
         if name in {"actors", "camera"}:
@@ -119,7 +135,7 @@ def save_scene(request):
             original.add_section(name)
         for key, value in fields.items():
             original.set(name, key, _value(value).replace("%", "%%"))
-    validate_assets(root, {s: dict(original[s]) for s in original.sections()}, verify_hashes=False)
+    validate_assets(path.parent, {s: dict(original[s]) for s in original.sections()}, verify_hashes=False)
 
     # Replace only edited sections, retaining user comments/formatting elsewhere.
     text = path.read_bytes().decode("utf-8-sig")
@@ -140,4 +156,3 @@ def save_scene(request):
     if pending:
         output = output.rstrip("\n") + "\n\n" + "".join(pending.values())
     atomic_replace(path, output.replace("\n", newline).encode("utf-8"))
-    return {"ok": True, "status": "success", "filepath": str(path)}

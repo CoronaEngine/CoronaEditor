@@ -438,6 +438,7 @@ import { cabbageContextService } from '@/services/cabbageAssistantContextService
 const { error: logError, warn: logWarn } = useErrorHandler('SceneBar');
 
 const currentSceneName = ref('');
+const archiveSession = ref('');
 let actorChangedCallbackToken = null;
 let sceneTreeChangedCallbackToken = null;
 let projectOpenedCallbackToken = null;
@@ -809,7 +810,7 @@ const SaveScene = async () => {
       )
     )
       return;
-    const result = await editorApi.main.sceneSave(currentSceneName.value);
+    const result = await editorApi.main.sceneSave(currentSceneName.value, archiveSession.value);
     const saved = result?.data ?? result;
     if (!saved?.ok) throw new Error(saved?.message || "保存场景失败");
     cabbageContextService.notifySceneSaved(saved.filepath);
@@ -1200,6 +1201,7 @@ const OnInitObjTree = async () => {
     // CEF bridge has already unwrapped it.
     const data = result?.data ?? result;
     if (result?.success !== false && data && typeof data === 'object') {
+      archiveSession.value = data.archive_session || '';
       const nextActors = Array.isArray(data.actors)
         ? data.actors.map((item) => ({
             name: item.name,
@@ -1248,11 +1250,11 @@ onMounted(async () => {
   await OnInitObjTree();
   await RefreshRenderBackendState();
   // 后端对象变化：项目打开/物体变化时重新加载场景树
-  actorChangedCallbackToken = await editorApi.events.onActorChanged(onActorChangeEvent);
+  actorChangedCallbackToken = await editorApi.scene.observe('selection', onActorChangeEvent);
   sceneTreeChangedCallbackToken =
-    await editorApi.events.onSceneTreeChanged(onSceneTreeChangedEvent);
-  projectOpenedCallbackToken = await editorApi.events.onProjectOpened(onProjectOpenedEvent);
-  nodeSelectionCallbackToken = await editorApi.events.onActorSelectionChanged(handleModelNodePick);
+    await editorApi.scene.observe('tree', onSceneTreeChangedEvent);
+  projectOpenedCallbackToken = await editorApi.scene.observe('project', onProjectOpenedEvent);
+  nodeSelectionCallbackToken = await editorApi.scene.observe('selection', handleModelNodePick);
 });
 
 // 项目打开时刷新当前场景树；actor 选择只更新详情面板，不重建树，避免点击闪烁。

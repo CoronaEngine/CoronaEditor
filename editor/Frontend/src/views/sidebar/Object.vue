@@ -281,7 +281,6 @@ import IkBoneSelect from '@/components/ui/IkBoneSelect.vue';
 import { useErrorHandler } from '@/composables/useErrorHandler.js';
 import { editorApi } from '@/api/editorApi.js';
 import { DEFAULT_SCENE_NAME } from '@/utils/constants.js';
-import { getActorContext } from '@/blockly/composables/useActorContext.js';
 import { cabbageContextService } from '@/services/cabbageAssistantContextService.js';
 import { createIkEditorController, createIkEditorState, makeIkFoot, isAutomaticIkFoot, ikFootStatus, ikBoneOptions, ikBoneError } from '@/utils/ikEditorController.js';
 
@@ -321,6 +320,7 @@ function guidanceKeyForTransform(groupKey, axis) {
 
 const selectedSceneName = ref(DEFAULT_SCENE_NAME);
 const selectedActorName = ref('');
+const archiveSession = ref('');
 const modelNodeSelection = ref(coronaEventBus.modelNodeSelection || null);
 const handleModelNodeSelection = (identity) => { modelNodeSelection.value = identity; };
 const loading = ref(false);
@@ -437,17 +437,19 @@ function vectorChanged(previous, next) {
   return ['x', 'y', 'z'].some((axis) => Math.abs(Number(previous[axis] || 0) - Number(next[axis] || 0)) > TRANSFORM_EPSILON);
 }
 
-async function loadActor(sceneName, actorName) {
+async function loadActor(sceneName, actorName, session, actorGuid) {
   if (!sceneName || !actorName) return;
   const sequence = ++loadSequence;
   loading.value = true;
+  archiveSession.value = '';
   selectedSceneName.value = sceneName;
   selectedActorName.value = actorName;
   ikController.clear();
   try {
-    const data = unwrap(await editorApi.scene.getActor(sceneName, actorName));
+    const data = unwrap(await editorApi.scene.getActor(sceneName, actorGuid || actorName, session));
     if (sequence !== loadSequence || selectedActorName.value !== actorName) return;
     if (!data || data.status === 'error') throw new Error(data?.message || '无法读取对象属性');
+    archiveSession.value = data.archive_session || '';
     actor.name = String(data.name || actorName);
     actor.type = String(data.actor_type || data.type || 'model');
     actor.handle = Number(data.handle || 0);
@@ -546,9 +548,9 @@ function flushTransformUpdates() {
           ? 'rotation'
           : 'scale';
       return editorApi.scene.setActorTransform(
-        selectedSceneName.value,
-        selectedActorName.value,
-        { [key]: update.vector, persist: false },
+        update.sceneName,
+        update.actorName,
+        { [key]: update.vector, archive_session: update.session, persist: false },
       );
     }),
   ).catch((error) => {
@@ -561,6 +563,7 @@ function scheduleTransform(operation) {
   pendingTransformUpdates.set(operation, {
     operation,
     vector: vectorFor(operation),
+    sceneName: selectedSceneName.value, actorName: selectedActorName.value, session: archiveSession.value,
   });
   if (transformFrameId === null) {
     transformFrameId = window.requestAnimationFrame(flushTransformUpdates);
@@ -655,7 +658,7 @@ async function rebindPlaceholderResource() {
     if (!result || result.status === 'error' || result.ok === false) {
       throw new Error(result?.message || '重新绑定资源失败');
     }
-    await loadActor(selectedSceneName.value, selectedActorName.value);
+    await loadActor(selectedSceneName.value, selectedActorName.value, archiveSession.value, actor.actorGuid);
   } catch (error) {
     logError('重新绑定占位资源失败', error);
   } finally {
@@ -794,13 +797,14 @@ async function updateCameraLockOffset() {
 async function saveActor() {
   if (!selectedActorName.value || saving.value) return;
   saving.value = true;
+  const [sceneName, actorName, session] = [selectedSceneName.value, selectedActorName.value, archiveSession.value];
   try {
     if (transformFrameId !== null) {
       window.cancelAnimationFrame(transformFrameId);
       flushTransformUpdates();
     }
     await transformFlushPromise;
-    const result = await editorApi.sceneTools.saveActor(selectedSceneName.value, selectedActorName.value);
+    const result = await editorApi.sceneTools.saveActor(sceneName, actorName, session);
     const saved = result?.data ?? result;
     if (saved?.ok === false) throw new Error(saved.message || '保存对象失败');
     cabbageContextService.notifySceneSaved(saved?.filepath);
@@ -823,6 +827,7 @@ function handleSelection(payload = {}) {
     loadSequence += 1;
     loading.value = false;
     ikController.clear();
+    archiveSession.value = '';
     selectedSceneName.value = sceneName;
     selectedActorName.value = '';
     actor.name = '';
@@ -830,11 +835,12 @@ function handleSelection(payload = {}) {
     clearViewportTransformBaseline();
     return;
   }
-  loadActor(sceneName, actorName);
+  loadActor(sceneName, actorName, payload.archive_session, payload.actor_guid);
 }
 
 function handleTransform(payload = {}) {
-  if (!selectedActorName.value || payload.actor !== selectedActorName.value || payload.scene !== selectedSceneName.value) return;
+  if (!selectedActorName.value || payload.archive_session !== archiveSession.value
+      || payload.actor_guid !== actor.actorGuid || payload.scene !== selectedSceneName.value) return;
   const actorKey = currentActorKey();
   if (viewportTransformBaseline.actorKey !== actorKey) {
     syncViewportTransformBaseline();
@@ -884,15 +890,9 @@ function handleGuidancePrepare(event) {
 
 onMounted(async () => {
   coronaEventBus.on('model-node-selection', handleModelNodeSelection);
-  // Actor selection is stored before this panel opens. Read it without invoking
-  // MainView.on_init, which would reinitialize the scene and main camera.
-  const actorContext = getActorContext();
-  selectedSceneName.value = actorContext.scene || DEFAULT_SCENE_NAME;
-  if (actorContext.actor) {
-    await loadActor(selectedSceneName.value, actorContext.actor);
-  }
-  selectionToken = await editorApi.events.onActorSelectionChanged(handleSelection);
-  transformToken = await editorApi.events.onActorTransformUpdated(handleTransform);
+  // Each window reads the current native selection on its first sample.
+  selectionToken = await editorApi.scene.observe('selection', handleSelection);
+  transformToken = await editorApi.scene.observe('transform', handleTransform);
   window.addEventListener('cabbage-guidance-prepare', handleGuidancePrepare);
 });
 

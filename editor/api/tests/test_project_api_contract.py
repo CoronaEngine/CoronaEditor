@@ -34,8 +34,8 @@ def test_project_lifecycle_manifest_methods_have_public_wrappers():
 
 def test_active_project_info_exposes_goal_metadata_for_editor_adapters():
     source = (
-        REPO_ROOT / "src/systems/ui/cef/cef_editor_native_api_handlers.cpp"
+        REPO_ROOT / "CoronaEditor/editor/runtime/archive/project.py"
     ).read_text(encoding="utf-8")
 
-    assert '"prompt", ini_value(scene_ini, "world", "prompt")' in source
-    assert '"mode", ini_value(scene_ini, "world", "type", "creative")' in source
+    assert '"prompt": config.get("world", "prompt"' in source
+    assert '"mode": config.get("world", "type", fallback="creative")' in source

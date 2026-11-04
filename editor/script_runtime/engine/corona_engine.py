@@ -41,6 +41,8 @@ class ScratchRuntimeContext:
     scene_name: str = ""
     actor_name: str = ""
 
+    shared_scenes: dict = field(default_factory=dict)
+
     x: float = 0.0
     y: float = 0.0
     z: float = 0.0
@@ -123,13 +125,6 @@ class ScratchRuntimeContext:
 _default_context = ScratchRuntimeContext("default", target_type="internal")
 _contexts: dict[str, ScratchRuntimeContext] = {"default": _default_context}
 _completed_state_snapshots: dict[str, dict] = {}
-_scene_virtual_objects: dict[str, dict[str, object]] = {}
-_scene_deleted_objects: dict[str, set[str]] = {}
-_scene_object_tags: dict[str, dict[str, str]] = {}
-_scene_shared_variables: dict[str, dict[str, object]] = {}
-_scene_shared_lists: dict[str, dict[str, list]] = {}
-_scene_shared_declarations: dict[str, dict[str, tuple]] = {}
-_scene_logical_collision_enabled: dict[str, dict[str, bool]] = {}
 _clone_threads: dict[str, list[_threading.Thread]] = {}
 _handler_threads: dict[str, list[_threading.Thread]] = {}
 
@@ -155,6 +150,7 @@ def create_context(
     target_type: str = "actor",
     scene_name: str = "",
     actor_name: str = "",
+    *, parent: ScratchRuntimeContext | None = None,
 ) -> ScratchRuntimeContext:
     if not context_id:
         context_id = f"scratch-{_threading.get_ident()}-{int(_time.time() * 1000)}"
@@ -163,6 +159,7 @@ def create_context(
         target_type="actor" if (target_type or "actor") == "model" else (target_type or "actor"),
         scene_name=scene_name or "",
         actor_name=actor_name or "",
+        shared_scenes=parent.shared_scenes if parent is not None else {},
     )
     if ctx.target_type == "project":
         ctx.initialized = True
@@ -592,6 +589,8 @@ class _NativeEditorActorProxy:
         values = [float(value[0]), float(value[1]), float(value[2])]
         self._pace_runtime_transform()
         transform = {key: values, "persist": False}
+        if self._data.get("archive_session"):
+            transform["archive_session"] = self._data["archive_session"]
         from api.editor_api import get_script_runtime_editor_api
 
         scene_api = get_script_runtime_editor_api().scene
@@ -696,11 +695,22 @@ class _NativeEditorActorProxy:
         raise NotImplementedError("The skeletal animation API currently supports switching looping clips; stopping is not supported")
 
     def to_dict(self): return dict(self._data)
-    def get_position(self): return list(self._position)
+    def _read_transform(self, field):
+        session = self._data.get("archive_session")
+        if session and self.actor_guid:
+            from api.editor_api import get_script_runtime_editor_api
+            state = get_script_runtime_editor_api().scene.read_transforms(session, [self.actor_guid])
+            if not state["actors"]:
+                raise RuntimeError(f"Actor disappeared: {self.actor_guid}")
+            transform = state["actors"][0]
+            self._position, self._rotation, self._scale = (transform[k] for k in ("position", "rotation", "scale"))
+        return list(getattr(self, "_" + field))
+
+    def get_position(self): return self._read_transform("position")
     def set_position(self, value, *_): return self._set_transform("position", value)
-    def get_rotation(self): return list(self._rotation)
+    def get_rotation(self): return self._read_transform("rotation")
     def set_rotation(self, value, *_): return self._set_transform("rotation", value)
-    def get_scale(self): return list(self._scale)
+    def get_scale(self): return self._read_transform("scale")
     def set_scale(self, value, *_): return self._set_transform("scale", value)
     def get_visible(self): return self._visible
     def set_visible(self, value):
@@ -1227,15 +1237,11 @@ def _verify_native_scene_restored(scene_route, original):
 def _clear_scene_runtime_state(scene_name):
     requested = _target_variants(scene_name)
     with _context_lock:
-        cache_maps = (_scene_virtual_objects, _scene_deleted_objects, _scene_object_tags)
-        for cache in cache_maps:
-            for key in list(cache):
-                if key == "__default__" and not requested:
-                    cache.pop(key, None)
-                elif _target_variants(key) & requested:
-                    cache.pop(key, None)
         for ctx in list(_contexts.values()):
-            if _target_variants(ctx.scene_name) & _target_variants(scene_name):
+            for key in list(ctx.shared_scenes):
+                if (key == "__default__" and not requested) or _target_variants(key) & requested:
+                    ctx.shared_scenes.pop(key, None)
+            if _target_variants(ctx.scene_name) & requested:
                 ctx.virtual_objects.clear()
                 ctx.deleted_objects.clear()
                 ctx.object_tags.clear()
@@ -2476,40 +2482,35 @@ def _runtime_scene_key(ctx=None):
     return str(getattr(scene, 'route', '') or ctx.scene_name or '__default__')
 
 
-def _shared_virtual_objects(ctx=None):
-    key = _runtime_scene_key(ctx)
+def _run_scene_store(ctx, category, factory=dict):
+    ctx = ctx or _current_context()
     with _context_lock:
-        return _scene_virtual_objects.setdefault(key, {})
+        scene = ctx.shared_scenes.setdefault(_runtime_scene_key(ctx), {})
+        return scene.setdefault(category, factory())
+
+
+def _shared_virtual_objects(ctx=None):
+    return _run_scene_store(ctx, "virtual_objects")
 
 
 def _shared_deleted_objects(ctx=None):
-    key = _runtime_scene_key(ctx)
-    with _context_lock:
-        return _scene_deleted_objects.setdefault(key, set())
+    return _run_scene_store(ctx, "deleted_objects", set)
 
 
 def _shared_object_tags(ctx=None):
-    key = _runtime_scene_key(ctx)
-    with _context_lock:
-        return _scene_object_tags.setdefault(key, {})
+    return _run_scene_store(ctx, "object_tags")
 
 
 def _shared_variables(ctx=None):
-    key = _runtime_scene_key(ctx)
-    with _context_lock:
-        return _scene_shared_variables.setdefault(key, {})
+    return _run_scene_store(ctx, "variables")
 
 
 def _shared_lists(ctx=None):
-    key = _runtime_scene_key(ctx)
-    with _context_lock:
-        return _scene_shared_lists.setdefault(key, {})
+    return _run_scene_store(ctx, "lists")
 
 
 def _shared_declarations(ctx=None):
-    key = _runtime_scene_key(ctx)
-    with _context_lock:
-        return _scene_shared_declarations.setdefault(key, {})
+    return _run_scene_store(ctx, "declarations")
 
 
 def _iter_scene_actors(scene=None):
@@ -2717,9 +2718,7 @@ def _position_distance(a, b):
 
 
 def _logical_collision_store(ctx=None):
-    key = _runtime_scene_key(ctx)
-    with _context_lock:
-        return _scene_logical_collision_enabled.setdefault(key, {})
+    return _run_scene_store(ctx, "logical_collision_enabled")
 
 
 def _actor_logical_collision_enabled(actor) -> bool:
@@ -3465,13 +3464,8 @@ def runtime_state_snapshots():
 def clear_runtime_state_snapshots():
     with _context_lock:
         _completed_state_snapshots.clear()
-        _scene_virtual_objects.clear()
-        _scene_deleted_objects.clear()
-        _scene_object_tags.clear()
-        _scene_shared_variables.clear()
-        _scene_shared_lists.clear()
-        _scene_shared_declarations.clear()
-        _scene_logical_collision_enabled.clear()
+        for ctx in _contexts.values():
+            ctx.shared_scenes.clear()
 
 
 def game_win():
@@ -3888,6 +3882,7 @@ def clone(name):
             target_type="actor",
             scene_name=parent.scene_name,
             actor_name=created_name,
+            parent=parent,
         )
         child.current_clone_name = created_name
         if native_scene:

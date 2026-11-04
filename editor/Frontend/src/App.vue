@@ -34,6 +34,7 @@ function closeNativePanel() { void appService.closeThisTab('').catch(error => co
 
 let appUnmounted = false;
 let projectOpenedToken = null;
+let observedProjectSession = '';
 let refreshRevision = 0;
 let preparationRevision = 0;
 let lastReadyProjectKey = '';
@@ -244,8 +245,10 @@ onMounted(() => {
   window.addEventListener('corona-active-project-changed', onActiveProjectChanged);
   window.addEventListener('storage', onProjectStorageChanged);
   window.addEventListener('storage', onWindowPolicyChanged);
-  void editorApi.events.onProjectOpened((payload) => {
-    void refreshWorldMode(payload?.path || '', true);
+  void editorApi.scene.observe('project', (payload) => {
+    const reopened = Boolean(observedProjectSession) && observedProjectSession !== payload.archive_session;
+    observedProjectSession = payload.archive_session;
+    void refreshWorldMode(payload.path, reopened);
   }).then((token) => {
     if (appUnmounted) return editorApi.off(token);
     projectOpenedToken = token;

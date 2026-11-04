@@ -7,7 +7,7 @@ export const projectService = {
     editorApi.main.onInit(projectPath),
   importResourceFileByDialog: (sceneName, fileType) =>
     editorApi.main.importResourceFile(sceneName, fileType),
-  sceneSave: (sceneName) => editorApi.main.sceneSave(sceneName),
+  sceneSave: (sceneName, session) => editorApi.main.sceneSave(sceneName, session),
   setDragRegions: (_routePath, x, y, w, h) =>
     Bridge.callDockCommand({ cmd: 'setDragRegions', tabId: null, regions: [{ x, y, w, h }] }),
   setCurrentTabDragRegions: (regions) =>

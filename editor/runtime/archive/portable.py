@@ -45,7 +45,7 @@ def _asset_route(route):
             and ":" not in route and "\0" not in route)
 
 
-def validate_assets(root, sections, *, verify_hashes):
+def validate_assets(root, sections, *, verify_hashes, references=None):
     manifest = root / "assets.manifest.json"
     def fail(code, message, path=manifest):
         raise ArchiveParseError(code, message, path=str(path))
@@ -110,18 +110,25 @@ def validate_assets(root, sections, *, verify_hashes):
         for section, fields in sections.items():
             for key, value in fields.items():
                 if section == "actors" and key.endswith(".animation.sources"):
-                    references = json.loads(value)
-                    if (not isinstance(references, list) or not all(isinstance(r, str) and r for r in references)
-                            or len(set(references)) != len(references)):
+                    values = json.loads(value)
+                    if (not isinstance(values, list) or not all(isinstance(r, str) and r for r in values)
+                            or len(set(values)) != len(values)):
                         fail("invalid_animation_sources", "Invalid animation sources")
                 elif ((section == "actors" and key.endswith((".route", ".material.texture")))
                       or (section in {"scripts", "terrain"} and key == "path") or _asset_route(value)):
-                    references = [value] if value else []
+                    values = [value] if value else []
                 else:
                     continue
-                for route in references:
+                for route in values:
                     if not _asset_route(route) or route not in routes:
-                        fail("untrusted_asset_route", f"Unlisted resource in {section}.{key}: {route}")
+                        error = ArchiveParseError("untrusted_asset_route", f"Unlisted resource in {section}.{key}: {route}",
+                                                  path=route, details={"field": f"{section}.{key}"})
+                        if references is None:
+                            raise error
+                        missing.append(error.to_diagnostic())
+                        continue
+                    if references is not None:
+                        references.add(route)
         return missing
     except ArchiveParseError:
         raise
