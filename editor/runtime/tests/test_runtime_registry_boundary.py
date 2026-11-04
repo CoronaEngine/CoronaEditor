@@ -13,8 +13,8 @@ def test_python_service_registry_has_a_runtime_canonical_owner():
 
 def test_runtime_registry_uses_script_runtime_for_generated_blockly():
     source = (EDITOR_ROOT / "runtime" / "registry.py").read_text(encoding="utf-8")
-    assert '_BLOCKLY_PACKAGE = "script_runtime"' in source
-    assert '"ScratchTool": (f"{_BLOCKLY_PACKAGE}.blockly.main", "ScratchTool")' in source
+    assert '_BLOCKLY_PACKAGE' not in source
+    assert '"FileScripts": ("script_runtime.file_runner", "FileScripts")' in source
 
 
 def test_active_services_have_a_separate_startup_inventory():

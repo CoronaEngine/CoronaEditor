@@ -30,7 +30,7 @@ C++ manifest 聚合契约，Vue/Python 只做薄适配，不直接暴露 `camera
 | `plugins` | ProjectArchive 存档服务及原生项目模板 |
 | `data` | native 项目运行时数据，不是 Python 业务 owner |
 
-项目的 `Scripts/blockly` 保存 Blockly workspace、生成的 .py 和 manifest；旧 backend、CoronaCore、CoronaPlugin、
+项目的 `Scripts/files` 保存 Web 提交的工作区文档和按摘要标识的 .py；旧 backend、CoronaCore、CoronaPlugin、
 utils 和 scripts 兼容目录已删除，新增代码不得重新引入这些路径。
 
 ## API 规则

@@ -1,4 +1,4 @@
-from script_runtime.engine import corona_engine as ce
+from Frontend.src.blockly.generators.runtime import block_program as ce
 
 
 def test_same_scene_is_shared_only_with_children_of_the_same_run():

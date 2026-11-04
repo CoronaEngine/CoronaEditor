@@ -148,7 +148,7 @@ function forwardScratchKey(event, released = false) {
 
   event[SCRATCH_KEY_FORWARDED] = true;
   if (released) {
-    editorApi.scratch.sendKeyUpEvent(code, displayKey).catch(() => {});
+    editorApi.scripts.sendKeyUpEvent(code, displayKey).catch(() => {});
     return;
   }
   const modifiers = [
@@ -156,7 +156,7 @@ function forwardScratchKey(event, released = false) {
     event.shiftKey ? 'Shift' : '',
     event.altKey ? 'Alt' : '',
   ].filter(Boolean).join(',');
-  editorApi.scratch.sendKeyEvent(code, modifiers, displayKey).catch(() => {});
+  editorApi.scripts.sendKeyEvent(code, modifiers, displayKey).catch(() => {});
 }
 
 function isGameplayKey(event) {

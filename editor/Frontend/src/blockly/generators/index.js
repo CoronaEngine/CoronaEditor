@@ -2,7 +2,7 @@
 import * as Blockly from 'blockly/core';
 import { pythonGenerator } from 'blockly/python';
 import { resetPrelude, renderPreludeAt } from './prelude';
-import { PYTHON_IMPORTS } from './constants';
+import { emitFileProgram } from './fileProgram';
 
 import { defineAppearanceGenerators } from './appearance';
 import { defineAudioGenerators } from './audio';
@@ -153,11 +153,9 @@ pythonGenerator.workspaceToCode = function customWorkspaceToCode(workspace) {
   if (mainCode && !mainCode.endsWith('\n')) mainCode += '\n';
 
   // ── 头注释 ──
-  const timestamp = new Date().toISOString();
   const header = [
     '# -*- coding: utf-8 -*-',
-    `# Generated from Blockly by CabbageEditor @ ${timestamp}`,
-    PYTHON_IMPORTS.ENGINE_IMPORT,
+    '# Generated from Blockly by CabbageEditor',
   ].join('\n');
 
   // ── 前置片段 ──
@@ -221,7 +219,7 @@ pythonGenerator.workspaceToCode = function customWorkspaceToCode(workspace) {
   }
 
   // 末尾统一加一个换行
-  return parts.join('\n') + '\n';
+  return emitFileProgram(parts);
 };
 
 export { pythonGenerator };
@@ -370,7 +368,7 @@ export function validateNodeGraph(rawGraph) {
 }
 
 /**
- * Compile serialized node graph data into Python executable by the Scratch runtime.
+ * Compile a serialized graph into a standalone Python file for the file host.
  * Keep the existing node graph JSON schema unchanged.
  */
 export function nodeGraphToCode(rawGraph) {
@@ -516,7 +514,7 @@ export function nodeGraphToCode(rawGraph) {
   const preludeGlobal = renderPreludeAt('global');
   const preludeRunPrologue = renderPreludeAt('runPrologue');
   const preludeRunEpilogue = renderPreludeAt('runEpilogue');
-  const parts = ['# -*- coding: utf-8 -*-', '# Generated from node graph by CabbageEditor', PYTHON_IMPORTS.ENGINE_IMPORT];
+  const parts = ['# -*- coding: utf-8 -*-', '# Generated from node graph by CabbageEditor'];
   if (generatorImports.size) parts.push(...generatorImports);
   if (preludeGlobal.trim()) parts.push('', preludeGlobal.trimEnd());
   if (generatorDefinitions.size) parts.push('', ...generatorDefinitions);
@@ -543,7 +541,7 @@ export function nodeGraphToCode(rawGraph) {
     const exitCode = lifecycle.exit.join('');
     const traceName = node?.nodeType === 'custom' ? node?.customName || node?.name || '\u81ea\u5b9a\u4e49\u8282\u70b9' : node?.nodeType === 'start' ? '\u5f00\u59cb\u8282\u70b9' : '\u7ed3\u675f\u8282\u70b9';
     parts.push(`        ${nodeIndex === 0 ? 'if' : 'elif'} _node_graph_state == ${pythonString(nodeId)}:`);
-    parts.push(`            CoronaEngine.node_graph_enter(${pythonString(nodeId)}, ${pythonString(traceName)})`);
+    parts.push(`            CoronaEngine.mark(${pythonString(nodeId)}, ${pythonString(traceName)})`);
     if (enterCode.trim()) parts.push(indentBlock(indentBlock(indentBlock(enterCode))));
     if (node.nodeType === 'end') {
       parts.push('            _node_graph_state = None');
@@ -564,9 +562,9 @@ export function nodeGraphToCode(rawGraph) {
       });
       parts.push(`                if _node_graph_state == ${pythonString(nodeId)}:`);
       const waitingEdge = outgoing.find(({ index }) => conditionFunctions.has(index))?.edge;
-      parts.push(`                    CoronaEngine.node_graph_waiting(${pythonString(waitingEdge?.id || '')}, ${pythonString(waitingEdge?.name || '\u7b49\u5f85\u8fde\u7ebf\u6761\u4ef6')})`);
+      parts.push(`                    CoronaEngine.mark_waiting(${pythonString(waitingEdge?.id || '')}, ${pythonString(waitingEdge?.name || '\u7b49\u5f85\u8fde\u7ebf\u6761\u4ef6')})`);
     } else {
-      parts.push(`                CoronaEngine.node_graph_waiting('', ${pythonString('\u7b49\u5f85\u8282\u70b9\u51fa\u7ebf')})`);
+      parts.push(`                CoronaEngine.mark_waiting('', ${pythonString('\u7b49\u5f85\u8282\u70b9\u51fa\u7ebf')})`);
     }
     const requestedTickInterval = Number(node?.tickInterval);
     const tickInterval = Number.isFinite(requestedTickInterval)
@@ -578,5 +576,5 @@ export function nodeGraphToCode(rawGraph) {
   parts.push('        else:');
   parts.push('            raise RuntimeError("\u8282\u70b9\u56fe\u8fdb\u5165\u4e86\u672a\u77e5\u8282\u70b9: " + str(_node_graph_state))');
   if (preludeRunEpilogue.trim()) parts.push(indentBlock(preludeRunEpilogue));
-  return parts.join('\n') + '\n';
+  return emitFileProgram(parts);
 }

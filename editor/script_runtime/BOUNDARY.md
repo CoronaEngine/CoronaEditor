@@ -1,14 +1,13 @@
 # Script Runtime 边界
 
-`script_runtime` 提供 Blockly/Scratch 生成文件的受限角色脚本运行时。一个文件绑定一个项目或 Actor 目标。Web 保存 workspace 和生成的 Python 文件，向 `scripts.runFile` 提交项目相对路径、SHA-256 和 `requestId`。C++ 校验路径，将消息交给当前编辑器的 Python 宿主。存档解析与脚本共用解释器、环境和模块表。
+`script_runtime` 是受限角色脚本运行时。Web 为 Blockly/Scratch 生成自包含的 Python 文件，包括积木需要的变量、输入、广播、克隆和游戏逻辑。Web 将工作区作为文档提交给 Python 存档服务。Python 在 `Scripts/files` 原子发布文档及对应脚本。用户无需打开图面板即可运行已经保存的文件。
 
 | 路径 | 职责 |
 |---|---|
-| `blockly/main.py` | 在活动项目的 `Scripts/blockly` 保存 workspace、文件和 manifest；核对摘要、创建运行上下文、注册回执、调用文件中的 `run()`。 |
-| `engine/` | 为生成代码提供变量、输入、广播、克隆、引擎操作与场景恢复。 |
-| `manifest_adapter.py` | 受限 manifest adapter，使用 ScriptRuntime caller 读取场景、更新 Actor 和视口。 |
-| `native_engine_adapter.py` | 脚本音频、鼠标和射线查询等原生能力。 |
+| `file_runner.py` | 接受 `scripts.runFile` 的项目会话、相对路径、SHA-256 和 `requestId`，校验文件，分配独立模块并调用 `run()`。 |
+| `file_api.py` | 提供与本次执行绑定的输入、协作停止、运行标记和受限的 Actor 操作。 |
+| `scene_state.py` | 在 Python 捕获、恢复并校验同一场景会话的运行前状态。 |
+| `manifest_adapter.py` | 受限 manifest adapter，主动查询场景、更新 Actor 和视口。 |
+| `native_engine_adapter.py` | 提供音频、鼠标和射线查询等底层脚本能力。 |
 
-脚本不得绕过受限接口获取编辑器公共 API 的原生对象。结束执行时需先停止输入与子任务，再恢复同一项目的快照。恢复失败保留快照以供重试。相同启动请求使用相同的 `requestId` 查询或重试；停止指定运行时使用 `runId`。项目切换先完成旧场景恢复。
-
-旧项目中的手写脚本不会自动加载；已退役的外部 Python 文件积木在生成阶段报告错误。编辑器保留单图运行和项目存档，不提供批量预览。
+脚本不得绕过受限接口取得编辑器公共 API 的原生对象。存档与文件执行共享宿主解释器，每次运行拥有独立模块和输入处理器。C++ 与 Web 均可查询启动回执，并用 `runId` 停止指定运行。恢复失败时保留快照，重新加载或切换项目必须先完成恢复。

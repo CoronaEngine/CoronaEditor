@@ -66,8 +66,7 @@ def test_active_consumers_do_not_import_project_state_from_settings_facade():
     consumers = (
         EDITOR_ROOT / "runtime" / "editor_host.py",
         EDITOR_ROOT / "runtime" / "project_context.py",
-        EDITOR_ROOT / "runtime" / "project_templates.py",
-        EDITOR_ROOT / "script_runtime" / "blockly" / "main.py",
+        EDITOR_ROOT / "runtime" / "archive" / "script_files.py",
     )
 
     for path in consumers:

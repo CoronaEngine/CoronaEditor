@@ -40,7 +40,6 @@ except Exception:
 
 
 editor = CoronaEditor
-editor.module_list["CoronaEditor"] = CoronaEditor
 editor.register_script_dispatcher()
 atexit.register(editor.unregister_script_dispatcher)
 

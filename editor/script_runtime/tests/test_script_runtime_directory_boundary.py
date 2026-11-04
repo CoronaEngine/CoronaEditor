@@ -23,18 +23,18 @@ def test_script_runtime_has_a_local_boundary_inventory():
         "Blockly/Scratch",
         "manifest adapter",
         "scripts.runFile",
-        "Scripts/blockly",
+        "Scripts/files",
         "requestId",
         "编辑器公共 API",
         "runId",
     ):
         assert marker in source
     for path in (
-        "engine/",
-        "blockly/",
+        "file_api.py",
+        "scene_state.py",
         "manifest_adapter.py",
         "native_engine_adapter.py",
-        "blockly/main.py",
+        "file_runner.py",
     ):
         assert path in source
 
@@ -43,7 +43,7 @@ def test_script_runtime_has_explicit_restricted_entrypoints():
     manifest_adapter = (SCRIPT_RUNTIME_ROOT / "manifest_adapter.py").read_text(
         encoding="utf-8"
     )
-    runner = (SCRIPT_RUNTIME_ROOT / "blockly/main.py").read_text(encoding="utf-8")
+    runner = (SCRIPT_RUNTIME_ROOT / "file_runner.py").read_text(encoding="utf-8")
 
     assert "ScriptRuntimeEditorApi" in manifest_adapter
     assert "ScriptRuntimeSceneAdapter" in manifest_adapter
@@ -67,7 +67,7 @@ def test_script_runtime_does_not_import_editor_plugins_or_legacy_backend():
 
 def test_script_runtime_engine_is_not_the_editor_manifest_owner():
     boundary = (SCRIPT_RUNTIME_ROOT / "BOUNDARY.md").read_text(encoding="utf-8")
-    engine = (SCRIPT_RUNTIME_ROOT / "engine" / "corona_engine.py").read_text(
+    engine = (SCRIPT_RUNTIME_ROOT / "file_runner.py").read_text(
         encoding="utf-8"
     )
 

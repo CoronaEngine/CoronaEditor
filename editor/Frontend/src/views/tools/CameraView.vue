@@ -931,7 +931,7 @@ const onKeyDown = (event) => {
   // UI while the native input path is still active.
   if (!window.coronaBridge && !event.__coronaScratchKeyForwarded) {
     event.__coronaScratchKeyForwarded = true;
-    editorApi.scratch.sendKeyEvent(
+    editorApi.scripts.sendKeyEvent(
       event.code || event.key || '',
       keyModifiers(event),
       event.key || event.code || '',
@@ -965,7 +965,7 @@ const onKeyUp = (event) => {
   }
   if (!window.coronaBridge && !event.__coronaScratchKeyForwarded) {
     event.__coronaScratchKeyForwarded = true;
-    editorApi.scratch.sendKeyUpEvent(
+    editorApi.scripts.sendKeyUpEvent(
       event.code || event.key || '',
       event.key || event.code || '',
     ).catch(() => {});
@@ -987,7 +987,7 @@ const sendScratchMouse = (
   viewportHeight,
   pickedActor = '',
 ) => {
-  editorApi.scratch.sendMouseEvent(
+  editorApi.scripts.sendMouseEvent(
     eventType,
     button,
     x,
@@ -1278,7 +1278,7 @@ scheduleDragRegionSync, { flush: 'post' });
 
 const pollScriptInputLock = async () => {
   try {
-    const scriptStatus = unwrap(await editorApi.scratch.getScriptStatus()) || {};
+    const scriptStatus = unwrap(await editorApi.scripts.getStatus()) || {};
     nodeGraphInputLocked.value = Boolean(scriptStatus.inputLocked);
     if (nodeGraphInputLocked.value) resetCameraInput();
   } catch {

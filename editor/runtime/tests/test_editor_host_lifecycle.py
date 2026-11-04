@@ -34,7 +34,7 @@ class CoronaEditorLifecycleTests(unittest.TestCase):
     def test_runtime_update_is_independent_of_the_retired_log_tool(self):
         editor = self._load_editor()
         self.assertFalse(hasattr(editor, "show_log_on_js"))
-        self.assertFalse(editor.emit_editor_event("log-batch", [[]]))
+        self.assertFalse(hasattr(editor, "emit_editor_event"))
         self.assertTrue(editor.initialize_runtime())
         self.assertTrue(editor.start_runtime())
         engine = SimpleNamespace(drain_input_events=Mock(return_value=[]))
@@ -90,7 +90,7 @@ class CoronaEditorLifecycleTests(unittest.TestCase):
             EDITOR_ROOT / "runtime" / "editor_host.py"
         ).read_text(encoding="utf-8")
         update_start = source.index("    def _set_native_runtime_phase(cls, phase):")
-        update_end = source.index("\ndef emit_editor_event(", update_start)
+        update_end = source.index("\ndef set_editor_camera_input_enabled(", update_start)
         update_body = source[update_start:update_end]
         for phase in (
             '"input_dispatch"',

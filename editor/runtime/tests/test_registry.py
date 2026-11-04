@@ -43,7 +43,7 @@ class PythonScriptServiceRegistryTests(unittest.TestCase):
 
         self.assertEqual(
             registry.ACTIVE_PYTHON_SCRIPT_SERVICES,
-            ("ProjectArchive", "ScratchTool"),
+            ("ProjectArchive", "FileScripts", "ProjectFiles"),
         )
         self.assertFalse(hasattr(registry, "LEGACY_PYTHON_SCRIPT_SERVICES"))
 
@@ -360,12 +360,12 @@ class PythonScriptServiceRegistryTests(unittest.TestCase):
             def shutdown(cls, deadline):
                 deadlines.append(deadline)
                 return {
-                    "service": "ScratchTool",
+                    "service": "FileScripts",
                     "state": "stop_timeout",
                     "thread_alive": True,
                 }
 
-        service = registry.PythonScriptService("ScratchTool", Target)
+        service = registry.PythonScriptService("FileScripts", Target)
         snapshot = service.shutdown(0.25)
 
         self.assertEqual(deadlines, [0.25])

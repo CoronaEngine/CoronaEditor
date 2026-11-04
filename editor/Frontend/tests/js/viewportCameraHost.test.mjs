@@ -65,7 +65,7 @@ function mountCreative(t, { native = true } = {}) {
     ref, reactive, cameraMovementKey, normalizeVisionRenderMode, visionAccumulationFromCamera, visionDenoiseFromCamera, visionStablePlanesFromCamera, visionDenoiserFromCamera,
     createViewportCameraController: options => createViewportCameraController({ ...options, ...clock }),
     window, document, viewCurrent: () => current,
-    editorApi: { scratch: Object.fromEntries(['sendKeyEvent', 'sendKeyUpEvent', 'sendMouseEvent']
+    editorApi: { scripts: Object.fromEntries(['sendKeyEvent', 'sendKeyUpEvent', 'sendMouseEvent']
       .map(name => [name, async (...args) => scratch.push([name, ...args])])) },
     cabbageContextService: { recordEvent: async record => records.push(record) },
     viewportGizmoController: { isDragging: () => false, cancel() {} },

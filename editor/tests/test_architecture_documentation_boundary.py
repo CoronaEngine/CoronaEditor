@@ -12,7 +12,7 @@ def test_architecture_documents_the_three_layer_boundary():
 
 def test_editor_readme_documents_canonical_directories():
     source = (EDITOR_ROOT / "README.md").read_text(encoding="utf-8")
-    for marker in ("api", "runtime", "script_runtime", "plugins", "Scripts/blockly"):
+    for marker in ("api", "runtime", "script_runtime", "plugins", "Scripts/files"):
         assert marker in source
 
 

@@ -45,3 +45,17 @@ def get_project_root(*, fallback_to_environment=True) -> Path:
         if configured:
             return Path(configured).expanduser()
     return Path.cwd()
+
+
+def require_project_session(data: dict) -> tuple[Path | None, dict | None]:
+    state = read_project_session()
+    if not state.get("archive_session") or not state.get("project_path"):
+        return None, {"status": "error", "code": "NO_ACTIVE_PROJECT", "message": "No project is open"}
+    root = Path(state["project_path"]).resolve()
+    if (data.get("archive_session") != state["archive_session"]
+            or not data.get("project_path") or Path(data["project_path"]).resolve() != root):
+        return None, {"status": "error", "code": "PROJECT_CONTEXT_CHANGED",
+                      "message": "Project session changed; request was ignored"}
+    if state.get("read_only"):
+        return None, {"status": "error", "code": "READ_ONLY_PROJECT", "message": "Project is read-only"}
+    return root, None

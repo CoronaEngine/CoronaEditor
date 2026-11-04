@@ -668,25 +668,25 @@ const editorApiStatic = {
       call_manifest_editor_api('viewport.setCameraPose', [sceneName, cameraName, camera]),
   },
   scripts: {
+    getStatus: () => call_manifest_editor_api('scripts.getStatus', []),
     runFile: (request) => call_manifest_editor_api('scripts.runFile', [request]),
     getRun: (requestId) => call_manifest_editor_api('scripts.getRun', [{ requestId }]),
     stop: (runId, restoreState = true, requestId) =>
       call_manifest_editor_api('scripts.stop', [{ runId, requestId, restore_state: restoreState }]),
-  },
-  scratch: {
-    saveBlocklyTarget: (payload) => call_manifest_editor_api('scratch.saveBlocklyTarget', [payload || {}]),
-    loadBlocklyTarget: (payload) => call_manifest_editor_api('scratch.loadBlocklyTarget', [payload || {}]),
-    getScriptStatus: () => call_manifest_editor_api('scratch.getScriptStatus', []),
     sendKeyEvent: (key, modifiers, displayKey) =>
-      call_manifest_editor_api('scratch.sendKeyEvent', [key, modifiers || '', displayKey || key]),
+      call_manifest_editor_api('scripts.sendKeyEvent', [key, modifiers || '', displayKey || key]),
     sendKeyUpEvent: (key, displayKey) =>
-      call_manifest_editor_api('scratch.sendKeyUpEvent', [key, displayKey || key]),
+      call_manifest_editor_api('scripts.sendKeyUpEvent', [key, displayKey || key]),
     sendMouseEvent: (eventType, button, x, y, viewportX, viewportY, viewportWidth, viewportHeight, pickedActor = '') =>
-      call_manifest_editor_api('scratch.sendMouseEvent', [
+      call_manifest_editor_api('scripts.sendMouseEvent', [
         eventType, button || '', x || 0, y || 0,
         viewportX ?? x ?? 0, viewportY ?? y ?? 0,
         viewportWidth ?? 0, viewportHeight ?? 0, pickedActor || '',
       ]),
+  },
+  projectFiles: {
+    save: request => call_manifest_editor_api('projectFiles.save', [request]),
+    load: request => call_manifest_editor_api('projectFiles.load', [request]),
   },
   sceneTools: {
     listSceneTree: (sceneName, query) => call_manifest_editor_api('sceneTools.listSceneTree', query ? [sceneName, query] : [sceneName]),

@@ -65,7 +65,7 @@ async function mountCreationPage(t, { stopResult = idle(), wrapped = true } = {}
     calls.push(['create', payload]);
     return wrap({ name: `创造世界_${++sequence}`, path: `creative-world-${sequence}` });
   });
-  t.mock.method(editorApi.scratch, 'getScriptStatus', async () => wrap({ runId: 'current', snapshotCaptured: true }));
+  t.mock.method(editorApi.scripts, 'getStatus', async () => wrap({ runId: 'current', snapshotCaptured: true }));
   t.mock.method(editorApi.scripts, 'stop', async (id, restore) => {
     calls.push(['script', restore]);
     return wrap(await scriptResult);

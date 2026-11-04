@@ -91,8 +91,8 @@ function mountMainPage(t, visionMode = 'path_tracing') {
       }] } };
     } },
     project: { getProjectLoadStatus: async () => ({ active: true, loading: false }) },
+    scripts: { getStatus: async () => ({ status: 'stopped', threadAlive: false }) },
     scratch: {
-      getScriptStatus: async () => ({ status: 'stopped', threadAlive: false }),
       getGamePreviewStatus: async () => ({ status: 'stopped', workerActive: false }),
     },
     events: Object.fromEntries(['onProjectOpened', 'onActorSelectionChanged', 'onActorTransformUpdated',

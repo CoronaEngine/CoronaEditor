@@ -28,8 +28,8 @@ class ProjectArchive(PluginBase):
 
     @staticmethod
     def update_metadata(request):
-        from script_runtime.blockly.main import ScratchTool
-        if ScratchTool.has_restore_snapshot():
+        from script_runtime.file_runner import FileScripts
+        if FileScripts.has_restore_snapshot():
             raise ValueError("请先停止脚本并恢复场景，再保存项目设置")
         return update_metadata(request)
 
@@ -90,9 +90,9 @@ class ProjectArchive(PluginBase):
 
     @staticmethod
     def save(request: dict) -> dict:
-        from script_runtime.blockly.main import ScratchTool
+        from script_runtime.file_runner import FileScripts
 
-        if ScratchTool.has_restore_snapshot():
+        if FileScripts.has_restore_snapshot():
             return {"ok": False, "status": "run_active", "message": "请先停止脚本并恢复场景，再保存存档"}
         try:
             return save_scene(request)

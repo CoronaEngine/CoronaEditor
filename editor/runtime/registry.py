@@ -8,20 +8,20 @@ from importlib import import_module
 from runtime.editor_host import CoronaEditor
 
 
-# Blockly's Python runtime host and generated output owner are canonical here.
-_BLOCKLY_PACKAGE = "script_runtime"
 logger = logging.getLogger(__name__)
 
 
 PYTHON_SCRIPT_SERVICES = {
     "ProjectArchive": ("plugins.ProjectArchive.main", "ProjectArchive"),
-    "ScratchTool": (f"{_BLOCKLY_PACKAGE}.blockly.main", "ScratchTool"),
+    "FileScripts": ("script_runtime.file_runner", "FileScripts"),
+    "ProjectFiles": ("runtime.archive.script_files", "ProjectFiles"),
 }
 
 # Normal editor startup inventory.
 ACTIVE_PYTHON_SCRIPT_SERVICES = (
     "ProjectArchive",
-    "ScratchTool",
+    "FileScripts",
+    "ProjectFiles",
 )
 LAZY_PYTHON_SCRIPT_SERVICES = {"ProjectArchive"}
 _managed_services = []

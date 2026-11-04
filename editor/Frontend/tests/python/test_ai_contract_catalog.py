@@ -4,8 +4,8 @@ import pathlib
 import tempfile
 import unittest
 
-from script_runtime.blockly.ai_node_graph_contract import load_contract_catalog
-from script_runtime.blockly.check_ai_contract_catalog import (
+from Frontend.tests.python.ai_node_graph_contract import load_contract_catalog
+from Frontend.tests.python.check_ai_contract_catalog import (
     CONTRACT_PATH,
     TOOLBOX_PATH,
     check_contract_catalog,

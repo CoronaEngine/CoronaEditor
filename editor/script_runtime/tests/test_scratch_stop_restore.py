@@ -2,13 +2,12 @@ import threading
 import unittest
 from unittest import mock
 
-from script_runtime.blockly import main as blockly_main
-from script_runtime.engine import corona_engine as corona_engine_scratch
+from script_runtime import file_runner
 
 
 class ScratchStopRestoreTests(unittest.TestCase):
     def setUp(self):
-        self.tool = blockly_main.ScratchTool
+        self.tool = file_runner.FileScripts
         state = dict(self.tool._exec_state)
         state.update(
             status="idle", outcome="", error="", inputLocked=False,
@@ -17,6 +16,8 @@ class ScratchStopRestoreTests(unittest.TestCase):
         self.enterContext(mock.patch.multiple(
             self.tool,
             _exec_thread=None,
+            _run=None,
+            _stopping=threading.Lock(),
             _exec_context_id=None,
             _exec_state_snapshot=None,
             _exec_input_locked=False,
@@ -24,26 +25,22 @@ class ScratchStopRestoreTests(unittest.TestCase):
             _exec_state=state,
         ))
         self.camera = self.enterContext(mock.patch.object(
-            blockly_main, "set_editor_camera_input_enabled",
-        ))
-        self.cancel_saves = self.enterContext(mock.patch.object(
-            blockly_main, "cancel_pending_auto_saves",
+            file_runner, "set_editor_camera_input_enabled",
         ))
         self.restore = self.enterContext(mock.patch.object(
-            corona_engine_scratch, "restore_runtime_scene_state",
+            file_runner.scene_state, "restore",
         ))
-        self.request_stop = self.enterContext(mock.patch.object(
-            corona_engine_scratch, "request_stop",
-        ))
-        self.children = self.enterContext(mock.patch.object(
-            corona_engine_scratch, "active_child_threads", return_value=[],
-        ))
-        self.isolate = self.enterContext(mock.patch.object(
-            corona_engine_scratch, "isolate_context",
-        ))
-        self.enterContext(mock.patch.object(
-            corona_engine_scratch, "runtime_context_snapshot", return_value={},
-        ))
+        self.request_stop = mock.Mock()
+        self.children = mock.Mock(return_value=[])
+        self.isolate = mock.Mock()
+
+    def attach_run(self):
+        run = file_runner.FileRun("test-context", "scope", "actor", "scene.ini", "Probe")
+        run.on_stop = self.request_stop
+        run.child_threads = self.children
+        run.on_quarantine = self.isolate
+        self.tool._exec_context_id = run.id
+        self.tool._run = run
 
     def assert_no_restore_needed(self, result):
         self.assertEqual(result, {
@@ -61,8 +58,7 @@ class ScratchStopRestoreTests(unittest.TestCase):
     def test_stop_before_any_execution_needs_no_restore(self):
         self.assert_no_restore_needed(self.tool.stop_script_execution(True))
         self.restore.assert_not_called()
-        self.cancel_saves.assert_not_called()
-        self.camera.assert_called_once_with(True, reason="node_graph")
+        self.camera.assert_called_once_with(True, reason="file_run")
 
     def test_no_snapshot_clears_stale_restore_error(self):
         self.tool._exec_state.update(
@@ -71,7 +67,6 @@ class ScratchStopRestoreTests(unittest.TestCase):
         )
         self.assert_no_restore_needed(self.tool.stop_script_execution(True))
         self.restore.assert_not_called()
-        self.cancel_saves.assert_not_called()
 
     def test_restore_then_stop_again_is_idempotent(self):
         snapshot = {"binding_mode": "native_editor", "scene_name": "test.scene"}
@@ -83,10 +78,8 @@ class ScratchStopRestoreTests(unittest.TestCase):
             "snapshotCaptured": False, "restoreStatus": "restored",
         })
         self.restore.assert_called_once_with(snapshot)
-        self.cancel_saves.assert_called_once_with()
         self.assert_no_restore_needed(self.tool.stop_script_execution(True))
         self.restore.assert_called_once_with(snapshot)
-        self.cancel_saves.assert_called_once_with()
 
     def test_restore_failure_keeps_snapshot_and_diagnostics_for_retry(self):
         snapshot = {"binding_mode": "native_editor", "scene_name": "test.scene"}
@@ -125,7 +118,7 @@ class ScratchStopRestoreTests(unittest.TestCase):
                 thread.name = f"pending-{role}"
                 thread.is_alive.return_value = True
                 self.tool._exec_state_snapshot = snapshot
-                self.tool._exec_context_id = "test-context"
+                self.attach_run()
                 self.tool._exec_thread = thread if role == "main" else None
                 self.children.return_value = [thread] if role == "child" else []
                 result = self.tool.stop_script_execution(True)
@@ -135,7 +128,6 @@ class ScratchStopRestoreTests(unittest.TestCase):
                 self.assertEqual(self.tool._exec_state["outcome"], "stop_timeout")
                 self.assertIs(self.tool._exec_state_snapshot, snapshot)
                 self.restore.assert_not_called()
-                self.cancel_saves.assert_not_called()
                 self.isolate.assert_called()
 
     def test_missing_snapshot_does_not_bypass_live_threads(self):
@@ -144,7 +136,7 @@ class ScratchStopRestoreTests(unittest.TestCase):
                 thread = mock.Mock()
                 thread.name = f"pending-{role}"
                 thread.is_alive.return_value = True
-                self.tool._exec_context_id = "test-context"
+                self.attach_run()
                 self.tool._exec_thread = thread if role == "main" else None
                 self.children.return_value = [thread] if role == "child" else []
                 result = self.tool.stop_script_execution(True)
@@ -163,14 +155,14 @@ class ScratchStopRestoreTests(unittest.TestCase):
         thread.name = "cooperative-main"
         thread.is_alive.side_effect = [True, False]
         self.tool._exec_thread = thread
-        self.tool._exec_context_id = "test-context"
+        self.attach_run()
         snapshot = {"binding_mode": "native_editor"}
         self.tool._exec_state_snapshot = snapshot
 
         def restore_after_stop(value):
-            self.request_stop.assert_called_once_with("test-context")
+            self.request_stop.assert_called_once_with()
             thread.join.assert_called_once_with(timeout=0.5)
-            self.children.assert_called_once_with({"test-context"})
+            self.children.assert_called_once_with()
             self.assertIs(value, snapshot)
 
         self.restore.side_effect = restore_after_stop
@@ -181,7 +173,6 @@ class ScratchStopRestoreTests(unittest.TestCase):
         self.tool._exec_state_snapshot = {"binding_mode": "native_editor"}
         self.assert_no_restore_needed(self.tool.stop_script_execution(False))
         self.restore.assert_not_called()
-        self.cancel_saves.assert_not_called()
 
 
 if __name__ == "__main__":

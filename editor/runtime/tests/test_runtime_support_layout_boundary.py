@@ -17,20 +17,9 @@ def test_obsolete_script_cleanup_modules_are_not_part_of_the_runtime():
     assert not (EDITOR_ROOT / "utils" / "hot_reload.py").exists()
 
 
-def test_scene_support_owns_scene_manifest_and_autosave_helpers():
-    scene_support = EDITOR_ROOT / "runtime" / "scene_support.py"
-    script_runtime = EDITOR_ROOT / "script_runtime" / "engine" / "corona_engine.py"
-    blockly_runtime = EDITOR_ROOT / "script_runtime" / "blockly" / "main.py"
-
-    assert scene_support.is_file()
-    scene_source = scene_support.read_text(encoding="utf-8")
-    assert "def get_project_scenes" not in scene_source
-    assert "def auto_save" in scene_source
-    assert "from runtime.scene_support import" in blockly_runtime.read_text(encoding="utf-8")
-    assert not (EDITOR_ROOT / "runtime" / "project_support.py").exists()
-    assert not (
-        EDITOR_ROOT / "runtime" / "compat" / "legacy_project_support.py"
-    ).exists()
+def test_obsolete_scene_services_are_absent():
+    for name in ("network_sync_policy.py", "scene_support.py", "project_templates.py"):
+        assert not (EDITOR_ROOT / "runtime" / name).exists()
 
 
 def test_runtime_project_support_has_no_compatibility_wrappers():
@@ -41,14 +30,3 @@ def test_runtime_project_support_has_no_compatibility_wrappers():
     assert not support_owner.exists()
     assert not (runtime_root / "project_support.py").exists()
     assert not (runtime_root / "project_copy.py").exists()
-
-
-def test_project_templates_only_creates_asset_descriptors():
-    templates = EDITOR_ROOT / "runtime" / "project_templates.py"
-
-    assert templates.is_file()
-    template_source = templates.read_text(encoding="utf-8")
-    assert "def create_actor_from_template" in template_source
-    assert "def normalize_project_runtime_paths" not in template_source
-    assert "def update_project_config" not in template_source
-    assert not (EDITOR_ROOT / "runtime" / "project_support.py").exists()

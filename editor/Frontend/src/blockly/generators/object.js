@@ -53,7 +53,7 @@ export const defineObjectGenerators = () => {
       FORWARD: [0, 0, -step],
       BACKWARD: [0, 0, step],
     }[direction] || [0, 0, -step];
-    return `CoronaEngine.object_set_position(${name}, CoronaEngine.object_x(${name}) + ${delta[0]}, CoronaEngine.object_y(${name}) + ${delta[1]}, CoronaEngine.object_z(${name}) + ${delta[2]})\n`;
+    return `CoronaEngine.translate_actor(${name}, ${delta.join(', ')})\n`;
   };
 
   pythonGenerator.forBlock['object_get_x'] = function (block) {

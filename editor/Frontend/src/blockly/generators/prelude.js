@@ -3,7 +3,6 @@
 // - 在某个积木的生成器中：import { need } from './prelude'; need('keyboard')
 // - 生成流程中：resetPrelude()；然后在不同位置 renderPreludeAt('global'|'runPrologue'|'runEpilogue')
 
-import { PYTHON_IMPORTS } from './constants';
 
 // 已请求的前置段集合
 const _required = new Set();
@@ -14,15 +13,11 @@ const _required = new Set();
 // - 或对象：{ global?: string, runPrologue?: string, runEpilogue?: string }
 const PRELUDE_SNIPPETS = {
   // 键盘事件支持：当使用键盘事件积木时加入
-  // 通过 CEF bridge (ScratchTool.key_event) → CE.handle_key_event → handle()
+  // 输入由文件宿主投递到这次运行。
   keyboard: {
-    global: [
-      '# 键盘事件桥接：注册 handle 到 CE 模块',
-      'from script_runtime.engine import corona_engine as _CE',
-    ].join('\n'),
     runPrologue: [
       '# 将 handle 注册到 CE，CEF bridge 收到键盘事件后会调用它',
-      '_CE.register_key_handler(handle)',
+      'CoronaEngine.register_key_handler(handle)',
       'print("[Blockly] 键盘处理器已注册: " + handle.__name__)',
     ].join('\n'),
     runEpilogue: [],
@@ -30,13 +25,9 @@ const PRELUDE_SNIPPETS = {
 
   // 鼠标事件支持：当使用鼠标事件积木时加入
   mouse: {
-    global: [
-      '# 鼠标事件桥接：注册 handle_mouse 到 CE 模块',
-      'from script_runtime.engine import corona_engine as _CE',
-    ].join('\n'),
     runPrologue: [
       '# 将 handle_mouse 注册到 CE，CEF bridge 收到鼠标事件后会调用它',
-      '_CE.register_mouse_handler(handle_mouse)',
+      'CoronaEngine.register_mouse_handler(handle_mouse)',
     ].join('\n'),
     runEpilogue: [],
   },
@@ -58,7 +49,7 @@ export function renderPrelude() {
 }
 
 // 渲染指定插入点的片段并返回文本（以单个换行结尾，或空串）
-export function renderPreludeAt(where /* 'global' | 'runPrologue' | 'runEpilogue' */) {
+export function renderPreludeAt(where) {
   const parts = [];
   for (const name of _required) {
     const entry = PRELUDE_SNIPPETS[name];

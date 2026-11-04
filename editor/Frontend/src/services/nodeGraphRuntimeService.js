@@ -1,3 +1,4 @@
+import { saveBlocklyTarget, loadBlocklyTarget } from '@/blockly/targetArchive.js';
 import { readScriptProject, startScriptFile } from './scriptFileService.js';
 import { editorApi } from '@/api/editorApi.js';
 import { appService } from '@/services/appService.js';
@@ -188,8 +189,8 @@ function formatRuntimeState(status = {}) {
   const state = String(status.status || 'idle');
   if (state === 'starting') return '启动中...';
   if (state === 'running') {
-    if (status.waitingEdgeName) return `等待条件：${status.waitingEdgeName}`;
-    if (status.currentNodeName) return `运行中：${status.currentNodeName}`;
+    if (status.waiting?.name) return `等待条件：${status.waiting?.name}`;
+    if (status.marker?.name) return `运行中：${status.marker?.name}`;
     return '运行中';
   }
   if (state === 'completed') return '已完成';
@@ -270,7 +271,7 @@ function uninstallBackgroundStateResponder() {
 }
 
 async function loadPersistedProjectNodeGraph(scope) {
-  const response = bridgeResult(await editorApi.scratch.loadBlocklyTarget({
+  const response = bridgeResult(await loadBlocklyTarget({
     ...scope, target_type: 'project', scene_name: '', actor_name: '', script_kind: 'node_graph',
   }));
   if (response?.status === 'error') throw new Error(response.message || '节点图加载失败');
@@ -283,7 +284,7 @@ function startBackgroundRunPoll() {
   backgroundRunPollTimer = window.setInterval(async () => {
     if (!backgroundRunId || !backgroundRuntimeState.running) return;
     try {
-      const status = bridgeResult(await editorApi.scratch.getScriptStatus()) || {};
+      const status = bridgeResult(await editorApi.scripts.getStatus()) || {};
       if (status.runId !== backgroundRunId) {
         clearBackgroundRunPoll();
         backgroundRunId = backgroundRequestId = '';
@@ -299,7 +300,7 @@ function startBackgroundRunPoll() {
         busy: false,
         status: nextStatus,
         detail: formatRuntimeDetail(status),
-        currentNodeId: String(status.currentNodeId || ''),
+        currentNodeId: String(status.marker?.id || ''),
       });
       if (!['starting', 'running'].includes(String(status.status || ''))) {
         if (status.status === 'completed') reportBackgroundRunTerminal(true);
@@ -390,7 +391,7 @@ export async function togglePersistedProjectNodeGraphRuntime() {
     const analysis = validateNodeGraph(workspace);
     let artifact = target;
     if (!artifact?.revision) {
-      const saved = bridgeResult(await editorApi.scratch.saveBlocklyTarget({
+      const saved = bridgeResult(await saveBlocklyTarget({
         ...target, ...scope, workspace, code: nodeGraphToCode(workspace),
         target_type: 'project', script_kind: 'node_graph',
       }));

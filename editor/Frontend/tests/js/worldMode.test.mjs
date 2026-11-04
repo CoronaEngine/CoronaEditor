@@ -164,11 +164,11 @@ test('project opening is serialized and stores only verified authoritative world
 
 
 function runningApi(stop) {
-  return { scratch: {getScriptStatus: async () => ({runId: 'current', snapshotCaptured: true})}, scripts: {stop} };
+  return { scripts: {getStatus: async () => ({runId: 'current', snapshotCaptured: true}), stop} };
 }
 
 test('world cleanup skips an idle runtime and restores the current file by ID', async () => {
-  await stopWorldRuntimeBeforeOpen({scratch: {getScriptStatus: async () => ({status: 'idle'})}, scripts: {stop: assert.fail}});
+  await stopWorldRuntimeBeforeOpen({scripts: {getStatus: async () => ({status: 'idle'}), stop: assert.fail}});
   const calls = [];
   await stopWorldRuntimeBeforeOpen(runningApi(async (id, restore) => {
     calls.push([id, restore]);
@@ -209,7 +209,7 @@ test('creative to story opens only after safe cleanup and can retry genuine fail
     worldModeService.invalidate();
   });
   t.mock.method(editorApi.projectSettings, 'getActiveProjectInfo', async () => info(activePath, activeMode));
-  t.mock.method(editorApi.scratch, 'getScriptStatus', async () => ({ data: { runId: 'current', threadAlive: true } }));
+  t.mock.method(editorApi.scripts, 'getStatus', async () => ({ data: { runId: 'current', threadAlive: true } }));
   t.mock.method(editorApi.scripts, 'stop', async (id, restore) => { calls.push(`script:${restore}`); return { data: stopResult }; });
   t.mock.method(editorApi.project, 'openProject', async path => {
     calls.push(`open:${path}`);

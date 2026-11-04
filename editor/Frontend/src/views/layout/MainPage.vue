@@ -1315,7 +1315,7 @@ const sendScratchPointerEvent = (type, event, pickedActor = '') => {
   const renderRect = getViewportRenderRect();
   const localX = Number(event.clientX || 0) - Number(renderRect.left || 0);
   const localY = Number(event.clientY || 0) - Number(renderRect.top || 0);
-  editorApi.scratch.sendMouseEvent(
+  editorApi.scripts.sendMouseEvent(
     type,
     scratchMouseButton(event.button),
     event.clientX || 0,
@@ -1380,7 +1380,7 @@ const handleKeyDown = (event) => {
   // Native SDL is authoritative in the editor; this is browser-dev fallback.
   if (!window.coronaBridge && !event.__coronaScratchKeyForwarded) {
     event.__coronaScratchKeyForwarded = true;
-    editorApi.scratch.sendKeyEvent(
+    editorApi.scripts.sendKeyEvent(
       event.code || event.key || '',
       modifiers,
       event.key || event.code || ''
@@ -1413,7 +1413,7 @@ const handleKeyUp = (event) => {
   if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
   if (!window.coronaBridge && !event.__coronaScratchKeyForwarded) {
     event.__coronaScratchKeyForwarded = true;
-    editorApi.scratch.sendKeyUpEvent(
+    editorApi.scripts.sendKeyUpEvent(
       event.code || event.key || '',
       event.key || event.code || ''
     ).catch(() => {});
@@ -1476,7 +1476,7 @@ let cameraInputLockReconcileToken = 0;
 async function reconcileEditorCameraInputLocks() {
   const token = ++cameraInputLockReconcileToken;
   try {
-    const result = await editorApi.scratch.getScriptStatus();
+    const result = await editorApi.scripts.getStatus();
     if (!viewCurrent() || token !== cameraInputLockReconcileToken) return;
     const state = unwrapBridgeData(result) || {};
     setEditorCameraInputLock('node_graph', Boolean(state.threadAlive && state.inputLocked));

@@ -1,18 +1,6 @@
-# -*- coding: utf-8 -*-
-"""
-CoronaEngine Scratch 兼容层。
-
-Blockly 生成的代码通过 Script Runtime adapter 导入本模块：
-    from script_runtime.engine import corona_engine as CoronaEngine
-
-生成脚本统一通过 `script_runtime.engine` 加载。
-
-运行时状态不再是模块级单例，而是绑定到当前脚本线程的
-ScratchRuntimeContext。这样项目预览可以同时运行项目全局脚本和多个
-Actor 脚本，而不会互相覆盖目标 Actor、变量或输入处理器。
-"""
-
-from __future__ import annotations
+# Web generator template. Its definitions are local to one generated script.
+from script_runtime import file_api, scene_state
+from script_runtime.scene_state import _native_payload, _native_payload_or_raise, _normalize_native_collision_type
 
 from contextlib import contextmanager
 from dataclasses import dataclass, field
@@ -31,7 +19,6 @@ _logger = logging.getLogger(__name__)
 _engine_lock = _threading.Lock()
 _context_lock = _threading.RLock()
 _tls = _threading.local()
-_run_count = 0
 
 
 @dataclass
@@ -124,7 +111,6 @@ class ScratchRuntimeContext:
 
 _default_context = ScratchRuntimeContext("default", target_type="internal")
 _contexts: dict[str, ScratchRuntimeContext] = {"default": _default_context}
-_completed_state_snapshots: dict[str, dict] = {}
 _clone_threads: dict[str, list[_threading.Thread]] = {}
 _handler_threads: dict[str, list[_threading.Thread]] = {}
 
@@ -137,11 +123,45 @@ def _bundled_audio_root() -> _Path:
         return get_repository_assets_dir() / "audio"
     except Exception:
         # Keep the runtime importable in minimal script-host environments.
-        return _Path(__file__).resolve().parents[3] / "assets" / "audio"
+        return _Path.cwd() / "assets" / "audio"
 
 
 def _current_context() -> ScratchRuntimeContext:
     ctx = getattr(_tls, "ctx", None)
+    if ctx is None:
+        run = file_api.current_run()
+        if run is not None:
+            ctx = create_context(run.id, run.target_type, run.scene_name, run.actor_name)
+            bind_context(ctx)
+            def input_event(kind, *args):
+                if kind == "key_down":
+                    handle_key_event(*args)
+                elif kind == "key_up":
+                    handle_key_release(args[0], args[2])
+                elif kind == "mouse":
+                    handle_mouse_event(*args)
+
+            def outcome():
+                reason = ctx.game_state
+                if reason in ("win", "over"):
+                    return "completed", "game_end"
+                if reason == "stop_restore":
+                    run.restore_on_exit = True
+                if reason or ctx.stop_requested:
+                    return "stopped", reason or "stopped"
+                return None
+
+            run.on_input = input_event
+            run.on_stop = lambda: request_stop(run.id)
+            run.on_close = lambda: release_context(ctx)
+            run.on_quarantine = lambda reason: isolate_context(run.id, reason)
+            run.child_threads = lambda: active_child_threads({run.id})
+            run.keep_alive = lambda: not ctx.stop_requested and has_runtime_handlers(ctx)
+            run.result = outcome
+            file_api.check_stop()
+            if run.target_type == "project":
+                resolved = resolve_runtime_target(run.target_type, run.scene_name, run.actor_name)
+                ctx.scene = ctx.target_scene = resolved.get("scene")
     return ctx if ctx is not None else _default_context
 
 
@@ -169,7 +189,6 @@ def create_context(
         ctx.external_target = True
     with _context_lock:
         _contexts[ctx.context_id] = ctx
-        _completed_state_snapshots.pop(ctx.context_id, None)
     return ctx
 
 
@@ -180,7 +199,7 @@ def bind_context(ctx: ScratchRuntimeContext):
     return ctx
 
 
-def isolate_context(context_id: str | None, reason: str = "") -> list[dict]:
+def isolate_context(context_id: str | None, reason: str = "") -> list[str]:
     """Quarantine live contexts without destroying state still used by their threads."""
     if not context_id:
         return []
@@ -194,7 +213,7 @@ def isolate_context(context_id: str | None, reason: str = "") -> list[dict]:
             ctx.stop_requested = True
             ctx.isolated = True
             ctx.isolation_reason = str(reason or "runtime isolated")
-    return [runtime_state_snapshot(ctx) for ctx in matches]
+    return [ctx.context_id for ctx in matches]
 
 
 def assert_engine_operation_allowed():
@@ -208,17 +227,14 @@ def release_context(ctx: ScratchRuntimeContext | None = None):
     if ctx is None:
         ctx = getattr(_tls, "ctx", None)
     if ctx is not None and ctx.context_id != "default":
-        if ctx.game_state or ctx.variables.get('game_state'):
-            with _context_lock:
-                _completed_state_snapshots[ctx.context_id] = runtime_state_snapshot(ctx)
         ctx.key_handler = None
         ctx.mouse_handler = None
         ctx.broadcast_handlers.clear()
         ctx.clone_start_handler = None
-        globals().get('_velocity_cache', {}).pop(ctx.context_id, None)
-        globals().get('_raycast_cache', {}).pop(ctx.context_id, None)
-        globals().get('_native_velocity_contexts', set()).discard(ctx.context_id)
-        globals().get('_native_gravity_contexts', set()).discard(ctx.context_id)
+        _velocity_cache.pop(ctx.context_id, None)
+        _raycast_cache.pop(ctx.context_id, None)
+        _native_velocity_contexts.discard(ctx.context_id)
+        _native_gravity_contexts.discard(ctx.context_id)
         ctx.virtual_objects.clear()
         ctx.deleted_objects.clear()
         ctx.object_tags.clear()
@@ -451,37 +467,6 @@ def _actor_matches(actor, requested):
     return any(_target_variants(candidate) & requested_values for candidate in candidates if candidate)
 
 
-def _native_payload(value):
-    if isinstance(value, str):
-        try:
-            value = _json.loads(value)
-        except Exception:
-            return None
-    if not isinstance(value, dict):
-        return None
-    if value.get("success") is False or value.get("status") == "error":
-        return None
-    data = value.get("data") if isinstance(value.get("data"), dict) else value
-    return data
-
-
-def _native_payload_or_raise(value, action):
-    """Validate a native editor result without discarding its error message."""
-    raw = value
-    if isinstance(raw, str):
-        try:
-            raw = _json.loads(raw)
-        except Exception as exc:
-            raise RuntimeError(f"{action} returned invalid data: {raw}") from exc
-    if not isinstance(raw, dict):
-        raise RuntimeError(f"{action} returned no valid result")
-    if raw.get("success") is False or raw.get("status") == "error":
-        message = raw.get("message") or raw.get("error") or "native interface failed"
-        raise RuntimeError(f"{action} failed: {message}")
-    data = raw.get("data") if isinstance(raw.get("data"), dict) else raw
-    return data
-
-
 def _native_actor_matches(data, requested):
     requested_values = _target_variants(requested)
     if not requested_values or not isinstance(data, dict):
@@ -519,23 +504,6 @@ def _native_scene_snapshot(scene_name):
     except Exception as exc:
         errors.append(str(exc))
     return None, errors
-
-
-def _normalize_native_collision_type(value):
-    if isinstance(value, dict):
-        value = value.get("type", value.get("shape"))
-    if isinstance(value, str):
-        candidate = value.strip().lower()
-        if candidate in ("none", "box", "mesh"):
-            return candidate
-        if candidate in ("off", "disabled", "false", "0"):
-            return "none"
-        return "box"
-    if value in (False, 0, None):
-        return "none"
-    if value == 2:
-        return "mesh"
-    return "box"
 
 
 class _NativeEditorActorProxy:
@@ -964,456 +932,9 @@ def resolve_runtime_target(
     }
 
 
-def capture_runtime_scene_state(scene_name="", scene=None, binding_mode=""):
-    """Capture the current scene for single node-graph execution restoration."""
-    scene = scene or _runtime_scene()
-    if binding_mode == "native_editor" or isinstance(scene, _NativeEditorSceneProxy):
-        route = str(getattr(scene, "route", "") or scene_name or "")
-        payload, errors = _native_scene_snapshot(route)
-        if payload is None:
-            raise RuntimeError("\u65e0\u6cd5\u8bfb\u53d6\u539f\u751f\u573a\u666f\u5feb\u7167" + (f": {'; '.join(errors)}" if errors else ""))
-        resolved_route = str(
-            payload.get("scene")
-            or payload.get("scene_id")
-            or payload.get("id")
-            or route
-            or payload.get("scene_name")
-            or payload.get("name")
-            or ""
-        )
-        return {"binding_mode": "native_editor", "scene_name": resolved_route, "payload": payload}
-
-    raise RuntimeError("native scene binding is required for runtime snapshots")
-
-
-def _snapshot_actor_key(data):
-    guid = str((data or {}).get("actor_guid") or "").strip()
-    if guid:
-        return "guid:" + guid.casefold()
-    return "name:" + _target_token((data or {}).get("name") or (data or {}).get("route") or "")
-
-
-def _native_restore_operation(scene_route, actor_name, operation, values):
+def _set_native_runtime_camera(*args, **kwargs):
     assert_engine_operation_allowed()
-    action = f"Restore actor {actor_name} operation {operation}"
-    from api.editor_api import get_script_runtime_editor_api
-
-    scene_tools = get_script_runtime_editor_api().scene_tools
-    if operation == "SetVisible":
-        result = scene_tools.set_actor_state(scene_route, actor_name, {"visible": bool(values[0])})
-    else:
-        match operation:
-            case "SetMass":
-                field = {"mass": float(values[0])}
-            case "SetRestitution":
-                field = {"restitution": float(values[0])}
-            case "SetDamping":
-                field = {"damping": float(values[0])}
-            case "SetPhysicsEnabled":
-                field = {"physics_enabled": bool(values[0])}
-            case "SetCollision":
-                field = {"collision_type": str(values[0])}
-            case "SetLinearLock":
-                field = {"linear_lock": list(map(bool, values[:3]))}
-            case "SetAngularLock":
-                field = {"angular_lock": list(map(bool, values[:3]))}
-            case _:
-                raise RuntimeError(f"unsupported native actor operation: {operation}")
-        result = scene_tools.set_actor_physics(scene_route, actor_name, field)
-    return _native_payload_or_raise(
-        result,
-        action,
-    )
-
-
-def _set_native_runtime_camera(scene_route, position, forward, world_up, fov, camera_name=""):
-    """Update the main editor viewport camera in memory without writing the scene file."""
-    assert_engine_operation_allowed()
-    try:
-        from api.editor_api import get_script_runtime_editor_api
-
-        viewport = get_script_runtime_editor_api().viewport
-        setter = getattr(viewport, "set_camera_pose", None) if viewport is not None else None
-        if not callable(setter):
-            return False
-        payload = _native_payload(setter(
-            str(scene_route or ""),
-            str(camera_name or ""),
-            {
-                "position": list(position),
-                "forward": list(forward),
-                "world_up": list(world_up),
-                "fov": float(fov),
-                "persist": False,
-            },
-        ))
-        return isinstance(payload, dict) and payload.get("status") not in ("error", "failed")
-    except Exception as exc:
-        _logger.debug("[ScratchWrapper] native runtime camera update failed: %s", exc)
-        return False
-
-
-def _restore_native_camera_state(scene_route, camera_data):
-    if not isinstance(camera_data, dict):
-        return False
-    return _set_native_runtime_camera(
-        scene_route,
-        camera_data.get("position") or [0.0, 0.0, -5.0],
-        camera_data.get("forward") or [0.0, 0.0, 1.0],
-        camera_data.get("world_up") or camera_data.get("up") or [0.0, 1.0, 0.0],
-        camera_data.get("fov", 45.0),
-        camera_data.get("camera_id") or camera_data.get("id") or camera_data.get("name") or "",
-    )
-
-
-def _restore_native_actor_state(scene_route, actor_data):
-    from api.editor_api import get_script_runtime_editor_api
-
-    actor_name = str(actor_data.get("name") or actor_data.get("route") or "")
-    if not actor_name:
-        raise RuntimeError("Scene snapshot actor is missing a name")
-    geometry = actor_data.get("geometry") if isinstance(actor_data.get("geometry"), dict) else {}
-    mechanics = actor_data.get("mechanics") if isinstance(actor_data.get("mechanics"), dict) else {}
-    scene_api = get_script_runtime_editor_api().scene
-    setter = getattr(scene_api, "set_actor_transform", None) if scene_api is not None else None
-    if not callable(setter):
-        raise RuntimeError("native set_editor_actor_transform is unavailable")
-
-    # Pause physics before restoring transforms so simulation cannot race restoration.
-    if mechanics:
-        _native_restore_operation(scene_route, actor_name, "SetPhysicsEnabled", [False])
-
-    transform = {
-        key: list(geometry[key])
-        for key in ("position", "rotation", "scale")
-        if isinstance(geometry.get(key), (list, tuple))
-    }
-    if transform:
-        _native_payload_or_raise(
-            setter(scene_route, actor_name, {**transform, "persist": False}),
-            f"Restore actor {actor_name} transform",
-        )
-
-    _native_restore_operation(
-        scene_route, actor_name, "SetVisible", [bool(actor_data.get("visible", True))]
-    )
-    _native_restore_operation(
-        scene_route,
-        actor_name,
-        "SetCollision",
-        [_normalize_native_collision_type(
-            actor_data.get("collision", mechanics.get("collision_type", "box"))
-        )],
-    )
-    if "mass" in mechanics:
-        _native_restore_operation(scene_route, actor_name, "SetMass", [mechanics.get("mass")])
-    if "restitution" in mechanics:
-        _native_restore_operation(
-            scene_route, actor_name, "SetRestitution", [mechanics.get("restitution")]
-        )
-    if "damping" in mechanics:
-        _native_restore_operation(scene_route, actor_name, "SetDamping", [mechanics.get("damping")])
-    linear = mechanics.get("linear_lock")
-    if isinstance(linear, (list, tuple)) and len(linear) >= 3:
-        _native_restore_operation(
-            scene_route,
-            actor_name,
-            "SetLinearLock",
-            [bool(linear[0]), bool(linear[1]), bool(linear[2])],
-        )
-    angular = mechanics.get("angular_lock")
-    if isinstance(angular, (list, tuple)) and len(angular) >= 3:
-        _native_restore_operation(
-            scene_route,
-            actor_name,
-            "SetAngularLock",
-            [bool(angular[0]), bool(angular[1]), bool(angular[2])],
-        )
-    if "physics_enabled" in mechanics:
-        _native_restore_operation(
-            scene_route,
-            actor_name,
-            "SetPhysicsEnabled",
-            [bool(mechanics.get("physics_enabled"))],
-        )
-
-
-def _snapshot_actor_match(actors, expected):
-    expected_key = _snapshot_actor_key(expected)
-    expected_guid = str((expected or {}).get("actor_guid") or "").strip().casefold()
-    expected_name = str((expected or {}).get("name") or "").strip().casefold()
-    expected_route = str((expected or {}).get("route") or (expected or {}).get("path") or "").strip().replace("\\", "/").casefold()
-    for actor in actors:
-        if _snapshot_actor_key(actor) == expected_key:
-            return actor
-    if expected_guid:
-        for actor in actors:
-            if str(actor.get("actor_guid") or "").strip().casefold() == expected_guid:
-                return actor
-    if expected_name:
-        matches = [actor for actor in actors if str(actor.get("name") or "").strip().casefold() == expected_name]
-        if len(matches) == 1:
-            return matches[0]
-    if expected_route and not expected_guid and not expected_name:
-        matches = [
-            actor for actor in actors
-            if str(actor.get("route") or actor.get("path") or "").strip().replace("\\", "/").casefold() == expected_route
-        ]
-        if len(matches) == 1:
-            return matches[0]
-    return None
-
-
-def _values_close(expected, actual, tolerance=1.0e-3):
-    try:
-        return abs(float(expected) - float(actual)) <= tolerance
-    except (TypeError, ValueError):
-        return expected == actual
-
-
-def _native_actor_state_mismatches(expected, actual):
-    mismatches = []
-    expected_geometry = expected.get("geometry") if isinstance(expected.get("geometry"), dict) else {}
-    actual_geometry = actual.get("geometry") if isinstance(actual.get("geometry"), dict) else {}
-    for key in ("position", "rotation", "scale"):
-        expected_value = expected_geometry.get(key)
-        actual_value = actual_geometry.get(key)
-        if not isinstance(expected_value, (list, tuple)):
-            continue
-        if not isinstance(actual_value, (list, tuple)) or len(actual_value) < len(expected_value):
-            mismatches.append(key)
-            continue
-        if any(not _values_close(left, right) for left, right in zip(expected_value, actual_value)):
-            mismatches.append(key)
-    for key in ("visible", "collision"):
-        if key in expected and bool(expected.get(key)) != bool(actual.get(key)):
-            mismatches.append(key)
-
-    expected_mechanics = expected.get("mechanics") if isinstance(expected.get("mechanics"), dict) else {}
-    actual_mechanics = actual.get("mechanics") if isinstance(actual.get("mechanics"), dict) else {}
-    for key in ("mass", "restitution", "damping"):
-        if key in expected_mechanics and not _values_close(
-            expected_mechanics.get(key), actual_mechanics.get(key)
-        ):
-            mismatches.append("mechanics." + key)
-    if "physics_enabled" in expected_mechanics and bool(expected_mechanics.get("physics_enabled")) != bool(actual_mechanics.get("physics_enabled")):
-        mismatches.append("mechanics.physics_enabled")
-    for key in ("linear_lock", "angular_lock"):
-        expected_value = expected_mechanics.get(key)
-        actual_value = actual_mechanics.get(key)
-        if isinstance(expected_value, (list, tuple)):
-            if not isinstance(actual_value, (list, tuple)) or tuple(bool(v) for v in expected_value[:3]) != tuple(bool(v) for v in actual_value[:3]):
-                mismatches.append("mechanics." + key)
-    return mismatches
-
-
-def _verify_native_scene_restored(scene_route, original):
-    payload, errors = _native_scene_snapshot(scene_route)
-    if payload is None:
-        return ["Unable to read the restored native scene" + (f": {'; '.join(errors)}" if errors else "")]
-    current = [item for item in payload.get("actors", []) if isinstance(item, dict)]
-    failures = []
-    matched_ids = set()
-    for expected in original:
-        actual = _snapshot_actor_match(current, expected)
-        actor_name = str(expected.get("name") or expected.get("route") or "(unnamed)")
-        if actual is None:
-            failures.append(f"Missing actor {actor_name}")
-            continue
-        matched_ids.add(id(actual))
-        mismatches = _native_actor_state_mismatches(expected, actual)
-        if mismatches:
-            failures.append(f"Actor {actor_name} fields not restored: {', '.join(mismatches)}")
-    extras = [
-        str(actor.get("name") or actor.get("route") or "(unnamed)")
-        for actor in current
-        if id(actor) not in matched_ids
-    ]
-    if extras:
-        failures.append("Runtime-created actors still exist: " + ", ".join(extras))
-    return failures
-
-
-def _clear_scene_runtime_state(scene_name):
-    requested = _target_variants(scene_name)
-    with _context_lock:
-        for ctx in list(_contexts.values()):
-            for key in list(ctx.shared_scenes):
-                if (key == "__default__" and not requested) or _target_variants(key) & requested:
-                    ctx.shared_scenes.pop(key, None)
-            if _target_variants(ctx.scene_name) & requested:
-                ctx.virtual_objects.clear()
-                ctx.deleted_objects.clear()
-                ctx.object_tags.clear()
-                globals().get('_velocity_cache', {}).pop(ctx.context_id, None)
-                globals().get('_raycast_cache', {}).pop(ctx.context_id, None)
-
-
-def restore_runtime_scene_state(snapshot):
-    if not isinstance(snapshot, dict):
-        raise RuntimeError("\u65e0\u6548\u7684\u573a\u666f\u6062\u590d\u5feb\u7167")
-    mode = snapshot.get("binding_mode")
-    scene_route = str(snapshot.get("scene_name") or "")
-    payload = snapshot.get("payload") if isinstance(snapshot.get("payload"), dict) else {}
-    original = [item for item in payload.get("actors", []) if isinstance(item, dict)]
-
-    if mode == "native_editor":
-        from api.editor_api import get_script_runtime_editor_api
-
-        scene_tools = get_script_runtime_editor_api().scene_tools
-        if scene_tools is None:
-            raise RuntimeError("native SceneTools adapter is unavailable")
-        _logger.info(
-            "[ScratchWrapper] native scene restore begin: scene=%s actors=%d",
-            scene_route,
-            len(original),
-        )
-        remover = getattr(scene_tools, "remove_actor", None) if scene_tools is not None else None
-        creator = getattr(scene_tools, "create_actor", None) if scene_tools is not None else None
-        verification_failures = []
-        for attempt in range(3):
-            current_payload, errors = _native_scene_snapshot(scene_route)
-            if current_payload is None:
-                raise RuntimeError(
-                    "Unable to read the current native scene while stopping"
-                    + (f": {'; '.join(errors)}" if errors else "")
-                )
-            project = payload.get("project_path")
-            if project and _Path(current_payload.get("project_path") or "").resolve() != _Path(project).resolve():
-                raise RuntimeError("The active project changed; the preview snapshot was not restored")
-            current = [
-                item for item in current_payload.get("actors", []) if isinstance(item, dict)
-            ]
-
-            # Remove runtime-created actors. Prefer GUID; use name/route only as fallback.
-            runtime_created = [
-                item for item in current
-                if not any(_snapshot_actor_match([item], expected) is not None for expected in original)
-            ]
-            if runtime_created and not callable(remover):
-                names = ", ".join(str(item.get("name") or item.get("route") or "") for item in runtime_created)
-                raise RuntimeError(f"Native remove actor API is unavailable; cannot remove: {names}")
-            for item in runtime_created:
-                actor_name = str(item.get("name") or item.get("route") or "")
-                _native_payload_or_raise(
-                    remover(scene_route, actor_name),
-                    f"Remove runtime-created actor {actor_name}",
-                )
-
-            refreshed, errors = _native_scene_snapshot(scene_route)
-            if refreshed is None:
-                raise RuntimeError(
-                    "Unable to refresh the native scene after removing runtime actors"
-                    + (f": {'; '.join(errors)}" if errors else "")
-                )
-            current = [item for item in refreshed.get("actors", []) if isinstance(item, dict)]
-
-            # Recreate original actors deleted during runtime.
-            missing_originals = [item for item in original if _snapshot_actor_match(current, item) is None]
-            if missing_originals and not callable(creator):
-                names = ", ".join(str(item.get("name") or item.get("route") or "") for item in missing_originals)
-                raise RuntimeError(f"Native create actor API is unavailable; cannot recreate: {names}")
-            for item in missing_originals:
-                route = str(item.get("route") or item.get("path") or item.get("model") or "")
-                actor_type = str(item.get("actor_type") or "model")
-                actor_name = str(item.get("name") or _Path(route).stem or "actor")
-                actor_data = dict(item)
-                actor_data.update(actor_name=actor_name, name=actor_name, skip_if_exists=False)
-                create_args = (
-                    (scene_route, route, actor_type, actor_data)
-                    if scene_tools is not None
-                    else (
-                        scene_route,
-                        route,
-                        actor_type,
-                        _json.dumps(actor_data, ensure_ascii=False),
-                    )
-                )
-                _native_payload_or_raise(
-                    creator(*create_args),
-                    f"Recreate original actor {actor_name}",
-                )
-
-            refreshed, errors = _native_scene_snapshot(scene_route)
-            if refreshed is None:
-                raise RuntimeError(
-                    "Unable to refresh the native scene after recreating actors"
-                    + (f": {'; '.join(errors)}" if errors else "")
-                )
-            current = [item for item in refreshed.get("actors", []) if isinstance(item, dict)]
-            for item in original:
-                actor_name = str(item.get("name") or item.get("route") or "")
-                current_actor = _snapshot_actor_match(current, item)
-                if current_actor is None:
-                    raise RuntimeError(f"Actor {actor_name} is still missing after recreation")
-                if _native_actor_state_mismatches(item, current_actor):
-                    _restore_native_actor_state(scene_route, item)
-
-            # Native writes and render/physics synchronization may cross a short frame.
-            # Re-read and verify; retry twice and never report restored on mismatch.
-            _time.sleep(0.02 * (attempt + 1))
-            verification_failures = _verify_native_scene_restored(scene_route, original)
-            if not verification_failures:
-                break
-            _logger.warning(
-                "[ScratchWrapper] native scene restore verification failed (attempt %d/3): %s",
-                attempt + 1,
-                "; ".join(verification_failures),
-            )
-
-        if verification_failures:
-            raise RuntimeError("Scene restore verification failed: " + "; ".join(verification_failures))
-
-        camera_restored = _restore_native_camera_state(scene_route, payload.get("camera"))
-        _logger.info(
-            "[ScratchWrapper] native scene restore verified: scene=%s camera=%s",
-            scene_route,
-            "restored" if camera_restored else "unavailable",
-        )
-        _clear_scene_runtime_state(scene_route)
-        try:
-            from runtime.editor_host import emit_editor_event, get_editor_selection
-
-            emit_editor_event("scene-tree-changed", [scene_route])
-            selected_scene, selected_actor = get_editor_selection()
-            if selected_scene == scene_route and selected_actor:
-                emit_editor_event(
-                    "actor-change", ["actor", scene_route, selected_actor]
-                )
-        except Exception:
-            _logger.debug("[ScratchWrapper] failed to notify restored native scene", exc_info=True)
-        return True
-
-    scene = snapshot.get("scene")
-    if scene is None:
-        raise RuntimeError("Python \u573a\u666f\u6062\u590d\u5feb\u7167\u5df2\u5931\u6548")
-    original_names = {_target_token(item.get("name")): item for item in original}
-    for actor in list(_iter_scene_actors(scene)):
-        name = _object_name(actor)
-        if _target_token(name) not in original_names:
-            remover = getattr(scene, "remove_actor", None)
-            if callable(remover):
-                remover(name)
-    for name_key, item in original_names.items():
-        actor = scene.find_actor(item.get("name")) if hasattr(scene, "find_actor") else None
-        if actor is None:
-            created = _try_native_spawn(scene, item.get("route"), item.get("name"), item.get("geometry", {}).get("position", [0, 0, 0]))
-            actor = created
-        if actor is None:
-            raise RuntimeError(f"\u65e0\u6cd5\u5728 Python \u573a\u666f\u4e2d\u91cd\u5efa\u7269\u4f53\u300c{item.get('name')}\u300d")
-        geometry = item.get("geometry") or {}
-        raw_geometry = getattr(actor, "_geometry", None)
-        for method_name, key in (("set_position", "position"), ("set_rotation", "rotation"), ("set_scale", "scale")):
-            method = getattr(raw_geometry, method_name, None) if raw_geometry is not None else None
-            if not callable(method):
-                method = getattr(actor, method_name, None)
-            if callable(method) and key in geometry:
-                method(geometry[key])
-        if hasattr(actor, "set_visible"):
-            actor.set_visible(item.get("visible", True))
-    _restore_native_camera_state(scene_route, payload.get("camera"))
-    _clear_scene_runtime_state(scene_route)
-    return True
+    return scene_state._set_native_runtime_camera(*args, **kwargs)
 
 
 def _init_engine():
@@ -3016,6 +2537,12 @@ def object_collect_touching_tag(tag='coin', points=1):
     return collected
 
 
+def translate_actor(name, dx, dy, dz):
+    if file_api.current_run() is not None and name not in _shared_virtual_objects():
+        return file_api.translate_actor(name, dx, dy, dz)
+    return object_set_position(name, object_x(name) + dx, object_y(name) + dy, object_z(name) + dz)
+
+
 def object_set_position(name, x, y, z):
     actor = _resolve_actor(name)
     if actor is None:
@@ -3387,87 +2914,6 @@ def countdown_finished():
     return bool(end_time > 0 and countdown_left() <= 0.0)
 
 
-def node_graph_enter(node_id, node_name=""):
-    ctx = _current_context()
-    ctx.current_node_id = str(node_id or "")
-    ctx.current_node_name = str(node_name or "")
-    ctx.waiting_edge_id = ""
-    ctx.waiting_edge_name = ""
-    return True
-
-
-def node_graph_waiting(edge_id="", edge_name=""):
-    ctx = _current_context()
-    ctx.waiting_edge_id = str(edge_id or "")
-    ctx.waiting_edge_name = str(edge_name or "")
-    return True
-
-
-def runtime_context_snapshot(context_id):
-    with _context_lock:
-        ctx = _contexts.get(str(context_id or ""))
-        completed = _completed_state_snapshots.get(str(context_id or ""))
-    if ctx is not None:
-        return runtime_state_snapshot(ctx)
-    return dict(completed) if completed else None
-
-
-def runtime_state_snapshot(ctx=None):
-    ctx = ctx or _current_context()
-    end_time = _safe_float(ctx.countdown_end_time, 0.0)
-    countdown = max(0.0, end_time - _time.monotonic()) if end_time > 0 else 0.0
-    variables = {}
-    for marker in sorted(ctx.visible_variables):
-        if marker.startswith('SCENE:'):
-            name = marker[6:]
-            variables[name] = _shared_variables(ctx).get(name, 0.0)
-        else:
-            variables[marker] = ctx.variables.get(marker, 0.0)
-    lists = {}
-    for marker in sorted(ctx.visible_lists):
-        if marker.startswith('SCENE:'):
-            name = marker[6:]
-            lists[name] = _shared_lists(ctx).get(name, [])
-        else:
-            lists[marker] = ctx.list_values.get(marker, [])
-    return {
-        'context_id': ctx.context_id,
-        'target_type': ctx.target_type,
-        'scene_name': ctx.scene_name,
-        'actor_name': ctx.actor_name,
-        'score': _safe_float(ctx.variables.get('score', 0.0)),
-        'lives': _safe_float(ctx.variables.get('lives', 0.0)),
-        'countdown': countdown,
-        'countdown_active': end_time > 0,
-        'game_state': ctx.variables.get('game_state', ctx.game_state or ''),
-        'variables': variables,
-        'lists': lists,
-        'mouse_locked': bool(ctx.mouse_locked),
-        'binding_error': ctx.binding_error,
-        'isolated': bool(ctx.isolated),
-        'isolation_reason': ctx.isolation_reason,
-        'current_node_id': ctx.current_node_id,
-        'current_node_name': ctx.current_node_name,
-        'waiting_edge_id': ctx.waiting_edge_id,
-        'waiting_edge_name': ctx.waiting_edge_name,
-    }
-
-
-def runtime_state_snapshots():
-    live = {ctx.context_id: runtime_state_snapshot(ctx) for ctx in _live_contexts()}
-    with _context_lock:
-        completed = dict(_completed_state_snapshots)
-    completed.update(live)
-    return list(completed.values())
-
-
-def clear_runtime_state_snapshots():
-    with _context_lock:
-        _completed_state_snapshots.clear()
-        for ctx in _contexts.values():
-            ctx.shared_scenes.clear()
-
-
 def game_win():
     ctx = _current_context()
     ctx.game_state = 'win'
@@ -3681,6 +3127,8 @@ def _tick_runtime_physics_auto():
 
 
 def check_stop():
+    if file_api.current_run() is not None:
+        file_api.check_stop()
     if _current_context().stop_requested or _current_context().isolated:
         raise SystemExit(0)
     _tick_runtime_physics_auto()
@@ -3689,6 +3137,8 @@ def check_stop():
 def loop_yield(frame_seconds=1.0 / 60.0):
     """Pace tight runtime loops so native calls and stop requests stay responsive."""
     ctx = _current_context()
+    if file_api.current_run() is not None:
+        file_api.wait(0)
     check_stop()
     interval = max(0.0, _safe_float(frame_seconds, 1.0 / 60.0))
     now = _time.monotonic()
@@ -3705,12 +3155,19 @@ def loop_yield(frame_seconds=1.0 / 60.0):
     check_stop()
 
 
+mark = file_api.mark
+mark_waiting = file_api.mark_waiting
+
+
 def wait(seconds):
     remaining = max(0.0, _safe_float(seconds))
     while remaining > 0:
         check_stop()
         step = min(0.1, remaining)
-        _time.sleep(step)
+        if file_api.current_run() is not None:
+            file_api.wait(step)
+        else:
+            _time.sleep(step)
         remaining -= step
     check_stop()
 
@@ -5187,31 +4644,6 @@ def stop_all_sounds():
                 pass
     _audio_cache.clear()
     return stopped > 0
-
-
-# Stop/reset compatibility
-def reset_state():
-    global _run_count
-    ctx = _current_context()
-    ctx.key_handler = None
-    ctx.mouse_handler = None
-    ctx.broadcast_handlers.clear()
-    ctx.clone_start_handler = None
-    globals().get('_velocity_cache', {}).pop(ctx.context_id, None)
-    globals().get('_raycast_cache', {}).pop(ctx.context_id, None)
-    globals().get('_native_velocity_contexts', set()).discard(ctx.context_id)
-    globals().get('_native_gravity_contexts', set()).discard(ctx.context_id)
-    fresh = ScratchRuntimeContext(ctx.context_id, target_type=ctx.target_type)
-    fresh.scene_name = ctx.scene_name
-    fresh.actor_name = ctx.actor_name
-    if fresh.target_type == "actor" and fresh.scene_name and fresh.actor_name:
-        fresh.target_scene_name = fresh.scene_name
-        fresh.target_actor_name = fresh.actor_name
-        fresh.external_target = True
-    if fresh.target_type == "project":
-        fresh.initialized = True
-    _run_count += 1
-    bind_context(fresh)
 
 
 def request_stop(context_id: str | None = None):

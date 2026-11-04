@@ -1203,10 +1203,6 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
             "onActorTransformUpdated: (callback) => register_manifest_editor_api_callback("
             "'events.onActorTransformUpdated', callback)",
             'return _register_manifest_editor_api_event_callback("events.on_actor_transform_updated", callback)',
-            '"transform-update": ("events.on_actor_transform_updated", lambda values: {',
-            '"position": values[2] if len(values) > 2 else {},',
-            '"rotation": values[3] if len(values) > 3 else {},',
-            '"scale": values[4] if len(values) > 4 else {},',
         ):
             with self.subTest(snippet=snippet):
                 self.assertIn(snippet, source + bridge_source + python_api_source + corona_editor_source)
@@ -1247,8 +1243,6 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
             "onNetworkActorOwnershipClaimed: (callback) => register_manifest_editor_api_callback("
             "'events.onNetworkActorOwnershipClaimed', callback)",
             'return _register_manifest_editor_api_event_callback("events.on_network_actor_ownership_claimed", callback)',
-            '"actor-ownership-claim": ("events.on_network_actor_ownership_claimed", lambda values: {',
-            '"actor_guid": (values[0] if len(values) > 0 else {}).get("actor_guid", "")',
         ):
             with self.subTest(snippet=snippet):
                 self.assertIn(snippet, source + bridge_source + python_api_source + corona_editor_source)
@@ -1285,8 +1279,6 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
             "onNetworkSyncPauseRequested: (callback) => register_manifest_editor_api_callback("
             "'events.onNetworkSyncPauseRequested', callback)",
             'return _register_manifest_editor_api_event_callback("events.on_network_sync_pause_requested", callback)',
-            '"network-sync-pause-request": ("events.on_network_sync_pause_requested", lambda values: {',
-            '"paused": bool((values[0] if len(values) > 0 else {}).get("paused", False))',
         ):
             with self.subTest(snippet=snippet):
                 self.assertIn(snippet, source + bridge_source + python_api_source + corona_editor_source)
@@ -1323,10 +1315,6 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
             "onNetworkFileSyncStatusChanged: (callback) => register_manifest_editor_api_callback("
             "'events.onNetworkFileSyncStatusChanged', callback)",
             'return _register_manifest_editor_api_event_callback("events.on_network_file_sync_status_changed", callback)',
-            '"file-sync-status": ("events.on_network_file_sync_status_changed", lambda values: {',
-            '"status": (values[0] if len(values) > 0 else {}).get("status", ""),',
-            '"model_path": (values[0] if len(values) > 0 else {}).get("model_path", ""),',
-            '"progress": (values[0] if len(values) > 0 else {}).get("progress", 0),',
         ):
             with self.subTest(snippet=snippet):
                 self.assertIn(snippet, source + bridge_source + python_api_source + corona_editor_source)
@@ -1363,7 +1351,6 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
             "onNetworkAssetImportCompleted: (callback) => register_manifest_editor_api_callback("
             "'events.onNetworkAssetImportCompleted', callback)",
             'return _register_manifest_editor_api_event_callback("events.on_network_asset_import_completed", callback)',
-            '"import-asset-complete": ("events.on_network_asset_import_completed", lambda values: values[0] if len(values) > 0 else {}),',
         ):
             with self.subTest(snippet=snippet):
                 self.assertIn(snippet, source + bridge_source + python_api_source + corona_editor_source)
@@ -1400,7 +1387,6 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
             "onNetworkActorSyncBroadcastRequested: (callback) => register_manifest_editor_api_callback("
             "'events.onNetworkActorSyncBroadcastRequested', callback)",
             'return _register_manifest_editor_api_event_callback("events.on_network_actor_sync_broadcast_requested", callback)',
-            '"actor-sync-broadcast": ("events.on_network_actor_sync_broadcast_requested", lambda values: values[0] if len(values) > 0 else {}),',
         ):
             with self.subTest(snippet=snippet):
                 self.assertIn(snippet, source + bridge_source + python_api_source + corona_editor_source)
@@ -1467,7 +1453,7 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
                     f'return _register_manifest_editor_api_event_callback("{python_wrapper}", callback)',
                     python_api_source,
                 )
-                self.assertIn(
+                self.assertNotIn(
                     f'"{legacy_name}": ("{python_wrapper}", lambda values: values[0] if len(values) > 0 else {{}}),',
                     corona_editor_source,
                 )
@@ -1510,7 +1496,6 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
             "onAiChunk: (callback) => register_manifest_editor_api_callback("
             "'events.onAiChunk', callback)",
             'return _register_manifest_editor_api_event_callback("events.on_ai_chunk", callback)',
-            '"ai-chunk": ("events.on_ai_chunk", lambda values: values[0] if len(values) > 0 else ""),',
         ):
             with self.subTest(snippet=snippet):
                 self.assertIn(snippet, source + bridge_source + python_api_source + corona_editor_source)
@@ -1928,7 +1913,7 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
     def test_scene_tools_frontend_wrappers_are_manifest_driven(self):
         bridge_source = self._frontend_bridge_source()
         scene_start = bridge_source.find("scene: {")
-        scene_end = bridge_source.find("scratch: {", scene_start)
+        scene_end = bridge_source.find("scripts: {", scene_start)
         self.assertGreaterEqual(scene_start, 0)
         self.assertGreater(scene_end, scene_start)
         scene_section = bridge_source[scene_start:scene_end]
@@ -2136,7 +2121,7 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
     def test_project_launcher_frontend_wrappers_are_manifest_driven(self):
         bridge_source = self._frontend_bridge_source()
         start = bridge_source.find("project: {")
-        end = bridge_source.find("scratch: {", start)
+        end = bridge_source.find("scripts: {", start)
         self.assertGreaterEqual(start, 0)
         self.assertGreater(end, start)
         project_section = bridge_source[start:end]
@@ -2176,7 +2161,7 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
                 )
                 self.assertTrue(
                     plain_schema in source
-                    or (wrapped_schema_prefix in source and return_type in source),
+                    or (any(prefix in source for prefix in (wrapped_schema_prefix, wrapped_schema_prefix.replace("WRAPPED(", "WRAPPED_CALLERS("))) and return_type in source),
                     f"{api_name} must keep an explicit C++ schema",
                 )
 
@@ -2245,7 +2230,7 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
                 )
                 self.assertTrue(
                     plain_schema in source
-                    or (wrapped_schema_prefix in source and return_type in source),
+                    or (any(prefix in source for prefix in (wrapped_schema_prefix, wrapped_schema_prefix.replace("WRAPPED(", "WRAPPED_CALLERS("))) and return_type in source),
                     f"{api_name} must keep an explicit C++ schema",
                 )
 
@@ -2374,7 +2359,7 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
                 )
                 self.assertTrue(
                     plain_schema in source
-                    or (wrapped_schema_prefix in source and return_type in source),
+                    or (any(prefix in source for prefix in (wrapped_schema_prefix, wrapped_schema_prefix.replace("WRAPPED(", "WRAPPED_CALLERS("))) and return_type in source),
                     f"{api_name} must keep an explicit C++ schema",
                 )
 
@@ -2487,7 +2472,7 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
                 )
                 self.assertTrue(
                     plain_schema in source
-                    or (wrapped_schema_prefix in source and return_type in source),
+                    or (any(prefix in source for prefix in (wrapped_schema_prefix, wrapped_schema_prefix.replace("WRAPPED(", "WRAPPED_CALLERS("))) and return_type in source),
                     f"{api_name} must keep an explicit C++ schema",
                 )
 
@@ -2562,12 +2547,12 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
 
         expected = {
             "AITool.submit_request": ("kObjectPayloadParam", "EditorApiValueType::Any"),
-            "ScratchTool.get_script_status": ("kNoParams", "EditorApiValueType::Any"),
-            "ScratchTool.key_event": ("kScratchKeyEventParams", "EditorApiValueType::Any"),
-            "ScratchTool.key_release": ("kScratchKeyReleaseParams", "EditorApiValueType::Any"),
-            "ScratchTool.load_blockly_target": ("kObjectPayloadParam", "EditorApiValueType::Any"),
-            "ScratchTool.mouse_event": ("kScratchMouseEventParams", "EditorApiValueType::Any"),
-            "ScratchTool.save_blockly_target": ("kObjectPayloadParam", "EditorApiValueType::Any"),
+            "Scripts.get_status": ("kNoParams", "EditorApiValueType::Object"),
+            "Scripts.key_event": ("kScriptKeyEventParams", "EditorApiValueType::Any"),
+            "Scripts.key_release": ("kScriptKeyReleaseParams", "EditorApiValueType::Any"),
+            "ProjectFiles.load": ("kObjectPayloadParam", "EditorApiValueType::Object"),
+            "Scripts.mouse_event": ("kScriptMouseEventParams", "EditorApiValueType::Any"),
+            "ProjectFiles.save": ("kObjectPayloadParam", "EditorApiValueType::Object"),
         }
         for api_name, (params_name, return_type) in expected.items():
             module, method = api_name.split(".", 1)
@@ -2578,7 +2563,7 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
                 )
                 self.assertTrue(
                     plain_schema in source
-                    or (wrapped_schema_prefix in source and return_type in source),
+                    or (any(prefix in source for prefix in (wrapped_schema_prefix, wrapped_schema_prefix.replace("WRAPPED(", "WRAPPED_CALLERS("))) and return_type in source),
                     f"{api_name} must keep an explicit C++ schema",
                 )
 
@@ -2588,34 +2573,34 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
         for snippet in (
             "ai: {",
             "submitRequest: (payload) => call_manifest_editor_api('ai.submitRequest', [payload || {}])",
-            "scratch: {",
-            "saveBlocklyTarget: (payload) => call_manifest_editor_api('scratch.saveBlocklyTarget', [payload || {}])",
-            "loadBlocklyTarget: (payload) => call_manifest_editor_api('scratch.loadBlocklyTarget', [payload || {}])",
-            "getScriptStatus: () => call_manifest_editor_api('scratch.getScriptStatus', [])",
+            "scripts: {",
+            "save: request => call_manifest_editor_api('projectFiles.save', [request])",
+            "load: request => call_manifest_editor_api('projectFiles.load', [request])",
+            "getStatus: () => call_manifest_editor_api('scripts.getStatus', [])",
             "sendKeyEvent: (key, modifiers, displayKey) =>",
             "sendKeyUpEvent: (key, displayKey) =>",
             "sendMouseEvent: (eventType, button, x, y, viewportX, viewportY, viewportWidth, viewportHeight, pickedActor = '') =>",
-            "saveBlocklyTarget: (payload) => editorApi.scratch.saveBlocklyTarget(payload)",
-            "sendKeyEvent: (key, modifiers, displayKey) =>\n    editorApi.scratch.sendKeyEvent",
+            "saveBlocklyTarget: (payload) => saveBlocklyTarget(payload)",
+            "sendKeyEvent: (key, modifiers, displayKey) =>\n    editorApi.scripts.sendKeyEvent",
         ):
             with self.subTest(snippet=snippet):
                 self.assertIn(snippet, bridge_source)
 
     def test_script_facade_scratch_frontend_wrappers_are_manifest_driven(self):
         bridge_source = self._frontend_bridge_source()
-        start = bridge_source.find("scratch: {")
+        start = bridge_source.find("scripts: {")
         end = bridge_source.find("sceneTools: {", start)
         self.assertGreaterEqual(start, 0)
         self.assertGreater(end, start)
         scratch_section = bridge_source[start:end]
 
         expected_wrappers = (
-            "scratch.saveBlocklyTarget",
-            "scratch.loadBlocklyTarget",
-            "scratch.getScriptStatus",
-            "scratch.sendKeyEvent",
-            "scratch.sendKeyUpEvent",
-            "scratch.sendMouseEvent",
+            "projectFiles.save",
+            "projectFiles.load",
+            "scripts.getStatus",
+            "scripts.sendKeyEvent",
+            "scripts.sendKeyUpEvent",
+            "scripts.sendMouseEvent",
         )
         for wrapper in expected_wrappers:
             with self.subTest(wrapper=wrapper):
@@ -3145,7 +3130,7 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
     def test_scratch_mouse_click_does_not_latch_held_state(self):
         repo_root = self._repo_root()
         source = (
-            repo_root / "editor" / "script_runtime" / "engine" / "corona_engine.py"
+            repo_root / "editor" / "Frontend" / "src" / "blockly" / "generators" / "runtime" / "block_program.py"
         ).read_text(encoding="utf-8")
         start = source.find("def handle_mouse_event(")
         end = source.find("\ndef ", start + 1)

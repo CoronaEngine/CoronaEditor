@@ -1,14 +1,15 @@
 /** Canonical Blockly and role-script runtime service facade. */
 
+import { saveBlocklyTarget, loadBlocklyTarget } from '@/blockly/targetArchive.js';
 import { editorApi } from '../api/editorApi.js';
 
 export const scriptingService = {
-  saveBlocklyTarget: (payload) => editorApi.scratch.saveBlocklyTarget(payload),
-  loadBlocklyTarget: (payload) => editorApi.scratch.loadBlocklyTarget(payload),
-  getScriptStatus: () => editorApi.scratch.getScriptStatus(),
+  saveBlocklyTarget: (payload) => saveBlocklyTarget(payload),
+  loadBlocklyTarget: (payload) => loadBlocklyTarget(payload),
+  getScriptStatus: () => editorApi.scripts.getStatus(),
   sendKeyEvent: (key, modifiers, displayKey) =>
-    editorApi.scratch.sendKeyEvent(key, modifiers, displayKey),
-  sendKeyUpEvent: (key, displayKey) => editorApi.scratch.sendKeyUpEvent(key, displayKey),
+    editorApi.scripts.sendKeyEvent(key, modifiers, displayKey),
+  sendKeyUpEvent: (key, displayKey) => editorApi.scripts.sendKeyUpEvent(key, displayKey),
   sendMouseEvent: (
     eventType,
     button,
@@ -20,7 +21,7 @@ export const scriptingService = {
     viewportHeight,
     pickedActor = ''
   ) =>
-    editorApi.scratch.sendMouseEvent(
+    editorApi.scripts.sendMouseEvent(
       eventType,
       button,
       x,

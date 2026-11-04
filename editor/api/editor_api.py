@@ -8,11 +8,7 @@ from runtime.project_context import (
     get_active_project_path,
     is_native_engine_available,
 )
-from runtime.editor_host import (
-    emit_editor_event,
-    get_editor_selection,
-    set_editor_camera_input_enabled,
-)
+from runtime.editor_host import set_editor_camera_input_enabled
 _CPP_EDITOR_API_METHODS = None
 _CPP_EDITOR_API_EVENTS = None
 _SCRIPT_RUNTIME_API_METHODS = None

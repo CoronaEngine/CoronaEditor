@@ -1,8 +1,9 @@
 import unittest
 from unittest import mock
 
-from script_runtime.blockly import main as blockly_main
-from script_runtime.engine import corona_engine as corona_engine_scratch
+from pathlib import Path
+from script_runtime import file_api, file_runner
+from Frontend.src.blockly.generators.runtime import block_program as corona_engine_scratch
 
 
 class _NonCooperativeThread:
@@ -19,40 +20,23 @@ class _NonCooperativeThread:
 
 
 class ScratchShutdownTests(unittest.TestCase):
-    def test_service_shutdown_requests_all_contexts_and_reports_pending_threads(self):
+    def test_service_shutdown_isolates_non_cooperative_threads(self):
         thread = _NonCooperativeThread()
-        previous_exec = blockly_main.ScratchTool._exec_thread
-        previous_context = blockly_main.ScratchTool._exec_context_id
-        try:
-            blockly_main.ScratchTool._exec_thread = thread
-            blockly_main.ScratchTool._exec_context_id = "shutdown-context"
-            with mock.patch.object(corona_engine_scratch, "request_stop_all") as request_all, \
-                 mock.patch.object(corona_engine_scratch, "isolate_context") as isolate_context:
-                blockly_main.ScratchTool.request_shutdown()
-                snapshot = blockly_main.ScratchTool.shutdown()
+        run = file_api.FileRun("shutdown-context", "session", "actor", "scene.ini", "Probe")
+        run.on_stop = mock.Mock()
+        run.on_quarantine = mock.Mock()
+        with mock.patch.multiple(file_runner.FileScripts, _exec_thread=thread, _run=run,
+                                 _shutdown_requested=False), mock.patch.object(file_runner, "set_editor_camera_input_enabled"):
+            snapshot = file_runner.FileScripts.shutdown(timeout=0.01)
+        self.assertEqual(snapshot["state"], "stop_timeout")
+        self.assertIn(thread.name, snapshot["pending_threads"])
+        run.on_stop.assert_called_once_with()
+        run.on_quarantine.assert_called_once()
+        with file_api.bind(run), self.assertRaises(SystemExit):
+            file_api.check_stop()
 
-            request_all.assert_called()
-            isolate_context.assert_called()
-            self.assertEqual(snapshot["state"], "stop_timeout")
-            self.assertIn(thread.name, snapshot["pending_threads"])
-        finally:
-            blockly_main.ScratchTool._exec_thread = previous_exec
-            blockly_main.ScratchTool._exec_context_id = previous_context
-
-    def test_non_cooperative_thread_is_isolated_without_async_exception(self):
-        thread = _NonCooperativeThread()
-        with mock.patch.object(corona_engine_scratch, "request_stop") as request_stop, \
-             mock.patch.object(corona_engine_scratch, "isolate_context") as isolate_context:
-            stopped = blockly_main._request_thread_stop(
-                thread,
-                timeout=0.01,
-                context_id="actor:scene:cube",
-            )
-
-        self.assertFalse(stopped)
-        request_stop.assert_called_once_with("actor:scene:cube")
-        isolate_context.assert_called_once()
-        source = blockly_main.Path(blockly_main.__file__).read_text(encoding="utf-8")
+    def test_shutdown_is_cooperative(self):
+        source = Path(file_runner.__file__).read_text(encoding="utf-8")
         self.assertNotIn("PyThreadState_SetAsyncExc", source)
         self.assertNotIn("import ctypes", source)
 
@@ -67,7 +51,7 @@ class ScratchShutdownTests(unittest.TestCase):
             corona_engine_scratch.release_context(context)
 
     def test_handler_and_broadcast_boundaries_include_cooperative_checkpoints(self):
-        source = blockly_main.Path(corona_engine_scratch.__file__).read_text(encoding="utf-8")
+        source = Path(corona_engine_scratch.__file__).read_text(encoding="utf-8")
         handler = source[
             source.index("def _run_bound_handler"):
             source.index("def _run_tracked_handler")

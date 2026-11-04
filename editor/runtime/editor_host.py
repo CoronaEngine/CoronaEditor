@@ -4,7 +4,7 @@ import threading
 
 from runtime.native_engine import get_corona_engine
 from config.paths_config import get_default_paths
-from runtime.response_utils import *
+from runtime.response_utils import create_error_response, create_success_response
 
 core_path = get_default_paths()
 
@@ -17,8 +17,6 @@ class CoronaEditor:
     url = core_path.frontend_dist
     module_list = {}
 
-    _selected_scene = None
-    _selected_actor = None
     _runtime_state = "created"
     _shutdown_requested = False
     _runtime_initialized = False
@@ -166,79 +164,10 @@ class CoronaEditor:
         return cls._shutdown_snapshot
 
     @classmethod
-    def emit_editor_event(cls, event_name, args=None):
-        """把历史 Python 脚本事件收口到 C++ 定义的 Editor API 事件。"""
-        if args is None:
-            args = []
-        args = list(args) if isinstance(args, (list, tuple)) else [args]
-        logger.debug("Python editor event emitted: %s args=%s", event_name, args)
-
-        event_mapping = {
-            "ai-chunk": ("events.on_ai_chunk", lambda values: values[0] if len(values) > 0 else ""),
-            "scene-tree-changed": ("events.on_scene_tree_changed", lambda values: {
-                "scene": values[0] if len(values) > 0 else "",
-            }),
-            "actor-change": ("events.on_actor_changed", lambda values: {
-                "actor_type": values[0] if len(values) > 0 else "",
-                "scene": values[1] if len(values) > 1 else "",
-                "actor": values[2] if len(values) > 2 else "",
-                "previous": values[3] if len(values) > 3 else "",
-            }),
-            "transform-update": ("events.on_actor_transform_updated", lambda values: {
-                "scene": values[0] if len(values) > 0 else "",
-                "actor": values[1] if len(values) > 1 else "",
-                "position": values[2] if len(values) > 2 else {},
-                "rotation": values[3] if len(values) > 3 else {},
-                "scale": values[4] if len(values) > 4 else {},
-                "actor_type": values[5] if len(values) > 5 else "",
-            }),
-            "actor-ownership-claim": ("events.on_network_actor_ownership_claimed", lambda values: {
-                "actor_guid": (values[0] if len(values) > 0 else {}).get("actor_guid", "")
-                if isinstance(values[0] if len(values) > 0 else {}, dict)
-                else "",
-            }),
-            "actor-sync-broadcast": ("events.on_network_actor_sync_broadcast_requested", lambda values: values[0] if len(values) > 0 else {}),
-            "actor-transform-sync-broadcast": ("events.on_network_actor_transform_sync_broadcast_requested", lambda values: values[0] if len(values) > 0 else {}),
-            "actor-state-sync-broadcast": ("events.on_network_actor_state_sync_broadcast_requested", lambda values: values[0] if len(values) > 0 else {}),
-            "actor-delete-sync-broadcast": ("events.on_network_actor_delete_sync_broadcast_requested", lambda values: values[0] if len(values) > 0 else {}),
-            "network-sync-pause-request": ("events.on_network_sync_pause_requested", lambda values: {
-                "paused": bool((values[0] if len(values) > 0 else {}).get("paused", False))
-            }),
-            "file-sync-status": ("events.on_network_file_sync_status_changed", lambda values: {
-                "status": (values[0] if len(values) > 0 else {}).get("status", ""),
-                "model_path": (values[0] if len(values) > 0 else {}).get("model_path", ""),
-                "progress": (values[0] if len(values) > 0 else {}).get("progress", 0),
-            }),
-            "import-asset-complete": ("events.on_network_asset_import_completed", lambda values: values[0] if len(values) > 0 else {}),
-        }
-        mapped_event = event_mapping.get(event_name)
-        if mapped_event is None:
-            return False
-        event_wrapper, payload_factory = mapped_event
-        from api.editor_api import _emit_manifest_cpp_editor_api_event
-        _emit_manifest_cpp_editor_api_event(event_wrapper, payload_factory(args))
-        return f"Editor event emitted: {event_name}"
-
-    @classmethod
     def register_page(cls, module_name: str, c_cls: object):
         if module_name not in cls.module_list:
             cls.module_list[module_name] = c_cls
 
-    @classmethod
-    def close_process(cls) -> None:
-        """请求引擎优雅退出（与点击 SDL 窗口关闭按钮走完全相同的路径）"""
-        import CoronaEngine
-        CoronaEngine.request_engine_exit()
-
-    # ================================================================
-    # 摄像机跟随
-    # ================================================================
-
-    _camera_follow_actor = None
-    _camera_follow_scene = None
-    _camera_follow_offset = [0.0, 0.0, 2.0]
-    _held_keys = set()
-    _editor_camera_input_enabled = True
     _editor_camera_input_locks = set()
     _editor_camera_input_state_lock = threading.RLock()
 
@@ -254,11 +183,6 @@ class CoronaEditor:
             else:
                 cls._editor_camera_input_locks.add(reason_key)
             input_enabled = not cls._editor_camera_input_locks
-            cls._editor_camera_input_enabled = input_enabled
-            if not input_enabled:
-                cls._held_keys.clear()
-                cls._follow_rmb_down = False
-                cls._follow_prev_mouse = None
             # Always re-apply the aggregate state. The native input gate can be
             # recreated while this long-lived Python class still remembers the old
             # value (for example after switching projects in the same editor process).
@@ -269,102 +193,6 @@ class CoronaEditor:
                     setter(input_enabled)
             except Exception:
                 logger.debug("CameraFollowController input gate unavailable", exc_info=True)
-
-    @classmethod
-    def camera_lock_set(cls, enabled, ox=0.0, oy=0.0, oz=2.0, rx=0.0, ry=0.0, rz=0.0):
-        if not enabled:
-            try:
-                if cls._selected_scene and cls._selected_actor:
-                    from api.editor_api import CoronaEditorApi
-                    result = CoronaEditorApi.scene_tools.set_actor_camera_lock(
-                        cls._selected_scene,
-                        cls._selected_actor,
-                        {"enabled": False},
-                    )
-                    if isinstance(result, dict) and result.get("status") != "error":
-                        cls._camera_follow_actor = None
-                        cls._camera_follow_scene = None
-                        cls._held_keys.clear()
-                        logger.debug("Camera follow disabled through sceneTools contract")
-                        return {"ok": True}
-            except Exception:
-                logger.debug("Native camera-lock disable unavailable", exc_info=True)
-            cls._camera_follow_actor = None
-            cls._camera_follow_scene = None
-            cls._held_keys.clear()
-            logger.debug("Camera follow disabled")
-            return {"ok": True}
-        scene_name = cls._selected_scene
-        actor_name = cls._selected_actor
-        if not scene_name and not actor_name:
-            return {"ok": False, "error": "请先在Object面板选中一个物体"}
-        try:
-            from api.editor_api import CoronaEditorApi
-            if not scene_name:
-                snapshot = CoronaEditorApi.scene.get_snapshot()
-                if not isinstance(snapshot, dict) or snapshot.get("status") == "error":
-                    return {"ok": False, "error": f"未找到物体: {actor_name}"}
-                scene_name = snapshot.get("scene", "")
-                actors = snapshot.get("actors", [])
-                if not scene_name or not any(
-                    isinstance(actor, dict) and actor.get("name") == actor_name
-                    for actor in actors
-                ):
-                    return {"ok": False, "error": f"未找到物体: {actor_name}"}
-            camera_lock = {"enabled": True}
-            if (cls._camera_follow_actor == actor_name and
-                    (ox != 0.0 or oy != 0.0 or oz != 2.0)):
-                camera_lock["position_offset"] = [ox, oy, oz]
-            if rx != 0.0 or ry != 0.0 or rz != 0.0:
-                camera_lock["rotation_offset"] = [rx, ry, rz]
-
-            result = CoronaEditorApi.scene_tools.set_actor_camera_lock(
-                scene_name, actor_name, camera_lock
-            )
-            if not isinstance(result, dict) or result.get("status") == "error":
-                return {
-                    "ok": False,
-                    "error": (result.get("message", f"未找到物体: {actor_name}")
-                              if isinstance(result, dict)
-                              else f"未找到物体: {actor_name}"),
-                }
-            actor_data = result.get("actor", {})
-            native_lock = actor_data.get("camera_lock", {}) if isinstance(actor_data, dict) else {}
-            cls._camera_follow_offset = native_lock.get(
-                "position_offset", [ox, oy, oz]
-            )
-            cls._camera_follow_actor = actor_name
-            cls._camera_follow_scene = scene_name
-            cls._follow_debug_once = True
-            logger.info("Camera following %s (offset=%s)", actor_name, cls._camera_follow_offset)
-            return {"ok": True, "offset": cls._camera_follow_offset}
-        except Exception as e:
-            logger.error("camera_lock_set failed: %s", e)
-            return {"ok": False, "error": str(e)}
-
-    @classmethod
-    def object_key_down(cls, key):
-        if not cls._editor_camera_input_enabled:
-            return {"ok": True}
-        cls._held_keys.add(key.lower())
-        return {"ok": True}
-
-    @classmethod
-    def object_key_up(cls, key):
-        if not cls._editor_camera_input_enabled:
-            return {"ok": True}
-        cls._held_keys.discard(key.lower())
-        return {"ok": True}
-
-    # 鼠标右键环绕相关
-    _follow_rmb_down = False
-    _follow_prev_mouse = None
-    _follow_orbit_sensitivity = 0.004
-    _follow_cam_look_at = True
-
-    _follow_frame_count = 0
-    _follow_logged_init = False
-
 
     @classmethod
     def _set_native_runtime_phase(cls, phase):
@@ -433,14 +261,14 @@ class CoronaEditor:
             import CoronaEngine
             events = CoronaEngine.drain_input_events()
             if events:
-                from script_runtime.engine import corona_engine as corona_engine_scratch
+                from script_runtime.file_runner import FileScripts
                 for e in events:
                     if e.type == 0:      # keyDown
-                        corona_engine_scratch.handle_key_event(e.arg0, e.arg1.split(',') if e.arg1 else [], e.arg2)
+                        FileScripts.key_event(e.arg0, e.arg1, e.arg2)
                     elif e.type == 1:    # keyUp
-                        corona_engine_scratch.handle_key_release(e.arg0, e.arg1 or e.arg0)
+                        FileScripts.key_release(e.arg0, e.arg1 or e.arg0)
                     elif e.type == 2:    # mouseEvent
-                        corona_engine_scratch.handle_mouse_event(e.arg0, e.arg1, e.arg3, e.arg4)
+                        FileScripts.mouse_event(e.arg0, e.arg1, e.arg3, e.arg4)
         except RuntimeError:
             return False
         except Exception:
@@ -467,16 +295,6 @@ class CoronaEditor:
             cls._arm_runtime_watchdog()
 
 
-def emit_editor_event(event_name, args=None):
-    """Canonical runtime helper for the historical editor-event vocabulary."""
-    return CoronaEditor.emit_editor_event(event_name, args)
-
-
 def set_editor_camera_input_enabled(enabled, *, reason="global"):
     """Canonical runtime helper for the aggregated camera-input gate."""
     return CoronaEditor.set_editor_camera_input_enabled(enabled, reason=reason)
-
-
-def get_editor_selection():
-    """Return the current host selection as a value tuple."""
-    return CoronaEditor._selected_scene, CoronaEditor._selected_actor

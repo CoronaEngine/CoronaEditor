@@ -48,7 +48,7 @@ function worldRuntimeCleanupError(kind, result) {
 // Finish restoring the OLD scene before native open replaces it. Never run a
 // stop/restore against the new story scene, and fail closed if workers persist.
 export async function stopWorldRuntimeBeforeOpen(api = editorApi) {
-  const reply = await api.scratch.getScriptStatus();
+  const reply = await api.scripts.getStatus();
   const status = reply.data ?? reply;
   if (!status.runId || !(status.threadAlive || status.snapshotCaptured || status.inputLocked)) return;
   const response = await api.scripts.stop(status.runId, true);

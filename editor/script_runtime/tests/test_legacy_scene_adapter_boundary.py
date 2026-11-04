@@ -6,10 +6,10 @@ EDITOR_ROOT = Path(__file__).resolve().parents[2]
 
 def test_script_runtime_legacy_scene_adapter_is_removed():
     engine_source = (
-        EDITOR_ROOT / "script_runtime" / "engine" / "corona_engine.py"
+        EDITOR_ROOT / "Frontend" / "src" / "blockly" / "generators" / "runtime" / "block_program.py"
     ).read_text(encoding="utf-8")
     blockly_source = (
-        EDITOR_ROOT / "script_runtime" / "blockly" / "main.py"
+        EDITOR_ROOT / "script_runtime" / "file_runner.py"
     ).read_text(encoding="utf-8")
     canonical = (
         EDITOR_ROOT / "script_runtime" / "compat" / "legacy_scene_adapter.py"

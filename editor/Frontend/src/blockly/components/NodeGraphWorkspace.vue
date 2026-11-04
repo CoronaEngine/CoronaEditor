@@ -312,6 +312,7 @@
 </template>
 
 <script setup>
+import { saveBlocklyTarget, loadBlocklyTarget } from '@/blockly/targetArchive.js';
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
 import MiniBlocklyWorkspace from '@/blockly/components/MiniBlocklyWorkspace.vue';
 import { readScriptProject, startScriptFile } from '@/services/scriptFileService.js';
@@ -2387,7 +2388,7 @@ async function saveNow(targetOverride = null, { force = false } = {}) {
 
   saveInFlight = (async () => {
     try {
-      const response = bridgeResult(await editorApi.scratch.saveBlocklyTarget({
+      const response = bridgeResult(await saveBlocklyTarget({
         target_type: target.targetType === 'model' ? 'actor' : target.targetType || 'actor',
         scene_name: isProject ? '' : target.sceneName || '',
         actor_name: isProject ? '' : target.actorName || '',
@@ -2461,7 +2462,7 @@ async function loadGraphForCurrentTarget() {
     const target = currentTarget(scope.project_path);
     target.archiveSession = scope.archive_session;
     const isProject = target.targetType === 'project';
-    const response = bridgeResult(await editorApi.scratch.loadBlocklyTarget({
+    const response = bridgeResult(await loadBlocklyTarget({
       ...scope, target_type: target.targetType, script_kind: 'node_graph',
       scene_name: isProject ? '' : target.sceneName || '', actor_name: isProject ? '' : target.actorName || '',
     }));
@@ -2518,9 +2519,10 @@ function normalizeNodeGraphScriptStatus(response = {}) {
   return {
     ...status,
     status: String(status.status || status.state || '').trim().toLowerCase(),
-    currentNodeId: String(status.currentNodeId || status.current_node_id || ''),
-    waitingEdgeId: String(status.waitingEdgeId || status.waiting_edge_id || ''),
-    waitingEdgeName: String(status.waitingEdgeName || status.waiting_edge_name || ''),
+    currentNodeId: String(status.marker?.id || ''),
+    currentNodeName: String(status.marker?.name || ''),
+    waitingEdgeId: String(status.waiting?.id || ''),
+    waitingEdgeName: String(status.waiting?.name || ''),
   };
 }
 
@@ -2757,7 +2759,7 @@ function startRunPoll() {
   runPollTimer = window.setInterval(async () => {
     if (!codeRunning.value) return;
     try {
-      const status = normalizeNodeGraphScriptStatus(await editorApi.scratch.getScriptStatus());
+      const status = normalizeNodeGraphScriptStatus(await editorApi.scripts.getStatus());
       if (fileRunId && status.runId !== fileRunId) {
         fileRunId = '';
         clearRunPoll();
