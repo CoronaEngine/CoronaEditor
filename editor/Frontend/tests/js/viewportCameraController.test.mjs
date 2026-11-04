@@ -1,7 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { cameraMovementKey, createViewportCameraController } from '../../src/utils/viewportCameraController.js';
-import { createStoryCameraController } from '../../src/utils/viewportStoryCamera.js';
 
 const initialPose = () => ({ position: [0, 0, 0], forward: [0, 0, 1], up: [0, 1, 0], fov: 60 });
 const event = (props = {}) => ({ preventDefault() {}, ...props });
@@ -137,13 +136,6 @@ test('lost right button resets held keys and pending frames', () => {
   f.step(100); assert.equal(f.frames.size, 0); assert.equal(f.calls.length, 0);
 });
 
-/**
- * 额外的「键 → 方向」只属于注册了它的那台控制器（小世界的空格上升就是这么进来的）。
- *
- * 非真空：把 `createViewportCameraController` 里的 `extraMovement` 去掉，第二条 fixture 的
- * `keyDown` 立刻返回 false、相机一格都不动；把它写成「谁都认空格」，第一条 fixture 的
- * 「编辑器视口一个键都不多」立刻失败。
- */
 test('extra movement keys are opt-in per controller: Space is dead by default and climbs when registered', () => {
   // 记录 preventDefault 的事件：这条用例要证明「认下来的键会挡住页面滚动/聚焦按钮」。
   const keyEvent = (props = {}) => {
@@ -179,28 +171,4 @@ test('extra movement keys are opt-in per controller: Space is dead by default an
   climbing.keyUp(q);
   assert.equal(timer.frames.size, 0);
   climbing.dispose();
-});
-
-test('story binding and creative host callbacks produce identical poses for identical inputs', () => {
-  const creative = fixture(), timer = clock(), calls = [];
-  const story = createStoryCameraController({
-    getBridge: () => ({ cameraMove: (handle, position, forward, up, fov) => calls.push({ position, forward, up, fov }) }),
-    getRect: () => ({ left: 0, top: 0, width: 800, height: 600 }), ...timer,
-  });
-  const pose = initialPose();
-  story.bind({ cameras: [{ handle: 12, ...pose, world_up: pose.up }] }, 'scene.ini');
-  for (const controller of [creative.controller, story]) {
-    controller.keyDown(event({ code: 'KeyW' })); controller.keyDown(event({ code: 'ArrowRight' }));
-    controller.pointerDown(event({ button: 2, clientX: 0, clientY: 0 }));
-    controller.pointerMove({ clientX: 60, clientY: -20, buttons: 2 });
-    controller.wheel(event({ deltaY: -100, shiftKey: true }));
-  }
-  for (const time of [16, 33, 66, 1000]) { creative.step(time); timer.step(time); }
-  for (const controller of [creative.controller, story]) {
-    controller.keyUp({ code: 'KeyW' }); controller.keyUp({ code: 'ArrowRight' });
-    controller.pointerUp({ button: 2 }); controller.wheel(event({ deltaY: -100 }));
-  }
-  creative.step(1016); timer.step(1016);
-  assert.deepEqual(calls, creative.calls);
-  story.dispose(); creative.controller.dispose();
 });

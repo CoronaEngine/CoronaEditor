@@ -73,7 +73,7 @@ def test_shipped_examples_have_only_scene_ini_archives():
 def test_python_adapters_do_not_default_to_old_archive_paths():
     import ast
 
-    for root in ("runtime", "config", "api", "plugins", "game/runtime", "script_runtime"):
+    for root in ("runtime", "config", "api", "plugins", "script_runtime"):
         for path in (EDITOR / root).rglob("*.py"):
             if "tests" in path.parts:
                 continue

@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import test from 'node:test';
 import { setImmediate } from 'node:timers';
-import { ref } from 'vue';
+import { ref, watch } from 'vue';
 import { babelParse, compileScript, parse } from 'vue/compiler-sfc';
 import { editorApi } from '../../src/api/editorApi.js';
 import * as launcher from '../../src/services/projectLauncherService.js';
@@ -90,7 +90,7 @@ async function mountCreationPage(t, { creative = true, stopResult = idle(), wrap
     replace: async path => { calls.push(['replace', path]); route = path; },
   };
   const component = makeComponent({
-    vue: { ref, onMounted: hook => mounted.push(hook), onUnmounted: hook => unmounted.push(hook) },
+    vue: { ref, watch, onMounted: hook => mounted.push(hook), onUnmounted: hook => unmounted.push(hook) },
     'vue-router': { useRouter: () => router },
     '@/api/editorApi.js': { editorApi },
     '@/services/worldModeService.js': worldMode,
@@ -113,38 +113,13 @@ async function mountCreationPage(t, { creative = true, stopResult = idle(), wrap
   };
 }
 
-test('creation button opens story worlds with idle, restored, and repeated-stop results', async t => {
-  for (const wrapped of [true, false]) {
-    for (const stopResult of [idle(), { status: 'stopped', restored: true, snapshotCaptured: false, restoreStatus: 'restored' }]) {
-      await t.test(JSON.stringify({ wrapped, stopResult }), async t => {
-        const h = await mountCreationPage(t, { wrapped, stopResult });
-        h.page.worldPrompt.value = '  云海故事  ';
-        await h.page.handleCreate();
-        assert.deepEqual(h.calls, [
-          ['create', { mode: 'story', prompt: '云海故事' }],
-          ['preview'], ['script', true], ['open', 'story-world-1'], ['route', '/'],
-        ]);
-        assert.equal(h.activePath(), 'story-world-1');
-        assert.equal(worldMode.worldModeState.mode, 'story');
-        assert.equal(h.page.creating.value, false);
-        assert.deepEqual(h.alerts, []);
-        assert.ok(h.saves.some(([key, value]) => key === 'corona.activeProjectPath' && value === 'story-world-1'));
-        h.setStopResult(idle());
-        await launcher.stopWorldRuntimeBeforeOpen(editorApi.scratch);
-        await launcher.stopWorldRuntimeBeforeOpen(editorApi.scratch);
-        assert.deepEqual(h.alerts, []);
-      });
-    }
-  }
-});
-
-test('fresh launcher creates a story without an old runtime to restore', async t => {
+test('story launches without creating a project, checking archives, or writing a save', async t => {
   const h = await mountCreationPage(t, { creative: false });
+  h.page.archiveReady.value = false;
   await h.page.handleCreate();
-  assert.deepEqual(h.calls, [
-    ['create', { mode: 'story', prompt: '' }], ['open', 'story-world-1'], ['route', '/'],
-  ]);
-  assert.deepEqual(h.alerts, []);
+  assert.deepEqual(h.calls, [['route', '/Story']]);
+  assert.deepEqual(h.saves, []);
+  assert.equal(h.activePath(), '');
 });
 
 test('creation keeps the old world on real failures and the button can retry', async t => {
@@ -154,9 +129,10 @@ test('creation keeps the old world on real failures and the button can retry', a
   ]) {
     await t.test(stopResult.restoreError || stopResult.message, async t => {
       const h = await mountCreationPage(t, { stopResult });
+      h.page.mode.value = 'creative';
       await h.page.handleCreate();
       assert.deepEqual(h.calls, [
-        ['create', { mode: 'story', prompt: '' }], ['preview'], ['script', true], ['replace', '/StartScreen'],
+        ['create', { mode: 'creative', prompt: '' }], ['preview'], ['script', true], ['replace', '/StartScreen'],
       ]);
       assert.equal(h.activePath(), 'creative-world');
       assert.equal(h.alerts.length, 1);
@@ -168,7 +144,7 @@ test('creation keeps the old world on real failures and the button can retry', a
       h.calls.length = 0;
       await h.page.handleCreate();
       assert.deepEqual(h.calls, [
-        ['create', { mode: 'story', prompt: '' }], ['preview'], ['script', true], ['open', 'story-world-2'], ['route', '/'],
+        ['create', { mode: 'creative', prompt: '' }], ['preview'], ['script', true], ['open', 'story-world-2'], ['route', '/'],
       ]);
       assert.equal(h.activePath(), 'story-world-2');
       assert.equal(h.route(), '/');
@@ -180,6 +156,7 @@ test('creation keeps the old world on real failures and the button can retry', a
 test('creation waits for cleanup, disables duplicate requests, and respects service readiness', async t => {
   const stop = deferred();
   const h = await mountCreationPage(t, { stopResult: stop.promise });
+  h.page.mode.value = 'creative';
   h.page.archiveReady.value = false;
   await h.page.handleCreate();
   assert.deepEqual(h.calls, []);
@@ -187,7 +164,7 @@ test('creation waits for cleanup, disables duplicate requests, and respects serv
   const creation = h.page.handleCreate();
   await new Promise(resolve => setImmediate(resolve));
   assert.equal(h.page.creating.value, true);
-  assert.deepEqual(h.calls, [['create', { mode: 'story', prompt: '' }], ['preview'], ['script', true]]);
+  assert.deepEqual(h.calls, [['create', { mode: 'creative', prompt: '' }], ['preview'], ['script', true]]);
   await h.page.handleCreate();
   assert.equal(h.calls.filter(([call]) => call === 'create').length, 1);
   stop.resolve(idle());

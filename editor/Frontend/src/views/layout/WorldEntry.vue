@@ -7,6 +7,6 @@ const StoryWorld = defineAsyncComponent(() => import('./StoryWorld.vue'));
 </script>
 
 <template>
-  <StoryWorld v-if="worldModeState.status === 'ready' && worldModeState.mode === 'story'" />
+  <StoryWorld :key="worldModeState.revision" v-if="worldModeState.status === 'ready' && worldModeState.mode === 'story'" />
   <CreativeWorld v-else-if="worldModeState.status === 'ready' && worldModeState.mode === 'creative'" />
 </template>

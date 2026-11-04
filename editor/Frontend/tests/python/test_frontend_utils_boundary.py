@@ -11,7 +11,6 @@ ACTIVE_UTILS = (
     "eventBus.js",
     "serviceInitialization.js",
     "viewportCameraController.js",
-    "viewportStoryCamera.js",
     "viewportGizmo.js",
     "viewportPick.js",
     "viewportUiMode.js",

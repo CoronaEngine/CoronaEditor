@@ -22,26 +22,11 @@ const rotate = (v, axis, angle) => {
   return v.map((n, i) => n * c + kv[i] * s + axis[i] * d * (1 - c));
 };
 
-/**
- * 空格键在真实事件里的写法不止一种：Chromium 给 `code: 'Space'`、`key: ' '`，老版引擎给
- * `key: 'Spacebar'`，而宿主合成的按键（本页的按键是 SDL 转 CEF 的 `KEYEVENT_RAWKEYDOWN`
- * 送进来的）可能只剩 `keyCode: 32`、`code` 为空。**路由那一层三种都认**
- * （`storyKeyRouter.js` 的 `isSpace`），控制器这边却只认由 `code` 推出的 `'space'`，
- * 于是同一台相机的 Q/E 按得动、空格被静默丢掉。
- */
+// Host input can represent Space by code, key, or the legacy numeric keyCode.
 const isSpacebarEvent = event => event.code === 'Space' || event.key === ' '
   || event.key === 'Spacebar' || event.keyCode === 32;
 
-/**
- * The movement key this event carries, or `''`.
- *
- * `movement` defaults to the creative-mode table, so every existing caller keeps exactly the
- * same keys. A host that registered extra keys (`extraMovement` below) passes its merged table
- * and gets its own additions recognized — 小世界的空格上升就是这么进来的。
- *
- * 空格先按上面几种写法归一化成表里的 `'space'` 再查表；表里没有 `'space'` 的宿主（创造模式
- * 视口、主世界第三人称）连这一步都不会命中，一个键都不会多。
- */
+// Normalize only keys registered by the calling viewport.
 export function cameraMovementKey(event, movement = MOVEMENT) {
   const code = String(event.code || '').toLowerCase();
   const key = code.startsWith('key') ? code.slice(3) : code;
@@ -51,13 +36,7 @@ export function cameraMovementKey(event, movement = MOVEMENT) {
   return Object.hasOwn(movement, fallback) ? fallback : '';
 }
 
-/**
- * 鼠标转向的唯一实现：把朝向按位移量（像素）转一点。
- *
- * 创造模式视口与剧情小世界的自由视角共用这一份数学，所以「敏感度一样」是构造出来的，
- * 不是两处各写一遍凑出来的。`degreesPerPixel` 默认就是创造模式的 0.15°/px。
- * 纯函数：返回一份新的 pose，`position` / `up` 原样保留。
- */
+// Default mouse sensitivity in degrees per pixel for the editor viewport.
 export const CREATIVE_LOOK_SENSITIVITY = 0.15;
 export function lookPose(pose, dx, dy, degreesPerPixel = CREATIVE_LOOK_SENSITIVITY) {
   const next = copyPose(pose);
@@ -98,9 +77,6 @@ export function createViewportCameraController({
   requestFrame = (callback) => requestAnimationFrame(callback),
   cancelFrame = (id) => cancelAnimationFrame(id),
   now = () => globalThis.performance.now(),
-  // 调用方额外注册的「键 → 方向」，默认一个都没有：创造模式仍然只有 WASD/QE/方向键。
-  // 小世界用它把空格接到 `up`（升降），而主世界的第三人称（空格 = 跳跃）与编辑器视口
-  // 都没有传这个参数，所以它们一个键都不会多。
   extraMovement = null,
 }) {
   const movement = Object.freeze({ ...MOVEMENT, ...(extraMovement || {}) });

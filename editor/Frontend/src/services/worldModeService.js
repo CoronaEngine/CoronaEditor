@@ -2,7 +2,7 @@
 import { shallowReactive } from 'vue';
 import { editorApi } from '../api/editorApi.js';
 
-export const LAUNCHER_ROUTES = new Set(['/StartScreen', '/NewGame', '/JoinGame', '/RecentGames']);
+export const LAUNCHER_ROUTES = new Set(['/StartScreen', '/NewGame', '/JoinGame', '/RecentGames', '/Story']);
 export const normalizeWorldMode = (mode) => mode === 'story' ? 'story' : 'creative';
 export const normalizeProjectPath = (path) => String(path || '').trim()
   .replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase();

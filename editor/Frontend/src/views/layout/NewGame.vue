@@ -11,7 +11,7 @@
     <div class="relative z-10 flex-1 flex flex-col px-8 py-6 overflow-hidden">
 
       <!-- ① 上方：悬浮提示词层（漂浮 / 发光 / 可点击注入） -->
-      <div class="relative h-44 shrink-0">
+      <div v-if="mode === 'creative'" class="relative h-44 shrink-0">
         <button
           v-for="(hint, i) in floatingHints"
           :key="hint.text"
@@ -33,6 +33,7 @@
 
       <!-- ② 中间：标题 + 世界描述输入框（页面焦点） -->
       <div class="flex-1 flex flex-col items-center justify-center min-h-0">
+        <template v-if="mode === 'creative'">
         <h1 class="text-3xl font-light tracking-wide mb-2 text-center">
           你想创造一个怎样的
           <span class="text-[#d8b86c] font-medium">世界</span>？
@@ -50,6 +51,11 @@
             placeholder="例如：一座漂浮在云海之上的赛博朋克城市，永远是雨夜，霓虹倒映在湿漉漉的街道……"
             @keydown.ctrl.enter="handleCreate"
           ></textarea>
+        </div>
+        </template>
+        <div v-else class="text-center">
+          <h1 class="text-3xl text-[#d8b86c]">山门神殿</h1>
+          <p class="mt-3 text-gray-400">进入主世界，挑战守门巨兽。每次进入都会开始新的一局。</p>
         </div>
       </div>
 
@@ -81,7 +87,7 @@
           </button>
 
           <button
-            :disabled="creating || !archiveReady"
+            :disabled="creating || (mode === 'creative' && !archiveReady)"
             class="px-14 py-3 bg-[#d8b86c] hover:bg-[#95b86c] disabled:bg-gray-700 disabled:cursor-not-allowed
                    rounded-lg font-bold text-base transition-all shadow-lg
                    inline-flex items-center gap-2"
@@ -89,7 +95,7 @@
           >
             <svg v-if="!creating" class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v18M3 12h18"/><path d="M5.6 5.6l1.4 1.4M17 17l1.4 1.4M18.4 5.6L17 7M7 17l-1.4 1.4"/></svg>
             <svg v-else class="w-5 h-5 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>
-            {{ creating ? '创造中…' : (archiveReady ? '创造世界' : '存档服务正在初始化…') }}
+            {{ mode === 'story' ? '开始剧情' : creating ? '创造中…' : (archiveReady ? '创造世界' : '存档服务正在初始化…') }}
           </button>
         </div>
       </div>
@@ -98,7 +104,7 @@
 </template>
 
 <script setup>
-import { onMounted, onUnmounted, ref } from 'vue';
+import { onUnmounted, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { editorApi } from '@/api/editorApi.js';
 import { worldModeState } from '@/services/worldModeService.js';
@@ -128,9 +134,13 @@ const refreshArchiveReady = async () => {
   }
 };
 
-onMounted(() => {
-  refreshArchiveReady();
-  archiveStatusTimer = window.setInterval(refreshArchiveReady, 250);
+watch(mode, current => {
+  window.clearInterval(archiveStatusTimer);
+  archiveStatusTimer = null;
+  if (current === 'creative') {
+    void refreshArchiveReady();
+    archiveStatusTimer = window.setInterval(refreshArchiveReady, 250);
+  }
 });
 
 onUnmounted(() => {
@@ -195,6 +205,10 @@ const waitForPythonProjectActivation = async (expectedPath, timeoutMs = 7000) =>
 };
 
 const handleCreate = async () => {
+  if (mode.value === 'story') {
+    await router.push('/Story');
+    return;
+  }
   if (creating.value || !archiveReady.value) return;
   const prompt = worldPrompt.value.trim(); // 允许为空：无提示词也可创建
 
