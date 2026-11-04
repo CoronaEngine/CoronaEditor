@@ -120,7 +120,8 @@ test('late native panel completion is closed even after creative -> story -> cre
   });
   await appService.setEditorUiEnabled(true);
   commands.length = 0;
-  const pending = appService.createPanelTab('Object', '/Object', 400, 600, 'right');
+  const nativePanel = { panelId: 'Object', routePath: '/Object', width: 400, height: 600, dockingPos: 'right', nativeDocked: true };
+  const pending = appService.openNativePanel(nativePanel);
   worldModeService.invalidate('story');
   await worldModeService.resolve('creative', { force: true });
   request.resolve({ tab_id: 7 });
@@ -128,7 +129,7 @@ test('late native panel completion is closed even after creative -> story -> cre
   assert.equal(commands[1].cmd, 'closePanelTab');
   assert.equal(commands[1].tabId, 7);
   worldModeService.invalidate();
-  await assert.rejects(appService.createDetachedPanel({ panelId: 'Object' }), /不允许/);
+  await assert.rejects(appService.openNativePanel(nativePanel), /不允许/);
 });
 
 test('preview restoration finishes before script shutdown and times out safely', async () => {

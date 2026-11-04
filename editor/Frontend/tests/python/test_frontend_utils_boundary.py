@@ -9,7 +9,6 @@ ACTIVE_UTILS = (
     "cameraDragRegions.js",
     "constants.js",
     "eventBus.js",
-    "panelWindows.js",
     "serviceInitialization.js",
     "viewportCameraController.js",
     "viewportStoryCamera.js",

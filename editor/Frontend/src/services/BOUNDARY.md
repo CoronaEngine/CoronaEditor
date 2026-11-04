@@ -38,6 +38,8 @@
 避免销毁回调上下文。主窗口使用 sessionStorage 中的 owner，在页面重载时退休原有窗口。
 删除该服务前需通过跨窗口、切换及迟到响应测试。
 
+`nativePanelHosts.js` 将主页面的面板开关同步到原生窗口，每个面板对应一个 CEF 文档。窗口创建和回收经过 `editorWindowSession.js`，停靠、拖动和尺寸由 ImGui 管理。
+
 ### 节点图领域编排
 
 `nodeGraphGenerationService.js`、`nodeGraphReviewService.js`、

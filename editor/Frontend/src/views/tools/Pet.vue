@@ -4,7 +4,7 @@
       <img
         ref="petImgRef"
         src="@/assets/cabbage.png"
-        class="h-20 w-20 fixed left-10 bottom-10 cursor-move z-50"
+        class="h-20 w-20 fixed left-10 bottom-10 z-50"
         @contextmenu="openContextMenu($event)"
       />
 
@@ -23,11 +23,9 @@
 
 <script setup>
 import { ref, reactive, onMounted, onUnmounted, nextTick } from 'vue';
-import { appService } from '@/services/appService.js';
 import AIHintBubble from '@/components/ui/AIHintBubble.vue';
 
 const petImgRef = ref(null);
-const ROUTE_PATH = '/Pet';
 const PET_HINT_INTERVAL_MS = 10000;
 const PET_HINT_AUTO_HIDE_MS = 6000;
 const PET_HINTS = [
@@ -41,27 +39,6 @@ const PET_HINTS = [
 const hintState = reactive({ show: false, text: '', loading: false });
 let hintIndex = 0;
 let hintTimer = null;
-
-// ── Throttle ──
-function throttle(fn, delay) {
-  let last = 0;
-  return function (...args) {
-    const now = Date.now();
-    if (now - last < delay) return;
-    last = now;
-    return fn(...args);
-  };
-}
-
-// ── Drag region ──
-const sendDragRegion = (el) => {
-  if (!el) return;
-  try {
-    const r = el.getBoundingClientRect();
-    appService.setDragRegions(ROUTE_PATH, Math.floor(r.x), Math.floor(r.y), Math.floor(r.width), Math.floor(r.height));
-  } catch { /* ignore */ }
-};
-const throttledSend = throttle(sendDragRegion, 16);
 
 const openContextMenu = (e) => e.preventDefault();
 
@@ -94,30 +71,9 @@ const stopTimedHints = () => {
   }
 };
 
-// ── Lifecycle ──
-let resizeObserver = null;
-
-onMounted(() => {
-  startTimedHints();
-
-  if (petImgRef.value) {
-    sendDragRegion(petImgRef.value);
-    try {
-      resizeObserver = new ResizeObserver(() => throttledSend(petImgRef.value));
-      resizeObserver.observe(petImgRef.value);
-    } catch { /* non-critical */ }
-    window.addEventListener('resize', onWindowResize);
-  }
-});
-
-const onWindowResize = () => {
-  if (petImgRef.value) throttledSend(petImgRef.value);
-};
-
+onMounted(startTimedHints);
 onUnmounted(() => {
   stopTimedHints();
   dismissHint();
-  if (resizeObserver) { try { resizeObserver.disconnect(); } catch { /* ignore */ } resizeObserver = null; }
-  window.removeEventListener('resize', onWindowResize);
 });
 </script>

@@ -2,7 +2,6 @@
   <div
     class="flex-1 min-h-0 w-full rounded-lg overflow-hidden flex flex-col bg-[#121a14] text-gray-300 font-mono text-xs"
   >
-    <DockTitleBar v-if="!isDocked" title="日志" extraClass="bg-[#b3995d]" routePath="/LogView" @close="closeFloat" />
 
     <div class="p-2 bg-[#202b22] flex gap-4 items-center border-b border-black">
       <div class="flex gap-2">
@@ -55,10 +54,7 @@
 import { ref, computed, nextTick, onMounted, onUnmounted } from 'vue';
 import { editorApi } from '@/api/editorApi.js';
 import SimpleSelect from '@/components/ui/SimpleSelect.vue';
-import DockTitleBar from '@/components/ui/DockTitleBar.vue';
-import { useDockPanel } from '@/composables/useDockPanel.js';
 
-const { closePanel: closeDockPanel, isDocked } = useDockPanel();
 
 const logs = ref([]);
 const filterSources = ref(['Engine', 'Python', 'Vue']);
@@ -138,9 +134,6 @@ const getLevelClass = (l) => {
   return 'text-blue-300'; // INFO
 };
 
-const closeFloat = () => {
-  if (closeDockPanel) { closeDockPanel(); return; }
-};
 
 onMounted(async () => {
   logBatchCallbackToken = await editorApi.events.onLogBatch(onLogBatch);

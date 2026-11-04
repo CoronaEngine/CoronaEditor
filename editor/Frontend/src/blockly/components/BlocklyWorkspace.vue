@@ -3,13 +3,6 @@
     :class="embedded ? 'flex-1 min-h-0 w-full' : 'h-screen'"
     class="rounded-lg overflow-hidden relative bg-[#1b241d]/90 flex flex-col text-white font-sans"
   >
-    <DockTitleBar
-      v-if="!embedded && !isDocked"
-      :title="editingTarget ? `${t('blockly.title')} - ${editingTarget}` : t('blockly.title')"
-      extraClass="bg-[#b3995d]"
-      routePath="/ScratchTool"
-      @close="handleClose"
-    />
 
     <!-- 导航栏已迁移至物体属性面板的积木标签页 -->
 
@@ -176,12 +169,9 @@ import { ref, watch, onMounted, onUnmounted } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { editorApi } from '@/api/editorApi.js';
 import { useErrorHandler } from '@/composables/useErrorHandler.js';
-import { useDockPanel } from '@/composables/useDockPanel.js';
 import { translateUiText } from '@/i18n/domTranslator.js';
 
-const { closePanel: closeDockPanel, isDocked } = useDockPanel();
 const { t, locale } = useI18n();
-import DockTitleBar from '@/components/ui/DockTitleBar.vue';
 import Search from './Search.vue';
 
 import Trashcan from './Trashcan.vue';
@@ -1268,9 +1258,6 @@ const resizeBlockly = () => {
   } catch {}
 };
 
-const handleClose = async () => {
-  if (closeDockPanel) { closeDockPanel(); return; }
-};
 
 /** 清空工作区 */
 function handleClear() {

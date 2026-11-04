@@ -2,13 +2,6 @@
   <div
     class="flex-1 min-h-0 w-full rounded-lg overflow-hidden relative bg-[#1b241d]/90 flex flex-col text-white font-sans"
   >
-    <DockTitleBar
-      v-if="!isDocked"
-      :title="t('projectSettings.title')"
-      extraClass="bg-[#b3995d]"
-      routePath="/ProjectSettings"
-      @close="closeFloat"
-    />
 
     <div v-if="loading" class="flex-1 flex items-center justify-center text-[#b3995d] text-sm">
       {{ t('common.loading') }}
@@ -86,10 +79,7 @@
 import { ref, onMounted } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { editorApi } from '@/api/editorApi.js';
-import { useDockPanel } from '@/composables/useDockPanel.js';
-import DockTitleBar from '@/components/ui/DockTitleBar.vue';
 
-const { closePanel: closeDockPanel, isDocked } = useDockPanel();
 const { t } = useI18n();
 
 const loading = ref(true);
@@ -153,13 +143,6 @@ const handleSave = async () => {
 };
 
 
-const closeFloat = () => {
-  if (closeDockPanel) {
-    closeDockPanel();
-    return;
-  }
-  window.__settingsOpen = false;
-};
 
 onMounted(loadSettings);
 </script>

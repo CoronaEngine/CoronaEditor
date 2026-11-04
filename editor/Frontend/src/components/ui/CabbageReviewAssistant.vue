@@ -166,9 +166,8 @@
 <script setup>
 import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
-import { useDockStore } from '@/stores/dockStore.js';
 import { useCabbageAssistantStore } from '@/stores/cabbageAssistantStore.js';
-import { closeFloatingPanel } from '@/utils/panelWindows.js';
+import { appService } from '@/services/appService.js';
 import { cabbageContextService, publishCabbageAssistantContext } from '@/services/cabbageAssistantContextService.js';
 import { guidanceService } from '@/services/cabbageGuidanceService.js';
 import { translateUiText } from '@/i18n/domTranslator.js';
@@ -198,7 +197,6 @@ const REMOVED_TUTORIAL_TASK_KEYS = new Set([
 ]);
 const NOTICE_FADE_MS = 650;
 const { t, locale } = useI18n();
-const dockStore = useDockStore();
 const assistant = useCabbageAssistantStore();
 const expandedKeys = reactive(new Set());
 const expandedHistoryGroups = reactive(new Set());
@@ -424,15 +422,7 @@ async function openChat(task) {
     window.dispatchEvent(new CustomEvent('cabbage-chat-focus-request', { detail: { taskKey: taskKey(task) } }));
     return;
   }
-  const panelId = 'CabbageChatPanel';
-  const panel = dockStore.panels[panelId];
-  if (!panel) return;
-  if (panel.open && panel.mode === 'external') await closeFloatingPanel(dockStore, panelId);
-  dockStore.popIn(panelId);
-  dockStore.setDockZone(panelId, 'right');
-  dockStore.openPanel(panelId);
-  dockStore.movePanel(panelId, 'right', null);
-  window.dispatchEvent(new Event('resize'));
+  await appService.crossTabBroadcast('creative-panel-open', { panelId: 'CabbageChatPanel' });
 }
 
 watch(() => assistant.ephemeralTip?.expiresAt || 0, (expiresAt) => {

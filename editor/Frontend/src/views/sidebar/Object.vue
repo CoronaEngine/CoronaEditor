@@ -1,12 +1,5 @@
 <template>
   <div class="object-panel-shell flex flex-col flex-1 min-h-0 h-full w-full rounded-lg overflow-hidden relative">
-    <DockTitleBar
-      v-if="!isDocked"
-      title="对象"
-      extraClass="bg-[#b3995d] rounded-t-md text-sm"
-      routePath="/Object"
-      @close="closeFloat"
-    />
 
     <div v-if="modelNodeSelection" class="object-empty"><strong>已选择模型内部节点</strong><span>{{ modelNodeSelection.actorName }} · 节点 {{ modelNodeSelection.nodeIndex }}。请在场景管理中的局部变换面板编辑节点。</span></div>
     <div v-else-if="loading" class="object-empty">正在读取对象属性…</div>
@@ -284,9 +277,7 @@
 import { computed, onMounted, onUnmounted, reactive, ref } from 'vue';
 import { pickedNodeIdentity } from '@/utils/modelHierarchy.js';
 import { coronaEventBus } from '@/utils/eventBus.js';
-import DockTitleBar from '@/components/ui/DockTitleBar.vue';
 import IkBoneSelect from '@/components/ui/IkBoneSelect.vue';
-import { useDockPanel } from '@/composables/useDockPanel.js';
 import { useErrorHandler } from '@/composables/useErrorHandler.js';
 import { editorApi } from '@/api/editorApi.js';
 import { DEFAULT_SCENE_NAME } from '@/utils/constants.js';
@@ -294,7 +285,6 @@ import { getActorContext } from '@/blockly/composables/useActorContext.js';
 import { cabbageContextService } from '@/services/cabbageAssistantContextService.js';
 import { createIkEditorController, createIkEditorState, makeIkFoot, isAutomaticIkFoot, ikFootStatus, ikBoneOptions, ikBoneError } from '@/utils/ikEditorController.js';
 
-const { closePanel, isDocked } = useDockPanel();
 const { error: logError } = useErrorHandler('Object');
 const axes = ['x', 'y', 'z'];
 const collapsedSections = reactive({
@@ -884,9 +874,6 @@ function handleGuidancePrepare(event) {
   if (selectorKey === 'object-physics' || selectorKey.startsWith('object-physics-')) collapsedSections.physics = false;
 }
 
-function closeFloat() {
-  closePanel();
-}
 
 onMounted(async () => {
   coronaEventBus.on('model-node-selection', handleModelNodeSelection);

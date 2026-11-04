@@ -49,24 +49,11 @@ export const appService = {
       tabId: null,
       regions: Array.isArray(regions) ? regions : [],
     }),
-  createPanelTab: (panelId, routePath, width, height, dockingPos, zPriority = 0) =>
-    openEditorWindow({
-      cmd: 'createPanelTab',
-      panelId,
-      routePath,
-      width,
-      height,
-      dockingPos,
-      zPriority,
-    }),
-  createDetachedPanel: ({ panelId, routePath, width, height, x, y }) =>
-    openEditorWindow({ cmd: 'createDetachedPanel', panelId, routePath, width, height, x, y }),
+  openNativePanel: options => openEditorWindow({ cmd: 'createPanelTab', ...options }),
   closeThisTab: (panelId) => session().closeThis(panelId),
   closePanelTab: (tabId, panelId) =>
     session().closeTab(tabId, panelId),
   detachPanel: (opts = {}) => openEditorWindow({ cmd: 'detachPanel', ...opts }),
-  togglePanelWindowMode: (opts = {}) =>
-    openEditorWindow({ cmd: 'togglePanelWindowMode', ...opts }),
   redockPanel: (opts = {}) => openEditorWindow({ cmd: 'redockPanel', ...opts }),
   toggleMaximizeThisCameraView: (sceneId = '', cameraId = '') =>
     openEditorWindow({ cmd: 'toggleMaximizeThisCameraView', sceneId, cameraId }),

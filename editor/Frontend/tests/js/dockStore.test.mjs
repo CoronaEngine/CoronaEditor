@@ -25,45 +25,20 @@ function session(t, mode = 'creative') {
 const openPanels = store => Object.entries(store.panels)
   .filter(([, panel]) => panel.open).map(([id]) => id).sort();
 
-test('creative entry opens scene controls and scene management by default', t => {
+test('creative sessions start empty and clear requested panels when retired', t => {
   const store = session(t);
-  store.initDefaultLayout();
-  assert.deepEqual(openPanels(store), ['SceneControls', 'SceneTools']);
-  assert.equal(store.panels.SceneControls.mode, 'docked');
-  assert.equal(store.panels.SceneTools.mode, 'docked');
-});
-
-test('reinitializing a session preserves panels the user closed', t => {
-  const store = session(t);
-  store.initDefaultLayout();
-  store.closePanel('SceneControls');
-  store.initDefaultLayout();
-  assert.deepEqual(openPanels(store), ['SceneTools']);
-});
-
-test('clearing a session allows the next creative session to seed its defaults', t => {
-  const store = session(t);
-  store.initDefaultLayout();
-  store.closePanel('SceneControls');
-  store.setExternal('NodeGraphPanel', 7);
+  assert.deepEqual(openPanels(store), []);
+  store.togglePanel('SceneTools');
+  store.openPanel('EditorSettings');
+  store.closePanel('SceneTools');
+  assert.deepEqual(openPanels(store), ['EditorSettings']);
   store.clearSession();
   assert.deepEqual(openPanels(store), []);
-  assert.equal(store.panels.NodeGraphPanel.mode, 'docked');
-  assert.equal(store.panels.NodeGraphPanel.externalTabId, null);
-  store.initDefaultLayout();
-  assert.deepEqual(openPanels(store), ['SceneControls', 'SceneTools']);
 });
 
-test('story entry cannot seed or open editor panels', t => {
+test('story mode cannot open or toggle editor panels', t => {
   const store = session(t, 'story');
-  store.initDefaultLayout();
   store.openPanel('SceneControls');
   store.togglePanel('SceneTools');
-  store.movePanel('Object', 'right');
-  store.setExternal('NodeGraphPanel', 7);
   assert.deepEqual(openPanels(store), []);
-
-  worldModeState.mode = 'creative';
-  store.initDefaultLayout();
-  assert.deepEqual(openPanels(store), ['SceneControls', 'SceneTools']);
 });

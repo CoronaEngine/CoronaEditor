@@ -2,13 +2,6 @@
   <div
     class="scene-tools-panel rounded-lg overflow-hidden flex flex-col flex-1 min-h-0 h-full w-full relative"
   >
-    <DockTitleBar
-      v-if="!isDocked"
-      title="场景管理"
-      extraClass="bg-[#b3995d] rounded-t-md"
-      routePath="/SceneBar"
-      @close="CloseFloat"
-    />
 
     <!-- 主内容区域 -->
     <div class="flex flex-col flex-1 min-h-0">
@@ -560,7 +553,6 @@ import { ref, reactive, onMounted, onUnmounted, computed } from 'vue';
 import { useRoute } from 'vue-router';
 import ModelNodeHierarchy from '@/components/ui/ModelNodeHierarchy.vue';
 import { pickedNodeIdentity } from '@/utils/modelHierarchy.js';
-import DockTitleBar from '@/components/ui/DockTitleBar.vue';
 import { editorApi } from '@/api/editorApi.js';
 import { appService } from '@/services/appService.js';
 import { resourceService } from '@/services/resourceService.js';
@@ -570,10 +562,8 @@ import { emptySceneTreeSettlement, resolveSceneTreeSnapshot } from '@/utils/scen
 import { useErrorHandler } from '@/composables/useErrorHandler.js';
 import { setActorContext } from '@/blockly/composables/useActorContext.js';
 import { coronaEventBus } from '@/utils/eventBus.js';
-import { useDockPanel } from '@/composables/useDockPanel.js';
 import { cabbageContextService } from '@/services/cabbageAssistantContextService.js';
 
-const { closePanel: closeDockPanel, isDocked } = useDockPanel();
 
 const { error: logError, warn: logWarn } = useErrorHandler('SceneBar');
 
@@ -1606,12 +1596,6 @@ const DeleteActor = async (scene) => {
   }
 };
 
-const CloseFloat = async () => {
-  if (closeDockPanel) {
-    closeDockPanel();
-    return;
-  }
-};
 
 const OnInitObjTree = async () => {
   const sceneName = currentSceneName.value;

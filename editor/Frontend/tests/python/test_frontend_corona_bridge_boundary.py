@@ -36,7 +36,6 @@ KNOWN_DEVIATIONS = {
     "services/projectLauncherService.js",
     "views/layout/MainPage.vue",
     "views/layout/StoryWorld.vue",
-    "views/sidebar/EditorSettings.vue",
     "views/tools/CameraView.vue",
 }
 

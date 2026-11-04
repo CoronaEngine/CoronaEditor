@@ -2,18 +2,19 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { createRequire } from 'node:module';
 import test from 'node:test';
+import { setImmediate } from 'node:timers';
 import * as Vue from 'vue';
-import { createPinia, defineStore, storeToRefs } from 'pinia';
+import { createPinia, defineStore } from 'pinia';
 import { babelParse, compileScript, parse } from 'vue/compiler-sfc';
 import { compile } from '@vue/compiler-ssr';
 import { renderToString } from '@vue/server-renderer';
 import * as manifests from '../../src/config/pluginManifest.js';
-import { createDockOverlayStyles } from '../../src/components/dock/dockOverlayLayout.js';
+import { createNativePanelHosts } from '../../src/services/nativePanelHosts.js';
 
 const require = createRequire(import.meta.url);
 const source = path => fs.readFileSync(new URL(`../../src/${path}`, import.meta.url), 'utf8');
 
-// Render the real App, DOM layout and panel shell. Native window/route services
+// Render the real App and native panel host. Native window/route services
 // are injected because this test runs without a CEF process or graphics device.
 function component(path, modules, window) {
   const { descriptor } = parse(source(path));
@@ -47,12 +48,14 @@ async function renderApp({ path = '/', standalone = false } = {}) {
     `${storeSource}; return useDockStore;`)(defineStore, manifests.PLUGIN_MANIFEST, editorUiAllowed);
   const pinia = createPinia();
   const store = useDockStore(pinia);
-  for (const id of ['SceneControls', 'SceneTools', 'EditorSettings']) store.openPanel(id);
+  for (const id of ['SceneControls', 'SceneTools', 'EditorSettings', 'NodeGraphPanel']) store.openPanel(id);
+  const opened = [];
 
   const window = { coronaBridge: { dockCommand() {} } };
   const noop = () => {};
   const asyncNoop = async () => {};
   const appService = {
+    openNativePanel: async options => ({ tab_id: opened.push(options) }),
     setEditorUiEnabled: asyncNoop,
     readEditorUiPolicy: async () => ({ enabled: true }),
   };
@@ -60,7 +63,6 @@ async function renderApp({ path = '/', standalone = false } = {}) {
   const empty = { render: () => null };
   const modules = {
     vue: { ...Vue, onMounted: noop, onUnmounted: noop },
-    pinia: { storeToRefs },
     'vue-router': { useRoute: () => route, useRouter: () => ({ replace: asyncNoop }) },
     'vue-i18n': { useI18n: () => ({ t: key => key, locale: Vue.ref('en') }) },
     '@/stores/dockStore.js': { useDockStore: () => useDockStore(pinia) },
@@ -72,20 +74,16 @@ async function renderApp({ path = '/', standalone = false } = {}) {
       normalizeProjectPath: value => value,
       editorUiAllowed, worldModeState, worldModeService: { opening: false },
     },
-    '@/views/panelRegistry.js': { getPluginComponent: () => empty },
     '@/components/ui/CabbageGuidanceOverlay.vue': { default: empty },
     '@/api/editorApi.js': { editorApi: {} },
     '@/stores/lanchat.js': { default: { finishWorldSession: asyncNoop } },
     '@/services/projectLauncherService.js': { cancelPendingProjectOpen: noop },
     '@/services/worldSessionLifecycle.js': { notifyWorldError: assert.fail },
     '@/utils/eventBus.js': { coronaEventBus: { on: noop, off: noop } },
-    './dockOverlayLayout.js': { createDockOverlayStyles },
+    '@/services/nativePanelHosts.js': { createNativePanelHosts },
   };
-  const panel = component('components/dock/DockPanel.vue', modules, window);
-  modules['./DockPanel.vue'] = { default: panel };
-  modules['@/components/dock/DockPanel.vue'] = { default: panel };
-  modules['@/components/dock/DockLayout.vue'] = {
-    default: component('components/dock/DockLayout.vue', modules, window),
+  modules['@/components/dock/NativeDockLayout.vue'] = {
+    default: component('components/dock/NativeDockLayout.vue', modules, window),
   };
   const App = component('App.vue', modules, window);
   const scope = Vue.effectScope();
@@ -99,29 +97,26 @@ async function renderApp({ path = '/', standalone = false } = {}) {
   app.config.errorHandler = error => errors.push(error);
   const html = await renderToString(app);
   assert.deepEqual(errors, []);
-  return { html, store, worldModeState, dispose: () => scope.stop() };
+  await new Promise(resolve => setImmediate(resolve));
+  return { html, store, opened, worldModeState, dispose: () => scope.stop() };
 }
 
-test('a CEF dockCommand transport still renders DOM sidebars and center settings', async t => {
+test('each requested creative panel gets a native window, including center and floating panels', async t => {
   const h = await renderApp();
   t.after(h.dispose);
-  const { html } = h;
-  assert.match(html, /data-dock-zone="left"/);
-  assert.match(html, /data-dock-panel-id="SceneControls"/);
-  assert.match(html, /data-dock-zone="right"/);
-  assert.match(html, /data-dock-panel-id="SceneTools"/);
-  assert.match(html, /class="global-center-overlay"/);
-  assert.match(html, /data-dock-panel-id="EditorSettings"/);
+  assert.doesNotMatch(h.html, /data-dock-zone=|global-center-overlay|standalone-resize-handle/);
+  assert.deepEqual(h.opened.map(({ panelId, dockingPos, nativeDocked }) => [panelId, dockingPos, nativeDocked]), [
+    ['SceneControls', 'left', true], ['SceneTools', 'right', true],
+    ['NodeGraphPanel', 'center', false], ['EditorSettings', 'center', true],
+  ]);
 });
 
-test('standalone panels keep their own route shell and resize handles', async t => {
+test('a standalone panel renders its route without hosting more windows', async t => {
   const h = await renderApp({ path: '/SceneControls', standalone: true });
   t.after(h.dispose);
-  const { html } = h;
-  assert.match(html, /class="standalone-route-shell"/);
-  assert.equal((html.match(/standalone-resize-handle--/g) || []).length, 7);
-  assert.doesNotMatch(html, /data-dock-zone=/);
-  assert.doesNotMatch(html, /class="global-center-overlay"/);
+  assert.match(h.html, /class="standalone-route-shell"/);
+  assert.doesNotMatch(h.html, /data-dock-zone=|standalone-resize-handle/);
+  assert.deepEqual(h.opened, []);
 });
 
 test('refreshing metadata for the current project preserves open and user-closed panels', async t => {

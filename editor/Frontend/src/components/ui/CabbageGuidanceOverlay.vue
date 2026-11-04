@@ -100,7 +100,7 @@ onMounted(() => {
 onBeforeUnmount(() => {
   window.removeEventListener('keydown', onKeydown, true);
   detachGuidance?.();
-  void guidance.stop({ restorePanelState: false });
+  void guidance.stop();
 });
 </script>
 

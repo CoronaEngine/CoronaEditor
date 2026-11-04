@@ -36,8 +36,7 @@ const makeComponent = new Function('modules', 'window', 'document', 'requestAnim
 function mountMainPage(t, visionMode = 'path_tracing') {
   const calls = [], errors = [], mounted = [], unmounted = [], observed = [];
   const dock = {
-    panels: { SceneControls: { open: true, mode: 'docked' }, SceneTools: { open: true, mode: 'docked' } },
-    initDefaultLayout() {},
+    panels: { SceneControls: { open: false }, SceneTools: { open: false } },
     closePanel(id) { if (this.panels[id]) this.panels[id].open = false; },
   };
   const frames = new Map();
@@ -158,8 +157,8 @@ function mountMainPage(t, visionMode = 'path_tracing') {
 test('world entry retains the initialized scene controls and scene manager', async t => {
   const h = mountMainPage(t);
   await h.mount();
-  assert.equal(h.dock.panels.SceneControls.open, true);
-  assert.equal(h.dock.panels.SceneTools.open, true);
+  assert.equal(h.dock.panels.SceneControls.open, false);
+  assert.equal(h.dock.panels.SceneTools.open, false);
   assert.deepEqual(h.errors, []);
 });
 

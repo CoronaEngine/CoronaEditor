@@ -2,12 +2,6 @@
   <div
     class="flex-1 min-h-0 h-full w-full rounded-lg overflow-hidden relative bg-[#1b241d]/90 flex flex-col text-white font-sans"
   >
-    <DockTitleBar
-      v-if="!isDocked"
-      title="局域网聊天"
-      extraClass="bg-[#b3995d]"
-      @close="closeFloat"
-    />
 
     <div class="flex-1 overflow-y-auto custom-scrollbar p-4 space-y-4 text-sm">
       <!-- ═══ 会话控制 ═══ -->
@@ -189,12 +183,9 @@
 
 <script setup>
 import { computed, ref, onMounted, onUnmounted } from 'vue';
-import DockTitleBar from '@/components/ui/DockTitleBar.vue';
 import { editorApi } from '@/api/editorApi.js';
 import { networkService } from '@/services/networkService.js';
-import { useDockPanel } from '@/composables/useDockPanel.js';
 
-const { closePanel: closeDockPanel, isDocked } = useDockPanel();
 const instanceName = ref('');
 const port = ref(27960);
 const sessionActive = ref(false);
@@ -648,9 +639,6 @@ function forgetActorCreateBroadcast(sceneName, actorGuid) {
   }
 }
 
-function closeFloat() {
-  closeDockPanel();
-}
 
 function unwrapCefResult(res) {
   return res && res.data !== undefined ? res.data : res;

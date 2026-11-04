@@ -7,13 +7,11 @@ export const PLUGIN_MANIFEST = [
     id: 'SceneControls', routePath: '/SceneControls',
     displayNameKey: 'plugins.SceneControls', displayName: '场景控制',
     pageType: 'view', defaultDock: 'left', defaultWidth: 380, defaultHeight: 350,
-    autoInit: true, defaultOpenMode: 'docked',
   },
   {
     id: 'CabbageTasks', routePath: '/CabbageTasks',
     displayNameKey: 'plugins.CabbageTasks', displayName: 'AI 任务',
     pageType: 'plugin', defaultDock: 'left', defaultWidth: 420, defaultHeight: 420,
-    autoInit: false, defaultOpenMode: 'docked',
   },
   {
     id: 'SceneTools',
@@ -24,12 +22,6 @@ export const PLUGIN_MANIFEST = [
     defaultDock: 'right',
     defaultWidth: 360,
     defaultHeight: 540,
-    autoInit: true,
-    defaultOpenMode: 'docked',
-    defaultFloatPosition: 'right_top',
-    minFloatWidth: 340,
-    minFloatHeight: 360,
-    floatingPriority: 10,
   },
   {
     id: 'LightFieldCalibration',
@@ -40,7 +32,6 @@ export const PLUGIN_MANIFEST = [
     defaultDock: 'right',
     defaultWidth: 300,
     defaultHeight: 300,
-    autoInit: false,
   },
   {
     id: 'Object',
@@ -51,12 +42,6 @@ export const PLUGIN_MANIFEST = [
     defaultDock: 'right',
     defaultWidth: 360,
     defaultHeight: 540,
-    autoInit: false,
-    defaultOpenMode: 'docked',
-    defaultFloatPosition: 'right_bottom',
-    minFloatWidth: 320,
-    minFloatHeight: 320,
-    floatingPriority: 10,
   },
   {
     id: 'AITool',
@@ -67,7 +52,6 @@ export const PLUGIN_MANIFEST = [
     defaultDock: 'bottom',
     defaultWidth: 200,
     defaultHeight: 200,
-    autoInit: false,
   },
   {
     id: 'LogTool',
@@ -78,7 +62,6 @@ export const PLUGIN_MANIFEST = [
     defaultDock: 'bottom',
     defaultWidth: 1100,
     defaultHeight: 200,
-    autoInit: false,
   },
   {
     id: 'FileManager',
@@ -89,7 +72,6 @@ export const PLUGIN_MANIFEST = [
     defaultDock: 'left',
     defaultWidth: 300,
     defaultHeight: 600,
-    autoInit: false,
   },
   {
     id: 'ProjectSettings',
@@ -100,7 +82,6 @@ export const PLUGIN_MANIFEST = [
     defaultDock: 'center',
     defaultWidth: 600,
     defaultHeight: 800,
-    autoInit: false,
   },
   {
     id: 'NodeGraphPanel',
@@ -108,22 +89,11 @@ export const PLUGIN_MANIFEST = [
     displayNameKey: 'plugins.NodeGraphPanel',
     displayName: '节点',
     pageType: 'view',
-    defaultDock: 'bottom',
-    // Open wide enough for the toolbox, node canvas and inspector to use the
-    // normal three-column layout immediately. Narrower user-resized windows still
-    // fall back to NodeGraphWorkspace's compact responsive layout.
-    defaultWidth: 1100,
-    defaultHeight: 320,
-    // Keep the docked height compact, but open the shortcut-created floating panel
-    // at the large centered size used by the node editing workflow.
-    defaultFloatWidth: 1480,
-    defaultFloatHeight: 790,
-    autoInit: false,
-    defaultOpenMode: 'docked',
-    defaultFloatPosition: 'center',
-    minFloatWidth: 760,
-    minFloatHeight: 440,
-    floatingPriority: 100,
+    // Start as a centered ImGui window; users can dock it like any other work panel.
+    defaultDock: 'center',
+    defaultWidth: 1480,
+    defaultHeight: 790,
+    floating: true,
   },
   {
     id: 'CabbageChatPanel',
@@ -134,12 +104,6 @@ export const PLUGIN_MANIFEST = [
     defaultDock: 'left',
     defaultWidth: 420,
     defaultHeight: 600,
-    autoInit: false,
-    defaultOpenMode: 'docked',
-    defaultFloatPosition: 'right_bottom',
-    minFloatWidth: 340,
-    minFloatHeight: 400,
-    floatingPriority: 110,
   },
   {
     id: 'EditorSettings',
@@ -150,7 +114,6 @@ export const PLUGIN_MANIFEST = [
     defaultDock: 'center',
     defaultWidth: 620,
     defaultHeight: 720,
-    autoInit: false,
   },
 ];
 

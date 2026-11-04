@@ -1,11 +1,5 @@
 <template>
   <div class="node-graph-panel flex h-full min-h-0 w-full flex-1 flex-col overflow-hidden">
-    <DockTitleBar
-      v-if="!isDocked"
-      title="节点"
-      routePath="/NodeGraph"
-      @close="closeFloat"
-    />
     <NodeGraphWorkspace
       ref="workspaceRef"
       class="min-h-0 flex-1"
@@ -20,12 +14,9 @@
 <script setup>
 import { onBeforeUnmount, onMounted, ref } from 'vue';
 import NodeGraphWorkspace from '@/blockly/components/NodeGraphWorkspace.vue';
-import DockTitleBar from '@/components/ui/DockTitleBar.vue';
-import { useDockPanel } from '@/composables/useDockPanel.js';
 import { appService } from '@/services/appService.js';
 import { coronaEventBus } from '@/utils/eventBus.js';
 
-const { closePanel, isDocked } = useDockPanel();
 // An empty route binds to the current scene until MainPage publishes its identity.
 const sceneName = ref('');
 const workspaceRef = ref(null);
@@ -77,13 +68,6 @@ onBeforeUnmount(() => {
   stopNodeRunForClose().catch(() => {});
 });
 
-async function closeFloat() {
-  try {
-    await stopNodeRunForClose();
-  } finally {
-    closePanel();
-  }
-}
 </script>
 
 <style scoped>

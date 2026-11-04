@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { registerHooks } from 'node:module';
 import test from 'node:test';
-import { createPinia, setActivePinia } from 'pinia';
+import { setImmediate } from 'node:timers';
 import { memoryStorage } from './windowSessionFixtures.mjs';
 import { worldModeState } from '../../src/services/worldModeService.js';
 import { Bridge } from '../../src/api/editorApi.js';
@@ -15,7 +15,6 @@ const aliases = registerHooks({
   },
 });
 const { guidanceService, attachNativeGuidance } = await import('../../src/services/cabbageGuidanceService.js');
-const { useDockStore } = await import('../../src/stores/dockStore.js');
 const { appService } = await import('../../src/services/appService.js');
 const { coronaEventBus } = await import('../../src/utils/eventBus.js');
 aliases.deregister();
@@ -29,7 +28,7 @@ const nodeGuidance = {
   steps: [{ target: { kind: 'selector', selectorKey: 'node-canvas' }, action: 'focus', text: 'Inspect nodes.' }],
 };
 
-async function fixture(t) {
+async function fixture(t, panelId = 'MainPage') {
   const previous = { window: globalThis.window, document: globalThis.document, mode: { ...worldModeState } };
   const commands = [];
   const window = Object.assign(new EventTarget(), {
@@ -45,11 +44,9 @@ async function fixture(t) {
     } : null,
   };
   Object.assign(worldModeState, { status: 'ready', mode: 'creative', revision: 1 });
-  setActivePinia(createPinia());
-  const store = useDockStore();
   t.mock.method(Bridge, 'callDockCommand', async command => { commands.push(command); return {}; });
   await appService.setEditorUiEnabled(true);
-  const detach = attachNativeGuidance('MainPage');
+  const detach = attachNativeGuidance(panelId);
   commands.length = 0;
   t.after(async () => {
     detach();
@@ -58,39 +55,32 @@ async function fixture(t) {
     globalThis.document = previous.document;
     Object.assign(worldModeState, previous.mode);
   });
-  return { store, commands };
+  return { commands };
 }
 
-test('guidance opens a DOM dock and highlights it in the main CEF document', async t => {
-  const { store, commands } = await fixture(t);
+test('guidance renders the highlight in the target native panel document', async t => {
+  await fixture(t, 'SceneControls');
   assert.equal(await guidanceService.start(lightingGuidance), true);
-  assert.equal(store.panels.SceneControls.open, true);
   assert.equal(guidanceService.state.active, true);
-  assert.equal(guidanceService.state.guidance.panelId, 'SceneControls');
   assert.deepEqual(guidanceService.state.targetRect, { left: 100, top: 100, width: 100, height: 30 });
-  assert.equal(commands.some(command => command.event === 'creative-guidance-request'), false);
 });
 
 test('guidance for an external panel still requests its native document', async t => {
-  const { store, commands } = await fixture(t);
-  store.setExternal('NodeGraphPanel', 7);
+  const { commands } = await fixture(t);
   assert.equal(await guidanceService.start(nodeGuidance), true);
   assert.equal(guidanceService.state.active, false);
-  assert.equal(store.panels.NodeGraphPanel.mode, 'external');
   const request = commands.find(command => command.event === 'creative-guidance-request');
   assert.equal(request?.payload.guidance.panelId, 'NodeGraphPanel');
 });
 
-test('a native document can request guidance for a DOM dock on the main surface', async t => {
-  const { store, commands } = await fixture(t);
+test('a request for another document asks the main surface to open that panel', async t => {
+  const { commands } = await fixture(t);
   const policy = await appService.readEditorUiPolicy();
   coronaEventBus.emit('creative-guidance-request', {
-    requestId: 'external-to-dom', guidance: lightingGuidance, uiGeneration: policy.generation,
+    requestId: 'native-lighting', guidance: lightingGuidance, uiGeneration: policy.generation,
   });
-  await new Promise(resolve => setTimeout(resolve, 500));
-  assert.equal(store.panels.SceneControls.open, true);
-  assert.equal(guidanceService.state.active, true);
-  assert.equal(guidanceService.state.guidance.panelId, 'SceneControls');
-  assert.ok(commands.some(command => command.event === 'creative-guidance-accepted'
-    && command.payload.requestId === 'external-to-dom'));
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(guidanceService.state.active, false);
+  assert.ok(commands.some(command => command.event === 'creative-panel-open'
+    && command.payload.panelId === 'SceneControls'));
 });

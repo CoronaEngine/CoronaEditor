@@ -3,12 +3,6 @@
     class="cabbage-chat-shell flex h-full min-h-0 w-full flex-1 flex-col overflow-hidden rounded-lg relative"
     :class="{ resident: props.resident }"
   >
-    <DockTitleBar
-      v-if="!props.resident && !isDocked"
-      title="AI 创作助手"
-      routePath="/CabbageChat"
-      @close="closeFloat"
-    />
 
     <div v-if="props.resident" class="resident-chat-title">
       <span>AI 创作助手</span>
@@ -117,8 +111,6 @@
 <script setup>
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
-import DockTitleBar from '@/components/ui/DockTitleBar.vue';
-import { useDockPanel } from '@/composables/useDockPanel.js';
 import { isCurrentWindowEvent } from '@/services/appService.js';
 import { coronaEventBus } from '@/utils/eventBus.js';
 import { useCabbageAssistantStore } from '@/stores/cabbageAssistantStore.js';
@@ -145,7 +137,6 @@ const emit = defineEmits(['detach']);
 
 const assistant = useCabbageAssistantStore();
 const { locale } = useI18n();
-const { closePanel, isDocked } = useDockPanel();
 const input = ref('');
 const historyRef = ref(null);
 const composerInputRef = ref(null);
@@ -506,9 +497,6 @@ async function stopWaiting() {
   scrollToBottom();
 }
 
-function closeFloat() {
-  closePanel();
-}
 
 function resetChatForProjectChange() {
   const taskId = activeTaskId.value;

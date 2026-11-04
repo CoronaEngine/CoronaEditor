@@ -1,22 +1,9 @@
 ﻿import { reactive } from 'vue';
-import { useDockStore } from '@/stores/dockStore.js';
-import { closeFloatingPanel, openFloatingPanel } from '@/utils/panelWindows.js';
-import { getPluginManifest } from '@/config/pluginManifest.js';
 import { appService, isCurrentWindowEvent } from './appService.js';
 import { coronaEventBus } from '../utils/eventBus.js';
 import { createNativeGuidanceRelay } from './nativeGuidanceRelay.js';
 
-const PANEL_ZONES = Object.freeze({
-  MainPage: 'center',
-  SceneControls: 'left',
-  CabbageChatPanel: 'left',
-  SceneTools: 'right',
-  Object: 'right',
-  EditorSettings: 'right',
-  // Keep node guidance in the main-page DOM so the highlight can target nodes,
-  // ports and blocks without falling back to the legacy bottom dock.
-  NodeGraphPanel: 'center',
-});
+const GUIDANCE_PANELS = new Set(['MainPage', 'SceneControls', 'CabbageChatPanel', 'SceneTools', 'Object', 'EditorSettings', 'NodeGraphPanel']);
 
 const SELECTOR_KEYS = Object.freeze({
   'main-viewport': '[data-guidance="main-viewport"]',
@@ -62,7 +49,6 @@ const state = reactive({
   preparing: false,
 });
 
-let restoreState = null;
 let rectTimer = null;
 let lifecycleToken = 0;
 let exactTargetSeen = false;
@@ -73,12 +59,7 @@ let lifecycleGuardsAttached = false;
 let nativeRelay = null;
 let nativePanelId = '';
 
-function isLocalDockPanel(panelId) {
-  return nativePanelId === 'MainPage' && useDockStore().panels[panelId]?.mode === 'docked';
-}
-
 export function attachNativeGuidance(panelId) {
-  if (typeof window.coronaBridge?.dockCommand !== 'function') return () => {};
   nativePanelId = panelId;
   const send = (event, payload) => { void appService.crossTabBroadcast(event, payload).catch(() => {}); };
   const relay = createNativeGuidanceRelay({ panelId, send,
@@ -89,11 +70,7 @@ export function attachNativeGuidance(panelId) {
   const handlers = {
     'creative-guidance-request': payload => {
       if (!isCurrentWindowEvent(payload)) return;
-      if (isLocalDockPanel(payload.guidance?.panelId)) {
-        void start(payload.guidance, { local: true }).then(shown => {
-          if (shown) send('creative-guidance-accepted', { requestId: payload.requestId });
-        });
-      } else void relay.receiveRequest(payload);
+      void relay.receiveRequest(payload);
     },
     'creative-guidance-ready': payload => { if (isCurrentWindowEvent(payload)) relay.receiveReady(payload); },
     'creative-guidance-accepted': payload => { if (isCurrentWindowEvent(payload)) relay.receiveAccepted(payload); },
@@ -104,23 +81,12 @@ export function attachNativeGuidance(panelId) {
     relay.dispose();
     if (nativeRelay === relay) { nativeRelay = null; nativePanelId = ''; }
     for (const [event, handler] of Object.entries(handlers)) coronaEventBus.off(event, handler);
-    void stop({ restorePanelState: false });
+    void stop();
   };
 }
 
 function safeId(value) {
   return String(value || '').replace(/["\\]/g, '\\$&');
-}
-
-function clonePanelState(panel) {
-  return panel ? {
-    open: Boolean(panel.open),
-    mode: String(panel.mode || 'docked'),
-    dockZone: String(panel.dockZone || ''),
-    order: Number(panel.order) || 0,
-    width: Number(panel.width) || 0,
-    height: Number(panel.height) || 0,
-  } : null;
 }
 
 function wait(ms) {
@@ -219,16 +185,6 @@ function prepareGuidanceTarget(target = {}) {
 
 function refreshRects() {
   if (!state.active) return;
-  const panelId = state.guidance?.panelId;
-  if (panelId !== 'MainPage') {
-    const dockStore = useDockStore();
-    const panel = dockStore.panels[panelId];
-    if (!panel?.open || panel.mode !== 'docked') {
-      void stop({ restorePanelState: false });
-      return;
-    }
-  }
-
   const step = currentStep();
   const target = step?.target || {};
   const fromTarget = step?.fromTarget || {};
@@ -276,75 +232,16 @@ function stopRectTracking() {
 
 async function ensurePanel(panelId, selectorKey = '') {
   if (!panelId) return false;
-  if (nativePanelId === panelId) {
-    restoreState = null;
-    const selector = SELECTOR_KEYS[String(selectorKey || '')];
-    // App's overlay can mount before the lazy route component finishes loading.
-    for (let attempt = 0; attempt < 60; attempt++) {
-      if (nativePanelId !== panelId) return false;
-      window.dispatchEvent(new CustomEvent('cabbage-guidance-prepare', { detail: { panelId, selectorKey } }));
-      if (selector ? document.querySelector(selector) : document.querySelector('[data-guidance]')) return true;
-      await wait(50);
-    }
-    return false;
+  if (nativePanelId !== panelId) return false;
+  const selector = SELECTOR_KEYS[String(selectorKey || '')];
+  // The native tab can be ready before its lazy Vue route mounts.
+  for (let attempt = 0; attempt < 60; attempt++) {
+    if (nativePanelId !== panelId) return false;
+    window.dispatchEvent(new CustomEvent('cabbage-guidance-prepare', { detail: { panelId, selectorKey } }));
+    if (selector ? document.querySelector(selector) : document.querySelector('[data-guidance]')) return true;
+    await wait(50);
   }
-  if (panelId === 'MainPage') {
-    restoreState = null;
-    window.dispatchEvent(new CustomEvent('cabbage-guidance-prepare', {
-      detail: { panelId, selectorKey },
-    }));
-    await wait(80);
-    const selector = SELECTOR_KEYS[String(selectorKey || '')] || '';
-    return selector ? Boolean(document.querySelector(selector)) : true;
-  }
-  const dockStore = useDockStore();
-  const panel = dockStore.panels[panelId];
-  if (!panel) return false;
-  restoreState = restoreState || { panelId, panel: clonePanelState(panel) };
-
-  if (panel.open && panel.mode === 'external') await closeFloatingPanel(dockStore, panelId);
-  dockStore.popIn(panelId);
-  dockStore.setDockZone(panelId, PANEL_ZONES[panelId] || panel.dockZone || 'right');
-
-  if (panelId === 'NodeGraphPanel') {
-    const manifest = getPluginManifest(panelId);
-    const width = Number(manifest?.defaultFloatWidth || manifest?.defaultWidth || panel.width);
-    const height = Number(manifest?.defaultFloatHeight || manifest?.defaultHeight || panel.height);
-    dockStore.resizePanel(panelId, width, height);
-  }
-
-  dockStore.openPanel(panelId);
-  window.dispatchEvent(new CustomEvent('cabbage-guidance-prepare', {
-    detail: { panelId, selectorKey },
-  }));
-  window.dispatchEvent(new Event('resize'));
-  await wait(panelId === 'NodeGraphPanel' ? 260 : 180);
-  return Boolean(dockStore.panels[panelId]?.open && dockStore.panels[panelId]?.mode === 'docked');
-}
-
-async function restorePanel() {
-  const saved = restoreState;
-  restoreState = null;
-  if (!saved?.panel) return;
-  const dockStore = useDockStore();
-  const panel = dockStore.panels[saved.panelId];
-  if (!panel) return;
-
-  panel.dockZone = saved.panel.dockZone || panel.dockZone;
-  panel.order = saved.panel.order;
-  if (saved.panel.width) panel.width = saved.panel.width;
-  if (saved.panel.height) panel.height = saved.panel.height;
-
-  if (!saved.panel.open) {
-    dockStore.closePanel(saved.panelId);
-  } else if (saved.panel.mode === 'external') {
-    dockStore.closePanel(saved.panelId);
-    await openFloatingPanel(dockStore, saved.panelId);
-  } else {
-    dockStore.popIn(saved.panelId);
-    dockStore.openPanel(saved.panelId);
-  }
-  window.dispatchEvent(new Event('resize'));
+  return false;
 }
 
 function stepFor(selectorKey, action, text, extra = {}) {
@@ -691,14 +588,14 @@ const BASICS_TUTORIAL_GUIDANCE = Object.freeze({
     { fallbackEn: 'Click Run once. The model will jump to X=-3 and then keep moving right at two units per second. The task completes immediately when you click.' },
   ),
   start_preview: basicGuidance(
-    'MainPage',
+    'SceneControls',
     { kind: 'selector', selectorKey: 'preview-start' },
     'click',
     '点击“开始预览”，等到预览画面真正启动。',
     { fallbackEn: 'Click Start Preview and wait until the preview is visibly running.' },
   ),
   stop_preview: basicGuidance(
-    'MainPage',
+    'SceneControls',
     { kind: 'selector', selectorKey: 'preview-stop' },
     'click',
     '点击“结束预览”，等待预览完全停止且场景恢复。',
@@ -828,9 +725,9 @@ function guidanceForTask(source = {}) {
 
 function panelIdForTarget(target = {}) {
   const selectorKey = String(target.selectorKey || '');
-  if (['scene-lighting', 'scene-light-x'].includes(selectorKey)) return 'SceneControls';
+  if (['scene-lighting', 'scene-light-x', 'preview-start', 'preview-stop'].includes(selectorKey)) return 'SceneControls';
   if (selectorKey.startsWith('cabbage-chat-')) return 'CabbageChatPanel';
-  if (['main-viewport', 'scene-shortcut', 'node-shortcut', 'preview-start', 'preview-stop'].includes(selectorKey)) return 'MainPage';
+  if (['main-viewport', 'scene-shortcut', 'node-shortcut'].includes(selectorKey)) return 'MainPage';
   if (selectorKey.startsWith('scene-')) return 'SceneTools';
   if (selectorKey.startsWith('settings-')) return 'EditorSettings';
   if (selectorKey.startsWith('object-')) return 'Object';
@@ -857,7 +754,7 @@ function normalizeGuidance(source, sourceType, resolved) {
     .map((step) => panelIdForTarget(step.target) || panelIdForTarget(step.fromTarget))
     .find(Boolean);
   const panelId = inferredPanelId || String(resolved?.panelId || source?.panelId || '');
-  if (!PANEL_ZONES[panelId]) return null;
+  if (!GUIDANCE_PANELS.has(panelId)) return null;
   return {
     guidanceId: String(source.guidanceId || source.taskKey || source.issueKey || source.tipKey || source.id || `guidance_${Date.now()}`),
     sourceType,
@@ -880,7 +777,7 @@ export const guidanceRegistry = {
       const template = CHAT_GUIDANCE[String(source.guidanceIntent || '')];
       if (!template) return null;
       const panelId = String(source.panelId || (
-        source.guidanceIntent === 'adjust_lighting' ? 'MainPage'
+        source.guidanceIntent === 'adjust_lighting' ? 'SceneControls'
           : source.guidanceIntent === 'import_model' ? 'SceneTools'
           : ['transform_model', 'adjust_physics'].includes(source.guidanceIntent) ? 'Object'
             : 'NodeGraphPanel'
@@ -917,12 +814,11 @@ async function showStep(index) {
 }
 
 function handleProjectChanged() {
-  if (state.active || state.preparing) void stop({ restorePanelState: false });
+  if (state.active || state.preparing) void stop();
 }
 
 function handlePageUnload() {
   stopRectTracking();
-  restoreState = null;
   state.active = false;
   state.preparing = false;
 }
@@ -945,7 +841,7 @@ async function start(source, { local = false } = {}) {
   const guidance = guidanceRegistry.resolve(source);
   if (!guidance) return false;
   if (state.active || state.preparing) await stop();
-  if (!local && nativeRelay && guidance.panelId !== nativePanelId && !isLocalDockPanel(guidance.panelId)) {
+  if (!local && nativeRelay && guidance.panelId !== nativePanelId) {
     nativeRelay.request(guidance);
     return true;
   }
@@ -954,7 +850,7 @@ async function start(source, { local = false } = {}) {
   attachLifecycleGuards();
   const panelReady = await ensurePanel(guidance.panelId, guidance.steps[0]?.target?.selectorKey || '');
   if (token !== lifecycleToken || !panelReady) {
-    if (token === lifecycleToken) await stop({ restorePanelState: false });
+    if (token === lifecycleToken) await stop();
     return false;
   }
   state.guidance = guidance;
@@ -967,7 +863,7 @@ async function start(source, { local = false } = {}) {
   return true;
 }
 
-async function stop({ restorePanelState = true } = {}) {
+async function stop() {
   ++lifecycleToken;
   stopRectTracking();
   state.active = false;
@@ -981,8 +877,6 @@ async function stop({ restorePanelState = true } = {}) {
   exactTargetPrepareTicks = 0;
   fromTargetPrepareTicks = 0;
   detachLifecycleGuards();
-  if (restorePanelState) await restorePanel();
-  else restoreState = null;
 }
 
 function next() {

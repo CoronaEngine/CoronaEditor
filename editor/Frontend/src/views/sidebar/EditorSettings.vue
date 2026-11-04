@@ -1,12 +1,5 @@
 <template>
   <main class="esc-panel">
-    <DockTitleBar
-      v-if="!isDocked"
-      :title="t('editorSettings.title')"
-      extraClass="bg-[#242724]"
-      routePath="/SetUp"
-      @close="handleContinue"
-    />
 
     <section class="esc-body" aria-labelledby="esc-menu-title">
 
@@ -172,18 +165,13 @@
 
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
-import { useRouter } from 'vue-router';
 import { useI18n } from 'vue-i18n';
-import { useDockPanel } from '@/composables/useDockPanel.js';
 import { setLocale } from '@/i18n/index.js';
 import { appService } from '@/services/appService.js';
 import { editorApi } from '@/api/editorApi.js';
 import { coronaEventBus } from '@/utils/eventBus.js';
-import DockTitleBar from '@/components/ui/DockTitleBar.vue';
 
-const router = useRouter();
 const { t, locale } = useI18n();
-const { closePanel, isDocked } = useDockPanel();
 const confirmHome = ref(false);
 const aiKeyInput = ref('');
 const aiKeyEditing = ref(false);
@@ -441,20 +429,9 @@ onBeforeUnmount(() => {
 
 function handleContinue() {
   confirmHome.value = false;
-  closePanel();
-
-  if (!isDocked && !hasNativeDockCommand()) {
-    router.push('/');
-  }
+  void appService.closeThisTab('EditorSettings');
 }
 
-function hasNativeDockCommand() {
-  return Boolean(
-    typeof window !== 'undefined' &&
-      window.coronaBridge &&
-      typeof window.coronaBridge.dockCommand === 'function'
-  );
-}
 
 function cancelHome() {
   confirmHome.value = false;
@@ -462,8 +439,7 @@ function cancelHome() {
 
 function goHome() {
   confirmHome.value = false;
-  closePanel();
-  router.push('/StartScreen');
+  void appService.crossTabBroadcast('creative-return-to-launcher', {});
 }
 </script>
 

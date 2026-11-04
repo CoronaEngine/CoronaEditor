@@ -1,295 +1,5 @@
 <template>
   <div class="relative flex flex-col flex-1 min-h-0 h-full w-full" tabindex="0">
-    <!-- 顶部菜单栏 -->
-    <div
-      class="relative z-40 shrink-0 w-full bg-[#202b22] text-gray-200 border-b border-gray-700 h-10 flex items-center px-4 space-x-6 text-sm shadow-md"
-    >
-      <!-- 项目菜单 -->
-      <div class="relative">
-        <button
-          class="hover:bg-[#354236] px-3 py-1.5 rounded transition-colors duration-200"
-          :class="{ 'bg-[#354236]': activeMenu === 'project' }"
-          @click="toggleMenu('project')"
-        >
-          项目
-        </button>
-        <div
-          v-if="activeMenu === 'project'"
-          class="absolute top-full left-0 mt-1 w-48 bg-[#202b22] border border-gray-700 rounded shadow-lg z-50"
-        >
-          <div class="py-1">
-            <a
-              href="#"
-              class="block px-4 py-2 hover:bg-[#354236] transition-colors duration-200"
-              @click.prevent="handleNewProject"
-            >
-              新建项目
-            </a>
-            <a
-              href="#"
-              class="block px-4 py-2 hover:bg-[#354236] transition-colors duration-200"
-              @click.prevent="handleOpenProject"
-            >
-              打开项目
-            </a>
-            <a
-              href="#"
-              class="block px-4 py-2 hover:bg-[#354236] transition-colors duration-200"
-              @click.prevent="handleProjectSettings"
-            >
-              项目设置
-            </a>
-            <hr class="border-gray-700 my-1" />
-            <a
-              href="#"
-              class="block px-4 py-2 hover:bg-[#354236] transition-colors duration-200"
-              @click.prevent="handleSaveProject"
-            >
-              保存项目
-            </a>
-          </div>
-        </div>
-      </div>
-
-      <!-- 视图菜单 - 修改为动态渲染 -->
-      <div class="relative">
-        <button
-          class="hover:bg-[#354236] px-3 py-1.5 rounded transition-colors duration-200"
-          :class="{ 'bg-[#354236]': activeMenu === 'view' }"
-          @click="toggleMenu('view')"
-        >
-          视图
-        </button>
-        <div
-          v-if="activeMenu === 'view'"
-          class="absolute top-full left-0 mt-1 w-56 bg-[#202b22] border border-gray-700 rounded shadow-lg z-50"
-        >
-          <div class="py-1">
-            <a
-              v-for="tool in viewStates"
-              :key="tool.id"
-              href="#"
-              class="flex items-center justify-between px-4 py-2 hover:bg-[#354236] transition-colors duration-200"
-              @click.prevent="toggleViewTool(tool)"
-            >
-              <span>{{ tool.name }}</span>
-              <span class="text-sm" :class="tool.open ? 'text-green-400' : 'text-red-400'">
-                {{ tool.open ? '√' : '×' }}
-              </span>
-            </a>
-          </div>
-        </div>
-      </div>
-
-      <!-- 物理参数菜单 -->
-      <div class="relative">
-        <button
-          class="hover:bg-[#354236] px-3 py-1.5 rounded transition-colors duration-200"
-          :class="{ 'bg-[#354236]': activeMenu === 'physics' }"
-          @click="toggleMenu('physics')"
-        >
-          物理
-        </button>
-        <div
-          v-if="activeMenu === 'physics'"
-          class="absolute top-full left-0 mt-1 w-72 bg-[#202b22] border border-gray-700 rounded shadow-lg z-50 p-3 space-y-3"
-          @click.stop
-        >
-          <!-- 重力 -->
-          <div>
-            <label class="block text-xs text-gray-400 mb-1">重力 (X, Y, Z)</label>
-            <div class="flex gap-1">
-              <input
-                v-model.number="physicsParams.gravityX"
-                type="number"
-                step="0.1"
-                class="w-1/3 bg-[#121a14] border border-gray-600 rounded px-2 py-1 text-xs text-white"
-                placeholder="X"
-              />
-              <input
-                v-model.number="physicsParams.gravityY"
-                type="number"
-                step="0.1"
-                class="w-1/3 bg-[#121a14] border border-gray-600 rounded px-2 py-1 text-xs text-white"
-                placeholder="Y"
-              />
-              <input
-                v-model.number="physicsParams.gravityZ"
-                type="number"
-                step="0.1"
-                class="w-1/3 bg-[#121a14] border border-gray-600 rounded px-2 py-1 text-xs text-white"
-                placeholder="Z"
-              />
-            </div>
-          </div>
-          <!-- 地面高度 -->
-          <div>
-            <label class="block text-xs text-gray-400 mb-1">地面高度 (Floor Y)</label>
-            <input
-              v-model.number="physicsParams.floorY"
-              type="number"
-              step="0.1"
-              class="w-full bg-[#121a14] border border-gray-600 rounded px-2 py-1 text-xs text-white"
-            />
-          </div>
-          <!-- 地面弹性 -->
-          <div>
-            <label class="block text-xs text-gray-400 mb-1">地面弹性系数</label>
-            <input
-              v-model.number="physicsParams.floorRestitution"
-              type="number"
-              step="0.05"
-              min="0"
-              max="1"
-              class="w-full bg-[#121a14] border border-gray-600 rounded px-2 py-1 text-xs text-white"
-            />
-          </div>
-          <!-- 时间步长 -->
-          <div>
-            <label class="block text-xs text-gray-400 mb-1">物理步长 (秒)</label>
-            <input
-              v-model.number="physicsParams.fixedDt"
-              type="number"
-              step="0.001"
-              min="0.001"
-              class="w-full bg-[#121a14] border border-gray-600 rounded px-2 py-1 text-xs text-white"
-            />
-          </div>
-          <!-- 应用按钮 -->
-          <button
-            class="w-full bg-[#b3995d] hover:bg-[#aa8727] text-white text-xs py-1.5 rounded transition-colors duration-200"
-            @click="handleApplyPhysics"
-          >
-            应用物理参数
-          </button>
-        </div>
-      </div>
-
-      <!-- 插件菜单 - 修改为动态渲染 -->
-      <div class="relative">
-        <button
-          class="hover:bg-[#354236] px-3 py-1.5 rounded transition-colors duration-200"
-          :class="{ 'bg-[#354236]': activeMenu === 'plugin' }"
-          @click="toggleMenu('plugin')"
-        >
-          插件
-        </button>
-        <div
-          v-if="activeMenu === 'plugin'"
-          class="absolute top-full left-0 mt-1 w-48 bg-[#202b22] border border-gray-700 rounded shadow-lg z-50"
-        >
-          <div class="py-1">
-            <a
-              v-for="plugin in pluginStates"
-              :key="plugin.id"
-              href="#"
-              class="flex items-center justify-between px-4 py-2 hover:bg-[#354236] transition-colors duration-200"
-              @click.prevent="toggleViewTool(plugin)"
-            >
-              <span>{{ plugin.name }}</span>
-              <span class="text-sm" :class="plugin.open ? 'text-green-400' : 'text-red-400'">
-                {{ plugin.open ? '√' : '×' }}
-              </span>
-            </a>
-          </div>
-        </div>
-      </div>
-
-      <!-- 运行菜单 -->
-      <div class="relative">
-        <button
-          class="hover:bg-[#354236] px-3 py-1.5 rounded transition-colors duration-200"
-          :class="{ 'bg-[#354236]': activeMenu === 'run' }"
-          @click="toggleMenu('run')"
-        >
-          运行
-        </button>
-        <div
-          v-if="activeMenu === 'run'"
-          class="absolute top-full left-0 mt-1 w-48 bg-[#202b22] border border-gray-700 rounded shadow-lg z-50"
-        >
-          <div class="py-1">
-            <a
-              href="#"
-              class="block px-4 py-2 hover:bg-[#354236] transition-colors duration-200"
-              @click.prevent="handleRunProject"
-            >
-              运行项目
-            </a>
-            <a
-              href="#"
-              class="block px-4 py-2 hover:bg-[#354236] transition-colors duration-200"
-              @click.prevent="handleRunCurrentScene"
-            >
-              运行当前场景
-            </a>
-          </div>
-        </div>
-      </div>
-
-      <!-- 帮助菜单 -->
-      <div class="relative">
-        <button
-          class="hover:bg-[#354236] px-3 py-1.5 rounded transition-colors duration-200"
-          :class="{ 'bg-[#354236]': activeMenu === 'help' }"
-          @click="toggleMenu('help')"
-        >
-          帮助
-        </button>
-        <div
-          v-if="activeMenu === 'help'"
-          class="absolute top-full left-0 mt-1 w-48 bg-[#202b22] border border-gray-700 rounded shadow-lg z-50"
-        >
-          <div class="py-1">
-            <a
-              href="#"
-              class="block px-4 py-2 hover:bg-[#354236] transition-colors duration-200"
-              @click.prevent="handleHelpDocs"
-            >
-              帮助文档
-            </a>
-            <a
-              href="#"
-              class="block px-4 py-2 hover:bg-[#354236] transition-colors duration-200"
-              @click.prevent="handleAbout"
-            >
-              关于
-            </a>
-          </div>
-        </div>
-      </div>
-
-      <div class="ml-auto flex items-center gap-2">
-        <button
-          class="px-2.5 py-1 rounded border transition-colors duration-200 whitespace-nowrap"
-          :class="previewRunning || previewBusy
-            ? 'border-gray-600 text-gray-500 bg-[#252525] cursor-not-allowed'
-            : 'border-green-500/50 text-green-200 bg-green-700/20 hover:bg-green-600/30'"
-          :disabled="previewRunning || previewBusy"
-          data-guidance="preview-start"
-          title="开始项目预览"
-          @click="handleStartGamePreview"
-        >
-          开始预览
-        </button>
-        <button
-          class="px-2.5 py-1 rounded border transition-colors duration-200 whitespace-nowrap"
-          :class="!previewRunning || previewBusy
-            ? 'border-gray-600 text-gray-500 bg-[#252525] cursor-not-allowed'
-            : 'border-red-500/50 text-red-200 bg-red-700/20 hover:bg-red-600/30'"
-          :disabled="!previewRunning || previewBusy"
-          data-guidance="preview-stop"
-          title="结束项目预览"
-          @click="handleStopGamePreview"
-        >
-          结束预览
-        </button>
-        <span v-if="previewStatusText" class="text-xs text-[#b8c7b0] whitespace-nowrap">
-          {{ previewStatusText }}
-        </span>
-      </div>
-    </div>
-
     <div
       ref="viewportPickSurfaceRef"
       tabindex="0"
@@ -376,38 +86,6 @@
       </div>
     </div>
 
-    <div
-      class="absolute right-5 top-20 z-[80] h-24 w-24 pointer-events-none select-none rounded-md border border-white/10 bg-[#101418]/70 shadow-xl backdrop-blur-sm"
-      aria-hidden="true"
-    >
-      <svg class="h-full w-full" viewBox="0 0 90 90">
-        <circle cx="45" cy="45" r="3" fill="#dbeafe" opacity="0.85" />
-        <g v-for="axis in sceneAxisVectors" :key="axis.name">
-          <line
-            x1="45"
-            y1="45"
-            :x2="axis.x"
-            :y2="axis.y"
-            :stroke="axis.color"
-            :stroke-width="axis.width"
-            stroke-linecap="round"
-            :opacity="axis.opacity"
-          />
-          <circle :cx="axis.x" :cy="axis.y" r="4" :fill="axis.color" :opacity="axis.opacity" />
-          <text
-            :x="axis.labelX"
-            :y="axis.labelY"
-            text-anchor="middle"
-            dominant-baseline="middle"
-            class="fill-white text-[10px] font-semibold"
-            :opacity="axis.opacity"
-          >
-            {{ axis.name }}
-          </text>
-        </g>
-      </svg>
-    </div>
-
     <nav class="dock-shortcut-bar" aria-label="Dock 开关">
       <button
         v-for="shortcut in dockShortcuts"
@@ -416,9 +94,7 @@
         class="dock-shortcut-button"
         :class="{
           active: isShortcutOpen(shortcut.id),
-          pending: dockShortcutPending.has(shortcut.id),
         }"
-        :aria-busy="dockShortcutPending.has(shortcut.id)"
         :data-guidance="shortcut.guidance || (shortcut.id === 'SceneTools' ? 'scene-shortcut' : 'node-shortcut')"
         :title="`${isShortcutOpen(shortcut.id) ? '关闭' : '打开'}${shortcut.label}`"
         @click.stop="toggleDockShortcut(shortcut.id, { source: 'user' })"
@@ -435,7 +111,6 @@
 <script setup>
 import FrameTimingOverlay from '@/components/ui/FrameTimingOverlay.vue';
 import { computed, ref, onMounted, onUnmounted, reactive, watch, nextTick } from 'vue';
-import { useRouter } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import { DEFAULT_SCENE_NAME } from '@/utils/constants.js';
 import {
@@ -455,13 +130,6 @@ import { useDockStore } from '@/stores/dockStore.js';
 import { PLUGIN_MANIFEST } from '@/config/pluginManifest.js';
 import { pickedNodeIdentity } from '@/utils/modelHierarchy.js';
 import { coronaEventBus } from '@/utils/eventBus.js';
-import {
-  closeFloatingPanel,
-  consumeExpectedPanelClosed,
-  isFloatingPanel,
-  openFloatingPanel,
-  toggleFloatingPanel,
-} from '@/utils/panelWindows.js';
 import { createViewportPickController, indexActorsByHandle } from '@/utils/viewportPick.js';
 import { cameraMovementKey, createViewportCameraController } from '@/utils/viewportCameraController.js';
 import {
@@ -506,7 +174,6 @@ async function subscribeWhileCurrent(register, handler) {
   return null;
 }
 
-const router = useRouter();
 const { t: translate } = useI18n();
 const dockStore = useDockStore();
 const cabbageAssistant = useCabbageAssistantStore();
@@ -517,19 +184,7 @@ const dockShortcuts = [
   { id: 'SceneTools', label: '场景管理', icon: '景' },
   { id: 'NodeGraphPanel', label: '节点', icon: '点' },
 ];
-const dockShortcutPending = reactive(new Set());
 const isShortcutOpen = (id) => Boolean(dockStore.panels[id]?.open);
-const openDockedPanel = (id, { preserveZone = false } = {}) => {
-  const panel = dockStore.panels[id];
-  const manifest = PLUGIN_MANIFEST.find((item) => item.id === id);
-  if (!panel || !manifest) return;
-  if (!preserveZone || !panel.dockZone) {
-    dockStore.setDockZone(id, manifest.defaultDock);
-  }
-  dockStore.popIn(id);
-  dockStore.openPanel(id);
-  nextTick(() => window.dispatchEvent(new Event('resize')));
-};
 const recordPanelOpened = (id, source = 'user') => cabbageContextService.recordEvent({
   type: 'panel_opened',
   category: 'panel',
@@ -538,51 +193,20 @@ const recordPanelOpened = (id, source = 'user') => cabbageContextService.recordE
 });
 
 const handleCreativePanelOpen = async payload => {
-  if (!viewCurrent() || (typeof window.coronaBridge?.dockCommand === 'function' && !isCurrentWindowEvent(payload))) return;
+  if (!viewCurrent() || (payload?.uiGeneration !== undefined && !isCurrentWindowEvent(payload))) return;
   if (!PLUGIN_MANIFEST.some(panel => panel.id === payload.panelId)) return;
-  const panel = dockStore.panels[payload.panelId];
-  if (panel?.mode === 'external') {
-    await appService.focusPanelTab(panel.externalTabId);
-  } else {
-    openDockedPanel(payload.panelId, { preserveZone: true });
-    await nextTick();
-    if (viewCurrent()) coronaEventBus.emit('native-panel-focus', payload.panelId);
-  }
+  dockStore.openPanel(payload.panelId);
+  await nextTick();
+  if (viewCurrent()) coronaEventBus.emit('native-panel-focus', payload.panelId);
 };
 
-const toggleDockShortcut = async (id, { source = 'user' } = {}) => {
-  const wasOpen = Boolean(dockStore.panels[id]?.open);
-  if (id === 'NodeGraphPanel') {
-    dockShortcutPending.add(id);
-    try {
-      await toggleFloatingPanel(dockStore, id);
-      if (!wasOpen && dockStore.panels[id]?.open) void recordPanelOpened(id, source);
-    } finally {
-      dockShortcutPending.delete(id);
-    }
-    return;
-  }
+const toggleDockShortcut = (id, { source = 'user' } = {}) => {
+  dockStore.togglePanel(id);
+  if (dockStore.panels[id]?.open) void recordPanelOpened(id, source);
+};
 
-  const panel = dockStore.panels[id];
-  if (!panel) return;
-  if (panel.open && panel.mode === 'external') {
-    await closeFloatingPanel(dockStore, id);
-    return;
-  }
-  if (panel.open) {
-    dockStore.closePanel(id);
-    nextTick(() => window.dispatchEvent(new Event('resize')));
-    return;
-  }
-  openDockedPanel(id);
-  if (!wasOpen && dockStore.panels[id]?.open) void recordPanelOpened(id, source);
-};
-const handleNodeGraphPanelOpenRequest = async () => {
-  // AI generation must use the same centered in-editor floating surface as the
-  // Node shortcut. Opening it as a normal dock would honor defaultDock=bottom
-  // and shrink the main viewport. openFloatingPanel also reuses an existing tab.
-  await openFloatingPanel(dockStore, 'NodeGraphPanel');
-};
+const handleNodeGraphPanelOpenRequest = () => handleCreativePanelOpen({ panelId: 'NodeGraphPanel' });
+
 
 
 const showLocalModal = ref(false);
@@ -818,7 +442,7 @@ const handleActorSelectionForObjectDock = async (payload = {}, maybeSceneId = ''
     viewportGizmoController.clearTarget();
   }
   if (!dockStore.panels.Object?.open) {
-    openDockedPanel('Object');
+    dockStore.openPanel('Object');
   }
 };
 
@@ -987,8 +611,6 @@ const cameraControls = createViewportCameraController({
 const isRealtimeCameraInputActive = cameraControls.isInputActive;
 const scheduleCameraUpdate = cameraControls.scheduleUpdate;
 
-// 新增：菜单状态
-const activeMenu = ref(null);
 const previewRunning = ref(false);
 const previewBusy = ref(false);
 const previewStatusText = ref('');
@@ -1029,21 +651,6 @@ const physicsParams = ref({
   fixedDt: 1.0 / 60.0,
 });
 
-// 视图/插件菜单状态：从 Pinia dockStore + pluginManifest 派生
-const viewStates = computed(() =>
-  PLUGIN_MANIFEST.filter((p) => p.pageType === 'view').map((p) => ({
-    id: p.id,
-    name: p.displayName,
-    open: dockStore.panels[p.id]?.open ?? false,
-  }))
-);
-const pluginStates = computed(() =>
-  PLUGIN_MANIFEST.filter((p) => p.pageType === 'plugin').map((p) => ({
-    id: p.id,
-    name: p.displayName,
-    open: dockStore.panels[p.id]?.open ?? false,
-  }))
-);
 const mainRenderModeOptions = [
   { value: 'native', backend: 'native', label: 'Native' },
   ...visionRenderModes,
@@ -1241,18 +848,6 @@ function onCabbageRunFailed(event) {
 
 // Assistant state has been initialized above.
 
-// 新增：切换菜单显示
-const toggleMenu = (menu) => {
-  if (activeMenu.value === menu) {
-    activeMenu.value = null;
-  } else {
-    activeMenu.value = menu;
-    if (menu === 'physics') {
-      loadPhysicsParams();
-    }
-  }
-};
-
 // Apply Vision both before first binding and after restoring camera windows,
 // which can recreate the camera from an archive that still remembers Native.
 const initializeCreativeRenderMode = async () => {
@@ -1287,7 +882,7 @@ const selectMainRenderMode = async (mode) => {
   const cameraId = currentMainCameraId();
   const previousBackend = mainRenderBackend.value;
   const previousMode = mainVisionRenderMode.value;
-  activeMenu.value = null;
+
   try {
     if (mode === 'native') {
       pendingMainRenderSelection = {
@@ -1419,7 +1014,7 @@ const toggleMainVisionDenoise = async () => {
 };
 
 const selectMainVisionDenoiser = async (type) => {
-  activeMenu.value = null;
+
   const sceneId = currentMainSceneId();
   const cameraId = currentMainCameraId();
   if (mainRenderBackend.value !== 'vision' || mainVisionRenderMode.value === 'ssat'
@@ -1493,19 +1088,6 @@ const toggleMainVisionStablePlanes = async () => {
     mainVisionStablePlanesBusy.value = false;
   }
 };
-
-// 新增：点击其他地方关闭菜单
-const handleClickOutside = (event) => {
-  if (activeMenu.value === 'render' || activeMenu.value === 'denoiser') {
-    if (!event.target.closest('.scene-quick-render-menu')) activeMenu.value = null;
-    return;
-  }
-  const menuBar = document.querySelector('.bg-\\[\\#202b22\\]');
-  if (menuBar && !menuBar.contains(event.target)) {
-    activeMenu.value = null;
-  }
-};
-
 
 const isVector3 = (value) => Array.isArray(value) && value.length === 3;
 
@@ -1969,51 +1551,6 @@ const vec3 = {
   },
 };
 
-const sceneAxisVectors = computed(() => {
-  const fwd = vec3.normalize(cameraState.value.forward);
-  let up = vec3.normalize(cameraState.value.up);
-  let right = vec3.cross(up, fwd);
-
-  if (vec3.length(right) <= 1e-6) {
-    up = Math.abs(fwd[1]) < 0.95 ? [0, 1, 0] : [1, 0, 0];
-    right = vec3.cross(up, fwd);
-  }
-
-  right = vec3.normalize(right);
-  up = vec3.normalize(vec3.cross(fwd, right));
-
-  const center = 45;
-  const radius = 29;
-  const axes = [
-    { name: 'X', color: '#ef4444', vector: [1, 0, 0] },
-    { name: 'Y', color: '#22c55e', vector: [0, 1, 0] },
-    { name: 'Z', color: '#3b82f6', vector: [0, 0, 1] },
-  ];
-
-  return axes
-    .map((axis) => {
-      const screenX = vec3.dot(axis.vector, right);
-      const screenY = -vec3.dot(axis.vector, up);
-      const depth = vec3.dot(axis.vector, fwd);
-      const x = center + screenX * radius;
-      const y = center + screenY * radius;
-      const labelOffset = 9;
-      const labelLength = Math.max(1, Math.sqrt(screenX * screenX + screenY * screenY));
-
-      return {
-        ...axis,
-        x,
-        y,
-        labelX: x + (screenX / labelLength) * labelOffset,
-        labelY: y + (screenY / labelLength) * labelOffset,
-        opacity: 0.58 + Math.max(0, depth) * 0.35,
-        width: 2.5 + Math.max(0, depth) * 1.2,
-        depth,
-      };
-    })
-    .sort((a, b) => a.depth - b.depth);
-});
-
 const viewportCursorShape = () => (cameraControls.isLooking() ? 'grabbing' : 'arrow');
 
 const handleViewportPointer = (event) => {
@@ -2262,7 +1799,7 @@ const handleCameraMove = (direction) => cameraControls.move(direction);
 
 const handleApplyPhysics = async () => {
   const sceneId = currentSceneId.value || DEFAULT_SCENE_NAME;
-  activeMenu.value = null;
+
   try {
     const result = await editorApi.sceneTools.setPhysicsParams(sceneId, {
       gravity: [
@@ -2306,39 +1843,6 @@ const loadPhysicsParams = async () => {
     logError('Load physics params failed', e);
     return false;
   }
-};
-
-const startEngine = () => {
-  dockStore.initDefaultLayout();
-};
-
-
-// ========== 预留的空函数 ==========
-
-// 项目菜单
-const handleNewProject = () => {
-  activeMenu.value = null;
-  // TODO: 实现新建项目逻辑
-};
-
-const handleOpenProject = () => {
-  activeMenu.value = null;
-  // TODO: 实现打开项目逻辑
-};
-
-const handleProjectSettings = () => {
-  dockStore.openPanel('ProjectSettings');
-  activeMenu.value = null;
-};
-
-const handleSaveProject = () => {
-  activeMenu.value = null;
-  // TODO: 实现保存项目逻辑
-};
-
-// 视图工具/插件切换：由 Pinia dockStore 管理
-const toggleViewTool = (tool) => {
-  dockStore.togglePanel(tool.id);
 };
 
 const unwrapBridgeData = (result) => result?.data ?? result;
@@ -2551,7 +2055,7 @@ const handleStartGamePreview = async (request = { scope: 'project' }) => {
     window.__coronaPreviewActionPending = window.__coronaPreviewActionPendingCount > 0;
     if (!window.__coronaPreviewActionPending) window.__coronaPreviewPendingScope = '';
     previewBusy.value = false;
-    activeMenu.value = null;
+
     broadcastViewportControlsState();
   }
 };
@@ -2587,7 +2091,7 @@ const handleStopGamePreview = async () => {
     return false;
   } finally {
     previewBusy.value = false;
-    activeMenu.value = null;
+
     broadcastViewportControlsState();
   }
 };
@@ -2607,8 +2111,6 @@ const handleRunProject = async () => {
   } catch (error) {
     logError('运行项目失败', error);
     return false;
-  } finally {
-    activeMenu.value = null;
   }
 };
 
@@ -2633,8 +2135,6 @@ const handleRunCurrentScene = async () => {
   } catch (error) {
     logError('运行当前场景失败', error);
     return false;
-  } finally {
-    activeMenu.value = null;
   }
 };
 
@@ -2810,17 +2310,6 @@ const unregisterEditorControls = () => {
   }
 };
 
-// 帮助菜单
-const handleHelpDocs = () => {
-  activeMenu.value = null;
-  // TODO: 实现打开帮助文档逻辑
-};
-
-const handleAbout = () => {
-  activeMenu.value = null;
-  // TODO: 实现显示关于信息逻辑
-};
-
 const showLoading = ({ title = '加载中', message = '请稍候...', progress = 0 } = {}) => {
   localModalTitle.value = title;
   localModalMessage.value = message;
@@ -2901,54 +2390,6 @@ const onProjectOpenedEvent = async (payload = {}) => {
   }
 };
 
-const pendingPanelRedocks = new Map();
-const PANEL_REDOCK_TTL_MS = 5000;
-
-const handlePanelRedockRequest = (payload) => {
-  if (!viewCurrent() || !isCurrentWindowEvent(payload)) return;
-  if (Number.isInteger(payload?.tabId) && dockStore.panels[payload?.panelId]?.externalTabId !== payload.tabId) return;
-  const panelId = payload?.panelId;
-  if (!panelId || !dockStore.panels[panelId]) return;
-  const previousTimer = pendingPanelRedocks.get(panelId);
-  if (previousTimer) window.clearTimeout(previousTimer);
-  const timer = window.setTimeout(() => pendingPanelRedocks.delete(panelId), PANEL_REDOCK_TTL_MS);
-  pendingPanelRedocks.set(panelId, timer);
-  if (panelId === 'CabbageChatPanel') {
-    dockStore.popIn(panelId);
-    dockStore.closePanel(panelId);
-    return;
-  }
-  openDockedPanel(panelId, { preserveZone: true });
-};
-
-const handlePanelClosed = (payload) => {
-  if (!viewCurrent() || !isCurrentWindowEvent(payload)) return;
-  if (Number.isInteger(payload?.tabId) && dockStore.panels[payload?.panelId]?.externalTabId !== payload.tabId) return;
-  const panelId = payload?.panelId;
-  if (!panelId) return;
-  const redockTimer = pendingPanelRedocks.get(panelId);
-  if (redockTimer) {
-    window.clearTimeout(redockTimer);
-    pendingPanelRedocks.delete(panelId);
-    if (panelId === 'CabbageChatPanel') {
-      dockStore.popIn(panelId);
-      dockStore.closePanel(panelId);
-    } else {
-      openDockedPanel(panelId, { preserveZone: true });
-    }
-    return;
-  }
-  if (isFloatingPanel(panelId)) {
-    // Ignore the delayed native event produced by our own close request. The
-    // queued shortcut operation may already have opened a replacement tab.
-    if (consumeExpectedPanelClosed(panelId)) return;
-    dockStore.markExternalClosed(panelId);
-    return;
-  }
-  dockStore.popIn(panelId);
-};
-
-
 onMounted(async () => {
   // A reused CEF page must not inherit camera locks from a previous world.
   // Real active workers are added back by reconcileEditorCameraInputLocks().
@@ -2969,7 +2410,6 @@ onMounted(async () => {
     visionAvailable.value = false;
   }
 
-  await startEngine();
   if (!viewCurrent()) return;
   // 等待 Vue 渲染 dock 面板（SceneBar/Object 等），确保 eventBus 监听就绪
   await nextTick();
@@ -2998,7 +2438,6 @@ onMounted(async () => {
 
   document.addEventListener('keydown', handleKeyDown);
   document.addEventListener('keyup', handleKeyUp);
-  document.addEventListener('click', handleClickOutside, true);
   document.addEventListener('mousedown', onMouseDown);
   document.addEventListener('mousemove', onMouseMove);
   document.addEventListener('mouseup', onMouseUp);
@@ -3010,9 +2449,7 @@ onMounted(async () => {
   registerEditorControls();
 
   // 跨窗口事件监听：panel / loading / viewport 等 UI 本地通道
-  coronaEventBus.on('panel-redock-request', handlePanelRedockRequest);
   coronaEventBus.on('creative-panel-open', handleCreativePanelOpen);
-  coronaEventBus.on('panel-closed', handlePanelClosed);
   coronaEventBus.on('loading-show', showLoading);
   coronaEventBus.on('loading-update', updateLoading);
   coronaEventBus.on('loading-hide', hideLoading);
@@ -3083,11 +2520,7 @@ onUnmounted(() => {
   window.removeEventListener('storage', onActiveProjectStorageChanged);
   closeTutorialSessionChannel();
   coronaEventBus.off('model-node-selection', handleModelNodeGizmoSelection);
-  coronaEventBus.off('panel-redock-request', handlePanelRedockRequest);
   coronaEventBus.off('creative-panel-open', handleCreativePanelOpen);
-  coronaEventBus.off('panel-closed', handlePanelClosed);
-  for (const timer of pendingPanelRedocks.values()) window.clearTimeout(timer);
-  pendingPanelRedocks.clear();
   coronaEventBus.off('loading-show', showLoading);
   coronaEventBus.off('loading-update', updateLoading);
   coronaEventBus.off('loading-hide', hideLoading);
@@ -3145,7 +2578,6 @@ onUnmounted(() => {
   viewportUiPointerController.dispose();
   document.removeEventListener('keydown', handleKeyDown);
   document.removeEventListener('keyup', handleKeyUp);
-  document.removeEventListener('click', handleClickOutside, true);
   document.removeEventListener('mousedown', onMouseDown);
   document.removeEventListener('mousemove', onMouseMove);
   document.removeEventListener('mouseup', onMouseUp);
@@ -3167,7 +2599,12 @@ provideCreativePanelState(() => ({
   creativeRenderDefaultsBusy: creativeRenderDefaultsBusy.value, creativeRenderDefaultsError: creativeRenderDefaultsError.value,
   cameraSpeed: cameraSpeed.value, sceneGridEnabled: sceneGridEnabled.value, viewportUiMode: viewportUiMode.value,
   sceneLightSettings, sceneLightBusy: sceneLightBusy.value,
+  previewRunning: previewRunning.value, previewBusy: previewBusy.value, previewStatusText: previewStatusText.value,
+  physics: getPhysicsSnapshot(),
 }), {
+  startPreview: handleStartGamePreview, stopPreview: handleStopGamePreview,
+  refreshPhysics: loadPhysicsParams, applyPhysics: applyPhysicsFromSettings,
+  runProject: handleRunProject, runCurrentScene: handleRunCurrentScene,
   selectMainRenderMode, selectMainVisionDenoiser, toggleMainVisionAccumulation,
   toggleMainVisionDenoise, toggleMainVisionStablePlanes, setCameraSpeedFromPanel,
   setSceneLightEnabled: async enabled => {
@@ -3208,9 +2645,6 @@ provideCreativePanelState(() => ({
 }
 .dock-shortcut-button:hover { border-color: #b79232; color: #fff4cd; }
 .dock-shortcut-button.active { border-color: #b3995d; background: #332712; color: #fff4cd; box-shadow: inset 0 0 0 1px rgba(179, 153, 93, .18); }
-.dock-shortcut-button.pending { cursor: progress; border-color: #9f8132; }
-.dock-shortcut-button.pending .dock-shortcut-icon { animation: dock-shortcut-pulse .7s ease-in-out infinite alternate; }
-@keyframes dock-shortcut-pulse { from { opacity: .48; } to { opacity: 1; } }
 .dock-shortcut-icon { display:grid; place-items:center; width:19px; height:19px; border-radius:4px; background:#0e0d09; color:#d6b66b; font-size:10px; font-weight:700; }
 
 @media (max-width: 720px) {

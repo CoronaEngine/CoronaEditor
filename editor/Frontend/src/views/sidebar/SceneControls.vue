@@ -1,6 +1,5 @@
 <template>
   <div class="scene-controls-panel">
-    <DockTitleBar v-if="!isDocked" title="场景控制" routePath="/SceneControls" @close="closePanel" />
     <p v-if="!ready" class="panel-status" role="status">正在连接主视口…</p>
     <p v-if="error" class="panel-status panel-error" role="alert">{{ error }}</p>
     <div v-if="ready" class="scene-controls-body">
@@ -12,6 +11,29 @@
       @click.stop
       @wheel.stop
     >
+      <div class="panel-commands">
+        <button data-guidance="preview-start" :disabled="state.previewRunning || state.previewBusy" @click="act('startPreview')">{{ translate('layout.previewStart') }}</button>
+        <button data-guidance="preview-stop" :disabled="!state.previewRunning || state.previewBusy" @click="act('stopPreview')">{{ translate('layout.previewStop') }}</button>
+        <span role="status">{{ state.previewStatusText }}</span>
+      </div>
+      <details>
+        <summary>{{ translate('layout.menuView') }}</summary>
+        <div class="panel-commands">
+          <button v-for="panel in toolPanels" :key="panel.id" @click="openTool(panel.id)">{{ translate(panel.displayNameKey) }}</button>
+          <button @click="act('runProject')">{{ translate('layout.runProject') }}</button>
+          <button @click="act('runCurrentScene')">{{ translate('layout.runCurrentScene') }}</button>
+        </div>
+      </details>
+      <details @toggle="refreshPhysics">
+        <summary>{{ translate('editorSettings.physics') }}</summary>
+        <form class="physics-fields" @submit.prevent="act('applyPhysics', { ...physicsDraft })">
+          <label v-for="field in physicsFields" :key="field">
+            {{ translate('editorSettings.' + field) }}
+            <input v-model.number="physicsDraft[field]" type="number" step="any" required />
+          </label>
+          <button>{{ translate('editorSettings.applyPhysics') }}</button>
+        </form>
+      </details>
       <section class="scene-quick-render" aria-label="渲染设置" data-guidance="render-settings"
         :inert="state.creativeRenderDefaultsBusy" :aria-busy="state.creativeRenderDefaultsBusy">
         <div class="scene-quick-render-mode">
@@ -180,24 +202,37 @@
   </div>
 </template>
 <script setup>
-import { ref } from 'vue';
+import { PLUGIN_MANIFEST } from '@/config/pluginManifest.js';
+import { appService } from '@/services/appService.js';
+import { ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useCreativePanelState } from '@/services/creativePanelState.js';
 import { visionDenoisers } from '@/utils/visionRenderModes.js';
-import { useDockPanel } from '@/composables/useDockPanel.js';
-import DockTitleBar from '@/components/ui/DockTitleBar.vue';
 import PtSettings from '@/components/ui/PtSettings.vue';
 import RestirSettings from '@/components/ui/RestirSettings.vue';
 import ReblurSettings from '@/components/ui/ReblurSettings.vue';
 import RelaxSettings from '@/components/ui/RelaxSettings.vue';
 const { t: translate } = useI18n();
 const { state, ready, error, act } = useCreativePanelState();
-const { isDocked, closePanel } = useDockPanel();
+const toolPanels = PLUGIN_MANIFEST.filter(panel => panel.id !== 'SceneControls');
+const openTool = panelId => appService.crossTabBroadcast('creative-panel-open', { panelId });
+const physicsFields = ['gravityX', 'gravityY', 'gravityZ', 'floorY', 'floorRestitution', 'fixedDt'];
+const physicsDraft = ref({});
+// Camera state is broadcast frequently. Refresh the form only when the actual physics values change.
+watch(() => JSON.stringify(state.value.physics ?? {}), value => { physicsDraft.value = JSON.parse(value); }, { immediate: true });
+const refreshPhysics = event => { if (event.target.open) void act('refreshPhysics'); };
 const activeMenu = ref(null);
 const toggleMenu = menu => { activeMenu.value = activeMenu.value === menu ? null : menu; };
 const select = (action, value) => { activeMenu.value = null; return act(action, value); };
 </script>
 <style scoped>
+.physics-fields { display:grid; gap:6px; padding:8px; }
+.physics-fields label { display:flex; justify-content:space-between; }
+.physics-fields input { width:7em; background:#19211c; }
+.panel-commands { display:flex; flex-wrap:wrap; align-items:center; gap:8px; padding:6px 0; }
+.panel-commands button { border:1px solid #434d46; border-radius:4px; padding:3px 8px; }
+.panel-commands button:disabled { opacity:0.5; }
+
 .scene-controls-panel { height:100%; min-height:0; display:flex; flex-direction:column; color:#e8ede3; background:#101711; }
 .scene-controls-body { min-height:0; overflow:auto; flex:1; padding:12px; }
 .scene-quick-controls { width:100%; }

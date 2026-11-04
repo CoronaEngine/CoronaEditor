@@ -7,11 +7,6 @@ import { defineAsyncComponent } from 'vue';
  * panel -- is its own document that boots this whole frontend, so eager imports would make
  * every window download all ten panels (plus Blockly) before it could render anything.
  *
- * `defineAsyncComponent` keeps `getPluginComponent()` synchronous while deferring the module
- * fetch to render time. A bare `() => import(...)` loader is NOT a valid substitute here:
- * `DockPanel.vue` declares its `component` prop as `type: Object`, and rendering relies on
- * `<component :is>`.
- *
  * Keep page-level component paths in the view composition layer. The keys
  * intentionally match the manifest IDs.
  */
