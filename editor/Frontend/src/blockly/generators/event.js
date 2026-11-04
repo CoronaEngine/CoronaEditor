@@ -29,7 +29,7 @@ export const defineEventGenerators = () => {
     if (!branch) branch = pythonGenerator.INDENT + 'pass\n';
     // 双路匹配: e.code (美式键盘) 或 _key_state (非美式键盘的 e.key)
     return (
-      `if key == '${keyCode}' or _CE.keyboard('${displayKey}'):\n` + indent(branch)
+      `if key == ${JSON.stringify(keyCode)} or CoronaEngine.keyboard(${JSON.stringify(displayKey)}):\n` + indent(branch)
     );
   };
 
@@ -43,7 +43,7 @@ export const defineEventGenerators = () => {
     const checks = parts.map(p => `'${p}' in (_mods or [])`).join(' and ');
     // 双路匹配: e.code 或 _key_state (兼容非美式键盘)
     return (
-      `if (key == '${keyPart}' or _CE.keyboard('${keyPart}')) and ${checks}:\n` +
+      `if (key == ${JSON.stringify(keyPart)} or CoronaEngine.keyboard(${JSON.stringify(keyPart)})) and ${checks}:\n` +
       indent(branch)
     );
   };
