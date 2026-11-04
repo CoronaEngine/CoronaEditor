@@ -1,11 +1,9 @@
 import json
-import os
 import sys
 import threading
 
 from runtime.native_engine import get_corona_engine
 from config.paths_config import get_default_paths
-from config.project_state import settings_manager
 from runtime.response_utils import *
 
 core_path = get_default_paths()
@@ -73,23 +71,6 @@ class CoronaEditor:
         unregister = getattr(cls.CoronaEngine, "unregister_python_script_service_dispatcher", None)
         if callable(unregister):
             unregister()
-
-    @classmethod
-    def update_project_context(cls, project_path):
-        """Apply the native launcher's authoritative project on the Python thread."""
-        normalized_path = os.path.abspath(os.path.expanduser(str(project_path or "").strip()))
-        if os.path.isfile(normalized_path) and os.path.splitext(normalized_path)[1].lower() in {".xml", ".pbrt"}:
-            # External geometry is a transient scene, never a portable project.
-            settings_manager.active_project_path = normalized_path
-            settings_manager.active_project_config = None
-            if cls.CoronaEngine is not None:
-                cls.CoronaEngine.active_project_path = normalized_path
-            return True
-        if not normalized_path or not settings_manager.set_active_project(normalized_path):
-            return False
-        if cls.CoronaEngine is not None:
-            cls.CoronaEngine.active_project_path = normalized_path
-        return True
 
     @classmethod
     def initialize_runtime(cls):

@@ -4,11 +4,13 @@ from unittest.mock import patch
 from script_runtime.blockly.main import ScratchTool
 
 
-def test_run_uses_the_verified_file_even_if_another_panel_saves_again(tmp_path):
+def test_run_uses_the_verified_file_even_if_another_panel_saves_again(tmp_path, monkeypatch):
+    state = {"archive_session": "A", "project_path": str(tmp_path)}
+    monkeypatch.setattr("script_runtime.blockly.main.read_project_session", lambda: state)
     path = tmp_path / "actor.py"
     original = b"def run(): return 1\n"
     path.write_bytes(original)
-    request = {"requestId": "initial", "project_path": str(tmp_path), "path": "actor.py",
+    request = {**state, "requestId": "initial", "path": "actor.py",
                "revision": hashlib.sha256(original).hexdigest(), "actor_name": "Player"}
     with patch.object(ScratchTool, "_file_requests", {}), \
             patch.object(ScratchTool, "_start_single", return_value={"runId": "run-1"}) as start:
@@ -24,9 +26,11 @@ def test_run_uses_the_verified_file_even_if_another_panel_saves_again(tmp_path):
         assert start.call_count == 1
 
 
-def test_close_before_start_prevents_a_late_delivery():
+def test_close_before_start_prevents_a_late_delivery(tmp_path, monkeypatch):
+    state = {"archive_session": "A", "project_path": str(tmp_path)}
+    monkeypatch.setattr("script_runtime.blockly.main.read_project_session", lambda: state)
     with patch.object(ScratchTool, "_file_requests", {}), patch.object(ScratchTool, "_start_single") as start:
-        request = {"requestId": "closed-panel"}
+        request = {**state, "requestId": "closed-panel"}
         assert ScratchTool.get_file_run(request)["status"] == "unknown"
         assert ScratchTool.stop_file(request)["status"] == "stopped"
         assert ScratchTool.run_file(request)["status"] == "cancelled"

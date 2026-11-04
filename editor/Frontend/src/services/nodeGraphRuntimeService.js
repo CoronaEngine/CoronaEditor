@@ -1,4 +1,4 @@
-import { startScriptFile } from './scriptFileService.js';
+import { readScriptProject, startScriptFile } from './scriptFileService.js';
 import { editorApi } from '@/api/editorApi.js';
 import { appService } from '@/services/appService.js';
 import { cabbageContextService } from '@/services/cabbageAssistantContextService.js';
@@ -23,9 +23,9 @@ function requestId() {
   return `node_graph_save_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
 }
 
-async function runLocalFlusher() {
+async function runLocalFlusher(archiveSession) {
   if (typeof window.__coronaNodeGraphFlushSave !== 'function') return false;
-  const result = await window.__coronaNodeGraphFlushSave();
+  const result = await window.__coronaNodeGraphFlushSave(archiveSession);
   if (result === false) throw new Error('\u8282\u70b9\u56fe\u4fdd\u5b58\u5931\u8d25\uff0c\u5df2\u53d6\u6d88\u5168\u5c40\u8fd0\u884c');
   return true;
 }
@@ -38,10 +38,11 @@ async function runLocalFlusher() {
  * for the real save result so global run never races a slow disk write.
  */
 export async function flushProjectNodeGraphBeforeRun({
-  ownerTimeoutMs = 800,
+  archiveSession, ownerTimeoutMs = 800,
   saveTimeoutMs = 6000,
 } = {}) {
-  if (await runLocalFlusher()) return { success: true, source: 'local' };
+  archiveSession ??= (await readScriptProject()).archive_session;
+  if (await runLocalFlusher(archiveSession)) return { success: true, source: 'local' };
 
   const id = requestId();
   return new Promise((resolve, reject) => {
@@ -85,7 +86,7 @@ export async function flushProjectNodeGraphBeforeRun({
       finish({ success: true, source: 'persisted', skipped: true });
     });
 
-    const payload = { requestId: id, targetId: GLOBAL_NODE_TARGET_ID };
+    const payload = { requestId: id, targetId: GLOBAL_NODE_TARGET_ID, archive_session: archiveSession };
     // Same-window Dock.
     coronaEventBus.emit(SAVE_REQUEST_EVENT, payload);
     // Detached Dock/CEF windows.
@@ -110,7 +111,7 @@ export function registerProjectNodeGraphSaveHandler(save) {
     let success = false;
     let message = '';
     try {
-      success = (await save()) !== false;
+      success = (await save(payload.archive_session)) !== false;
       if (!success) message = '\u8282\u70b9\u56fe\u4fdd\u5b58\u5931\u8d25\uff0c\u5df2\u53d6\u6d88\u5168\u5c40\u8fd0\u884c';
     } catch (error) {
       message = String(error?.message || error || '\u8282\u70b9\u56fe\u4fdd\u5b58\u5931\u8d25');
@@ -132,14 +133,6 @@ export function registerProjectNodeGraphSaveHandler(save) {
 
 function bridgeResult(response) {
   return response?.data?.data ?? response?.data ?? response ?? {};
-}
-
-function readActiveProjectPath() {
-  return String(window.localStorage?.getItem('corona.activeProjectPath') || '').trim();
-}
-
-function normalizeProjectPath(value) {
-  return String(value || '').trim().replaceAll('\\', '/').replace(/\/+$/, '').toLowerCase();
 }
 
 function normalizePersistedGraph(rawGraph) {
@@ -276,36 +269,13 @@ function uninstallBackgroundStateResponder() {
   coronaEventBus.off(RUNTIME_STATE_REQUEST_EVENT, onBackgroundRuntimeStateRequest);
 }
 
-async function loadPersistedProjectNodeGraph() {
-  let projectPath = readActiveProjectPath();
-  let response = null;
-  for (let attempt = 0; attempt < 2; attempt += 1) {
-    response = bridgeResult(await editorApi.scratch.loadBlocklyTarget({
-      target_type: 'project',
-      scene_name: '',
-      actor_name: '',
-      script_kind: 'node_graph',
-      project_path: projectPath,
-    }));
-    if (response?.status === 'error' && response?.code === 'PROJECT_CONTEXT_CHANGED' && attempt === 0) {
-      const backendProjectPath = String(response.project_path || '').trim();
-      if (backendProjectPath) {
-        projectPath = backendProjectPath;
-        window.localStorage?.setItem('corona.activeProjectPath', backendProjectPath);
-        continue;
-      }
-    }
-    break;
-  }
+async function loadPersistedProjectNodeGraph(scope) {
+  const response = bridgeResult(await editorApi.scratch.loadBlocklyTarget({
+    ...scope, target_type: 'project', scene_name: '', actor_name: '', script_kind: 'node_graph',
+  }));
   if (response?.status === 'error') throw new Error(response.message || '节点图加载失败');
   if (response?.status !== 'loaded') throw new Error('当前世界还没有可运行的项目节点图');
-  const responseProjectPath = String(response.project_path || projectPath || '').trim();
-  const currentProjectPath = readActiveProjectPath();
-  if (currentProjectPath && responseProjectPath
-    && normalizeProjectPath(responseProjectPath) !== normalizeProjectPath(currentProjectPath)) {
-    throw new Error('当前世界已切换，已取消运行旧世界的节点图');
-  }
-  return { workspace: normalizePersistedGraph(response.workspace || {}), target: response.target, projectPath: responseProjectPath };
+  return { workspace: normalizePersistedGraph(response.workspace || {}), target: response.target };
 }
 
 function startBackgroundRunPoll() {
@@ -413,14 +383,15 @@ export async function togglePersistedProjectNodeGraphRuntime() {
   });
 
   try {
-    await flushProjectNodeGraphBeforeRun();
-    const { workspace, target, projectPath } = await loadPersistedProjectNodeGraph();
+    const scope = await readScriptProject();
+    await flushProjectNodeGraphBeforeRun({ archiveSession: scope.archive_session });
+    const { workspace, target } = await loadPersistedProjectNodeGraph(scope);
     const { nodeGraphToCode, validateNodeGraph } = await import('@/blockly/generators/index.js');
     const analysis = validateNodeGraph(workspace);
     let artifact = target;
     if (!artifact?.revision) {
       const saved = bridgeResult(await editorApi.scratch.saveBlocklyTarget({
-        ...target, project_path: projectPath, workspace, code: nodeGraphToCode(workspace),
+        ...target, ...scope, workspace, code: nodeGraphToCode(workspace),
         target_type: 'project', script_kind: 'node_graph',
       }));
       if (saved.status !== 'saved') throw new Error(saved.message || '项目节点图保存失败');
@@ -431,7 +402,7 @@ export async function togglePersistedProjectNodeGraphRuntime() {
     backgroundRequestId = crypto.randomUUID();
     const response = bridgeResult(await startScriptFile({
       requestId: backgroundRequestId, path: artifact.code_path, revision: artifact.revision,
-      project_path: projectPath, target_type: 'project', scene_name: '', actor_name: '',
+      ...scope, target_type: 'project', scene_name: '', actor_name: '',
     }));
     if ((response?.status === 'error' && !response.runId) || response?.success === false) {
       throw new Error(response?.message || '后端拒绝执行节点图');
@@ -523,7 +494,7 @@ export function registerProjectNodeGraphRuntimeHandler({ toggle, getState }) {
 
     let result;
     try {
-      await toggle();
+      await toggle(payload.archive_session);
       result = {
         requestId: id,
         targetId: GLOBAL_NODE_TARGET_ID,
@@ -574,11 +545,12 @@ export function registerProjectNodeGraphRuntimeHandler({ toggle, getState }) {
  * Requests are repeated until the heavy detached node page finishes mounting, then
  * stop as soon as that page accepts ownership of the command.
  */
-export function requestProjectNodeGraphToggle({
+export async function requestProjectNodeGraphToggle({
   ownerTimeoutMs = 15000,
   resultTimeoutMs = 30000,
   retryIntervalMs = 250,
 } = {}) {
+  const scope = await readScriptProject();
   const id = `node_graph_runtime_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
   return new Promise((resolve, reject) => {
     let settled = false;
@@ -611,7 +583,7 @@ export function requestProjectNodeGraphToggle({
     };
     const sendRequest = () => {
       broadcastRuntimeEvent(RUNTIME_TOGGLE_REQUEST_EVENT, {
-        requestId: id,
+        requestId: id, archive_session: scope.archive_session,
         targetId: GLOBAL_NODE_TARGET_ID,
       });
     };

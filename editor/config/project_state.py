@@ -34,21 +34,7 @@ class CoronaSettings:
             self.config_path = config_path
 
         self.config = configparser.ConfigParser(strict=False)
-        self._active_project_path = None
-        self._automatic_hydration_attempted = False
-        self.active_project_config = None
         self._ensure_file_exists()
-
-    @property
-    def active_project_path(self):
-        if not self._active_project_path and not self._automatic_hydration_attempted:
-            self._automatic_hydration_attempted = True
-            self._hydrate_active_project_from_last_project()
-        return self._active_project_path
-
-    @active_project_path.setter
-    def active_project_path(self, value):
-        self._active_project_path = value
 
     @staticmethod
     def _project_config_path(project_path):
@@ -82,36 +68,6 @@ class CoronaSettings:
             self.config.read(self.config_path, encoding="utf-8-sig")
         except Exception as exc:
             logger.error("Failed to load config: %s", exc)
-
-    def _hydrate_active_project_from_last_project(self):
-        try:
-            self.load()
-            project_path = self.config.get("General", "last_project", fallback="") or ""
-            if not project_path:
-                return False
-            project_path = os.path.abspath(project_path)
-            ini_path = self._project_config_path(project_path)
-            if not os.path.isdir(project_path) or not ini_path:
-                return False
-
-            proj_cfg = configparser.ConfigParser()
-            proj_cfg.read(ini_path, encoding="utf-8")
-            self._active_project_path = project_path
-            self.active_project_config = proj_cfg
-            try:
-                from runtime.project_context import set_active_project_path
-
-                set_active_project_path(project_path)
-            except Exception:
-                logger.debug(
-                    "CoronaEngine active_project_path is not writable; "
-                    "using settings_manager only"
-                )
-            logger.info("Active project hydrated from last_project: %s", project_path)
-            return True
-        except Exception as exc:
-            logger.error("Failed to hydrate active project from last_project: %s", exc)
-            return False
 
     def save(self):
         try:
@@ -228,59 +184,6 @@ class CoronaSettings:
     def set_default_path(self, path: str):
         self.config.set("General", "default_path", path)
         self.save()
-
-    def set_active_project(self, project_path: str):
-        if not os.path.exists(project_path):
-            logger.error("Project path does not exist: %s", project_path)
-            return False
-
-        ini_path = self._project_config_path(project_path)
-        if not ini_path:
-            logger.error("No valid scene.ini found in %s", project_path)
-            return False
-
-        try:
-            proj_cfg = configparser.ConfigParser()
-            proj_cfg.read(ini_path, encoding="utf-8")
-            self._active_project_path = project_path
-            try:
-                from runtime.project_context import set_active_project_path
-
-                set_active_project_path(project_path)
-            except Exception:
-                logger.debug(
-                    "CoronaEngine active_project_path is not writable; "
-                    "using settings_manager only"
-                )
-            self.active_project_config = proj_cfg
-            self.config.set("General", "last_project", project_path)
-            self.add_recent_project(project_path)
-            self.save()
-            logger.info("Active project set to: %s", project_path)
-            return True
-        except Exception as exc:
-            logger.error("Failed to load project config: %s", exc)
-            return False
-
-    def get_active_project_info(self) -> dict:
-        if not self.active_project_config:
-            return {}
-        return {
-            section: dict(self.active_project_config.items(section))
-            for section in self.active_project_config.sections()
-        }
-
-    def save_active_project_info(self) -> bool:
-        if not self.active_project_path:
-            logger.error("未激活任何项目，无法保存配置")
-            return False
-        ini_path = self._project_config_path(self.active_project_path)
-        if not ini_path:
-            logger.error("活动存档配置文件不存在")
-            return False
-        self.config.set("General", "last_project", self.active_project_path)
-        self.save()
-        return True
 
 
 settings_manager = CoronaSettings()

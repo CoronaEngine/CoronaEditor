@@ -7,7 +7,6 @@ from runtime.project_context import (
     _resolve_native_engine,
     get_active_project_path,
     is_native_engine_available,
-    set_active_project_path,
 )
 from runtime.editor_host import (
     emit_editor_event,

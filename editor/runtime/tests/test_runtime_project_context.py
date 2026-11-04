@@ -1,20 +1,14 @@
-import sys
-import types
+from types import SimpleNamespace
+from unittest.mock import Mock
 
+from api import editor_api
 from runtime import project_context
 
 
-def test_native_project_context_is_authoritative_over_legacy_settings(monkeypatch):
-    native_engine = types.SimpleNamespace(active_project_path="C:/native-project")
-    legacy_settings = types.SimpleNamespace(active_project_path="C:/legacy-project")
-    legacy_module = types.ModuleType("config.project_state")
-    legacy_module.settings_manager = legacy_settings
-
-    monkeypatch.setitem(sys.modules, "config.project_state", legacy_module)
-    monkeypatch.setattr(
-        project_context,
-        "_resolve_native_engine",
-        lambda native_engine_arg=None: native_engine,
-    )
-
-    assert project_context.get_active_project_path() == "C:/native-project"
+def test_active_project_is_pulled_on_each_access(monkeypatch):
+    monkeypatch.setattr(project_context, "_resolve_native_engine", lambda: SimpleNamespace(active_project_path="old"))
+    read = Mock(side_effect=[{"archive_session": "A", "project_path": "first"}, {"archive_session": ""}])
+    monkeypatch.setattr(editor_api, "get_script_runtime_editor_api", lambda: SimpleNamespace(scene=SimpleNamespace(read_active=read)))
+    assert project_context.get_active_project_path() == "first"
+    assert project_context.get_active_project_path() == ""
+    assert read.call_count == 2

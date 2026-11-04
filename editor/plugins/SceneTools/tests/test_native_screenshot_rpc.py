@@ -3157,16 +3157,10 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
         self.assertIn('normalized_event in ("mouseup", "pointerup", "up")', body)
         self.assertNotIn('normalized_event in ("click",', body)
 
-    def test_python_settings_hydrates_native_last_project(self):
-        repo_root = pathlib.Path(__file__).resolve().parents[4]
-        settings_source = (
-            repo_root / "editor" / "config" / "project_state.py"
-        ).read_text(encoding="utf-8")
-
-        self.assertIn("def _hydrate_active_project_from_last_project", settings_source)
-        self.assertIn('self.config.get("General", "last_project"', settings_source)
-        self.assertIn("self._active_project_path = project_path", settings_source)
-        self.assertIn("self.active_project_config = proj_cfg", settings_source)
+    def test_launcher_history_is_not_used_as_a_live_scene(self):
+        settings_source = (self._repo_root() / "editor/config/project_state.py").read_text(encoding="utf-8")
+        self.assertNotIn("_hydrate_active_project_from_last_project", settings_source)
+        self.assertNotIn("set_active_project_path", settings_source)
 
     def test_actor_body_type_is_persisted_through_native_and_editor(self):
         hub = (self._engine_root() / "include/corona/shared_data_hub.h").read_text(encoding="utf-8")

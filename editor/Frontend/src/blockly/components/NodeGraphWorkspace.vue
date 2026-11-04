@@ -314,7 +314,7 @@
 <script setup>
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
 import MiniBlocklyWorkspace from '@/blockly/components/MiniBlocklyWorkspace.vue';
-import { startScriptFile } from '@/services/scriptFileService.js';
+import { readScriptProject, startScriptFile } from '@/services/scriptFileService.js';
 import BlocklyToolboxPalette from '@/blockly/components/BlocklyToolboxPalette.vue';
 import { useErrorHandler } from '@/composables/useErrorHandler.js';
 import { editorApi } from '@/api/editorApi.js';
@@ -323,7 +323,7 @@ import { coronaEventBus } from '@/utils/eventBus.js';
 import { nodeGraphToCode, validateNodeGraph } from '@/blockly/generators/index.js';
 import { generatedNodeGraphRevision, registerGeneratedNodeGraphConsumer } from '@/blockly/node-editor/aiNodeGraphService.js';
 import { actorContextNameKey, actorContextRevision, actorRecordsFromSceneTree, normalizeActorContextName } from '@/blockly/utils/actorContext.js';
-import { nextSaveAction, shouldResumeBlockedSave } from '@/blockly/utils/saveRetryPolicy.js';
+import { nextSaveAction } from '@/blockly/utils/saveRetryPolicy.js';
 import { graphRevision as reviewGraphRevision, reviewScopeId, startNodeGraphReview } from '@/services/nodeGraphReviewService.js';
 import { useCabbageAssistantStore } from '@/stores/cabbageAssistantStore.js';
 import {
@@ -522,12 +522,12 @@ let isLoading = false,
   tutorialObservationTimer = null,
   lastTutorialObservationSignature = '',
   loadedProjectPath = '',
+  loadedArchiveSession = '',
   componentMounted = false,
   initialLoadComplete = false,
   graphDirty = false,
   saveInFlight = null,
-  saveQueued = false,
-  saveBlockedProjectPath = '';
+  saveQueued = false;
 const targetEnabledByKey = new Map();
 const nodeRunLifecycle = { active: false, terminalReported: false };
 const sceneActorContext = reactive({
@@ -620,34 +620,6 @@ function resetNodeRunLifecycle() {
 }
 function readActiveProjectPath() {
   return String(window.localStorage?.getItem('corona.activeProjectPath') || '').trim();
-}
-function extractProjectPath(response) {
-  const candidates = [
-    response,
-    response?.data,
-    response?.result,
-    response?.data?.data,
-    response?.result?.data,
-  ];
-  for (const item of candidates) {
-    const value = String(item?.project_path || item?.projectPath || '').trim();
-    if (value) return value;
-  }
-  return '';
-}
-async function refreshActiveProjectPath() {
-  try {
-    const response = await editorApi.projectSettings.getActiveProjectInfo();
-    const projectPath = extractProjectPath(response);
-    if (projectPath) {
-      activeProjectPath.value = projectPath;
-      window.localStorage?.setItem('corona.activeProjectPath', projectPath);
-      return projectPath;
-    }
-  } catch (error) {
-    console.warn('\u8bfb\u53d6\u5f53\u524d\u9879\u76ee\u8def\u5f84\u5931\u8d25\uff0c\u5c06\u4f7f\u7528\u5df2\u6709\u9879\u76ee\u4e0a\u4e0b\u6587:', error);
-  }
-  return activeProjectPath.value || readActiveProjectPath();
 }
 function normalizeProjectPath(value) {
   return String(value || '')
@@ -2331,9 +2303,10 @@ function scheduleSave() {
   graphDirty = true;
   saveLabel.value = '正在保存到当前世界...';
   if (saveTimer) clearTimeout(saveTimer);
+  const target = currentTarget();
   saveTimer = setTimeout(() => {
     saveTimer = null;
-    saveNow();
+    saveNow(target);
   }, SAVE_DELAY);
 }
 
@@ -2348,6 +2321,7 @@ function currentTarget(projectPathOverride = '') {
     targetType: normalizedTargetType.value,
     sceneName: isProjectTarget.value ? '' : props.sceneName || '',
     actorName: isProjectTarget.value ? '' : props.actorName || '',
+    archiveSession: loadedArchiveSession,
     projectPath: projectPathOverride || loadedProjectPath || activeProjectPath.value || readActiveProjectPath(),
   };
 }
@@ -2368,16 +2342,17 @@ async function selectRunTarget(event) {
 }
 async function saveNow(targetOverride = null, { force = false } = {}) {
   if (isLoading || (!initialLoadComplete && !force)) return false;
+  const target = { ...currentTarget(), ...(targetOverride || {}) };
+  if (!target.archiveSession || target.archiveSession !== loadedArchiveSession) return false;
   if (!graphDirty && !force) return true;
   if (saveInFlight) {
     saveQueued = true;
     const currentSaveSucceeded = await saveInFlight;
     if (!currentSaveSucceeded) return false;
-    if (force || graphDirty) return saveNow(targetOverride, { force });
+    if (force || graphDirty) return saveNow(target, { force });
     return true;
   }
 
-  const target = { ...currentTarget(), ...(targetOverride || {}) };
   const expectedProjectPath = normalizeProjectPath(target.projectPath);
   const currentProjectPath = normalizeProjectPath(activeProjectPath.value || readActiveProjectPath());
   if (expectedProjectPath && currentProjectPath && expectedProjectPath !== currentProjectPath) {
@@ -2403,7 +2378,9 @@ async function saveNow(targetOverride = null, { force = false } = {}) {
     validationErrors.push(String(error?.message || error));
   }
   try {
-    window.localStorage?.setItem(storageKeyForTarget(target), snapshotFingerprint);
+    window.localStorage?.setItem(storageKeyForTarget(target), JSON.stringify({
+      archive_session: target.archiveSession, workspace: snapshot,
+    }));
   } catch (error) {
     logError('保存本地节点图失败', error);
   }
@@ -2415,7 +2392,7 @@ async function saveNow(targetOverride = null, { force = false } = {}) {
         scene_name: isProject ? '' : target.sceneName || '',
         actor_name: isProject ? '' : target.actorName || '',
         script_kind: 'node_graph',
-        project_path: target.projectPath || '',
+        project_path: target.projectPath, archive_session: target.archiveSession,
         workspace: snapshot,
         code,
         enabled: targetEnabledByKey.get(storageKeyForTarget(target)) ?? true,
@@ -2423,18 +2400,16 @@ async function saveNow(targetOverride = null, { force = false } = {}) {
         validation_errors: validationErrors,
       }));
       if (response?.status === 'error') {
-        if (response.code === 'NO_ACTIVE_PROJECT' || response.code === 'PROJECT_CONTEXT_CHANGED') {
-          saveBlockedProjectPath = String(response.project_path || target.projectPath || '').trim();
-        }
         throw new Error(response.message || '保存节点图失败');
       }
+      if (target.archiveSession !== loadedArchiveSession) return false;
       graphDirty = JSON.stringify(graphSnapshot()) !== snapshotFingerprint;
-      saveBlockedProjectPath = '';
       saveLabel.value = runnable
         ? `已实时保存到当前世界 ${new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}`
         : `已实时保存（不可运行：${validationErrors[0]}）`;
       return response;
     } catch (error) {
+      if (target.archiveSession !== loadedArchiveSession) return false;
       graphDirty = true;
       logError('保存项目节点图失败', error);
       saveLabel.value = '项目保存失败（本地副本已保留）';
@@ -2450,6 +2425,7 @@ async function saveNow(targetOverride = null, { force = false } = {}) {
     saveInFlight = null;
     const action = nextSaveAction({
       succeeded: saveSucceeded,
+      session: target.archiveSession, currentSession: loadedArchiveSession,
       saveQueued,
       graphDirty,
     });
@@ -2457,7 +2433,7 @@ async function saveNow(targetOverride = null, { force = false } = {}) {
     if (action === 'resave' && componentMounted && initialLoadComplete && !saveTimer) {
       saveTimer = setTimeout(() => {
         saveTimer = null;
-        saveNow();
+        saveNow(target);
       }, SAVE_DELAY);
     }
   }
@@ -2465,6 +2441,7 @@ async function saveNow(targetOverride = null, { force = false } = {}) {
 
 async function loadGraphForCurrentTarget() {
   const loadSequence = ++graphLoadSequence;
+  loadedArchiveSession = '';
   resetZoom();
   initialLoadComplete = false;
   if (!targetReady.value) {
@@ -2479,69 +2456,38 @@ async function loadGraphForCurrentTarget() {
   let shouldMigrateLocal = false;
   let loadCancelled = false;
   try {
-    await refreshActiveProjectPath();
+    const scope = await readScriptProject();
     if (!componentMounted || loadSequence !== graphLoadSequence) return;
-    let requestProjectPath = activeProjectPath.value || readActiveProjectPath();
-    let target = null;
-    let response = null;
-
-    for (let attempt = 0; attempt < 2; attempt += 1) {
-      target = currentTarget(requestProjectPath);
-      const isProject = (target.targetType === 'model' ? 'actor' : target.targetType || 'actor') === 'project';
-      response = bridgeResult(await editorApi.scratch.loadBlocklyTarget({
-        target_type: target.targetType === 'model' ? 'actor' : target.targetType || 'actor',
-        scene_name: isProject ? '' : target.sceneName || '',
-        actor_name: isProject ? '' : target.actorName || '',
-        script_kind: 'node_graph',
-        project_path: requestProjectPath,
-      }));
-      if (!componentMounted || loadSequence !== graphLoadSequence) return;
-
-      if (response?.status === 'error' && response?.code === 'PROJECT_CONTEXT_CHANGED' && attempt === 0) {
-        const backendProjectPath = String(response.project_path || '').trim();
-        if (backendProjectPath) {
-          requestProjectPath = backendProjectPath;
-          activeProjectPath.value = backendProjectPath;
-          window.localStorage?.setItem('corona.activeProjectPath', backendProjectPath);
-          continue;
-        }
-      }
-      break;
-    }
-
-    const responseProjectPath = String(response?.project_path || requestProjectPath || '').trim();
-    const currentProjectPath = activeProjectPath.value || readActiveProjectPath();
-    if (normalizeProjectPath(responseProjectPath) !== normalizeProjectPath(currentProjectPath)) return;
-
-    activeProjectPath.value = responseProjectPath;
-    loadedProjectPath = responseProjectPath;
-    window.localStorage?.setItem('corona.activeProjectPath', responseProjectPath);
-    target.projectPath = responseProjectPath;
-
-    if (response?.status === 'error') throw new Error(response.message || '\u8282\u70b9\u56fe\u52a0\u8f7d\u5931\u8d25');
+    const target = currentTarget(scope.project_path);
+    target.archiveSession = scope.archive_session;
+    const isProject = target.targetType === 'project';
+    const response = bridgeResult(await editorApi.scratch.loadBlocklyTarget({
+      ...scope, target_type: target.targetType, script_kind: 'node_graph',
+      scene_name: isProject ? '' : target.sceneName || '', actor_name: isProject ? '' : target.actorName || '',
+    }));
+    if (!componentMounted || loadSequence !== graphLoadSequence) return;
+    if (response?.status === 'error') throw new Error(response.message || '节点图加载失败');
+    loadedArchiveSession = scope.archive_session;
+    loadedProjectPath = activeProjectPath.value = scope.project_path;
+    window.localStorage?.setItem('corona.activeProjectPath', scope.project_path);
     if (response?.status === 'loaded') {
       targetEnabledByKey.set(storageKeyForTarget(target), response.target?.enabled !== false);
       shouldMigrateLocal = applyGraph(normalizeGraph(response.workspace || {}));
       saveLabel.value = '\u9879\u76ee\u8282\u70b9\u56fe\u5df2\u52a0\u8f7d';
     } else {
       targetEnabledByKey.set(storageKeyForTarget(target), true);
-      const raw = window.localStorage?.getItem(storageKeyForTarget(target));
-      const portsRedistributed = applyGraph(normalizeGraph(raw ? JSON.parse(raw) : {}));
-      shouldMigrateLocal = Boolean(raw) || portsRedistributed;
-      saveLabel.value = raw ? '\u5df2\u52a0\u8f7d\u5f53\u524d\u9879\u76ee\u7684\u672c\u5730\u8282\u70b9\u56fe\uff0c\u6b63\u5728\u8fc1\u79fb...' : '\u65b0\u8282\u70b9\u56fe';
+      let draft = JSON.parse(window.localStorage?.getItem(storageKeyForTarget(target)) || 'null');
+      // Older editors stored the workspace directly. New drafts belong to one opening.
+      if (draft?.archive_session) draft = draft.archive_session === scope.archive_session ? draft.workspace : null;
+      const portsRedistributed = applyGraph(normalizeGraph(draft || {}));
+      shouldMigrateLocal = Boolean(draft) || portsRedistributed;
+      saveLabel.value = draft ? '已加载当前项目的本地节点图，正在迁移...' : '新节点图';
     }
   } catch (error) {
     logError('\u52a0\u8f7d\u9879\u76ee\u8282\u70b9\u56fe\u5931\u8d25', error);
-    try {
-      const target = currentTarget(activeProjectPath.value || readActiveProjectPath());
-      const raw = window.localStorage?.getItem(storageKeyForTarget(target));
-      const portsRedistributed = applyGraph(normalizeGraph(raw ? JSON.parse(raw) : {}));
-      shouldMigrateLocal = Boolean(raw) || portsRedistributed;
-      saveLabel.value = raw ? '\u9879\u76ee\u52a0\u8f7d\u5931\u8d25\uff0c\u5df2\u4f7f\u7528\u5f53\u524d\u9879\u76ee\u672c\u5730\u526f\u672c' : '\u8282\u70b9\u56fe\u52a0\u8f7d\u5931\u8d25';
-    } catch (_) {
-      applyGraph(normalizeGraph({}));
-      saveLabel.value = '\u8282\u70b9\u56fe\u52a0\u8f7d\u5931\u8d25';
-    }
+    if (!componentMounted || loadSequence !== graphLoadSequence) return;
+    applyGraph(normalizeGraph({}));
+    saveLabel.value = '项目节点图加载失败';
   } finally {
     loadCancelled = !componentMounted || loadSequence !== graphLoadSequence;
     if (!loadCancelled) {
@@ -2935,7 +2881,7 @@ async function handleToggleRun() {
       return;
     }
     const saved = await saveNow(runTarget, { force: true });
-    if (panelClosing || !componentMounted || storageKeyForTarget(currentTarget()) !== storageKeyForTarget(runTarget)) return;
+    if (panelClosing || !componentMounted || loadedArchiveSession !== runTarget.archiveSession || storageKeyForTarget(currentTarget()) !== storageKeyForTarget(runTarget)) return;
     if (!saved?.target?.runnable || !saved.target.revision) {
       throw new Error(saved?.target?.validation_errors?.[0] || '未能保存可运行的脚本');
     }
@@ -2945,12 +2891,12 @@ async function handleToggleRun() {
     const response = bridgeResult(
       await startScriptFile({
         requestId,
-        project_path: saved.project_path, path: saved.target.code_path, revision: saved.target.revision,
+        archive_session: runTarget.archiveSession, project_path: saved.project_path, path: saved.target.code_path, revision: saved.target.revision,
         target_type: saved.target.target_type, scene_name: saved.target.scene_name, actor_name: saved.target.actor_name,
       })
     );
     pendingFileRequest = '';
-    if (panelClosing || !componentMounted || storageKeyForTarget(currentTarget()) !== storageKeyForTarget(runTarget)) {
+    if (panelClosing || !componentMounted || loadedArchiveSession !== runTarget.archiveSession || storageKeyForTarget(currentTarget()) !== storageKeyForTarget(runTarget)) {
       if (response.runId) await editorApi.scripts.stop(response.runId);
       setNodeGraphInputLocked(false);
       return;
@@ -3133,6 +3079,9 @@ function onNodeGraphActorChanged(payload, maybeSceneId) {
   scheduleSceneActorOptionsRefresh(80);
 }
 function onNodeGraphSceneTreeChanged(payload) {
+  if (loadedArchiveSession && payload?.archive_session && payload.archive_session !== loadedArchiveSession) {
+    void loadGraphForCurrentTarget();
+  }
   const changedScene = typeof payload === 'string'
     ? payload
     : payload?.scene ?? payload?.sceneName ?? '';
@@ -3150,14 +3099,6 @@ async function onActiveProjectChanged(event) {
   const nextProjectPath = String(event?.detail?.projectPath || readActiveProjectPath()).trim();
   if (!nextProjectPath) return;
   if (normalizeProjectPath(nextProjectPath) === normalizeProjectPath(activeProjectPath.value)) {
-    if (shouldResumeBlockedSave({
-      dirty: graphDirty,
-      blockedProjectPath: saveBlockedProjectPath,
-      eventProjectPath: nextProjectPath,
-    })) {
-      saveBlockedProjectPath = '';
-      await saveNow(null, { force: true });
-    }
     return;
   }
   if (saveTimer) {
@@ -3211,6 +3152,7 @@ watch(
     }
 
     const oldTarget = {
+      archiveSession: loadedArchiveSession, projectPath: loadedProjectPath,
       targetType: oldTargetType,
       sceneName: old?.[0] || '',
       actorName: old?.[1] || '',
@@ -3229,15 +3171,20 @@ watch(
     if (componentMounted) await loadGraphForCurrentTarget();
   }
 );
+function flushSessionGraph(session) {
+  if (!session || session !== loadedArchiveSession) return false;
+  return saveNow();
+}
+
 function registerNodeGraphFlusher() {
   const flushers = window.__coronaNodeGraphFlushers instanceof Set
     ? window.__coronaNodeGraphFlushers
     : new Set();
   window.__coronaNodeGraphFlushers = flushers;
-  flushers.add(saveNow);
-  window.__coronaNodeGraphFlushSave = async () => {
+  flushers.add(flushSessionGraph);
+  window.__coronaNodeGraphFlushSave = async session => {
     const results = await Promise.all(
-      Array.from(window.__coronaNodeGraphFlushers || []).map((flush) => Promise.resolve().then(() => flush()))
+      Array.from(window.__coronaNodeGraphFlushers || []).map((flush) => Promise.resolve().then(() => flush(session)))
     );
     if (results.some((result) => result === false)) {
       throw new Error('\u8282\u70b9\u56fe\u4fdd\u5b58\u5931\u8d25\uff0c\u5df2\u53d6\u6d88\u5168\u5c40\u8fd0\u884c');
@@ -3246,7 +3193,7 @@ function registerNodeGraphFlusher() {
   };
 }
 function unregisterNodeGraphFlusher() {
-  window.__coronaNodeGraphFlushers?.delete?.(saveNow);
+  window.__coronaNodeGraphFlushers?.delete?.(flushSessionGraph);
   if (!window.__coronaNodeGraphFlushers?.size) {
     delete window.__coronaNodeGraphFlushSave;
     delete window.__coronaNodeGraphFlushers;
@@ -3346,9 +3293,12 @@ onMounted(async () => {
   window.addEventListener('keydown', handleFullscreenKey);
   registerNodeGraphFlusher();
   if (isProjectTarget.value) {
-    unregisterProjectNodeGraphSaveHandler = registerProjectNodeGraphSaveHandler(saveNow);
+    unregisterProjectNodeGraphSaveHandler = registerProjectNodeGraphSaveHandler(flushSessionGraph);
     unregisterProjectNodeGraphRuntimeHandler = registerProjectNodeGraphRuntimeHandler({
-      toggle: handleToggleRun,
+      toggle: session => {
+        if (!session || session !== loadedArchiveSession) throw new Error('项目会话已切换');
+        return handleToggleRun();
+      },
       getState: currentProjectNodeGraphRuntimeState,
     });
     syncProjectNodeGraphRuntimeState();

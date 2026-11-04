@@ -16,7 +16,7 @@ from api.editor_api import (
     get_scene_tools_adapter,
     get_script_runtime_editor_api,
     get_script_runtime_adapter,
-    set_active_project_path,
+    get_active_project_path,
     get_viewport_adapter,
 )
 
@@ -152,13 +152,9 @@ class EditorAggregateApiTest(unittest.TestCase):
         self.assertIsNone(get_scene_adapter(object()))
         return
 
-    def test_active_project_context_sync_is_hidden_behind_runtime_adapter(self):
-        class NativeEngine:
-            active_project_path = ""
-
-        engine = NativeEngine()
-        self.assertTrue(set_active_project_path("D:/Projects/Example", engine))
-        self.assertEqual(engine.active_project_path, "D:/Projects/Example")
+    def test_api_reads_the_runtime_project_context(self):
+        with patch("runtime.project_context.read_project_session", return_value={"project_path": "D:/Projects/Example"}):
+            self.assertEqual(get_active_project_path(), "D:/Projects/Example")
 
     def test_script_runtime_adapter_limits_native_capabilities_to_runtime_methods(self):
         class NativeEngine:

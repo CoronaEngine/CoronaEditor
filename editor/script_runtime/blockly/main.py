@@ -12,9 +12,8 @@ import uuid
 from typing import Any, Optional
 
 from runtime.editor_host import set_editor_camera_input_enabled
-from runtime.project_context import get_active_project_path
+from runtime.project_context import read_project_session
 from runtime.scene_support import cancel_pending_auto_saves
-from config.project_state import settings_manager
 
 logger = logging.getLogger(__name__)
 
@@ -85,87 +84,30 @@ class ScratchTool:
     # ------------------------------------------------------------------
     # Project Blockly persistence
     # ------------------------------------------------------------------
-    @classmethod
-    def _active_project_path(cls) -> Path:
-        # The native project launcher updates CoronaEditor.ini immediately, but
-        # this long-lived Python settings singleton can still point at the
-        # project that was active when the editor process started. Refresh the
-        # launcher setting before every Blockly load/save/run operation.
-        try:
-            settings_manager.load()
-            latest_project = settings_manager.config.get(
-                "General", "last_project", fallback=""
-            ).strip()
-            if latest_project:
-                latest_path = Path(latest_project).resolve()
-                current = settings_manager.active_project_path
-                current_path = Path(current).resolve() if current else None
-                if (
-                    settings_manager._project_config_path(str(latest_path))
-                    and current_path != latest_path
-                ):
-                    settings_manager.set_active_project(str(latest_path))
-        except Exception:
-            logger.exception(
-                "[ScratchTool] failed to refresh active project "
-                "from launcher settings"
-            )
-
-        project_path = settings_manager.active_project_path
-        if not project_path:
-            project_path = get_active_project_path()
-        if not project_path:
-            raise RuntimeError("No project is open; Blockly cannot be saved or run")
-        return Path(project_path)
+    @staticmethod
+    def _request_project_context(data: dict) -> tuple[Optional[Path], Optional[dict]]:
+        state = read_project_session()
+        if not state.get("archive_session") or not state.get("project_path"):
+            return None, {"status": "error", "code": "NO_ACTIVE_PROJECT", "message": "No project is open"}
+        root = Path(state["project_path"]).resolve()
+        if (data.get("archive_session") != state["archive_session"]
+                or not data.get("project_path") or Path(data["project_path"]).resolve() != root):
+            return None, {"status": "error", "code": "PROJECT_CONTEXT_CHANGED",
+                          "message": "Project session changed; request was ignored"}
+        if state.get("read_only"):
+            return None, {"status": "error", "code": "READ_ONLY_PROJECT", "message": "Project is read-only"}
+        return root, None
 
     @staticmethod
-    def _project_identity(path: Path | str) -> str:
-        """Return a stable, case-insensitive identity for a Windows project path."""
-        return os.path.normcase(str(Path(path).expanduser().resolve()))
+    def _blockly_dir(project_path: Path) -> Path:
+        return project_path / "Scripts" / "blockly"
 
     @classmethod
-    def _request_project_context(cls, data: dict) -> tuple[Optional[Path], Optional[dict]]:
-        """Pin one request to the active project and reject stale frontend requests."""
-        expected_raw = str(data.get("project_path") or "").strip()
-        expected_path = Path(expected_raw).expanduser().resolve() if expected_raw else None
-
-        active_raw = settings_manager.active_project_path
-        if not active_raw:
-            active_raw = get_active_project_path()
-
-        if not active_raw:
-            if expected_path is not None and settings_manager.set_active_project(str(expected_path)):
-                return expected_path, None
-            return None, {
-                "status": "error",
-                "code": "NO_ACTIVE_PROJECT",
-                "message": "no active project is available for this Blockly request",
-                "project_path": str(expected_path) if expected_path is not None else "",
-            }
-
-        project_path = Path(active_raw).expanduser().resolve()
-        if expected_raw:
-            if cls._project_identity(expected_path) != cls._project_identity(project_path):
-                return project_path, {
-                    "status": "error",
-                    "code": "PROJECT_CONTEXT_CHANGED",
-                    "message": "active project changed; stale Blockly request was ignored",
-                    "project_path": str(project_path),
-                }
-        return project_path, None
-
-    @classmethod
-    def _blockly_dir(cls, project_path: Optional[Path] = None) -> Path:
-        directory = (project_path or cls._active_project_path()) / "Scripts" / "blockly"
-        directory.mkdir(parents=True, exist_ok=True)
-        return directory
-
-    @classmethod
-    def _manifest_path(cls, project_path: Optional[Path] = None) -> Path:
+    def _manifest_path(cls, project_path: Path) -> Path:
         return cls._blockly_dir(project_path) / "manifest.json"
 
     @classmethod
-    def _load_manifest(cls, project_path: Optional[Path] = None) -> dict:
+    def _load_manifest(cls, project_path: Path) -> dict:
         path = cls._manifest_path(project_path)
         if not path.exists():
             return {"targets": []}
@@ -218,7 +160,7 @@ class ScratchTool:
         )
 
     @classmethod
-    def _write_manifest(cls, manifest: dict, project_path: Optional[Path] = None) -> None:
+    def _write_manifest(cls, manifest: dict, project_path: Path) -> None:
         cls._atomic_write_json(cls._manifest_path(project_path), manifest)
 
     @staticmethod
@@ -481,15 +423,17 @@ class ScratchTool:
         request_id = request.get("requestId")
         if not isinstance(request_id, str) or not 0 < len(request_id) <= 128:
             return {"status": "error", "message": "A script requestId is required"}
+        root, error = cls._request_project_context(request)
+        if error:
+            return error
         identity = tuple(request.get(key) for key in (
-            "project_path", "path", "revision", "target_type", "scene_name", "actor_name"))
+            "archive_session", "project_path", "path", "revision", "target_type", "scene_name", "actor_name"))
         if request_id in cls._file_requests:
             previous, run_id = cls._file_requests[request_id]
             if run_id and previous != identity:
                 return {"status": "error", "code": "REQUEST_CONFLICT", "message": "Script requestId was reused"}
             return cls.get_file_run(request)
         try:
-            root = Path(request["project_path"]).resolve(strict=True)
             path = (root / request["path"]).resolve(strict=True)
             if not path.is_relative_to(root) or path.suffix != ".py":
                 raise ValueError("Script must be a .py file in the active project")

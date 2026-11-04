@@ -1,9 +1,27 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { startScriptFile } from '../../src/services/scriptFileService.js';
+import { editorApi } from '../../src/api/editorApi.js';
+import { readScriptProject, startScriptFile } from '../../src/services/scriptFileService.js';
 
-const request = { requestId: 'panel-click-1' };
+const request = { requestId: 'panel-click-1', archive_session: 'first-A', project_path: '/A' };
 const timeout = () => Object.assign(new Error('lost acknowledgement'), { code: 504 });
+
+test('a retry after reopening the same project keeps the session captured at the click', async t => {
+  let session = 'first-A';
+  t.mock.method(editorApi.scene, 'readActive', async () => ({ data: { project_path: '/A', archive_session: session } }));
+  const start = { requestId: 'delayed', ...await readScriptProject() };
+  let attempts = 0;
+  await assert.rejects(startScriptFile(start, {
+    getRun: async () => ({ data: { status: 'unknown' } }),
+    runFile: async payload => {
+      assert.equal(payload.archive_session, 'first-A');
+      if (++attempts === 1) { session = 'second-A'; throw timeout(); }
+      throw new Error('PROJECT_CONTEXT_CHANGED');
+    },
+  }), /PROJECT_CONTEXT_CHANGED/);
+  assert.equal(attempts, 2);
+  assert.equal((await readScriptProject()).archive_session, 'second-A');
+});
 
 test('a lost acknowledgement recovers the existing Python run', async () => {
   let starts = 0;

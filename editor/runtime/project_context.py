@@ -1,10 +1,4 @@
-"""Canonical runtime access to the active project context.
-
-Project metadata and editor preferences remain owned by ``config.project_state``.
-This module resolves the current project path and synchronizes the embedded
-native host. The native host path is authoritative; persisted project state is
-used when no native context is available.
-"""
+"""Read the active project from the current engine scene."""
 
 from __future__ import annotations
 
@@ -22,23 +16,17 @@ def _resolve_native_engine(native_engine=None):
     return CoronaEngine
 
 
-def get_active_project_path(native_engine=None) -> str:
-    """Return the active project path without exposing a native engine object."""
-    engine = _resolve_native_engine(native_engine)
-    native_path = str(getattr(engine, "active_project_path", "") or "")
-    if native_path:
-        return native_path
+def read_project_session() -> dict:
+    """Read the current session without creating a scene or hydrating launcher history."""
+    if _resolve_native_engine() is None:
+        return {}
+    from api.editor_api import get_script_runtime_editor_api
 
-    try:
-        from config.project_state import settings_manager
+    return get_script_runtime_editor_api().scene.read_active()
 
-        project_path = getattr(settings_manager, "active_project_path", None)
-        if project_path:
-            return str(project_path)
-    except Exception:
-        pass
 
-    return ""
+def get_active_project_path() -> str:
+    return str(read_project_session().get("project_path") or "")
 
 
 def is_native_engine_available(native_engine=None) -> bool:
@@ -57,15 +45,3 @@ def get_project_root(*, fallback_to_environment=True) -> Path:
         if configured:
             return Path(configured).expanduser()
     return Path.cwd()
-
-
-def set_active_project_path(project_path, native_engine=None):
-    """Synchronize the active path with the embedded native host."""
-    engine = _resolve_native_engine(native_engine)
-    if engine is None:
-        return False
-    try:
-        setattr(engine, "active_project_path", str(project_path or ""))
-    except Exception:
-        return False
-    return True

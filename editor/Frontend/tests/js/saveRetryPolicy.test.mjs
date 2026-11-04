@@ -7,33 +7,17 @@ const policyUrl = new URL('../../src/blockly/utils/saveRetryPolicy.js', import.m
 test('failed save remains dirty without scheduling an automatic retry', async () => {
   assert.equal(existsSync(policyUrl), true, 'save retry policy module must exist');
   const { nextSaveAction } = await import(policyUrl);
-  assert.equal(nextSaveAction({ succeeded: false, saveQueued: true, graphDirty: true }), 'idle');
+  assert.equal(nextSaveAction({ session: 'A1', currentSession: 'A1', succeeded: false, saveQueued: true, graphDirty: true }), 'idle');
 });
 
 test('successful save drains edits queued while the request was in flight', async () => {
   assert.equal(existsSync(policyUrl), true, 'save retry policy module must exist');
   const { nextSaveAction } = await import(policyUrl);
-  assert.equal(nextSaveAction({ succeeded: true, saveQueued: true, graphDirty: true }), 'resave');
-  assert.equal(nextSaveAction({ succeeded: true, saveQueued: false, graphDirty: false }), 'idle');
+  assert.equal(nextSaveAction({ session: 'A1', currentSession: 'A1', succeeded: true, saveQueued: true, graphDirty: true }), 'resave');
+  assert.equal(nextSaveAction({ session: 'A1', currentSession: 'A1', succeeded: true, saveQueued: false, graphDirty: false }), 'idle');
 });
 
-test('project context event resumes one blocked dirty save for the same project', async () => {
-  assert.equal(existsSync(policyUrl), true, 'save retry policy module must exist');
-  const { shouldResumeBlockedSave } = await import(policyUrl);
-  assert.equal(
-    shouldResumeBlockedSave({
-      dirty: true,
-      blockedProjectPath: 'D:\\Projects\\World',
-      eventProjectPath: 'd:/projects/world/',
-    }),
-    true
-  );
-  assert.equal(
-    shouldResumeBlockedSave({
-      dirty: true,
-      blockedProjectPath: 'D:/Projects/Old',
-      eventProjectPath: 'D:/Projects/New',
-    }),
-    false
-  );
+test('reopening the same directory cannot retry edits from the previous session', async () => {
+  const { nextSaveAction } = await import(policyUrl);
+  assert.equal(nextSaveAction({ session: 'A1', currentSession: 'A2', succeeded: true, saveQueued: true }), 'idle');
 });

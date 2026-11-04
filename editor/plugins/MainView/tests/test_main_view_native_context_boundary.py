@@ -1,33 +1,21 @@
 from pathlib import Path
 
 
-REPO_ROOT = Path(__file__).resolve().parents[3]
-MAIN_VIEW = REPO_ROOT / "plugins" / "MainView" / "main.py"
-HANDLERS = (
-    REPO_ROOT
-    / ".."
-    / "src"
-    / "systems"
-    / "ui"
-    / "cef"
-    / "cef_editor_native_api_handlers.cpp"
-).resolve()
+HANDLERS = Path(__file__).resolve().parents[5] / "src/systems/ui/cef/cef_editor_native_api_handlers.cpp"
 
 
-def test_native_scene_reload_persists_active_scene_index():
+def test_native_scene_reload_uses_current_project_and_does_not_write_an_index():
     source = HANDLERS.read_text(encoding="utf-8")
-    start = source.index("void register_scene_tools_api_handlers")
-    section = source[start:source.index("void register_network_api_handlers", start)]
-    reload_start = section.index('{"reload_scene"')
-    reload_source = section[reload_start:section.index('{"rebind_actor_resource"', reload_start)]
-    assert "build_native_project_scene_index" in reload_source
-    assert "persist_native_project_scene_index" in reload_source
+    start = source.index('{"reload_scene"')
+    reload_source = source[start:source.index('{"rebind_actor_resource"', start)]
+    assert "reload_native_editor_scene(path_to_utf8(current->project_root), current->route)" in reload_source
+    assert "persist_native_project_scene_index" not in reload_source
 
 
-def test_native_main_init_updates_python_project_context_for_direct_launches():
+def test_direct_launch_materializes_a_scene_for_readers():
     source = HANDLERS.read_text(encoding="utf-8")
-    start = source.index('void register_main_view_api_handlers')
-    section = source[start:source.index('void register_project_settings_api_handlers', start)]
-    init_start = section.index('{"on_init"')
-    init_source = section[init_start:section.index('{"create_scene"', init_start)]
-    assert "enqueue_python_project_context_changed" in init_source
+    start = source.index('{"on_init"', source.index('void register_main_view_api_handlers'))
+    init_source = source[start:source.index('{"scene_save"', start)]
+    assert "reload_native_editor_scene" in init_source
+    assert "make_native_main_init_payload" in init_source
+    assert "enqueue_python_project_context_changed" not in init_source
