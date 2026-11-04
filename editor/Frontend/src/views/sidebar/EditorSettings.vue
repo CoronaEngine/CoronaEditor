@@ -108,6 +108,7 @@
           <h3>{{ t('editorSettings.ai.title') }}</h3>
         </div>
 
+        <p class="setting-description">{{ t('editorSettings.ai.sessionHint') }}</p>
         <label class="field">
           <span>{{ t('editorSettings.ai.keyLabel') }}</span>
           <input
@@ -132,7 +133,7 @@
           :disabled="aiKeyBusy || !aiKeyEditing || !aiKeyInput.trim()"
           @click="saveAiKey"
         >
-          {{ aiKeyBusy ? t('common.saving') : t('common.save') }}
+          {{ aiKeyBusy ? t('editorSettings.ai.configuring') : t('common.apply') }}
         </button>
 
         <p v-if="aiKeyMessage" class="status-line" :class="aiKeyMessageType" role="status">
@@ -169,6 +170,7 @@ import { useI18n } from 'vue-i18n';
 import { setLocale } from '@/i18n/index.js';
 import { appService } from '@/services/appService.js';
 import { editorApi } from '@/api/editorApi.js';
+import { aiSettings } from '@/services/aiSessionService.js';
 import { coronaEventBus } from '@/utils/eventBus.js';
 
 const { t, locale } = useI18n();
@@ -352,9 +354,7 @@ function normalizeAiKeyStatus(payload) {
 
 async function loadAiKeyStatus() {
   try {
-    const response = await editorApi.ai.submitRequest({
-      operation: 'ai.settings.get',
-    });
+    const response = await aiSettings.get();
     const data = response?.data ?? response;
     aiKeyStatus.value = normalizeAiKeyStatus(data);
     if (!aiKeyEditing.value) {
@@ -388,10 +388,7 @@ async function saveAiKey() {
   aiKeyBusy.value = true;
   aiKeyMessage.value = '';
   try {
-    const response = await editorApi.ai.submitRequest({
-      operation: 'ai.settings.set',
-      payload: { api_key: key },
-    });
+    const response = await aiSettings.saveApiKey(key);
     const data = response?.data ?? response;
     aiKeyStatus.value = normalizeAiKeyStatus(data);
     aiKeyEditing.value = false;

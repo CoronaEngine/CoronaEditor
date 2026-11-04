@@ -1,6 +1,8 @@
 import { worldModeState, editorUiAllowed } from './worldModeService.js';
 import { trackWorldSessionWork } from './worldSessionLifecycle.js';
 import { aiService } from '@/services/aiService.js';
+import { editorApi } from '../api/editorApi.js';
+import { AI_SETTINGS_CHANGED } from './aiSessionService.js';
 import { createServiceResponseError } from '@/utils/serviceInitialization.js';
 
 const CHANNEL_NAME = 'corona-cabbage-assistant-context-v2';
@@ -504,3 +506,17 @@ export const cabbageContextService = {
   subscribePreWarnings: subscribeCabbagePreWarnings,
   flush,
 };
+
+// Configuring a session key after entering a world retries an earlier unconfigured plan.
+window.addEventListener(AI_SETTINGS_CHANGED,()=>{
+  if(!editorUiAllowed())return;
+  const query=new URLSearchParams((window.location?.hash||'').split('?')[1]||'');
+  if(query.get('standalone')==='1')return;
+  const revision=worldModeState.revision;
+  void editorApi.projectSettings.getActiveProjectInfo().then(response=>{
+    if(revision!==worldModeState.revision||!editorUiAllowed())return;
+    const info=response?.data??response;
+    const prompt=String(info?.world_prompt||info?.prompt||'').trim();
+    if(prompt)return initializeWorldTasks({prompt,mode:info.mode||'creative',waitForCompletion:false});
+  }).catch(error=>console.warn('[CabbageContext] session planning retry failed',error?.message||error));
+});

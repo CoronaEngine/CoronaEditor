@@ -113,6 +113,7 @@ export default {
     },
   },
   editorSettings: {
+    ai:{configuring:'Configuring...',title:'AI Settings',keyLabel:'DeepSeek API Key',placeholder:'Enter the API key for this session',saved:'API key configured for this session',loadFailed:'Unable to read AI settings',saveFailed:'Unable to configure the API key',sessionHint:'The key is kept in memory for this session. Enter it again after restarting the editor.'},
     applyPhysics: 'Apply Physics',
     common: 'Common',
     confirmHome: 'Return to home?',

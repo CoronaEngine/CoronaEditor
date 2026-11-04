@@ -113,6 +113,7 @@ export default {
     },
   },
   editorSettings: {
+    ai:{configuring:'配置中...',title:'AI 设置',keyLabel:'DeepSeek API Key',placeholder:'输入本次启动使用的 API Key',saved:'本次启动的 API Key 已配置',loadFailed:'读取 AI 配置失败',saveFailed:'配置 API Key 失败',sessionHint:'密钥只保存在本次启动的内存中，重启编辑器后需要重新输入。'},
     applyPhysics: '应用物理参数',
     common: '常用',
     confirmHome: '确定回到主页？',

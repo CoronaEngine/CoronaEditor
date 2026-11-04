@@ -16,7 +16,7 @@ def test_runtime_has_a_local_boundary_inventory():
 def test_runtime_registry_remains_the_plugin_lifecycle_owner():
     source = (RUNTIME_ROOT / "registry.py").read_text(encoding="utf-8")
     assert "PYTHON_SCRIPT_SERVICES" in source
-    assert '"plugins.AITool.main"' in source
+    assert '"plugins.AITool.main"' not in source
     assert "register" in source
 
 

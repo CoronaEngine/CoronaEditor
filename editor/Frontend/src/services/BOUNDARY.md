@@ -1,14 +1,14 @@
 # Frontend Services 边界
 
 `src/services` 是前端 active domain facade 和 UI 编排目录，不是 C++ manifest/schema owner，
-也不直接持有 Scene/Actor、AI runtime、API key 或 raw CEF transport。公共契约唯一来源仍是
+也不直接持有 Scene/Actor 或 raw CEF transport。原生公共契约唯一来源仍是
 `src/api/editorApi.js`。已迁移的 service 由本目录直接承载，外部旧宿主 alias 不再受支持。
 
 ## 分类
 
 ### Manifest facade
 
-这些 active 文件提供窗口、LANChat、网络、AI、资源和项目生命周期编排；新页面应优先直接
+这些 active 文件提供窗口、LANChat、网络、资源和项目生命周期编排；新页面应优先直接
 使用对应的 `editorApi` namespace：
 
 `lanChatService.js`、`networkService.js`、`aiService.js`、
@@ -46,11 +46,7 @@
 
 ### Cabbage UI 状态
 
-`aiService.js` 只通过 `ai.submitRequest` 调用节点检查、聊天、节点生成、Cabbage 上下文、
-目标规划和画像评分。`cabbageChatRequest.js` 在普通聊天发送时取最近 24 条消息、前 20 个任务和前 80 个场景对象，
-用同一份快照组装最终模型消息和展示步骤。聊天使用原有 start/status/cancel 操作，Python 校验并发送模型消息，
-仅在成功完成时发布随请求传入的引导。此模块的替换需通过模型消息、引导与取消行为的等价测试。旧通用聊天、提示及读文件
-接口已从 Vue、Python 和原生 manifest 同步移除。LANChat 房间及原生网络同步接口独立保留。
+aiService.js 保持聊天、审查、节点生成、目标规划和评分的页面接口；模型请求进入纯 Web 会话。cabbageChatRequest.js 在发送时取最近 24 条消息、前 20 个任务和前 80 个对象，用同一份快照组装最终消息与展示步骤。引导只在成功完成时发布，替换必须通过消息、引导与取消的等价测试。LANChat 和原生网络同步独立保留。
 
 `cabbageAssistantContextService.js`、`cabbageGuidanceService.js`、
 `cabbageTutorialSessionService.js` 负责面板上下文、引导和教程会话；它们不定义 AI 密钥、
@@ -70,4 +66,8 @@ Agent runtime、Scene/Actor 权威状态或公共引擎 API。
 测试；删除节点图或 Cabbage service 前必须先迁移所有组件调用方和持久化/事件回归。任何
 删除都不能改变 `editorApi` manifest contract。
 
-AI 业务 owner：aiService.js 保持页面接口；aiModelService.js 经 editorApi 的 model.start/status/cancel 调用 Python 传输。aiWorkflows.js 管理 Web 任务、世界归属、取消和持久化；aiGraphDomain.js、aiGraphRequirements.js 负责审查与生成校验；aiPlanningDomain.js 负责计划与评分；cabbageDomain.js、aiPolicy.json 负责教程、任务和问题记忆。聊天策略归 cabbageChatRequest.js、cabbageChatPolicy.json。积木合同唯一来源是 aiBlockContract.xml，Python 仅在开发期检查目录一致性。助手文档通过原生 projectSettings.readProjectDocument/commitProjectDocument 原子比较版本保存。删除条件：Web 领域回归、模型取消、跨世界隔离和合同检查全部通过。
+AI 业务 owner：aiService.js 保持页面调用接口；aiWorkflows.js 管理业务任务、世界归属与结果校验；aiGraphDomain.js、aiGraphRequirements.js、aiPlanningDomain.js、cabbageDomain.js 拥有业务规则。策略与合同归 aiPolicy.json、aiPrompts.json、cabbageChatPolicy.json 和 aiBlockContract.xml。
+
+aiModelService.js 调用纯 Web 会话；aiProviderRuntime.js 负责 fetch、SSE、配置快照、队列与取消；aiSessionService.js 在主文档持有请求和内存密钥，独立面板通过 BroadcastChannel 共享。本次启动内可跨面板接续请求，重启不恢复密钥或网络任务。设置页只回显掩码。
+
+助手文档内容沿用通用原生 projectSettings.readProjectDocument/commitProjectDocument 保存。AI 不经过 Python，也不定义原生 AI manifest。删除条件：HTTP 参数、流式分片、取消、配置快照、跨面板共享和无 Python AI 依赖回归全部通过。

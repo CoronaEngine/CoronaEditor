@@ -1,6 +1,7 @@
 import { createApp } from 'vue';
 import { createPinia } from 'pinia';
 import App from './App.vue';
+import { initializeAiSession } from './services/aiSessionService.js';
 import Router from './router/index.js';
 import { i18n, setupLocaleSync } from './i18n/index.js';
 import { setupDomTranslation } from './i18n/domTranslator.js';
@@ -11,6 +12,8 @@ import './style.css';
 // editor window -- including each detached `?standalone=1` panel, none of which shows a
 // Blockly workspace at boot. The node graph loads and registers its own blocks.
 // `tests/python/test_frontend_panel_lazy_loading.py` pins this.
+
+initializeAiSession();
 
 const app = createApp(App);
 app.use(createPinia());

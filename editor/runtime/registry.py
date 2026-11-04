@@ -15,7 +15,6 @@ logger = logging.getLogger(__name__)
 
 PYTHON_SCRIPT_SERVICES = {
     "ProjectArchive": ("plugins.ProjectArchive.main", "ProjectArchive"),
-    "AITool": ("plugins.AITool.main", "AITool"),
     "ScratchTool": (f"{_BLOCKLY_PACKAGE}.blockly.main", "ScratchTool"),
     "MainView": ("plugins.MainView.main", "MainView"),
     "ProjectLauncher": ("plugins.ProjectLauncher.main", "ProjectLauncher"),
@@ -28,10 +27,9 @@ CORE_PYTHON_SCRIPT_SERVICES = set()
 # Normal editor startup inventory.
 ACTIVE_PYTHON_SCRIPT_SERVICES = (
     "ProjectArchive",
-    "AITool",
     "ScratchTool",
 )
-LAZY_PYTHON_SCRIPT_SERVICES = {"AITool", "ProjectArchive"}
+LAZY_PYTHON_SCRIPT_SERVICES = {"ProjectArchive"}
 _managed_services = []
 _registered_service_names = set()
 _registry_shutdown_requested = threading.Event()

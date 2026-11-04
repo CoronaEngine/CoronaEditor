@@ -21,11 +21,13 @@ def test_web_catalog_matches_the_canonical_xml():
         assert spec["capabilities"] == block.attrib.get("capabilities", "").split()
 
 
-def test_runtime_no_longer_owns_ai_business_policy_or_project_files():
-    root = EDITOR / "plugins/AITool"
-    assert not (root / "cabbage_chat_policy.json").exists()
-    assert not (EDITOR / "script_runtime/blockly/CoronaBlocksDocument.internal-ai-contract.xml").exists()
-    for file in (root / "services").glob("*.py"):
-        source = file.read_text(encoding="utf-8")
-        for retired in ("worldGoal", "taskHistory", "issueMemory", "completionSignal", "workspace", "CabbageAssistant"):
-            assert retired not in source, (file, retired)
+def test_ai_is_web_owned_without_native_or_python_ai_routes():
+    assert not (EDITOR / "plugins/AITool/main.py").exists()
+    registry = (EDITOR / "runtime/registry.py").read_text(encoding="utf-8")
+    assert "AITool" not in registry
+    transport = (WEB / "aiModelService.js").read_text(encoding="utf-8")
+    assert "editorApi" not in transport
+    assert "initializeAiSession" in transport
+    source = (EDITOR / "Frontend/src/views/sidebar/EditorSettings.vue").read_text(encoding="utf-8")
+    assert "aiSettings.saveApiKey" in source
+    assert "ai.settings." not in source

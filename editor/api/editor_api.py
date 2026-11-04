@@ -470,10 +470,6 @@ class _EventsApi(_DynamicApiNamespace):
         super().__init__("events")
 
     @staticmethod
-    def on_ai_chunk(callback):
-        return _register_manifest_editor_api_event_callback("events.on_ai_chunk", callback)
-
-    @staticmethod
     def on_actor_changed(callback):
         return _register_manifest_editor_api_event_callback("events.on_actor_changed", callback)
 

@@ -1,17 +1,10 @@
-import { editorApi } from '../api/editorApi.js';
-
-async function call(operation, fields) {
-  const response = await editorApi.ai.submitRequest({ operation, ...fields });
-  const result = response?.data ?? response;
-  if (result?.success !== true)
-    throw new Error(result?.message || result?.error || 'AI request failed');
-  return result;
-}
+import { initializeAiSession } from './aiSessionService.js';
 
 export const modelService = {
-  start: (payload) => call('model.start', { payload }),
-  status: (taskId) => call('model.status', { taskId }),
-  cancel: (taskId) => call('model.cancel', { taskId }),
+  sessionId: async () => (await initializeAiSession().invoke('session.get')).sessionId,
+  start: (payload) => initializeAiSession().invoke('model.start', payload),
+  status: (taskId) => initializeAiSession().invoke('model.status', taskId),
+  cancel: (taskId) => initializeAiSession().invoke('model.cancel', taskId),
 };
 
 export function parseModelJson(text) {

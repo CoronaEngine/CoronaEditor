@@ -43,7 +43,7 @@ class PythonScriptServiceRegistryTests(unittest.TestCase):
 
         self.assertEqual(
             registry.ACTIVE_PYTHON_SCRIPT_SERVICES,
-            ("ProjectArchive", "AITool", "ScratchTool"),
+            ("ProjectArchive", "ScratchTool"),
         )
         self.assertFalse(hasattr(registry, "LEGACY_PYTHON_SCRIPT_SERVICES"))
 
@@ -99,9 +99,9 @@ class PythonScriptServiceRegistryTests(unittest.TestCase):
         registry = self._load_registry()
         registry.PYTHON_SCRIPT_SERVICES = {
             "ProjectArchive": ("services.archive", "ProjectArchive"),
-            "AITool": ("services.ai", "AITool"),
+            "ExampleService": ("services.example", "ExampleService"),
         }
-        registry.LAZY_PYTHON_SCRIPT_SERVICES = {"AITool"}
+        registry.LAZY_PYTHON_SCRIPT_SERVICES = {"ExampleService"}
         imported = []
         initialized = []
         registered_pages = {}
@@ -117,8 +117,8 @@ class PythonScriptServiceRegistryTests(unittest.TestCase):
             import_started.set()
             self.assertTrue(allow_import.wait(2.0))
             return SimpleNamespace(
-                AITool=ai_service,
-                initialize_script_service=lambda: initialized.append("AITool"),
+                ExampleService=ai_service,
+                initialize_script_service=lambda: initialized.append("ExampleService"),
             )
 
         registry.CoronaEditor.register_page = (
@@ -133,25 +133,25 @@ class PythonScriptServiceRegistryTests(unittest.TestCase):
             self.assertTrue(import_started.wait(1.0))
             self.assertEqual(initialized, [])
             self.assertEqual(
-                registered_pages["AITool"].submit_request("hello"),
+                registered_pages["ExampleService"].submit_request("hello"),
                 {
                     "success": False,
                     "status": "initializing",
-                    "message": "AITool is initializing",
+                    "message": "ExampleService is initializing",
                 },
             )
             allow_import.set()
             self.assertTrue(
-                registered_pages["AITool"].wait_for_initialization(2.0),
+                registered_pages["ExampleService"].wait_for_initialization(2.0),
             )
-            self.assertEqual(initialized, ["AITool"])
+            self.assertEqual(initialized, ["ExampleService"])
             self.assertEqual(
-                registered_pages["AITool"].submit_request("hello"),
+                registered_pages["ExampleService"].submit_request("hello"),
                 {"ok": "hello"},
             )
 
-        self.assertEqual(registered, ["ProjectArchive", "AITool"])
-        self.assertEqual(imported, ["services.archive", "services.ai"])
+        self.assertEqual(registered, ["ProjectArchive", "ExampleService"])
+        self.assertEqual(imported, ["services.archive", "services.example"])
 
     def test_lazy_service_can_publish_target_before_background_initializer_finishes(self):
         registry = self._load_registry()
@@ -168,11 +168,11 @@ class PythonScriptServiceRegistryTests(unittest.TestCase):
             return True
 
         module = SimpleNamespace(
-            AITool=target,
+            ExampleService=target,
             INITIALIZE_AFTER_PUBLISH=True,
             initialize_script_service=initialize_script_service,
         )
-        service = registry.LazyPythonScriptService("AITool", "services.ai", "AITool")
+        service = registry.LazyPythonScriptService("ExampleService", "services.example", "ExampleService")
         with patch.object(registry, "import_module", return_value=module):
             service.start_background_load()
             self.assertTrue(initializer_started.wait(1.0))
@@ -187,28 +187,28 @@ class PythonScriptServiceRegistryTests(unittest.TestCase):
     def test_repeated_service_registration_is_idempotent(self):
         registry = self._load_registry()
         registry.PYTHON_SCRIPT_SERVICES = {
-            "AITool": ("services.ai", "AITool"),
+            "ExampleService": ("services.example", "ExampleService"),
         }
-        registry.LAZY_PYTHON_SCRIPT_SERVICES = {"AITool"}
+        registry.LAZY_PYTHON_SCRIPT_SERVICES = {"ExampleService"}
         registered_pages = []
         target = SimpleNamespace(submit_request=lambda payload: {"ok": payload})
         registry.CoronaEditor.register_page = (
             lambda service_name, service: registered_pages.append((service_name, service))
         )
 
-        with patch.object(registry, "import_module", return_value=SimpleNamespace(AITool=target)):
-            self.assertEqual(registry.register_python_script_services(), ["AITool"])
+        with patch.object(registry, "import_module", return_value=SimpleNamespace(ExampleService=target)):
+            self.assertEqual(registry.register_python_script_services(), ["ExampleService"])
             self.assertEqual(registry.register_python_script_services(), [])
 
-        self.assertEqual([name for name, _service in registered_pages], ["AITool"])
+        self.assertEqual([name for name, _service in registered_pages], ["ExampleService"])
 
     def test_active_registration_does_not_start_legacy_scene_tools_service(self):
         registry = self._load_registry()
         registry.PYTHON_SCRIPT_SERVICES = {
             "SceneTools": ("plugins.SceneTools.main", "SceneTools"),
-            "AITool": ("services.ai", "AITool"),
+            "ExampleService": ("services.example", "ExampleService"),
         }
-        registry.ACTIVE_PYTHON_SCRIPT_SERVICES = ("AITool",)
+        registry.ACTIVE_PYTHON_SCRIPT_SERVICES = ("ExampleService",)
         registered_pages = []
 
         registry.CoronaEditor.register_page = (
@@ -220,31 +220,19 @@ class PythonScriptServiceRegistryTests(unittest.TestCase):
             "import_module",
             side_effect=lambda module_path: SimpleNamespace(
                 SceneTools=object() if module_path == "plugins.SceneTools.main" else None,
-                AITool=object(),
+                ExampleService=object(),
             ),
         ) as import_service:
             registered = registry.register_active_python_script_services()
 
-        self.assertEqual(registered, ["AITool"])
-        self.assertEqual(registered_pages, ["AITool"])
-        import_service.assert_called_once_with("services.ai")
+        self.assertEqual(registered, ["ExampleService"])
+        self.assertEqual(registered_pages, ["ExampleService"])
+        import_service.assert_called_once_with("services.example")
 
-    def test_aitool_uses_post_publish_initialization_without_import_time_worker_start(self):
-        source_path = Path(__file__).resolve().parents[2] / "plugins" / "AITool" / "main.py"
-        source = source_path.read_text(encoding="utf-8")
-        tree = ast.parse(source)
-
-        post_publish = [
-            node
-            for node in tree.body
-            if isinstance(node, ast.Assign)
-            and any(isinstance(target, ast.Name) and target.id == "INITIALIZE_AFTER_PUBLISH" for target in node.targets)
-        ]
-        self.assertTrue(post_publish, "AITool must publish its lightweight target before initialization")
-        self.assertTrue(
-            any(isinstance(node.value, ast.Constant) and node.value.value is True for node in post_publish),
-        )
-        self.assertNotIn("AITool._lanchat_agent_worker.start()", source)
+    def test_ai_is_not_registered_as_a_python_service(self):
+        registry = self._load_registry()
+        self.assertNotIn("AITool", registry.PYTHON_SCRIPT_SERVICES)
+        self.assertNotIn("AITool", registry.ACTIVE_PYTHON_SCRIPT_SERVICES)
 
     def test_lazy_service_failure_is_degraded_and_does_not_retry(self):
         registry = self._load_registry()
@@ -255,9 +243,9 @@ class PythonScriptServiceRegistryTests(unittest.TestCase):
             raise RuntimeError("missing AI dependency")
 
         service = registry.LazyPythonScriptService(
-            "AITool",
-            "services.ai",
-            "AITool",
+            "ExampleService",
+            "services.example",
+            "ExampleService",
         )
         with self.assertLogs(registry.logger, level="ERROR") as logs:
             with patch.object(registry, "import_module", side_effect=import_service):
@@ -265,14 +253,14 @@ class PythonScriptServiceRegistryTests(unittest.TestCase):
                 self.assertTrue(service.wait_for_initialization(2.0))
                 service.start_background_load()
 
-        self.assertEqual(imported, ["services.ai"])
+        self.assertEqual(imported, ["services.example"])
         self.assertIn("missing AI dependency", "\n".join(logs.output))
         self.assertEqual(
             service.submit_request("hello"),
             {
                 "success": False,
                 "status": "degraded",
-                "message": "AITool initialization failed: missing AI dependency",
+                "message": "ExampleService initialization failed: missing AI dependency",
             },
         )
 
@@ -286,9 +274,9 @@ class PythonScriptServiceRegistryTests(unittest.TestCase):
         def import_service(_module_path):
             import_started.set()
             self.assertTrue(allow_import.wait(2.0))
-            return SimpleNamespace(AITool=target)
+            return SimpleNamespace(ExampleService=target)
 
-        service = registry.LazyPythonScriptService("AITool", "services.ai", "AITool")
+        service = registry.LazyPythonScriptService("ExampleService", "services.example", "ExampleService")
         with patch.object(registry, "import_module", side_effect=import_service):
             service.start_background_load()
             self.assertTrue(import_started.wait(1.0))
@@ -314,10 +302,10 @@ class PythonScriptServiceRegistryTests(unittest.TestCase):
             stop_token.wait(2.0)
 
         module = SimpleNamespace(
-            AITool=target,
+            ExampleService=target,
             initialize_script_service=initialize_script_service,
         )
-        service = registry.LazyPythonScriptService("AITool", "services.ai", "AITool")
+        service = registry.LazyPythonScriptService("ExampleService", "services.example", "ExampleService")
         with patch.object(registry, "import_module", return_value=module):
             service.start_background_load()
             self.assertTrue(initializer_started.wait(1.0))
@@ -337,7 +325,7 @@ class PythonScriptServiceRegistryTests(unittest.TestCase):
             while True:
                 value += 1
 
-        service = registry.LazyPythonScriptService("AITool", "services.ai", "AITool")
+        service = registry.LazyPythonScriptService("ExampleService", "services.example", "ExampleService")
         with patch.object(registry, "import_module", side_effect=import_service):
             service.start_background_load()
             self.assertTrue(import_started.wait(1.0))

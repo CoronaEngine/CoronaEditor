@@ -30,6 +30,23 @@ const { validateGeneratedGraph, validateSemantics, generationRequirements, filte
   await import('../../src/services/aiGraphDomain.js');
 const { buildCabbageChatRequest } = await import('../../src/services/cabbageChatRequest.js');
 const { editorApi } = await import('../../src/api/editorApi.js');
+const { modelService } = await import('../../src/services/aiModelService.js');
+function mockTransport(handler) {
+  modelService.sessionId = async () => 'fixture-launch';
+  for (const [name, operation] of [
+    ['start', 'model.start'],
+    ['status', 'model.status'],
+    ['cancel', 'model.cancel'],
+  ]) {
+    modelService[name] = async (value) => {
+      const response = await handler(
+        name === 'start' ? { operation, payload: value } : { operation, taskId: value }
+      );
+      return response?.data ?? response;
+    };
+  }
+}
+
 const { aiWorkflows } = await import('../../src/services/aiWorkflows.js');
 const { worldModeState } = await import('../../src/services/worldModeService.js');
 
@@ -140,14 +157,14 @@ test('same basename in another project rejects writes and cancelled jobs ignore 
     /世界已切换/
   );
   let resolve;
-  editorApi.ai.submitRequest = async (request) => {
+  mockTransport(async (request) => {
     if (request.operation === 'model.start') return { data: { success: true, taskId: 'late' } };
     if (request.operation === 'model.cancel')
       return { data: { success: true, status: 'cancelled' } };
     return new Promise((r) => {
       resolve = r;
     });
-  };
+  });
   const job = aiWorkflows.startReview({
     workspace: { nodes: [], edges: [] },
     projectContext: {},
@@ -355,7 +372,7 @@ async function finished(job) {
   }
   assert.fail('Web workflow did not complete');
 }
-test('a reloaded Web document resumes a persisted model task without another model call', async () => {
+test('another panel resumes an active task in the same launch without another model call', async () => {
   const context = normalizeContext(null, 'E:/World/FixtureWorld');
   context.worldGoal = {
     prompt: '世界目标',
@@ -363,18 +380,19 @@ test('a reloaded Web document resumes a persisted model task without another mod
     source: 'ai',
     status: 'generating',
     generationId: 'persisted-goal',
+    transportSessionId: 'fixture-launch',
     modelTaskId: 'provider-task',
     startedAt: Date.now(),
   };
   const saved = documentFixture(context);
-  editorApi.ai.submitRequest = async (request) => {
+  mockTransport(async (request) => {
     assert.notEqual(
       request.operation,
       'model.start',
       'resume must reuse the existing transport task'
     );
     return { data: { success: true, status: 'completed', content: JSON.stringify(samplePlan()) } };
-  };
+  });
   const job = await aiWorkflows.startGoal({ prompt: '世界目标', mode: 'creative' });
   const result = await finished(job);
   assert.equal(result.success, true, result.message);
@@ -391,7 +409,7 @@ test('concurrent score requests share a Web job and commit a smoothed result onc
   context.metrics.nodeEdits = 2;
   const saved = documentFixture(context);
   let starts = 0;
-  editorApi.ai.submitRequest = async (request) => {
+  mockTransport(async (request) => {
     if (request.operation === 'model.start') {
       starts++;
       return { data: { success: true, taskId: 'score-model' } };
@@ -403,7 +421,7 @@ test('concurrent score requests share a Web job and commit a smoothed result onc
         content: '{"score":90,"reasonCodes":["stable_runs"]}',
       },
     };
-  };
+  });
   const [first, second] = await Promise.all([
     aiWorkflows.startScore({ force: true }),
     aiWorkflows.startScore({ force: true }),
@@ -419,13 +437,13 @@ test('concurrent score requests share a Web job and commit a smoothed result onc
 test('chat facade passes final messages unchanged and retains completed guidance across polls', async () => {
   const { aiService } = await import('../../src/services/aiService.js');
   const record = fixture('aiChatMigration.json').find((r) => r.guidance.needsShowcase);
-  editorApi.ai.submitRequest = async (request) => {
+  mockTransport(async (request) => {
     if (request.operation === 'model.start') {
       assert.deepEqual(request.payload.messages, record.messages);
       return { data: { success: true, taskId: 'chat-model', status: 'accepted' } };
     }
     return { data: { success: true, status: 'completed', content: 'answer' } };
-  };
+  });
   const started = await aiService.startCabbageChat(record.input);
   assert.equal(started.requestId, record.input.requestId);
   for (let i = 0; i < 2; i++) {
@@ -440,7 +458,7 @@ test('chat facade passes final messages unchanged and retains completed guidance
 test('review results are cached in Web by revision and scene context', async () => {
   const { reviewGraph } = await import('../../src/services/aiGraphDomain.js');
   let starts = 0;
-  editorApi.ai.submitRequest = async (request) => {
+  mockTransport(async (request) => {
     if (request.operation === 'model.start') {
       starts++;
       return { data: { success: true, taskId: 'review-cache' } };
@@ -452,7 +470,7 @@ test('review results are cached in Web by revision and scene context', async () 
         content: '{"hasProblems":false,"issues":[],"summary":""}',
       },
     };
-  };
+  });
   const payload = {
     graphRevision: 'cache-rev',
     projectScopeId: 'cache-world',
@@ -503,4 +521,33 @@ test('generation request assembly keeps scene semantics and trims rendering payl
     () => normalizeGenerationRequest({ ...payload, baseGraphRevision: '' }),
     /baseGraphRevision/
   );
+});
+
+test('a pending plan from another editor launch is regenerated instead of polling an old request', async () => {
+  const context = normalizeContext(null, 'E:/World/FixtureWorld');
+  context.worldGoal = {
+    prompt: '上次启动的目标',
+    mode: 'creative',
+    source: 'ai',
+    status: 'generating',
+    generationId: 'previous-plan',
+    modelTaskId: 'previous-model',
+    transportSessionId: 'previous-launch',
+    startedAt: Date.now(),
+  };
+  const saved = documentFixture(context);
+  let calls = 0;
+  mockTransport(async (request) => {
+    if (request.operation === 'model.start') {
+      calls++;
+      return { data: { success: true, taskId: 'current-launch-model' } };
+    }
+    assert.notEqual(request.taskId, 'previous-model');
+    return { data: { success: true, status: 'completed', content: JSON.stringify(samplePlan()) } };
+  });
+  const job = await aiWorkflows.startGoal({ prompt: '上次启动的目标', mode: 'creative' });
+  const result = await finished(job);
+  assert.equal(result.success, true, result.message);
+  assert.equal(calls, 1);
+  assert.equal(saved().worldGoal.transportSessionId, 'fixture-launch');
 });

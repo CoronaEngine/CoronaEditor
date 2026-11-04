@@ -491,7 +491,6 @@ const editorApiStatic = {
     unregisterCallback: (callbackToken) => unregister_callback(callbackToken),
   },
   events: {
-    onAiChunk: (callback) => register_manifest_editor_api_callback('events.onAiChunk', callback),
     onActorChanged: (callback) => register_manifest_editor_api_callback('events.onActorChanged', callback),
     onActorSelectionChanged: (callback) => register_manifest_editor_api_callback('events.onActorSelectionChanged', callback),
     onActorTransformUpdated: (callback) => register_manifest_editor_api_callback('events.onActorTransformUpdated', callback),
@@ -514,9 +513,6 @@ const editorApiStatic = {
   },
   app: {
     closeProcess: () => call_manifest_editor_api('app.closeProcess', []),
-  },
-  ai: {
-    submitRequest: (payload) => call_manifest_editor_api('ai.submitRequest', [payload || {}]),
   },
   files: {
     getProjectInfo: () => call_manifest_editor_api('files.getProjectInfo', []),

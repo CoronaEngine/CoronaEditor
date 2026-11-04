@@ -1,6 +1,6 @@
 import { watch } from 'vue';
 import { editorApi } from '../api/editorApi.js';
-import { completeModel, waitForModel, parseModelJson } from './aiModelService.js';
+import { modelService, completeModel, waitForModel, parseModelJson } from './aiModelService.js';
 import {
   activeProjectPath,
   roundScore,
@@ -139,6 +139,7 @@ async function startGoal(payload = {}) {
       context.goalTaskPlan = { ...policy.defaultContext.goalTaskPlan };
       return { status: 'completed' };
     });
+  const transportSessionId=await modelService.sessionId();
   let generationId = crypto.randomUUID();
   const claim = await contextTransaction(path, (context) => {
     const goal = context.worldGoal;
@@ -152,7 +153,7 @@ async function startGoal(payload = {}) {
     if (
       goal.prompt === prompt &&
       goal.mode === mode &&
-      goal.status === 'generating' &&
+      goal.status === 'generating' && goal.transportSessionId===transportSessionId &&
       Date.now() - Number(goal.startedAt || 0) < 70000
     )
       return { status: 'pending', taskId: goal.generationId };
@@ -163,6 +164,7 @@ async function startGoal(payload = {}) {
       status: 'generating',
       generationId,
       startedAt: Date.now(),
+      transportSessionId,
     };
     return { status: 'pending', taskId: generationId, claimed: true };
   });

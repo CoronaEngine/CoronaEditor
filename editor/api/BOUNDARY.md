@@ -7,5 +7,5 @@
 `network` 和 `lan_chat` 等聚合 namespace，并规范化 LANChat 的 value object。
 
 不负责定义第二份 schema、实现 Actor/Scene/Camera/Geometry 底层操作，或管理 host 生命周期。
-Vue、AITool 和普通 Python 不得绕过该入口取得底层 binding。旧外部 import 兼容已放弃，
+Vue 和普通 Python 不得绕过该入口取得底层 binding。旧外部 import 兼容已放弃，
 所有调用方必须使用 manifest contract。

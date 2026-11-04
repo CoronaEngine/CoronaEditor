@@ -5,7 +5,6 @@ EDITOR_ROOT = Path(__file__).resolve().parents[1]
 PLUGINS_ROOT = EDITOR_ROOT / "plugins"
 
 PLUGIN_DIRECTORIES = (
-    "AITool",
     "FileManager",
     "MainView",
     "ProjectArchive",
@@ -39,7 +38,7 @@ def test_plugins_keep_registration_and_ownership_in_the_runtime_layer():
     assert "runtime/registry.py" in boundary
     assert "PYTHON_SCRIPT_SERVICES" in registry
     assert '"SceneTools": ("plugins.SceneTools.main", "SceneTools")' in registry
-    assert "plugins.AITool.main" in registry
+    assert "plugins.AITool.main" not in registry
 
 
 def test_legacy_service_implementations_live_under_compat_owners():
@@ -86,7 +85,7 @@ def test_legacy_service_implementations_live_under_compat_owners():
 
 
 def test_active_plugins_have_local_boundary_documents():
-    for directory in ("AITool", "FileManager", "ProjectLauncher", "ProjectSettings"):
+    for directory in ("FileManager", "ProjectLauncher", "ProjectSettings"):
         boundary = PLUGINS_ROOT / directory / "BOUNDARY.md"
         assert boundary.is_file(), directory
         source = boundary.read_text(encoding="utf-8")
