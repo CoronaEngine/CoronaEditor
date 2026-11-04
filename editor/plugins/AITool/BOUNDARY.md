@@ -8,6 +8,7 @@
 | 路径 | canonical owner | 负责内容 | 不负责 |
 |---|---|---|---|
 | `configuration/` | AITool configuration owner | `.env`、API key 和本地配置读取 | 不保存密钥到源码、日志或 Vue bundle |
+| `deepseek_client.py` | DeepSeek HTTP 客户端 | 构造 HTTP 请求、读取 JSON 响应和 SSE 文本 | 业务提示词、任务状态和取消策略由调用服务负责 |
 | `services/` | AITool service owner | 节点检查、聊天、生成和 Cabbage 上下文四个服务 | 不直接操作 `Actor`/`Scene`，不定义公共 manifest |
 | `compat/`、`utils/` | removed compatibility code | 目录和旧导入入口已删除；配置统一由 `configuration/` 负责 | 不得重新创建旧入口 |
 
@@ -32,7 +33,7 @@
 
 Agent Runtime、Agent Collaboration、LANChat AI 编排及旧聊天/媒体链已经退役，其专属
 测试随功能移除。Actor 物理契约与原生同步测试必须保留；禁止恢复旧工具注册入口。
-Quasar 子模块、配置桥接和专属依赖已移除；当前服务直接使用标准库调用 DeepSeek 官方 API。
+Quasar 子模块、配置桥接和专属依赖已移除。四个服务通过共享客户端使用标准库调用 DeepSeek 官方 API。
 项目上下文、用户密钥和媒体数据不属于源码清理范围。
 
 ## DeepSeek 配置
@@ -40,7 +41,7 @@ Quasar 子模块、配置桥接和专属依赖已移除；当前服务直接使�
 `configuration/deepseek_settings.py` 是模型配置 owner。未提供覆盖时，模型保持
 `deepseek-v4-flash`；审查/评分使用 0.1/1200，聊天使用 0.25/1400，目标规划使用
 0.25/3600，节点生成使用 0.05/12000（temperature/max_tokens）。默认关闭 thinking。
-现有 HTTP 请求、提示词、超时和业务校验由四个服务保留。
+四个服务保留各自的提示词、超时、请求参数、错误处理和业务校验。
 
 可选的 `editor/deepseek_settings.json` 仅存放非密钥参数，启动时读取一次。例如迁移原
 provider.model 和 node_graph 设置时，使用：

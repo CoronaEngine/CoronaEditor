@@ -11,6 +11,7 @@ import urllib.request
 import uuid
 from typing import Any
 
+from .. import deepseek_client
 from .node_graph_review_service import NodeGraphReviewService
 
 logger = logging.getLogger(__name__)
@@ -499,44 +500,9 @@ class NodeGraphReviewChatService:
 
     @classmethod
     def _build_http_request(cls, request: dict[str, Any], settings: Any, *, stream: bool) -> urllib.request.Request:
-        base = settings.base_url.rstrip("/")
-        endpoint = base if base.endswith("/chat/completions") else base + "/chat/completions"
-        body = {
-            "model": settings.model,
-            "temperature": 0.25,
-            "max_tokens": 1400,
-            "thinking": {"type": "disabled"},
-            "stream": stream,
-            "messages": cls._build_messages(request),
-        }
-        return urllib.request.Request(
-            endpoint,
-            data=json.dumps(body, ensure_ascii=False).encode("utf-8"),
-            headers={
-                "Authorization": "Bearer " + settings.api_key,
-                "Content-Type": "application/json",
-                "Accept": "text/event-stream" if stream else "application/json",
-            },
-            method="POST",
+        return deepseek_client.build_request(
+            settings, cls._build_messages(request), temperature=0.25, max_tokens=1400, stream=stream,
         )
-
-    @staticmethod
-    def _extract_message(data: Any) -> str:
-        choices = data.get("choices") if isinstance(data, dict) else None
-        first = choices[0] if isinstance(choices, list) and choices and isinstance(choices[0], dict) else {}
-        message = first.get("message") if isinstance(first.get("message"), dict) else {}
-        content = message.get("content")
-        return content.strip() if isinstance(content, str) else ""
-
-    @staticmethod
-    def _extract_delta(data: Any) -> str:
-        choices = data.get("choices") if isinstance(data, dict) else None
-        first = choices[0] if isinstance(choices, list) and choices and isinstance(choices[0], dict) else {}
-        delta = first.get("delta") if isinstance(first.get("delta"), dict) else {}
-        content = delta.get("content")
-        if isinstance(content, str):
-            return content
-        return NodeGraphReviewChatService._extract_message(data)
 
     def _append_content(self, task_id: str, text: str) -> None:
         if not text:
@@ -559,39 +525,24 @@ class NodeGraphReviewChatService:
             state["updatedAt"] = time.time()
 
     def _run_stream(self, task_id: str, request: dict[str, Any], settings: Any) -> None:
+        def stop_if_cancelled() -> bool:
+            with self._lock:
+                state = self._tasks.get(task_id)
+                cancelled = not state or state["cancel"].is_set()
+            if cancelled:
+                self._finish_task(task_id, "cancelled", message="已停止等待本次回答。")
+            return cancelled
+
         try:
             http_request = self._build_http_request(request, settings, stream=True)
-            with urllib.request.urlopen(http_request, timeout=self.TIMEOUT_SECONDS) as response:
-                content_type = str(response.headers.get("Content-Type") or "").lower()
-                if "text/event-stream" not in content_type:
-                    data = json.loads(response.read().decode("utf-8"))
-                    content = self._extract_message(data)
-                    if not content:
-                        raise ValueError("DeepSeek 返回了空内容")
-                    self._append_content(task_id, content)
-                else:
-                    for raw_line in response:
-                        with self._lock:
-                            state = self._tasks.get(task_id)
-                            cancelled = not state or state["cancel"].is_set()
-                        if cancelled:
-                            self._finish_task(task_id, "cancelled", message="已停止等待本次回答。")
-                            return
-                        line = raw_line.decode("utf-8", errors="replace").strip()
-                        if not line or line.startswith(":") or not line.startswith("data:"):
-                            continue
-                        payload = line[5:].strip()
-                        if payload == "[DONE]":
-                            break
-                        try:
-                            chunk = json.loads(payload)
-                        except json.JSONDecodeError:
-                            continue
-                        self._append_content(task_id, self._extract_delta(chunk))
+            for text in deepseek_client.stream_text(
+                http_request, timeout=self.TIMEOUT_SECONDS, should_stop=stop_if_cancelled,
+            ):
+                self._append_content(task_id, text)
 
             with self._lock:
                 state = self._tasks.get(task_id)
-                if not state:
+                if not state or state["status"] == "cancelled":
                     return
                 if state["cancel"].is_set():
                     state["status"] = "cancelled"

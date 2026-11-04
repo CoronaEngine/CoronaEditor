@@ -19,11 +19,11 @@ import socket
 import threading
 import time
 import urllib.error
-import urllib.request
 import xml.etree.ElementTree as ET
 import uuid
 from typing import Any
 
+from .. import deepseek_client
 from .node_graph_review_service import NodeGraphReviewService
 
 try:
@@ -1056,46 +1056,24 @@ class NodeGraphGenerationService:
 
     @classmethod
     def _call_deepseek(cls, settings: Any, prompt: str) -> str:
-        base = str(settings.base_url or "").rstrip("/")
-        endpoint = base if base.endswith("/chat/completions") else base + "/chat/completions"
-        body = {
-            "model": settings.model,
-            "temperature": float(getattr(settings, "temperature", 0.05)),
-            "max_tokens": int(getattr(settings, "max_tokens", 12000)),
-            "response_format": {"type": "json_object"},
-            "thinking": {
-                "type": "enabled" if getattr(settings, "thinking_enabled", False) else "disabled"
+        messages = [
+            {
+                "role": "system",
+                "content": (
+                    "你是 CoronaEngine 内嵌节点图编辑器。你只输出一个 JSON 对象。"
+                    "必须根据本次提供的 XML 合同对 node_graph:project:global 做增删改查，返回完整最终节点图。"
+                    "禁止输出 Python、XML、文件路径、JSON Patch、Markdown 或合同外积木。"
+                ),
             },
-            "messages": [
-                {
-                    "role": "system",
-                    "content": (
-                        "你是 CoronaEngine 内嵌节点图编辑器。你只输出一个 JSON 对象。"
-                        "必须根据本次提供的 XML 合同对 node_graph:project:global 做增删改查，返回完整最终节点图。"
-                        "禁止输出 Python、XML、文件路径、JSON Patch、Markdown 或合同外积木。"
-                    ),
-                },
-                {"role": "user", "content": prompt},
-            ],
-        }
-        http_request = urllib.request.Request(
-            endpoint,
-            data=json.dumps(body, ensure_ascii=False).encode("utf-8"),
-            headers={
-                "Authorization": "Bearer " + settings.api_key,
-                "Content-Type": "application/json",
-            },
-            method="POST",
+            {"role": "user", "content": prompt},
+        ]
+        return deepseek_client.complete_json(
+            settings, messages,
+            temperature=float(getattr(settings, "temperature", 0.05)),
+            max_tokens=int(getattr(settings, "max_tokens", 12000)),
+            thinking=bool(getattr(settings, "thinking_enabled", False)),
+            timeout=cls.TIMEOUT_SECONDS,
         )
-        with urllib.request.urlopen(http_request, timeout=cls.TIMEOUT_SECONDS) as response:
-            data = json.loads(response.read().decode("utf-8"))
-        choices = data.get("choices") if isinstance(data, dict) else None
-        first = choices[0] if isinstance(choices, list) and choices and isinstance(choices[0], dict) else {}
-        message = first.get("message") if isinstance(first.get("message"), dict) else {}
-        content = message.get("content")
-        if not isinstance(content, str) or not content.strip():
-            raise ValueError("DeepSeek 返回了空内容")
-        return content.strip()
 
     @classmethod
     def _contains_forbidden_key(cls, value: Any) -> str:

@@ -149,7 +149,7 @@ class NodeGraphReviewServiceTests(unittest.TestCase):
                 {"choices": [{"message": {"content": '{"hasProblems":false,"summary":"","issues":[]}'}}]}
             )
 
-        with mock.patch.object(MODULE.urllib.request, "urlopen", fake_urlopen):
+        with mock.patch("urllib.request.urlopen", fake_urlopen):
             text = NodeGraphReviewService._call_deepseek(settings, "review")
 
         self.assertEqual("https://api.deepseek.com/v1/chat/completions", captured["url"])

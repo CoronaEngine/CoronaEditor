@@ -47,6 +47,7 @@ def test_runtime_requests_streaming_and_key_updates_without_external_packages(tm
         from plugins.AITool.configuration import local_secrets, deepseek_settings
         from plugins.AITool.main import AITool
         from plugins.AITool.services.node_graph_review_service import NodeGraphReviewService
+        from plugins.AITool.services.node_graph_review_chat_service import NodeGraphReviewChatService
         from plugins.AITool.services.node_graph_generation_service import NodeGraphGenerationService
         from plugins.AITool.services.cabbage_context_service import CabbageContextService
 
@@ -84,7 +85,7 @@ def test_runtime_requests_streaming_and_key_updates_without_external_packages(tm
                 yield b'data: [DONE]\\n'
         def urlopen(request, timeout):
             body = json.loads(request.data)
-            requests.append((request, body, timeout))
+            requests.append((request, timeout))
             return Response(body.get("stream", False))
         urllib.request.urlopen = urlopen
 
@@ -105,20 +106,45 @@ def test_runtime_requests_streaming_and_key_updates_without_external_packages(tm
         assert status["status"] == "completed" and status["content"] == "hello", status
         NodeGraphReviewService._call_deepseek(current, "next review")
 
-        for (request, body, timeout), (temperature, tokens, seconds, stream) in zip(requests, [
+        profiles = [
             (0.1, 1200, 35, False), (0.05, 12000, 90, False),
             (0.25, 3600, 45, False), (0.25, 1400, 45, True), (0.1, 1200, 35, False),
-        ]):
+        ]
+        def pair(system, user):
+            return [{"role": "system", "content": system}, {"role": "user", "content": user}]
+        review_system = (
+            "你是 CoronaEngine 3D 游戏节点逻辑审查员。只审查给定的可见节点、"
+            "连线、条件和积木，不编造对象或积木。发现问题时合并成一句委婉、"
+            "可执行的中文提示，句式接近‘……有问题，原因是……；这样做就好了。’只输出 JSON。"
+        )
+        generate_system = (
+            "你是 CoronaEngine 内嵌节点图编辑器。你只输出一个 JSON 对象。"
+            "必须根据本次提供的 XML 合同对 node_graph:project:global 做增删改查，返回完整最终节点图。"
+            "禁止输出 Python、XML、文件路径、JSON Patch、Markdown 或合同外积木。"
+        )
+        goal_system = "你只负责为 CoronaEngine 生成结构化的个性化世界搭建任务，绝不生成或修改节点图、积木工作区和脚本，必须返回合法 JSON。"
+        prompts = [
+            pair(review_system, "review"), pair(generate_system, "generate"),
+            pair(goal_system, CabbageContextService._goal_plan_prompt("world", "creative")),
+            NodeGraphReviewChatService._build_messages(NodeGraphReviewChatService._normalize_payload(payload)),
+            pair(review_system, "next review"),
+        ]
+        keys = ["old-fixture-key"] * 4 + ["new-fixture-key"]
+        for (request, timeout), profile, key, messages in zip(requests, profiles, keys, prompts, strict=True):
+            temperature, tokens, seconds, stream = profile
             assert request.full_url == "https://api.deepseek.com/v1/chat/completions"
-            assert body["model"] == "deepseek-v4-flash"
-            assert (body["temperature"], body["max_tokens"], timeout) == (temperature, tokens, seconds)
-            assert body["thinking"] == {"type": "disabled"}
-            assert bool(body.get("stream")) == stream
+            assert request.get_method() == "POST" and timeout == seconds
+            headers = {"Authorization": "Bearer " + key, "Content-type": "application/json"}
+            expected = {"model": "deepseek-v4-flash", "temperature": temperature, "max_tokens": tokens}
             if not stream:
-                assert body["response_format"] == {"type": "json_object"}
-        assert len(requests) == 5
-        assert all(request.get_header("Authorization") == "Bearer old-fixture-key" for request, _, _ in requests[:4])
-        assert requests[-1][0].get_header("Authorization") == "Bearer new-fixture-key"
+                expected["response_format"] = {"type": "json_object"}
+            expected["thinking"] = {"type": "disabled"}
+            if stream:
+                expected["stream"] = True
+                headers["Accept"] = "text/event-stream"
+            expected["messages"] = messages
+            assert dict(request.header_items()) == headers
+            assert request.data == json.dumps(expected, ensure_ascii=False).encode("utf-8")
 
         entered.clear()
         release.clear()

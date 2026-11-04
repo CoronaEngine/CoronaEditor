@@ -10,7 +10,6 @@ import time
 import unicodedata
 import uuid
 import urllib.error
-import urllib.request
 import xml.etree.ElementTree as ET
 from concurrent.futures import ThreadPoolExecutor
 from functools import lru_cache
@@ -20,6 +19,7 @@ from typing import Any, Iterable
 logger = logging.getLogger(__name__)
 
 
+from .. import deepseek_client
 from ..configuration.deepseek_settings import (
     DEFAULT_BASE_URL, DEFAULT_MODEL, DeepSeekSettings, resolve_settings,
 )
@@ -395,51 +395,21 @@ class NodeGraphReviewService:
 
     @classmethod
     def _call_deepseek(cls, settings: DeepSeekSettings, prompt: str) -> str:
-        base = settings.base_url.rstrip("/")
-        endpoint = base if base.endswith("/chat/completions") else base + "/chat/completions"
-        body = {
-            "model": settings.model,
-            "temperature": 0.1,
-            "max_tokens": 1200,
-            "response_format": {"type": "json_object"},
-            "thinking": {"type": "disabled"},
-            "messages": [
-                {
-                    "role": "system",
-                    "content": (
-                        "你是 CoronaEngine 3D 游戏节点逻辑审查员。只审查给定的可见节点、"
-                        "连线、条件和积木，不编造对象或积木。发现问题时合并成一句委婉、"
-                        "可执行的中文提示，句式接近‘……有问题，原因是……；这样做就好了。’"
-                        "只输出 JSON。"
-                    ),
-                },
-                {"role": "user", "content": prompt},
-            ],
-        }
-        request = urllib.request.Request(
-            endpoint,
-            data=json.dumps(body, ensure_ascii=False).encode("utf-8"),
-            headers={
-                "Authorization": "Bearer " + settings.api_key,
-                "Content-Type": "application/json",
+        messages = [
+            {
+                "role": "system",
+                "content": (
+                    "你是 CoronaEngine 3D 游戏节点逻辑审查员。只审查给定的可见节点、"
+                    "连线、条件和积木，不编造对象或积木。发现问题时合并成一句委婉、"
+                    "可执行的中文提示，句式接近‘……有问题，原因是……；这样做就好了。’"
+                    "只输出 JSON。"
+                ),
             },
-            method="POST",
+            {"role": "user", "content": prompt},
+        ]
+        return deepseek_client.complete_json(
+            settings, messages, temperature=0.1, max_tokens=1200, timeout=cls.TIMEOUT_SECONDS,
         )
-        with urllib.request.urlopen(request, timeout=cls.TIMEOUT_SECONDS) as response:
-            data = json.loads(response.read().decode("utf-8"))
-
-        choices = data.get("choices") if isinstance(data, dict) else None
-        message = (
-            choices[0].get("message")
-            if isinstance(choices, list)
-            and choices
-            and isinstance(choices[0], dict)
-            else None
-        )
-        content = message.get("content") if isinstance(message, dict) else None
-        if not isinstance(content, str) or not content.strip():
-            raise ValueError("DeepSeek 返回了空内容")
-        return content.strip()
 
     @staticmethod
     def _parse_model_result(text: str) -> dict[str, Any]:

@@ -1250,7 +1250,7 @@ class NodeGraphGenerationServiceTests(unittest.TestCase):
             thinking_enabled=True,
         )
         with mock.patch(
-            "editor.plugins.AITool.services.node_graph_generation_service.urllib.request.urlopen",
+            "urllib.request.urlopen",
             return_value=response,
         ) as urlopen:
             self.assertEqual("{}", self.service._call_deepseek(settings, "prompt"))

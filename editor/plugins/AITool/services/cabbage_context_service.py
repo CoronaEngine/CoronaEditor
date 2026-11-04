@@ -10,7 +10,6 @@ import shutil
 import threading
 import time
 import urllib.error
-import urllib.request
 import uuid
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
@@ -19,6 +18,7 @@ from typing import Any
 from api.editor_api import CoronaEditorApi
 from runtime.project_context import get_active_project_path
 
+from .. import deepseek_client
 from .node_graph_review_service import NodeGraphReviewService
 
 logger = logging.getLogger(__name__)
@@ -2529,38 +2529,17 @@ class CabbageContextService:
         settings = NodeGraphReviewService._resolve_settings()
         if not settings.api_key:
             raise ValueError("DeepSeek API Key 未配置，无法生成世界任务")
-        base = settings.base_url.rstrip("/")
-        endpoint = base if base.endswith("/chat/completions") else base + "/chat/completions"
-        body = {
-            "model": settings.model,
-            "temperature": 0.25,
-            "max_tokens": 3600,
-            "response_format": {"type": "json_object"},
-            "thinking": {"type": "disabled"},
-            "messages": [
-                {
-                    "role": "system",
-                    "content": "你只负责为 CoronaEngine 生成结构化的个性化世界搭建任务，绝不生成或修改节点图、积木工作区和脚本，必须返回合法 JSON。",
-                },
-                {"role": "user", "content": cls._goal_plan_prompt(world_prompt, mode)},
-            ],
-        }
-        request = urllib.request.Request(
-            endpoint,
-            data=json.dumps(body, ensure_ascii=False).encode("utf-8"),
-            headers={
-                "Authorization": "Bearer " + settings.api_key,
-                "Content-Type": "application/json",
+        messages = [
+            {
+                "role": "system",
+                "content": "你只负责为 CoronaEngine 生成结构化的个性化世界搭建任务，绝不生成或修改节点图、积木工作区和脚本，必须返回合法 JSON。",
             },
-            method="POST",
+            {"role": "user", "content": cls._goal_plan_prompt(world_prompt, mode)},
+        ]
+        content = deepseek_client.complete_json(
+            settings, messages, temperature=0.25, max_tokens=3600,
+            timeout=cls.GOAL_PLAN_TIMEOUT_SECONDS, empty_error="DeepSeek 没有返回世界任务",
         )
-        with urllib.request.urlopen(request, timeout=cls.GOAL_PLAN_TIMEOUT_SECONDS) as response:
-            payload = json.loads(response.read().decode("utf-8"))
-        choices = payload.get("choices") if isinstance(payload, dict) else None
-        message = choices[0].get("message") if isinstance(choices, list) and choices and isinstance(choices[0], dict) else None
-        content = message.get("content") if isinstance(message, dict) else None
-        if not isinstance(content, str) or not content.strip():
-            raise ValueError("DeepSeek 没有返回世界任务")
         return NodeGraphReviewService._parse_model_result(content)
 
     @classmethod
