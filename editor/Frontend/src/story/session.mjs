@@ -1,15 +1,15 @@
 // Each mounted story page owns exactly one session.
 export const LEVEL = { width: 64, depth: 88, asset: 'scene/01_山门神殿_平地版.glb' };
 export const PLAYER_MODEL = 'player/E3D-Assassin.glb';
-export const MERCHANT = { name: '商人', x: -5, z: 3 };
+export const MERCHANT = { name: '商人', x: -30, z: -15 };
 const cast = [
-  ['boss', '守门巨兽', 'boss/Em001_00.glb', 11, 16, 200, 4],
-  ['wyvern', '地龙', 'monster/em135_03.glb', -9, -5, 180, 2.6],
-  ['huntress', '蜥蜴女猎手', 'monster/em001_01.glb', -7, 8, 120, 2],
-  ['warrior', '蜥蜴战士', 'monster/em001_03.glb', 10, 6, 120, 2],
-  ['lion', '荒原狮兽', 'monster/em3.glb', 0, -12, 160, 2],
-  ['mantis', '刀螳', 'monster/em1.glb', -12, 2, 80, 1.8],
-  ['larva', '沙原幼虫', 'monster/em001_05.glb', 6, -11, 90, 1.5],
+  ['boss', '守门巨兽', 'boss/Em001_00.glb', 11, 16, 200, 8],
+  ['wyvern', '地龙', 'monster/landwyvern.fbx', -9, -5, 180, 3.0],
+  ['huntress', '蜥蜴女猎手', 'monster/lizardf.fbx', -7, 8, 120, 3.5],
+  ['warrior', '蜥蜴战士', 'monster/lizardm.fbx', 10, 6, 120, 3.1],
+  ['lion', '荒原狮兽', 'monster/lion.fbx', 0, -12, 160, 3.7],
+  ['mantis', '刀螳', 'monster/mantis.fbx', -12, 2, 80, 2.3],
+  ['larva', '沙原幼虫', 'monster/larva.fbx', 6, -11, 90, 2.4],
 ];
 export const EQUIPMENT = {
   'hunter-blade': { name: '猎人长刃', slot: 'weapon', attack: 80 },
@@ -31,7 +31,7 @@ export const SKILLS = {
 export function createStorySession() {
   return {
     elapsed: 0, phase: 'playing', message: '山门已开。寻找并击败守门巨兽。',
-    player: { x: 0, z: 0, yaw: 0, hp: 100, rage: 0 },
+    player: { x: 0, y: 0, z: 0, yaw: 0, grounded: true, motion: 'idle', hp: 100, rage: 0 },
     enemies: cast.map(([id, name, asset, x, z, hp, size]) =>
       ({ id, name, asset, x, z, hp, maxHp: hp, size, nextHit: 1 })),
     inventory: { 'hunter-blade': 1, 'hunter-chest': 1, herb: 3 },
@@ -77,7 +77,7 @@ export function nearestTarget(game, skill = SKILLS.strike) {
 
 export function attack(game, id = 'strike', random = Math.random) {
   const skill = SKILLS[id];
-  if (!skill || game.phase !== 'playing' || game.elapsed < game.attackReady ||
+  if (!skill || !game.player.grounded || game.player.motion === 'dodging' || game.phase !== 'playing' || game.elapsed < game.attackReady ||
       game.elapsed < (game.cooldown[id] || 0)) return false;
   if (game.player.rage < skill.cost) { game.message = '怒气不足'; return false; }
   const target = nearestTarget(game, skill);
@@ -100,7 +100,7 @@ export function attack(game, id = 'strike', random = Math.random) {
 
 export function talkToMerchant(game) {
   if (Math.hypot(game.player.x - MERCHANT.x, game.player.z - MERCHANT.z) > 3.5) {
-    game.message = '商人在出生地西南侧。';
+    game.message = '靠近商人后按 F 交谈。';
     return;
   }
   if (game.merchantGift) { game.message = '商人：一路平安。'; return; }
@@ -109,17 +109,11 @@ export function talkToMerchant(game) {
   game.message = '商人赠送了一份回气草。';
 }
 
-export function advanceStory(game, dx, dz, seconds) {
+export function advanceStory(game, seconds) {
   if (game.phase !== 'playing') return;
   const dt = Math.max(0, Math.min(0.1, seconds));
   game.elapsed += dt;
   const player = game.player;
-  const length = Math.hypot(dx, dz);
-  if (length) {
-    player.x = Math.max(-LEVEL.width / 2, Math.min(LEVEL.width / 2, player.x + 5 * dt * dx / length));
-    player.z = Math.max(-LEVEL.depth / 2, Math.min(LEVEL.depth / 2, player.z + 5 * dt * dz / length));
-    player.yaw = Math.atan2(dx, dz);
-  }
   for (const enemy of game.enemies) {
     if (!enemy.hp) continue;
     const x = player.x - enemy.x, z = player.z - enemy.z;

@@ -16,8 +16,6 @@ test('each entry starts a fresh main world and isolate inventories and enemies',
 
 test('movement, facing, timed attacks and boss rewards stay in the current run', () => {
   const game = createStorySession();
-  advanceStory(game, 0, 1, 0.1);
-  assert.equal(game.player.z, 0.5);
   const boss = game.enemies[0];
   Object.assign(game.player, { x: boss.x, z: boss.z - 1, yaw: Math.PI });
   assert.equal(attack(game), false);
@@ -26,7 +24,7 @@ test('movement, facing, timed attacks and boss rewards stay in the current run',
   assert.equal(attack(game), true);
   assert.equal(boss.hp, 100);
   assert.equal(attack(game), false);
-  for (let i = 0; i < 5; i++) advanceStory(game, 0, 0, 0.1);
+  for (let i = 0; i < 5; i++) advanceStory(game, 0.1);
   assert.equal(attack(game), true);
   assert.equal(game.phase, 'victory');
   assert.equal(game.inventory['boss-main'], 1);
@@ -36,7 +34,7 @@ test('movement, facing, timed attacks and boss rewards stay in the current run',
 
 test('merchant gift, skills and enemy damage work without host services', () => {
   const game = createStorySession();
-  Object.assign(game.player, { x: -5, z: 3 });
+  Object.assign(game.player, { x: -30, z: -15 });
   talkToMerchant(game); talkToMerchant(game);
   assert.equal(game.inventory.herb, 4);
   useItem(game, 'herb');
@@ -47,6 +45,6 @@ test('merchant gift, skills and enemy damage work without host services', () => 
   assert.equal(game.player.rage, 0);
   assert.equal(enemy.hp, enemy.maxHp - 50);
   game.player.hp = 1;
-  for (let i = 0; i < 20; i++) advanceStory(game, 0, 0, 0.1);
+  for (let i = 0; i < 20; i++) advanceStory(game, 0.1);
   assert.equal(game.phase, 'defeat');
 });

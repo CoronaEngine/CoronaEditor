@@ -21,6 +21,7 @@
     "pinia": "^3.0.4",
     "postcss-selector-parser": "^6.1.4",
     "three": "^0.185.1",
+    "three-mesh-bvh": "^0.9.18",
     "vue": "^3.5.13",
     "vue-i18n": "^11.4.6",
     "vue-router": "^4.5.0"

@@ -1,58 +1,155 @@
 <script setup>
-import { computed, onMounted, onBeforeUnmount, reactive, ref } from 'vue';
+import { onMounted, onBeforeUnmount, reactive, ref } from 'vue';
 import { useRouter } from 'vue-router';
-import { advanceStory, attack, createStorySession, EQUIPMENT, LEVEL, MERCHANT, talkToMerchant, useItem } from '../../story/session.mjs';
+import {
+  advanceStory,
+  attack,
+  createStorySession,
+  LEVEL,
+  MERCHANT,
+  talkToMerchant,
+} from '../../story/session.mjs';
+import { createPlayerControls, VIEW_LABELS } from '../../story/controls.mjs';
+import { createPlayerAnimationSwitcher, PLAYER_SKILL_CLIP } from '../../story/playerAnimation.mjs';
+import StoryHud from './StoryHud.vue';
+import StoryBag from './StoryBag.vue';
 
 const router = useRouter();
 const game = reactive(createStorySession());
-const stageHost = ref(null);
-const bag = ref(false), overhead = ref(false), hasStage = ref(false);
-const pressed = new Set();
-let stage, frame, last = 0, mounted = false;
-const bagItems = computed(() => Object.entries(game.inventory).filter(([, count]) => count > 0));
-const boss = computed(() => game.enemies.find(e => e.id === 'boss'));
-const time = computed(() => Math.floor(game.elapsed));
-
+const surface = ref(null),
+  stageHost = ref(null),
+  bag = ref(false),
+  hasStage = ref(false);
+const view = ref('third');
+let stage,
+  frame,
+  last = 0,
+  mounted = false;
+let lastDraw = 0;
+function motion() {
+  return createPlayerControls(game.player, {
+    floor: (x, z) => stage?.floor(x, z) ?? 0,
+    collide: (point) => {
+      point.x = Math.max(-LEVEL.width / 2, Math.min(LEVEL.width / 2, point.x));
+      point.z = Math.max(-LEVEL.depth / 2, Math.min(LEVEL.depth / 2, point.z));
+      return stage?.constrain(point) ?? point;
+    },
+  });
+}
+const animate = () =>
+  createPlayerAnimationSwitcher({ play: (clip, blend) => stage?.playPlayer(clip, blend) });
+let controls = motion(),
+  animation = animate();
+function clearInput() {
+  controls.resetInput();
+  last = 0;
+}
+function unlock() {
+  if (document.pointerLockElement === surface.value) document.exitPointerLock();
+}
 function exitStory() {
-  pressed.clear();
+  clearInput();
+  unlock();
   router.replace('/StartScreen');
 }
 function reset() {
-  pressed.clear();
+  clearInput();
+  unlock();
+  animation.dispose();
   bag.value = false;
   Object.assign(game, createStorySession());
+  controls = motion();
+  animation = animate();
+  view.value = controls.view;
 }
-function command(key) {
-  if (key === 'Escape') { if (bag.value) bag.value = false; else exitStory(); return; }
-  if (key === 'Tab') { pressed.clear(); bag.value = !bag.value; return; }
-  if (bag.value) return;
-  if (key === 'KeyV') overhead.value = !overhead.value;
-  if (key === 'KeyF') talkToMerchant(game);
-  if (key === 'Space' || key === 'KeyJ') attack(game);
-  if (key === 'KeyE') attack(game, 'heavy');
-  if (key === 'KeyR') attack(game, 'sweep');
+function toggleBag() {
+  clearInput();
+  unlock();
+  bag.value = !bag.value;
 }
-const movement = ['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'];
-const shortcuts = ['Escape', 'Tab', 'KeyV', 'KeyF', 'Space', 'KeyJ', 'KeyE', 'KeyR'];
+function strike(id = 'strike') {
+  if (bag.value || !attack(game, id)) return;
+  if (id === 'strike') animation.combo();
+  else animation.playOnce(PLAYER_SKILL_CLIP);
+}
 function keyDown(event) {
-  if (event.ctrlKey || event.metaKey || event.altKey || event.isComposing) return;
-  if (!movement.includes(event.code) && !shortcuts.includes(event.code)) return;
-  event.preventDefault();
-  if (movement.includes(event.code)) pressed.add(event.code);
-  else if (!event.repeat) command(event.code);
+  if (
+    event.defaultPrevented ||
+    event.ctrlKey ||
+    event.metaKey ||
+    event.altKey ||
+    event.isComposing ||
+    event.target?.closest?.('input,select,textarea,[contenteditable="true"]')
+  )
+    return;
+  const code = event.code;
+  if (code === 'Escape') {
+    event.preventDefault();
+    if (bag.value) toggleBag();
+    else exitStory();
+    return;
+  }
+  if (code === 'Tab') {
+    event.preventDefault();
+    if (!event.repeat) toggleBag();
+    return;
+  }
+  if (bag.value || game.phase !== 'playing') return;
+  if (controls.down(code, event.repeat)) {
+    event.preventDefault();
+    return;
+  }
+  if (event.repeat) return;
+  if (code === 'KeyV') {
+    event.preventDefault();
+    view.value = controls.cycle();
+    if (view.value === 'top') unlock();
+  }
+  if (code === 'KeyF') talkToMerchant(game);
+  if (code === 'KeyE' || code === 'KeyR') strike(code === 'KeyE' ? 'heavy' : 'sweep');
 }
-function keyUp(event) { pressed.delete(event.code); }
-function clearInput() { pressed.clear(); last = 0; }
-function tick(now) {
+function keyUp(event) {
+  controls.up(event.code);
+}
+function pointerDown(event) {
+  if (event.target.closest('button,.story-bag,.outcome') || bag.value || game.phase !== 'playing')
+    return;
+  surface.value.focus();
+  if (event.button !== 0) return;
+  event.preventDefault();
+  if (view.value !== 'top' && !document.pointerLockElement)
+    surface.value.requestPointerLock?.()?.catch?.(() => {});
+  strike();
+}
+function pointerMove(event) {
+  if (!bag.value && game.phase === 'playing')
+    controls.pointerMove(
+      event,
+      surface.value?.getBoundingClientRect(),
+      document.pointerLockElement === surface.value
+    );
+}
+function wheel(event) {
+  if (!bag.value) controls.zoom(event.deltaY);
+}
+function tick(time) {
   if (!mounted) return;
   frame = requestAnimationFrame(tick);
-  if (document.hidden || (last && now - last < 1000 / 30)) return;
-  const dt = last ? Math.min((now - last) / 1000, 0.1) : 0;
-  last = now;
-  const held = (letter, arrow) => Number(pressed.has(letter) || pressed.has(arrow));
-  if (!bag.value) advanceStory(game, held('KeyA', 'ArrowLeft') - held('KeyD', 'ArrowRight'),
-    held('KeyW', 'ArrowUp') - held('KeyS', 'ArrowDown'), dt);
-  stage?.draw(dt, overhead.value);
+  if (document.hidden) {
+    last = 0;
+    return;
+  }
+  const dt = last ? Math.min((time - last) / 1000, 0.1) : 0;
+  last = time;
+  if (!bag.value && game.phase === 'playing') {
+    controls.step(dt);
+    advanceStory(game, dt);
+    animation.update(game.player.motion);
+  }
+  if (stage && (!lastDraw || time - lastDraw >= 1000 / 30)) {
+    stage.draw(lastDraw ? Math.min((time - lastDraw) / 1000, 0.1) : 0, controls.pose());
+    lastDraw = time;
+  }
 }
 function dropStage() {
   stage?.dispose();
@@ -71,13 +168,16 @@ onMounted(async () => {
     if (!mounted) return;
     stage = createStage(stageHost.value, game, dropStage);
     hasStage.value = true;
-  } catch {
-    dropStage(); // CEF without WebGL can play the same session on the tactical map.
+  } catch (error) {
+    console.warn('剧情 3D 视口不可用', error);
+    dropStage();
   }
 });
 onBeforeUnmount(() => {
   mounted = false;
   cancelAnimationFrame(frame);
+  unlock();
+  animation.dispose();
   window.removeEventListener('keydown', keyDown);
   window.removeEventListener('keyup', keyUp);
   window.removeEventListener('blur', clearInput);
@@ -87,59 +187,154 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <main class="story-world" aria-label="剧情模式">
+  <main
+    ref="surface"
+    class="story-world-viewport"
+    aria-label="剧情模式"
+    tabindex="0"
+    data-story-viewport
+    @pointerdown="pointerDown"
+    @pointermove="pointerMove"
+    @pointerleave="controls.clearPointer()"
+    @wheel.prevent="wheel"
+    @contextmenu.prevent
+  >
     <div ref="stageHost" class="stage" />
     <svg v-if="!hasStage" class="field" viewBox="-34 -46 68 92" aria-label="主世界战术地图">
-      <defs><pattern id="story-grid" width="4" height="4" patternUnits="userSpaceOnUse">
-        <path d="M4 0H0V4" fill="none" stroke="#3e5d55" stroke-width=".09"/>
-      </pattern></defs>
-      <rect :x="-LEVEL.width/2" :y="-LEVEL.depth/2" :width="LEVEL.width" :height="LEVEL.depth" fill="url(#story-grid)" stroke="#69847c" stroke-width=".15"/>
-      <g v-for="e in game.enemies.filter(enemy => enemy.hp > 0)" :key="e.id" :transform="`translate(${-e.x} ${-e.z})`">
-        <circle :r="e.size / 2" :fill="e.id === 'boss' ? '#ec785a' : '#d6ab6a'"/>
+      <defs>
+        <pattern id="story-grid" width="4" height="4" patternUnits="userSpaceOnUse">
+          <path d="M4 0H0V4" fill="none" stroke="#3e5d55" stroke-width=".09" />
+        </pattern>
+      </defs>
+      <rect
+        :x="-LEVEL.width / 2"
+        :y="-LEVEL.depth / 2"
+        :width="LEVEL.width"
+        :height="LEVEL.depth"
+        fill="url(#story-grid)"
+        stroke="#69847c"
+        stroke-width=".15"
+      />
+      <g
+        v-for="e in game.enemies.filter((enemy) => enemy.hp > 0)"
+        :key="e.id"
+        :transform="`translate(${-e.x} ${-e.z})`"
+      >
+        <circle :r="e.size / 2" :fill="e.id === 'boss' ? '#ec785a' : '#d6ab6a'" />
         <text y="-2.3">{{ e.name }} · {{ e.hp }}</text>
       </g>
-      <g :transform="`translate(${-MERCHANT.x} ${-MERCHANT.z})`"><circle r=".8" fill="#94beef"/><text y="-1.3">商人</text></g>
-      <g :transform="`translate(${-game.player.x} ${-game.player.z}) rotate(${-game.player.yaw * 180/Math.PI})`">
-        <path d="M0 -1.4L.8 .9L0 .6L-.8 .9Z" fill="#80ffe2"/>
+      <g :transform="`translate(${-MERCHANT.x} ${-MERCHANT.z})`">
+        <circle r=".8" fill="#94beef" />
+        <text y="-1.3">商人</text>
+      </g>
+      <g
+        :transform="`translate(${-game.player.x} ${-game.player.z}) rotate(${(-game.player.yaw * 180) / Math.PI})`"
+      >
+        <path d="M0 -1.4L.8 .9L0 .6L-.8 .9Z" fill="#80ffe2" />
       </g>
     </svg>
-    <header><div><small>CORONA · 剧情模式</small><h1>山门神殿</h1></div>
-      <div class="actions"><button @click="command('Tab')">行囊 · Tab</button><button @click="exitStory">离开剧情</button></div></header>
-    <aside class="status">
-      <b>生命 {{ game.player.hp }} / 100</b><progress :value="game.player.hp" max="100"/>
-      <span>怒气 {{ game.player.rage }} / 100</span><progress :value="game.player.rage" max="100"/>
-      <span>守门巨兽 {{ boss.hp }} / {{ boss.maxHp }}</span><small>本局 {{ time }} 秒</small>
-    </aside>
-    <footer><p role="status">{{ game.message }}</p><div class="actions">
-      <button @click="attack(game)">攻击 · J</button><button @click="attack(game,'heavy')">重斩 · E</button>
-      <button @click="attack(game,'sweep')">横扫 · R</button><button @click="talkToMerchant(game)">交谈 · F</button></div>
-      <small>WASD / 方向键移动 · V 切换视角 · Esc 离开 · 进度仅在本局有效</small></footer>
-    <section v-if="bag" class="overlay" aria-label="行囊"><article>
-      <h2>行囊</h2><p>点击装备穿戴，服用回气草可恢复怒气。</p>
-      <div class="items"><button v-for="[id,count] in bagItems" :key="id" @click="useItem(game,id)">
-        {{ EQUIPMENT[id]?.name || '回气草' }} × {{ count }}</button></div>
-      <p>已穿戴：{{ Object.values(game.equipped).map(id => EQUIPMENT[id].name).join('、') || '无' }}</p>
-      <button @click="command('Tab')">返回战斗</button></article></section>
-    <section v-else-if="game.phase !== 'playing'" class="overlay"><article>
-      <small>山门神殿</small><h2>{{ game.phase === 'victory' ? '守门巨兽已击败' : '挑战结束' }}</h2>
-      <p>{{ game.message }}</p><button @click="reset">再玩一局</button> <button @click="exitStory">返回启动页</button>
-    </article></section>
+    <StoryHud
+      v-show="!bag"
+      :game="game"
+      :view-label="VIEW_LABELS[view]"
+      @skill="strike"
+      @bag="toggleBag"
+      @exit="exitStory"
+    />
+    <StoryBag v-if="bag" :game="game" @close="toggleBag" />
+    <section v-if="!bag && game.phase !== 'playing'" class="outcome">
+      <article>
+        <small>山门神殿</small>
+        <h2>{{ game.phase === 'victory' ? '守门巨兽已击败' : '挑战结束' }}</h2>
+        <p>{{ game.message }}</p>
+        <button @click="reset">再玩一局</button>
+        <button @click="exitStory">返回启动页</button>
+      </article>
+    </section>
   </main>
 </template>
-
 <style scoped>
-.story-world{position:fixed;inset:0;background:#142722;color:#f1f0df;font:15px/1.5 system-ui,sans-serif;overflow:hidden;isolation:isolate}
-.stage,.field{position:absolute;width:100%;height:100%;inset:0}.stage :deep(canvas){display:block;width:100%;height:100%}
-.field text{text-anchor:middle;fill:#e4e4d2;font-size:1.15px;paint-order:stroke;stroke:#182a25;stroke-width:.25px}
-header,.status,footer,article{background:#162925ed;border:1px solid #657e6f;border-radius:8px;padding:12px 18px}
-header{position:absolute;top:16px;left:16px;right:16px;display:flex;align-items:center;justify-content:space-between}
-h1,h2,p{margin:0 0 6px}h1{font-size:24px}small{color:#b5c5b3;letter-spacing:.06em}
-.status{position:absolute;left:16px;top:106px;display:grid;gap:6px;min-width:155px}
-progress{width:100%;height:6px;accent-color:#74d1b4}
-footer{position:absolute;bottom:14px;left:50%;transform:translateX(-50%);width:max-content;max-width:94%;text-align:center}
-.actions,.items{display:flex;gap:7px;flex-wrap:wrap;justify-content:center}
-button{color:#f4f4e4;background:#304a40;border:1px solid #749282;border-radius:4px;padding:5px 11px;cursor:pointer}
-button:focus-visible,button:hover{background:#527660;outline:1px solid #b8eac5}
-.overlay{position:absolute;inset:0;display:grid;place-items:center;background:#0d1919b8}
-article{max-width:min(420px,85vw)}article .items{margin:16px 0}
+.story-world-viewport {
+  /* —— 颜色 —— */
+  --c-paper: #e8ede3;
+  --c-paper-dim: #8d9e85;
+  --c-gold: #b3995d;
+  --c-gold-dim: #4d4024;
+  --c-gold-bright: #e6d5a7;
+  --c-cinnabar: #c24133;
+  --c-cinnabar-bright: #e0523b;
+  --c-bronze: #689f38;
+  --c-bronze-dim: #2c4a3c;
+
+  /* —— 结构 —— */
+  --gold-line: rgba(179, 153, 93, 0.42);
+  --gold-line-soft: rgba(179, 153, 93, 0.22);
+  --panel-a: 0.88;
+  --pattern: rgba(232, 237, 227, 0.08);
+  --haze: 0.12;
+  --cut: 14px;
+  --edge: 2px;
+  --shape: polygon(
+    var(--cut) 0,
+    100% 0,
+    100% calc(100% - var(--cut)),
+    calc(100% - var(--cut)) 100%,
+    0 100%,
+    0 var(--cut)
+  );
+  --font-serif:
+    'Noto Serif SC', 'Source Han Serif SC', 'Source Han Serif CN', 'Songti SC', 'STSong', 'SimSun',
+    serif;
+  --font-brush:
+    'LXGW WenKai', '霞鹜文楷', 'Kaiti SC', 'STKaiti', 'KaiTi', '楷体', var(--font-serif);
+
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  outline: none;
+  background: transparent;
+  color: var(--c-paper);
+  font-family: var(--font-serif);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+.stage,
+.field {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+.stage :deep(canvas) {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.field text {
+  text-anchor: middle;
+  fill: var(--c-text-main);
+  font-size: 1.15px;
+  paint-order: stroke;
+  stroke: var(--c-bg);
+  stroke-width: 0.25px;
+}
+.outcome {
+  position: absolute;
+  inset: 0;
+  z-index: 11;
+  display: grid;
+  place-items: center;
+  background: #0c120eaa;
+}
+.outcome article {
+  padding: 28px 40px;
+  background: var(--c-panel-bg, #181f19);
+  border: 1px solid var(--c-gold);
+  color: var(--c-text-main);
+}
+.outcome button {
+  border: 1px solid var(--c-gold);
+  padding: 4px 12px;
+  margin: 8px 4px 0;
+}
 </style>
