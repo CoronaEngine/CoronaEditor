@@ -1,127 +1,63 @@
-/**
- * AI, node-graph review/generation, and Cabbage workflow facade.
- *
- * The public C++ contract remains owned by `src/api/editorApi.js`; this file
- * adapts response shapes and operation names used by panels.
- */
-
-import { editorApi } from '../api/editorApi.js';
+/** Web AI orchestration. Native transport remains owned by editorApi. */
 import { buildCabbageChatRequest } from './cabbageChatRequest.js';
+import { modelService } from './aiModelService.js';
+// Keep XML/catalog and non-chat workflows out of the ordinary-chat import path.
+function workflow(name, ...args) {
+  return import('./aiWorkflows.js').then(({ aiWorkflows }) => aiWorkflows[name](...args));
+}
 
+const chatGuidance = new Map();
 export const aiService = {
-  startNodeGraphReview: async (payload) => {
-    const response = await editorApi.ai.submitRequest({
-      operation: 'node_graph.review.start',
-      payload: payload || {},
+  startCabbageChat: (input) => aiService.startNodeGraphReviewChat(buildCabbageChatRequest(input)),
+  async startNodeGraphReviewChat(payload) {
+    const prepared = payload.modelMessages
+      ? payload
+      : buildCabbageChatRequest({
+          assistant: payload,
+          requestId: payload.requestId,
+          locale: payload.locale,
+          selectedTaskKey: payload.selectedTaskKey,
+          tasks: payload.tasks || [],
+          content: payload.messages?.at(-1)?.content || '',
+        });
+    const result = await modelService.start({
+      messages: prepared.modelMessages,
+      options: { format: 'text', max_tokens: 1400, temperature: 0.25, timeout: 45 },
     });
-    return response?.data ?? response;
+    if (chatGuidance.size >= 128) chatGuidance.delete(chatGuidance.keys().next().value);
+    chatGuidance.set(result.taskId, { requestId: prepared.requestId, guidance: prepared.guidance });
+    return { ...result, requestId: prepared.requestId };
   },
-  getNodeGraphReviewStatus: async (taskId) => {
-    const response = await editorApi.ai.submitRequest({
-      operation: 'node_graph.review.status',
-      taskId: String(taskId || ''),
-    });
-    return response?.data ?? response;
+  async getNodeGraphReviewChatStatus(taskId) {
+    const status = await modelService.status(taskId);
+    const request = chatGuidance.get(taskId);
+    const metadata = status.status === 'completed' ? request?.guidance : null;
+    return {
+      ...status,
+      requestId: request?.requestId || '',
+      needsShowcase: false,
+      guidanceIntent: '',
+      steps: [],
+      ...metadata,
+    };
   },
-  startCabbageChat(input) {
-    return aiService.startNodeGraphReviewChat(buildCabbageChatRequest(input));
+  async cancelNodeGraphReviewChat(taskId) {
+    const result = await modelService.cancel(taskId);
+    if (result.status !== 'completed' && chatGuidance.has(taskId))
+      chatGuidance.get(taskId).guidance = null;
+    return result;
   },
-  startNodeGraphReviewChat: async (payload) => {
-    const response = await editorApi.ai.submitRequest({
-      operation: 'node_graph.review.chat.start',
-      payload: payload || {},
-    });
-    return response?.data ?? response;
-  },
-  getNodeGraphReviewChatStatus: async (taskId) => {
-    const response = await editorApi.ai.submitRequest({
-      operation: 'node_graph.review.chat.status',
-      taskId: String(taskId || ''),
-    });
-    return response?.data ?? response;
-  },
-  cancelNodeGraphReviewChat: async (taskId) => {
-    const response = await editorApi.ai.submitRequest({
-      operation: 'node_graph.review.chat.cancel',
-      taskId: String(taskId || ''),
-    });
-    return response?.data ?? response;
-  },
-  startNodeGraphGeneration: async (payload) => {
-    const response = await editorApi.ai.submitRequest({
-      operation: 'node_graph.generate.start',
-      payload: payload || {},
-    });
-    return response?.data ?? response;
-  },
-  getNodeGraphGenerationStatus: async (taskId) => {
-    const response = await editorApi.ai.submitRequest({
-      operation: 'node_graph.generate.status',
-      taskId: String(taskId || ''),
-    });
-    return response?.data ?? response;
-  },
-  cancelNodeGraphGeneration: async (taskId) => {
-    const response = await editorApi.ai.submitRequest({
-      operation: 'node_graph.generate.cancel',
-      taskId: String(taskId || ''),
-    });
-    return response?.data ?? response;
-  },
-  loadCabbageContext: async (payload = {}) => {
-    const response = await editorApi.ai.submitRequest({
-      operation: 'cabbage.context.load',
-      payload,
-    });
-    return response?.data ?? response;
-  },
-  recordCabbageEvent: async (payload) => {
-    const response = await editorApi.ai.submitRequest({
-      operation: 'cabbage.context.record_event',
-      payload: payload || {},
-    });
-    return response?.data ?? response;
-  },
-  updateCabbageTask: async (payload) => {
-    const response = await editorApi.ai.submitRequest({
-      operation: 'cabbage.context.update_task',
-      payload: payload || {},
-    });
-    return response?.data ?? response;
-  },
-  appendCabbageMessage: async (payload) => {
-    const response = await editorApi.ai.submitRequest({
-      operation: 'cabbage.context.append_message',
-      payload: payload || {},
-    });
-    return response?.data ?? response;
-  },
-  startCabbageGoalPlan: async (payload = {}) => {
-    const response = await editorApi.ai.submitRequest({
-      operation: 'cabbage.goal_plan.start',
-      payload,
-    });
-    return response?.data ?? response;
-  },
-  getCabbageGoalPlanStatus: async (taskId) => {
-    const response = await editorApi.ai.submitRequest({
-      operation: 'cabbage.goal_plan.status',
-      taskId: String(taskId || ''),
-    });
-    return response?.data ?? response;
-  },
-  startCabbageProfileScoreUpdate: async (payload = {}) => {
-    const response = await editorApi.ai.submitRequest({
-      operation: 'cabbage.profile.score.start',
-      payload,
-    });
-    return response?.data ?? response;
-  },
-  getCabbageProfileScoreStatus: async (taskId) => {
-    const response = await editorApi.ai.submitRequest({
-      operation: 'cabbage.profile.score.status',
-      taskId: String(taskId || ''),
-    });
-    return response?.data ?? response;
-  },
+  startNodeGraphReview: (payload) => workflow('startReview', payload),
+  getNodeGraphReviewStatus: (taskId) => workflow('status', taskId),
+  startNodeGraphGeneration: (payload) => workflow('startGeneration', payload),
+  getNodeGraphGenerationStatus: (taskId) => workflow('status', taskId),
+  cancelNodeGraphGeneration: (taskId) => workflow('cancel', taskId),
+  loadCabbageContext: (payload) => workflow('load', payload),
+  recordCabbageEvent: (payload) => workflow('recordEvent', payload),
+  updateCabbageTask: (payload) => workflow('updateTask', payload),
+  appendCabbageMessage: (payload) => workflow('appendMessage', payload),
+  startCabbageGoalPlan: (payload) => workflow('startGoal', payload),
+  getCabbageGoalPlanStatus: (taskId) => workflow('goalStatus', taskId),
+  startCabbageProfileScoreUpdate: (payload) => workflow('startScore', payload),
+  getCabbageProfileScoreStatus: (taskId) => workflow('status', taskId),
 };

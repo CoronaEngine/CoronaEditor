@@ -1,0 +1,6528 @@
+{
+  "validation": [
+    {
+      "result": {
+        "schemaVersion": 1,
+        "requestId": "request-1",
+        "targetId": "node_graph:project:global",
+        "projectScopeId": "world-scope-1",
+        "baseGraphRevision": "revision-1",
+        "operation": "create",
+        "summary": "Generated the dodgeball node graph.",
+        "workspace": {
+          "version": 1,
+          "nodes": [
+            {
+              "id": "start",
+              "macroType": "state",
+              "nodeType": "start",
+              "name": "Start",
+              "customName": "Initialize",
+              "x": 80,
+              "y": 120,
+              "workspace": {}
+            }
+          ],
+          "edges": [],
+          "globalVariablesWorkspace": {}
+        }
+      },
+      "request": {
+        "schemaVersion": 1,
+        "requestId": "request-1",
+        "targetId": "node_graph:project:global",
+        "projectScopeId": "world-scope-1",
+        "baseGraphRevision": "revision-1",
+        "operation": "create",
+        "instruction": "Please create a dodgeball demo",
+        "responseLanguage": "en-US",
+        "workspace": {
+          "version": 1,
+          "nodes": [
+            {
+              "id": "start",
+              "macroType": "state",
+              "nodeType": "start",
+              "name": "Start",
+              "customName": "Initialize",
+              "x": 80,
+              "y": 120,
+              "workspace": {}
+            }
+          ],
+          "edges": [],
+          "globalVariablesWorkspace": {}
+        },
+        "projectContext": {
+          "sceneName": "default",
+          "actors": [
+            {
+              "name": "Player",
+              "type": "model",
+              "tags": [
+                "player"
+              ],
+              "aliases": []
+            }
+          ]
+        }
+      },
+      "accepted": true,
+      "workspace": {
+        "version": 1,
+        "nodes": [
+          {
+            "id": "start",
+            "macroType": "state",
+            "nodeType": "start",
+            "name": "Start",
+            "customName": "Initialize",
+            "x": 80,
+            "y": 120,
+            "workspace": {}
+          }
+        ],
+        "edges": [],
+        "globalVariablesWorkspace": {}
+      }
+    },
+    {
+      "result": {
+        "schemaVersion": 1,
+        "requestId": "request-1",
+        "targetId": "node_graph:project:global",
+        "projectScopeId": "world-scope-1",
+        "baseGraphRevision": "revision-1",
+        "operation": "extend",
+        "summary": "Added ball controls.",
+        "workspace": {
+          "version": 1,
+          "nodes": [
+            {
+              "id": "start",
+              "macroType": "state",
+              "nodeType": "start",
+              "name": "Start",
+              "customName": "Initialize",
+              "x": 80,
+              "y": 120,
+              "workspace": {}
+            },
+            {
+              "id": "control",
+              "macroType": "state",
+              "nodeType": "custom",
+              "name": "Play",
+              "customName": "Play",
+              "x": 480,
+              "y": 120,
+              "workspace": {
+                "blocks": {
+                  "languageVersion": 0,
+                  "blocks": [
+                    {
+                      "type": "node_while_active",
+                      "id": "control-active",
+                      "x": 24,
+                      "y": 24,
+                      "inputs": {
+                        "DO": {
+                          "block": {
+                            "type": "object_third_person_move",
+                            "id": "move-ball",
+                            "fields": {
+                              "NAME": "ball",
+                              "SPEED": 0.18,
+                              "OBSTACLE_TAG": "obstacle",
+                              "MIN_X": -12,
+                              "MAX_X": 12,
+                              "MIN_Z": -12,
+                              "MAX_Z": 12
+                            },
+                            "next": {
+                              "block": {
+                                "type": "object_arcade_jump",
+                                "id": "jump-ball",
+                                "fields": {
+                                  "NAME": "ball",
+                                  "POWER": 0.28,
+                                  "GRAVITY": 0.025,
+                                  "GROUND_Y": 0.8
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          ],
+          "edges": [
+            {
+              "id": "start-control",
+              "source": {
+                "nodeId": "start",
+                "side": "right",
+                "index": 0
+              },
+              "target": {
+                "nodeId": "control",
+                "side": "left",
+                "index": 0
+              },
+              "name": "Start Play",
+              "conditionWorkspace": {
+                "blocks": {
+                  "languageVersion": 0,
+                  "blocks": [
+                    {
+                      "type": "logic_boolean",
+                      "id": "always-control",
+                      "fields": {
+                        "BOOL": "TRUE"
+                      },
+                      "x": 24,
+                      "y": 24
+                    }
+                  ]
+                }
+              }
+            }
+          ],
+          "globalVariablesWorkspace": {}
+        }
+      },
+      "request": {
+        "schemaVersion": 1,
+        "requestId": "request-1",
+        "targetId": "node_graph:project:global",
+        "projectScopeId": "world-scope-1",
+        "baseGraphRevision": "revision-1",
+        "operation": "extend",
+        "instruction": "给球加 WASD 和空格跳跃",
+        "responseLanguage": "zh-CN",
+        "workspace": {
+          "version": 1,
+          "nodes": [
+            {
+              "id": "start",
+              "macroType": "state",
+              "nodeType": "start",
+              "name": "Start",
+              "customName": "Initialize",
+              "x": 80,
+              "y": 120,
+              "workspace": {}
+            }
+          ],
+          "edges": [],
+          "globalVariablesWorkspace": {}
+        },
+        "projectContext": {
+          "sceneName": "default",
+          "actors": [
+            {
+              "name": "Player",
+              "type": "model",
+              "tags": [
+                "player"
+              ],
+              "aliases": []
+            }
+          ]
+        }
+      },
+      "accepted": false,
+      "error": "中文请求的 summary 必须使用中文"
+    },
+    {
+      "result": {
+        "schemaVersion": 1,
+        "requestId": "request-1",
+        "targetId": "node_graph:project:global",
+        "projectScopeId": "world-scope-1",
+        "baseGraphRevision": "revision-1",
+        "operation": "extend",
+        "summary": "已添加球体控制。",
+        "workspace": {
+          "version": 1,
+          "nodes": [
+            {
+              "id": "start",
+              "macroType": "state",
+              "nodeType": "start",
+              "name": "Start",
+              "customName": "Initialize",
+              "x": 80,
+              "y": 120,
+              "workspace": {}
+            },
+            {
+              "id": "control",
+              "macroType": "state",
+              "nodeType": "custom",
+              "name": "球体控制",
+              "customName": "球体控制",
+              "x": 480,
+              "y": 120,
+              "workspace": {
+                "blocks": {
+                  "languageVersion": 0,
+                  "blocks": [
+                    {
+                      "type": "node_while_active",
+                      "id": "control-active",
+                      "x": 24,
+                      "y": 24,
+                      "inputs": {
+                        "DO": {
+                          "block": {
+                            "type": "object_third_person_move",
+                            "id": "move-ball",
+                            "fields": {
+                              "NAME": "ball",
+                              "SPEED": 0.18,
+                              "OBSTACLE_TAG": "obstacle",
+                              "MIN_X": -12,
+                              "MAX_X": 12,
+                              "MIN_Z": -12,
+                              "MAX_Z": 12
+                            },
+                            "next": {
+                              "block": {
+                                "type": "object_arcade_jump",
+                                "id": "jump-ball",
+                                "fields": {
+                                  "NAME": "ball",
+                                  "POWER": 0.28,
+                                  "GRAVITY": 0.025,
+                                  "GROUND_Y": 0.8
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          ],
+          "edges": [
+            {
+              "id": "start-control",
+              "source": {
+                "nodeId": "start",
+                "side": "right",
+                "index": 0
+              },
+              "target": {
+                "nodeId": "control",
+                "side": "left",
+                "index": 0
+              },
+              "name": "进入控制",
+              "conditionWorkspace": {
+                "blocks": {
+                  "languageVersion": 0,
+                  "blocks": [
+                    {
+                      "type": "logic_boolean",
+                      "id": "always-control",
+                      "fields": {
+                        "BOOL": "TRUE"
+                      },
+                      "x": 24,
+                      "y": 24
+                    }
+                  ]
+                }
+              }
+            }
+          ],
+          "globalVariablesWorkspace": {}
+        }
+      },
+      "request": {
+        "schemaVersion": 1,
+        "requestId": "request-1",
+        "targetId": "node_graph:project:global",
+        "projectScopeId": "world-scope-1",
+        "baseGraphRevision": "revision-1",
+        "operation": "extend",
+        "instruction": "给球加 WASD 和空格跳跃",
+        "responseLanguage": "zh-CN",
+        "workspace": {
+          "version": 1,
+          "nodes": [
+            {
+              "id": "start",
+              "macroType": "state",
+              "nodeType": "start",
+              "name": "Start",
+              "customName": "Initialize",
+              "x": 80,
+              "y": 120,
+              "workspace": {}
+            }
+          ],
+          "edges": [],
+          "globalVariablesWorkspace": {}
+        },
+        "projectContext": {
+          "actors": [
+            {
+              "name": "Player",
+              "type": "model",
+              "tags": [],
+              "aliases": []
+            }
+          ]
+        }
+      },
+      "accepted": false,
+      "error": "对象引用校验失败：积木 move-ball (object_third_person_move) 引用的对象 'ball' 不存在于当前场景；积木 jump-ball (object_arcade_jump) 引用的对象 'ball' 不存在于当前场景"
+    },
+    {
+      "result": {
+        "schemaVersion": 1,
+        "requestId": "request-1",
+        "targetId": "node_graph:project:global",
+        "projectScopeId": "world-scope-1",
+        "baseGraphRevision": "revision-1",
+        "operation": "edit",
+        "summary": "已将移动积木的对象改为 bunny2。",
+        "workspace": {
+          "version": 1,
+          "nodes": [
+            {
+              "id": "start",
+              "macroType": "state",
+              "nodeType": "start",
+              "name": "Start",
+              "customName": "Initialize",
+              "x": 80,
+              "y": 120,
+              "workspace": {}
+            },
+            {
+              "id": "control",
+              "macroType": "state",
+              "nodeType": "custom",
+              "name": "球体控制",
+              "customName": "球体控制",
+              "x": 480,
+              "y": 120,
+              "workspace": {
+                "blocks": {
+                  "languageVersion": 0,
+                  "blocks": [
+                    {
+                      "type": "node_while_active",
+                      "id": "control-active",
+                      "x": 24,
+                      "y": 24,
+                      "inputs": {
+                        "DO": {
+                          "block": {
+                            "type": "object_third_person_move",
+                            "id": "move-ball",
+                            "fields": {
+                              "NAME": "bunny2",
+                              "SPEED": 0.18,
+                              "OBSTACLE_TAG": "obstacle",
+                              "MIN_X": -12,
+                              "MAX_X": 12,
+                              "MIN_Z": -12,
+                              "MAX_Z": 12
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          ],
+          "edges": [
+            {
+              "id": "start-control",
+              "source": {
+                "nodeId": "start",
+                "side": "right",
+                "index": 0
+              },
+              "target": {
+                "nodeId": "control",
+                "side": "left",
+                "index": 0
+              },
+              "name": "进入控制",
+              "conditionWorkspace": {
+                "blocks": {
+                  "languageVersion": 0,
+                  "blocks": [
+                    {
+                      "type": "logic_boolean",
+                      "id": "always-control",
+                      "fields": {
+                        "BOOL": "TRUE"
+                      },
+                      "x": 24,
+                      "y": 24
+                    }
+                  ]
+                }
+              }
+            }
+          ],
+          "globalVariablesWorkspace": {}
+        }
+      },
+      "request": {
+        "schemaVersion": 1,
+        "requestId": "request-1",
+        "targetId": "node_graph:project:global",
+        "projectScopeId": "world-scope-1",
+        "baseGraphRevision": "revision-1",
+        "operation": "edit",
+        "instruction": "将移动积木的对象改为 bunny2",
+        "responseLanguage": "zh-CN",
+        "workspace": {
+          "version": 1,
+          "nodes": [
+            {
+              "id": "start",
+              "macroType": "state",
+              "nodeType": "start",
+              "name": "Start",
+              "customName": "Initialize",
+              "x": 80,
+              "y": 120,
+              "workspace": {}
+            },
+            {
+              "id": "control",
+              "macroType": "state",
+              "nodeType": "custom",
+              "name": "球体控制",
+              "customName": "球体控制",
+              "x": 480,
+              "y": 120,
+              "workspace": {
+                "blocks": {
+                  "languageVersion": 0,
+                  "blocks": [
+                    {
+                      "type": "node_while_active",
+                      "id": "control-active",
+                      "x": 24,
+                      "y": 24,
+                      "inputs": {
+                        "DO": {
+                          "block": {
+                            "type": "object_third_person_move",
+                            "id": "move-ball",
+                            "fields": {
+                              "NAME": "bunny1",
+                              "SPEED": 0.18,
+                              "OBSTACLE_TAG": "obstacle",
+                              "MIN_X": -12,
+                              "MAX_X": 12,
+                              "MIN_Z": -12,
+                              "MAX_Z": 12
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          ],
+          "edges": [
+            {
+              "id": "start-control",
+              "source": {
+                "nodeId": "start",
+                "side": "right",
+                "index": 0
+              },
+              "target": {
+                "nodeId": "control",
+                "side": "left",
+                "index": 0
+              },
+              "name": "进入控制",
+              "conditionWorkspace": {
+                "blocks": {
+                  "languageVersion": 0,
+                  "blocks": [
+                    {
+                      "type": "logic_boolean",
+                      "id": "always-control",
+                      "fields": {
+                        "BOOL": "TRUE"
+                      },
+                      "x": 24,
+                      "y": 24
+                    }
+                  ]
+                }
+              }
+            }
+          ],
+          "globalVariablesWorkspace": {}
+        },
+        "projectContext": {
+          "actors": [
+            {
+              "name": "bunny1",
+              "type": "model",
+              "tags": [],
+              "aliases": []
+            },
+            {
+              "name": "bunny2",
+              "type": "model",
+              "tags": [],
+              "aliases": []
+            }
+          ]
+        }
+      },
+      "accepted": true,
+      "workspace": {
+        "version": 1,
+        "nodes": [
+          {
+            "id": "start",
+            "macroType": "state",
+            "nodeType": "start",
+            "name": "Start",
+            "customName": "Initialize",
+            "x": 80,
+            "y": 120,
+            "workspace": {}
+          },
+          {
+            "id": "control",
+            "macroType": "state",
+            "nodeType": "custom",
+            "name": "球体控制",
+            "customName": "球体控制",
+            "x": 480,
+            "y": 120,
+            "workspace": {
+              "blocks": {
+                "languageVersion": 0,
+                "blocks": [
+                  {
+                    "type": "node_while_active",
+                    "id": "control-active",
+                    "x": 24,
+                    "y": 24,
+                    "inputs": {
+                      "DO": {
+                        "block": {
+                          "type": "object_third_person_move",
+                          "id": "move-ball",
+                          "fields": {
+                            "NAME": "bunny2",
+                            "SPEED": 0.18,
+                            "OBSTACLE_TAG": "obstacle",
+                            "MIN_X": -12,
+                            "MAX_X": 12,
+                            "MIN_Z": -12,
+                            "MAX_Z": 12
+                          }
+                        }
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        ],
+        "edges": [
+          {
+            "id": "start-control",
+            "source": {
+              "nodeId": "start",
+              "side": "right",
+              "index": 0
+            },
+            "target": {
+              "nodeId": "control",
+              "side": "left",
+              "index": 0
+            },
+            "name": "进入控制",
+            "conditionWorkspace": {
+              "blocks": {
+                "languageVersion": 0,
+                "blocks": [
+                  {
+                    "type": "logic_boolean",
+                    "id": "always-control",
+                    "fields": {
+                      "BOOL": "TRUE"
+                    },
+                    "x": 24,
+                    "y": 24
+                  }
+                ]
+              }
+            }
+          }
+        ],
+        "globalVariablesWorkspace": {}
+      }
+    },
+    {
+      "result": {
+        "schemaVersion": 1,
+        "requestId": "request-1",
+        "targetId": "node_graph:project:global",
+        "projectScopeId": "world-scope-1",
+        "baseGraphRevision": "revision-1",
+        "operation": "create",
+        "summary": "Generated the dodgeball node graph.",
+        "workspace": {
+          "version": 1,
+          "nodes": [
+            {
+              "id": "start",
+              "macroType": "state",
+              "nodeType": "start",
+              "name": "Start",
+              "customName": "Initialize",
+              "x": 80,
+              "y": 120,
+              "workspace": {}
+            }
+          ],
+          "edges": [],
+          "globalVariablesWorkspace": {}
+        },
+        "python": "not allowed"
+      },
+      "request": {
+        "schemaVersion": 1,
+        "requestId": "request-1",
+        "targetId": "node_graph:project:global",
+        "projectScopeId": "world-scope-1",
+        "baseGraphRevision": "revision-1",
+        "operation": "create",
+        "instruction": "Please create a dodgeball demo",
+        "responseLanguage": "en-US",
+        "workspace": {
+          "version": 1,
+          "nodes": [
+            {
+              "id": "start",
+              "macroType": "state",
+              "nodeType": "start",
+              "name": "Start",
+              "customName": "Initialize",
+              "x": 80,
+              "y": 120,
+              "workspace": {}
+            }
+          ],
+          "edges": [],
+          "globalVariablesWorkspace": {}
+        },
+        "projectContext": {
+          "sceneName": "default",
+          "actors": [
+            {
+              "name": "Player",
+              "type": "model",
+              "tags": [
+                "player"
+              ],
+              "aliases": []
+            }
+          ]
+        }
+      },
+      "accepted": false,
+      "error": "DeepSeek 返回了禁止字段：python"
+    },
+    {
+      "result": {
+        "schemaVersion": 1,
+        "requestId": "request-1",
+        "targetId": "node_graph:project:global",
+        "projectScopeId": "world-scope-1",
+        "baseGraphRevision": "revision-1",
+        "operation": "create",
+        "summary": "Generated the dodgeball node graph.",
+        "workspace": {
+          "version": 1,
+          "nodes": [
+            {
+              "id": "start",
+              "macroType": "state",
+              "nodeType": "start",
+              "name": "Start",
+              "customName": "Initialize",
+              "x": 80,
+              "y": 120,
+              "workspace": {}
+            }
+          ],
+          "edges": [],
+          "globalVariablesWorkspace": {}
+        },
+        "generatedCode": "not allowed"
+      },
+      "request": {
+        "schemaVersion": 1,
+        "requestId": "request-1",
+        "targetId": "node_graph:project:global",
+        "projectScopeId": "world-scope-1",
+        "baseGraphRevision": "revision-1",
+        "operation": "create",
+        "instruction": "Please create a dodgeball demo",
+        "responseLanguage": "en-US",
+        "workspace": {
+          "version": 1,
+          "nodes": [
+            {
+              "id": "start",
+              "macroType": "state",
+              "nodeType": "start",
+              "name": "Start",
+              "customName": "Initialize",
+              "x": 80,
+              "y": 120,
+              "workspace": {}
+            }
+          ],
+          "edges": [],
+          "globalVariablesWorkspace": {}
+        },
+        "projectContext": {
+          "sceneName": "default",
+          "actors": [
+            {
+              "name": "Player",
+              "type": "model",
+              "tags": [
+                "player"
+              ],
+              "aliases": []
+            }
+          ]
+        }
+      },
+      "accepted": false,
+      "error": "DeepSeek 返回了禁止字段：generatedCode"
+    },
+    {
+      "result": {
+        "schemaVersion": 1,
+        "requestId": "request-1",
+        "targetId": "node_graph:project:global",
+        "projectScopeId": "world-scope-1",
+        "baseGraphRevision": "revision-1",
+        "operation": "create",
+        "summary": "Generated the dodgeball node graph.",
+        "workspace": {
+          "version": 1,
+          "nodes": [
+            {
+              "id": "start",
+              "macroType": "state",
+              "nodeType": "start",
+              "name": "Start",
+              "customName": "Initialize",
+              "x": 80,
+              "y": 120,
+              "workspace": {}
+            }
+          ],
+          "edges": [],
+          "globalVariablesWorkspace": {}
+        },
+        "xml": "not allowed"
+      },
+      "request": {
+        "schemaVersion": 1,
+        "requestId": "request-1",
+        "targetId": "node_graph:project:global",
+        "projectScopeId": "world-scope-1",
+        "baseGraphRevision": "revision-1",
+        "operation": "create",
+        "instruction": "Please create a dodgeball demo",
+        "responseLanguage": "en-US",
+        "workspace": {
+          "version": 1,
+          "nodes": [
+            {
+              "id": "start",
+              "macroType": "state",
+              "nodeType": "start",
+              "name": "Start",
+              "customName": "Initialize",
+              "x": 80,
+              "y": 120,
+              "workspace": {}
+            }
+          ],
+          "edges": [],
+          "globalVariablesWorkspace": {}
+        },
+        "projectContext": {
+          "sceneName": "default",
+          "actors": [
+            {
+              "name": "Player",
+              "type": "model",
+              "tags": [
+                "player"
+              ],
+              "aliases": []
+            }
+          ]
+        }
+      },
+      "accepted": false,
+      "error": "DeepSeek 返回了禁止字段：xml"
+    },
+    {
+      "result": {
+        "schemaVersion": 1,
+        "requestId": "request-1",
+        "targetId": "node_graph:project:global",
+        "projectScopeId": "world-scope-1",
+        "baseGraphRevision": "revision-1",
+        "operation": "extend",
+        "summary": "已为兔子添加旋转功能。",
+        "workspace": {
+          "version": 1,
+          "nodes": [
+            {
+              "id": "start",
+              "macroType": "state",
+              "nodeType": "start",
+              "name": "Start",
+              "customName": "Initialize",
+              "x": 80,
+              "y": 120,
+              "workspace": {
+                "blocks": {
+                  "languageVersion": 0,
+                  "blocks": [
+                    {
+                      "type": "node_while_active",
+                      "id": "active-root",
+                      "x": 24,
+                      "y": 24,
+                      "inputs": {
+                        "DO": {
+                          "block": {
+                            "type": "control_if",
+                            "id": "legacy-if",
+                            "fields": {
+                              "BOOL": "TRUE"
+                            },
+                            "inputs": {
+                              "DO": {
+                                "block": {
+                                  "type": "engine_rotateZ",
+                                  "id": "legacy-rotate",
+                                  "fields": {
+                                    "ANGLE": 15,
+                                    "OBJECT": "bunny2"
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          ],
+          "edges": [],
+          "globalVariablesWorkspace": {}
+        }
+      },
+      "request": {
+        "schemaVersion": 1,
+        "requestId": "request-1",
+        "targetId": "node_graph:project:global",
+        "projectScopeId": "world-scope-1",
+        "baseGraphRevision": "revision-1",
+        "operation": "extend",
+        "instruction": "给兔子添加旋转功能",
+        "responseLanguage": "zh-CN",
+        "workspace": {
+          "version": 1,
+          "nodes": [
+            {
+              "id": "start",
+              "macroType": "state",
+              "nodeType": "start",
+              "name": "Start",
+              "customName": "Initialize",
+              "x": 80,
+              "y": 120,
+              "workspace": {}
+            }
+          ],
+          "edges": [],
+          "globalVariablesWorkspace": {}
+        },
+        "projectContext": {
+          "actors": [
+            {
+              "name": "bunny2",
+              "type": "model",
+              "tags": [],
+              "aliases": []
+            }
+          ]
+        }
+      },
+      "accepted": true,
+      "workspace": {
+        "version": 1,
+        "nodes": [
+          {
+            "id": "start",
+            "macroType": "state",
+            "nodeType": "start",
+            "name": "Start",
+            "customName": "Initialize",
+            "x": 80,
+            "y": 120,
+            "workspace": {
+              "blocks": {
+                "languageVersion": 0,
+                "blocks": [
+                  {
+                    "type": "node_while_active",
+                    "id": "active-root",
+                    "x": 24,
+                    "y": 24,
+                    "inputs": {
+                      "DO": {
+                        "block": {
+                          "type": "control_if",
+                          "id": "legacy-if",
+                          "inputs": {
+                            "DO": {
+                              "block": {
+                                "type": "engine_rotateZ",
+                                "id": "legacy-rotate",
+                                "fields": {
+                                  "ANGLE": 15
+                                },
+                                "inputs": {
+                                  "OBJECT": {
+                                    "block": {
+                                      "type": "object_reference",
+                                      "id": "ai_repair_object_2",
+                                      "fields": {
+                                        "OBJECT": "bunny2",
+                                        "MANUAL": ""
+                                      }
+                                    }
+                                  }
+                                }
+                              }
+                            },
+                            "CONDITION": {
+                              "block": {
+                                "type": "logic_boolean",
+                                "id": "ai_repair_condition_1",
+                                "fields": {
+                                  "BOOL": "TRUE"
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        ],
+        "edges": [],
+        "globalVariablesWorkspace": {}
+      }
+    },
+    {
+      "result": {
+        "schemaVersion": 1,
+        "requestId": "request-1",
+        "targetId": "node_graph:project:global",
+        "projectScopeId": "world-scope-1",
+        "baseGraphRevision": "revision-1",
+        "operation": "extend",
+        "summary": "已添加移动和跳跃。",
+        "workspace": {
+          "version": 1,
+          "nodes": [
+            {
+              "id": "start",
+              "macroType": "state",
+              "nodeType": "start",
+              "name": "Start",
+              "customName": "Initialize",
+              "x": 80,
+              "y": 120,
+              "workspace": {}
+            },
+            {
+              "id": "control",
+              "macroType": "state",
+              "nodeType": "custom",
+              "name": "球体控制",
+              "customName": "球体控制",
+              "x": 480,
+              "y": 120,
+              "workspace": {
+                "blocks": {
+                  "languageVersion": 0,
+                  "blocks": [
+                    {
+                      "type": "node_while_active",
+                      "id": "control-active",
+                      "x": 24,
+                      "y": 24,
+                      "inputs": {
+                        "DO": {
+                          "block": {
+                            "type": "object_third_person_move",
+                            "id": "move-ball",
+                            "fields": {
+                              "NAME": "ball",
+                              "SPEED": 0.18,
+                              "OBSTACLE_TAG": "obstacle",
+                              "MIN_X": -12,
+                              "MAX_X": 12,
+                              "MIN_Z": -12,
+                              "MAX_Z": 12
+                            },
+                            "next": {
+                              "block": {
+                                "type": "object_arcade_jump",
+                                "id": "jump-ball",
+                                "fields": {
+                                  "NAME": "other",
+                                  "POWER": 0.28,
+                                  "GRAVITY": 0.025,
+                                  "GROUND_Y": 0.8
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          ],
+          "edges": [
+            {
+              "id": "start-control",
+              "source": {
+                "nodeId": "start",
+                "side": "right",
+                "index": 0
+              },
+              "target": {
+                "nodeId": "control",
+                "side": "left",
+                "index": 0
+              },
+              "name": "进入控制",
+              "conditionWorkspace": {
+                "blocks": {
+                  "languageVersion": 0,
+                  "blocks": [
+                    {
+                      "type": "logic_boolean",
+                      "id": "always-control",
+                      "fields": {
+                        "BOOL": "TRUE"
+                      },
+                      "x": 24,
+                      "y": 24
+                    }
+                  ]
+                }
+              }
+            }
+          ],
+          "globalVariablesWorkspace": {}
+        }
+      },
+      "request": {
+        "schemaVersion": 1,
+        "requestId": "request-1",
+        "targetId": "node_graph:project:global",
+        "projectScopeId": "world-scope-1",
+        "baseGraphRevision": "revision-1",
+        "operation": "extend",
+        "instruction": "给球加 WASD 和空格跳跃",
+        "responseLanguage": "zh-CN",
+        "workspace": {
+          "version": 1,
+          "nodes": [
+            {
+              "id": "start",
+              "macroType": "state",
+              "nodeType": "start",
+              "name": "Start",
+              "customName": "Initialize",
+              "x": 80,
+              "y": 120,
+              "workspace": {}
+            }
+          ],
+          "edges": [],
+          "globalVariablesWorkspace": {}
+        },
+        "projectContext": {
+          "actors": [
+            {
+              "name": "ball",
+              "type": "model",
+              "tags": [],
+              "aliases": []
+            },
+            {
+              "name": "other",
+              "type": "model",
+              "tags": [],
+              "aliases": []
+            }
+          ]
+        }
+      },
+      "accepted": false,
+      "error": "WASD 移动和空格跳跃必须绑定同一个对象"
+    },
+    {
+      "result": {
+        "schemaVersion": 1,
+        "requestId": "request-1",
+        "targetId": "node_graph:project:global",
+        "projectScopeId": "world-scope-1",
+        "baseGraphRevision": "revision-1",
+        "operation": "extend",
+        "summary": "已添加球体控制。",
+        "workspace": {
+          "version": 1,
+          "nodes": [
+            {
+              "id": "start",
+              "macroType": "state",
+              "nodeType": "start",
+              "name": "Start",
+              "customName": "Initialize",
+              "x": 80,
+              "y": 120,
+              "workspace": {}
+            },
+            {
+              "id": "control",
+              "macroType": "state",
+              "nodeType": "custom",
+              "name": "球体控制",
+              "customName": "球体控制",
+              "x": 480,
+              "y": 120,
+              "workspace": {
+                "blocks": {
+                  "languageVersion": 0,
+                  "blocks": [
+                    {
+                      "type": "node_while_active",
+                      "id": "control-active",
+                      "x": 24,
+                      "y": 24,
+                      "inputs": {
+                        "DO": {
+                          "block": {
+                            "type": "object_third_person_move",
+                            "id": "move-ball",
+                            "fields": {
+                              "NAME": "ball",
+                              "SPEED": 0.18,
+                              "OBSTACLE_TAG": "obstacle",
+                              "MIN_X": -12,
+                              "MAX_X": 12,
+                              "MIN_Z": -12,
+                              "MAX_Z": 12
+                            },
+                            "next": {
+                              "block": {
+                                "type": "object_arcade_jump",
+                                "id": "jump-ball",
+                                "fields": {
+                                  "NAME": "ball",
+                                  "POWER": 0.28,
+                                  "GRAVITY": 0.025,
+                                  "GROUND_Y": 0.8
+                                },
+                                "next": {
+                                  "block": {
+                                    "type": "ui_set_score",
+                                    "id": "unrequested-score",
+                                    "fields": {
+                                      "VALUE": 0
+                                    }
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          ],
+          "edges": [
+            {
+              "id": "start-control",
+              "source": {
+                "nodeId": "start",
+                "side": "right",
+                "index": 0
+              },
+              "target": {
+                "nodeId": "control",
+                "side": "left",
+                "index": 0
+              },
+              "name": "进入控制",
+              "conditionWorkspace": {
+                "blocks": {
+                  "languageVersion": 0,
+                  "blocks": [
+                    {
+                      "type": "logic_boolean",
+                      "id": "always-control",
+                      "fields": {
+                        "BOOL": "TRUE"
+                      },
+                      "x": 24,
+                      "y": 24
+                    }
+                  ]
+                }
+              }
+            }
+          ],
+          "globalVariablesWorkspace": {}
+        }
+      },
+      "request": {
+        "schemaVersion": 1,
+        "requestId": "request-1",
+        "targetId": "node_graph:project:global",
+        "projectScopeId": "world-scope-1",
+        "baseGraphRevision": "revision-1",
+        "operation": "extend",
+        "instruction": "给球加 WASD 和空格跳跃",
+        "responseLanguage": "zh-CN",
+        "workspace": {
+          "version": 1,
+          "nodes": [
+            {
+              "id": "start",
+              "macroType": "state",
+              "nodeType": "start",
+              "name": "Start",
+              "customName": "Initialize",
+              "x": 80,
+              "y": 120,
+              "workspace": {}
+            }
+          ],
+          "edges": [],
+          "globalVariablesWorkspace": {}
+        },
+        "projectContext": {
+          "actors": [
+            {
+              "name": "ball",
+              "type": "model",
+              "tags": [],
+              "aliases": []
+            }
+          ]
+        }
+      },
+      "accepted": false,
+      "error": "局部对象控制请求不应新增计分、生命、胜负或战斗模板：ui_set_score"
+    },
+    {
+      "result": {
+        "schemaVersion": 1,
+        "requestId": "request-1",
+        "targetId": "node_graph:project:global",
+        "projectScopeId": "world-scope-1",
+        "baseGraphRevision": "revision-1",
+        "operation": "extend",
+        "summary": "已添加旋转功能。",
+        "workspace": {
+          "version": 1,
+          "nodes": [
+            {
+              "id": "start",
+              "macroType": "state",
+              "nodeType": "start",
+              "name": "Start",
+              "customName": "Initialize",
+              "x": 80,
+              "y": 120,
+              "workspace": {
+                "blocks": {
+                  "languageVersion": 0,
+                  "blocks": [
+                    {
+                      "type": "node_while_active",
+                      "id": "active-root",
+                      "x": 24,
+                      "y": 24,
+                      "inputs": {
+                        "DO": {
+                          "block": {
+                            "type": "control_if",
+                            "id": "legacy-if",
+                            "fields": {
+                              "BOOL": "TRUE"
+                            },
+                            "inputs": {
+                              "DO": {
+                                "block": {
+                                  "type": "engine_rotateZ",
+                                  "id": "legacy-rotate",
+                                  "fields": {
+                                    "ANGLE": 15,
+                                    "OBJECT": "missing-rabbit"
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          ],
+          "edges": [],
+          "globalVariablesWorkspace": {}
+        }
+      },
+      "request": {
+        "schemaVersion": 1,
+        "requestId": "request-1",
+        "targetId": "node_graph:project:global",
+        "projectScopeId": "world-scope-1",
+        "baseGraphRevision": "revision-1",
+        "operation": "extend",
+        "instruction": "给兔子添加旋转功能",
+        "responseLanguage": "zh-CN",
+        "workspace": {
+          "version": 1,
+          "nodes": [
+            {
+              "id": "start",
+              "macroType": "state",
+              "nodeType": "start",
+              "name": "Start",
+              "customName": "Initialize",
+              "x": 80,
+              "y": 120,
+              "workspace": {}
+            }
+          ],
+          "edges": [],
+          "globalVariablesWorkspace": {}
+        },
+        "projectContext": {
+          "actors": [
+            {
+              "name": "bunny2",
+              "type": "model",
+              "tags": [],
+              "aliases": []
+            }
+          ]
+        }
+      },
+      "accepted": false,
+      "error": "对象引用校验失败：积木 legacy-rotate (engine_rotateZ) 引用的对象 'missing-rabbit' 不存在于当前场景"
+    },
+    {
+      "result": {
+        "schemaVersion": 1,
+        "requestId": "request-1",
+        "targetId": "node_graph:project:global",
+        "projectScopeId": "world-scope-1",
+        "baseGraphRevision": "revision-1",
+        "operation": "extend",
+        "summary": "已添加球体控制。",
+        "workspace": {
+          "version": 1,
+          "nodes": [
+            {
+              "id": "start",
+              "macroType": "state",
+              "nodeType": "start",
+              "name": "Start",
+              "customName": "Initialize",
+              "x": 80,
+              "y": 120,
+              "workspace": {}
+            },
+            {
+              "id": "control",
+              "macroType": "state",
+              "nodeType": "custom",
+              "name": "球体控制",
+              "customName": "球体控制",
+              "x": 480,
+              "y": 120,
+              "workspace": {
+                "blocks": {
+                  "languageVersion": 0,
+                  "blocks": [
+                    {
+                      "type": "node_while_active",
+                      "id": "control-active",
+                      "x": 24,
+                      "y": 24,
+                      "inputs": {
+                        "DO": {
+                          "block": {
+                            "type": "object_set_tag_velocity_axis",
+                            "id": "wrong-tag-velocity",
+                            "fields": {
+                              "TAG_TEXT": "ball",
+                              "AXIS": "X",
+                              "VALUE_NUMBER": 0.1
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          ],
+          "edges": [
+            {
+              "id": "start-control",
+              "source": {
+                "nodeId": "start",
+                "side": "right",
+                "index": 0
+              },
+              "target": {
+                "nodeId": "control",
+                "side": "left",
+                "index": 0
+              },
+              "name": "进入控制",
+              "conditionWorkspace": {
+                "blocks": {
+                  "languageVersion": 0,
+                  "blocks": [
+                    {
+                      "type": "logic_boolean",
+                      "id": "always-control",
+                      "fields": {
+                        "BOOL": "TRUE"
+                      },
+                      "x": 24,
+                      "y": 24
+                    }
+                  ]
+                }
+              }
+            }
+          ],
+          "globalVariablesWorkspace": {}
+        }
+      },
+      "request": {
+        "schemaVersion": 1,
+        "requestId": "request-1",
+        "targetId": "node_graph:project:global",
+        "projectScopeId": "world-scope-1",
+        "baseGraphRevision": "revision-1",
+        "operation": "extend",
+        "instruction": "给球加 WASD 和空格跳跃",
+        "responseLanguage": "zh-CN",
+        "workspace": {
+          "version": 1,
+          "nodes": [
+            {
+              "id": "start",
+              "macroType": "state",
+              "nodeType": "start",
+              "name": "Start",
+              "customName": "Initialize",
+              "x": 80,
+              "y": 120,
+              "workspace": {}
+            }
+          ],
+          "edges": [],
+          "globalVariablesWorkspace": {}
+        },
+        "projectContext": {
+          "actors": [
+            {
+              "name": "ball",
+              "type": "model",
+              "tags": [],
+              "aliases": []
+            }
+          ]
+        }
+      },
+      "accepted": false,
+      "error": "请求的控制能力没有完整实现：node_while_active 中的 object_third_person_move；同一持续循环中的 object_arcade_jump"
+    },
+    {
+      "result": {
+        "schemaVersion": 1,
+        "requestId": "request-1",
+        "targetId": "node_graph:project:global",
+        "projectScopeId": "world-scope-1",
+        "baseGraphRevision": "revision-1",
+        "operation": "extend",
+        "summary": "已为球添加 WASD 移动和空格跳跃。",
+        "workspace": {
+          "version": 1,
+          "nodes": [
+            {
+              "id": "start",
+              "macroType": "state",
+              "nodeType": "start",
+              "name": "Start",
+              "customName": "Initialize",
+              "x": 80,
+              "y": 120,
+              "workspace": {}
+            },
+            {
+              "id": "control",
+              "macroType": "state",
+              "nodeType": "custom",
+              "name": "球体控制",
+              "customName": "球体控制",
+              "x": 480,
+              "y": 120,
+              "workspace": {
+                "blocks": {
+                  "languageVersion": 0,
+                  "blocks": [
+                    {
+                      "type": "node_while_active",
+                      "id": "control-active",
+                      "x": 24,
+                      "y": 24,
+                      "inputs": {
+                        "DO": {
+                          "block": {
+                            "type": "object_third_person_move",
+                            "id": "move-ball",
+                            "fields": {
+                              "NAME": "ball",
+                              "SPEED": 0.18,
+                              "OBSTACLE_TAG": "obstacle",
+                              "MIN_X": -12,
+                              "MAX_X": 12,
+                              "MIN_Z": -12,
+                              "MAX_Z": 12
+                            },
+                            "next": {
+                              "block": {
+                                "type": "object_arcade_jump",
+                                "id": "jump-ball",
+                                "fields": {
+                                  "NAME": "ball",
+                                  "POWER": 0.28,
+                                  "GRAVITY": 0.025,
+                                  "GROUND_Y": 0.8
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          ],
+          "edges": [
+            {
+              "id": "start-control",
+              "source": {
+                "nodeId": "start",
+                "side": "right",
+                "index": 0
+              },
+              "target": {
+                "nodeId": "control",
+                "side": "left",
+                "index": 0
+              },
+              "name": "进入控制",
+              "conditionWorkspace": {
+                "blocks": {
+                  "languageVersion": 0,
+                  "blocks": [
+                    {
+                      "type": "logic_boolean",
+                      "id": "always-control",
+                      "fields": {
+                        "BOOL": "TRUE"
+                      },
+                      "x": 24,
+                      "y": 24
+                    }
+                  ]
+                }
+              }
+            }
+          ],
+          "globalVariablesWorkspace": {}
+        }
+      },
+      "request": {
+        "schemaVersion": 1,
+        "requestId": "request-1",
+        "targetId": "node_graph:project:global",
+        "projectScopeId": "world-scope-1",
+        "baseGraphRevision": "revision-1",
+        "operation": "extend",
+        "instruction": "给球加 WASD 和空格跳跃",
+        "responseLanguage": "zh-CN",
+        "workspace": {
+          "version": 1,
+          "nodes": [
+            {
+              "id": "start",
+              "macroType": "state",
+              "nodeType": "start",
+              "name": "Start",
+              "customName": "Initialize",
+              "x": 80,
+              "y": 120,
+              "workspace": {}
+            }
+          ],
+          "edges": [],
+          "globalVariablesWorkspace": {}
+        },
+        "projectContext": {
+          "actors": [
+            {
+              "name": "ball",
+              "type": "model",
+              "tags": [],
+              "aliases": []
+            }
+          ]
+        }
+      },
+      "accepted": true,
+      "workspace": {
+        "version": 1,
+        "nodes": [
+          {
+            "id": "start",
+            "macroType": "state",
+            "nodeType": "start",
+            "name": "Start",
+            "customName": "Initialize",
+            "x": 80,
+            "y": 120,
+            "workspace": {}
+          },
+          {
+            "id": "control",
+            "macroType": "state",
+            "nodeType": "custom",
+            "name": "球体控制",
+            "customName": "球体控制",
+            "x": 480,
+            "y": 120,
+            "workspace": {
+              "blocks": {
+                "languageVersion": 0,
+                "blocks": [
+                  {
+                    "type": "node_while_active",
+                    "id": "control-active",
+                    "x": 24,
+                    "y": 24,
+                    "inputs": {
+                      "DO": {
+                        "block": {
+                          "type": "object_third_person_move",
+                          "id": "move-ball",
+                          "fields": {
+                            "NAME": "ball",
+                            "SPEED": 0.18,
+                            "OBSTACLE_TAG": "obstacle",
+                            "MIN_X": -12,
+                            "MAX_X": 12,
+                            "MIN_Z": -12,
+                            "MAX_Z": 12
+                          },
+                          "next": {
+                            "block": {
+                              "type": "object_arcade_jump",
+                              "id": "jump-ball",
+                              "fields": {
+                                "NAME": "ball",
+                                "POWER": 0.28,
+                                "GRAVITY": 0.025,
+                                "GROUND_Y": 0.8
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        ],
+        "edges": [
+          {
+            "id": "start-control",
+            "source": {
+              "nodeId": "start",
+              "side": "right",
+              "index": 0
+            },
+            "target": {
+              "nodeId": "control",
+              "side": "left",
+              "index": 0
+            },
+            "name": "进入控制",
+            "conditionWorkspace": {
+              "blocks": {
+                "languageVersion": 0,
+                "blocks": [
+                  {
+                    "type": "logic_boolean",
+                    "id": "always-control",
+                    "fields": {
+                      "BOOL": "TRUE"
+                    },
+                    "x": 24,
+                    "y": 24
+                  }
+                ]
+              }
+            }
+          }
+        ],
+        "globalVariablesWorkspace": {}
+      }
+    },
+    {
+      "result": {
+        "schemaVersion": 1,
+        "requestId": "request-1",
+        "targetId": "node_graph:project:global",
+        "projectScopeId": "world-scope-1",
+        "baseGraphRevision": "revision-1",
+        "operation": "extend",
+        "summary": "已添加球体控制。",
+        "workspace": {
+          "version": 1,
+          "nodes": [
+            {
+              "id": "start",
+              "macroType": "state",
+              "nodeType": "start",
+              "name": "Start",
+              "customName": "Initialize",
+              "x": 80,
+              "y": 120,
+              "workspace": {}
+            },
+            {
+              "id": "control",
+              "macroType": "state",
+              "nodeType": "custom",
+              "name": "球体控制",
+              "customName": "球体控制",
+              "x": 480,
+              "y": 120,
+              "workspace": {
+                "blocks": {
+                  "languageVersion": 0,
+                  "blocks": [
+                    {
+                      "type": "node_while_active",
+                      "id": "control-active",
+                      "x": 24,
+                      "y": 24,
+                      "inputs": {
+                        "DO": {
+                          "block": {
+                            "type": "object_set_tag_velocity_axis",
+                            "id": "wrong-tag-velocity",
+                            "fields": {
+                              "TAG_TEXT": "ball",
+                              "AXIS": "X",
+                              "VALUE_NUMBER": 0.1
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          ],
+          "edges": [
+            {
+              "id": "start-control",
+              "source": {
+                "nodeId": "start",
+                "side": "right",
+                "index": 0
+              },
+              "target": {
+                "nodeId": "control",
+                "side": "left",
+                "index": 0
+              },
+              "name": "进入控制",
+              "conditionWorkspace": {
+                "blocks": {
+                  "languageVersion": 0,
+                  "blocks": [
+                    {
+                      "type": "logic_boolean",
+                      "id": "always-control",
+                      "fields": {
+                        "BOOL": "TRUE"
+                      },
+                      "x": 24,
+                      "y": 24
+                    }
+                  ]
+                }
+              }
+            }
+          ],
+          "globalVariablesWorkspace": {}
+        }
+      },
+      "request": {
+        "schemaVersion": 1,
+        "requestId": "request-1",
+        "targetId": "node_graph:project:global",
+        "projectScopeId": "world-scope-1",
+        "baseGraphRevision": "revision-1",
+        "operation": "extend",
+        "instruction": "给球加 WASD 和空格跳跃",
+        "responseLanguage": "zh-CN",
+        "workspace": {
+          "version": 1,
+          "nodes": [
+            {
+              "id": "start",
+              "macroType": "state",
+              "nodeType": "start",
+              "name": "Start",
+              "customName": "Initialize",
+              "x": 80,
+              "y": 120,
+              "workspace": {}
+            }
+          ],
+          "edges": [],
+          "globalVariablesWorkspace": {}
+        },
+        "projectContext": {
+          "sceneName": "default",
+          "actors": [
+            {
+              "name": "Player",
+              "type": "model",
+              "tags": [
+                "player"
+              ],
+              "aliases": []
+            }
+          ]
+        }
+      },
+      "accepted": false,
+      "error": "请求的控制能力没有完整实现：node_while_active 中的 object_third_person_move；同一持续循环中的 object_arcade_jump"
+    },
+    {
+      "result": {
+        "schemaVersion": 1,
+        "requestId": "request-1",
+        "targetId": "node_graph:project:global",
+        "projectScopeId": "world-scope-1",
+        "baseGraphRevision": "revision-1",
+        "operation": "extend",
+        "summary": "已添加旋转功能。",
+        "workspace": {
+          "version": 1,
+          "nodes": [
+            {
+              "id": "start",
+              "macroType": "state",
+              "nodeType": "start",
+              "name": "Start",
+              "customName": "Initialize",
+              "x": 80,
+              "y": 120,
+              "workspace": {
+                "blocks": {
+                  "languageVersion": 0,
+                  "blocks": [
+                    {
+                      "type": "node_while_active",
+                      "id": "active-root",
+                      "x": 24,
+                      "y": 24,
+                      "inputs": {
+                        "DO": {
+                          "block": {
+                            "type": "control_if",
+                            "id": "legacy-if",
+                            "fields": {
+                              "BOOL": "TRUE"
+                            },
+                            "inputs": {
+                              "DO": {
+                                "block": {
+                                  "type": "engine_rotateZ",
+                                  "id": "legacy-rotate",
+                                  "fields": {
+                                    "ANGLE": 15,
+                                    "OBJECT": "bunny2",
+                                    "BROKEN": 1
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          ],
+          "edges": [],
+          "globalVariablesWorkspace": {}
+        }
+      },
+      "request": {
+        "schemaVersion": 1,
+        "requestId": "request-1",
+        "targetId": "node_graph:project:global",
+        "projectScopeId": "world-scope-1",
+        "baseGraphRevision": "revision-1",
+        "operation": "extend",
+        "instruction": "给兔子添加旋转功能",
+        "responseLanguage": "zh-CN",
+        "workspace": {
+          "version": 1,
+          "nodes": [
+            {
+              "id": "start",
+              "macroType": "state",
+              "nodeType": "start",
+              "name": "Start",
+              "customName": "Initialize",
+              "x": 80,
+              "y": 120,
+              "workspace": {}
+            }
+          ],
+          "edges": [],
+          "globalVariablesWorkspace": {}
+        },
+        "projectContext": {
+          "actors": [
+            {
+              "name": "bunny2",
+              "type": "model",
+              "tags": [],
+              "aliases": []
+            }
+          ]
+        }
+      },
+      "accepted": false,
+      "error": "生成的节点图未通过积木合同校验：node start.blocks[0].inputs.DO[0].inputs.DO[0] uses unknown field BROKEN for engine_rotateZ"
+    },
+    {
+      "result": {
+        "schemaVersion": 1,
+        "requestId": "request-1",
+        "targetId": "node_graph:project:global",
+        "projectScopeId": "world-scope-1",
+        "baseGraphRevision": "stale-revision",
+        "operation": "create",
+        "summary": "Generated the dodgeball node graph.",
+        "workspace": {
+          "version": 1,
+          "nodes": [
+            {
+              "id": "start",
+              "macroType": "state",
+              "nodeType": "start",
+              "name": "Start",
+              "customName": "Initialize",
+              "x": 80,
+              "y": 120,
+              "workspace": {}
+            }
+          ],
+          "edges": [],
+          "globalVariablesWorkspace": {}
+        }
+      },
+      "request": {
+        "schemaVersion": 1,
+        "requestId": "request-1",
+        "targetId": "node_graph:project:global",
+        "projectScopeId": "world-scope-1",
+        "baseGraphRevision": "revision-1",
+        "operation": "create",
+        "instruction": "Please create a dodgeball demo",
+        "responseLanguage": "en-US",
+        "workspace": {
+          "version": 1,
+          "nodes": [
+            {
+              "id": "start",
+              "macroType": "state",
+              "nodeType": "start",
+              "name": "Start",
+              "customName": "Initialize",
+              "x": 80,
+              "y": 120,
+              "workspace": {}
+            }
+          ],
+          "edges": [],
+          "globalVariablesWorkspace": {}
+        },
+        "projectContext": {
+          "sceneName": "default",
+          "actors": [
+            {
+              "name": "Player",
+              "type": "model",
+              "tags": [
+                "player"
+              ],
+              "aliases": []
+            }
+          ]
+        }
+      },
+      "accepted": false,
+      "error": "DeepSeek 返回的 baseGraphRevision 与当前请求不一致"
+    }
+  ],
+  "requirements": [
+    {
+      "instruction": "camera follows Player",
+      "operation": "create",
+      "project": {
+        "actorContextAvailable": true,
+        "actors": [
+          {
+            "name": "A"
+          },
+          {
+            "name": "Player"
+          }
+        ]
+      },
+      "expected": {
+        "operation": "create",
+        "actors": {
+          "mentioned": [
+            "Player"
+          ],
+          "control": [],
+          "source": [
+            "Player"
+          ],
+          "targets": [],
+          "multiTarget": false
+        },
+        "capabilities": [
+          "camera-follow"
+        ],
+        "requiredCapabilities": [
+          "camera-follow"
+        ],
+        "capabilityAlternatives": [],
+        "parameters": {
+          "defaultsRequired": []
+        },
+        "lifecycle": [
+          "while-active"
+        ],
+        "constraints": [
+          "use-only-existing-scene-actors",
+          "use-only-contracted-blocks",
+          "return-complete-workspace",
+          "preserve-unrelated-logic"
+        ],
+        "narrowObjectControl": false,
+        "firstPersonRequested": false,
+        "replacementDirective": null,
+        "dynamicActorRelations": [],
+        "distanceActorRelations": [],
+        "cameraTargets": [
+          "Player"
+        ]
+      }
+    },
+    {
+      "instruction": "让所有建筑被来源对象持续吸附",
+      "operation": "create",
+      "project": {
+        "actorContextAvailable": true,
+        "actors": [
+          {
+            "name": "SourceCore",
+            "semanticRole": "source"
+          },
+          {
+            "name": "TowerA",
+            "semanticRole": "building"
+          },
+          {
+            "name": "TowerB",
+            "tags": [
+              "building"
+            ]
+          }
+        ]
+      },
+      "expected": {
+        "operation": "create",
+        "actors": {
+          "mentioned": [
+            "TowerA",
+            "TowerB",
+            "SourceCore"
+          ],
+          "control": [],
+          "source": [
+            "SourceCore"
+          ],
+          "targets": [
+            "TowerA",
+            "TowerB"
+          ],
+          "multiTarget": true
+        },
+        "capabilities": [
+          "attraction",
+          "multi-object"
+        ],
+        "requiredCapabilities": [
+          "attraction",
+          "multi-object"
+        ],
+        "capabilityAlternatives": [],
+        "parameters": {
+          "defaultsRequired": [
+            "force"
+          ]
+        },
+        "lifecycle": [
+          "while-active"
+        ],
+        "constraints": [
+          "use-only-existing-scene-actors",
+          "use-only-contracted-blocks",
+          "return-complete-workspace",
+          "preserve-unrelated-logic"
+        ],
+        "narrowObjectControl": false,
+        "firstPersonRequested": false,
+        "replacementDirective": null,
+        "dynamicActorRelations": [
+          {
+            "kind": "attraction",
+            "source": "SourceCore",
+            "targets": [
+              "TowerA",
+              "TowerB"
+            ],
+            "axes": [
+              "X",
+              "Y",
+              "Z"
+            ]
+          }
+        ],
+        "distanceActorRelations": [],
+        "cameraTargets": []
+      }
+    },
+    {
+      "instruction": "Please create a dodgeball demo",
+      "operation": "create",
+      "project": {
+        "sceneName": "default",
+        "actors": [
+          {
+            "name": "Player",
+            "type": "model",
+            "tags": [
+              "player"
+            ],
+            "aliases": []
+          }
+        ]
+      },
+      "expected": {
+        "operation": "create",
+        "actors": {
+          "mentioned": [],
+          "control": [],
+          "source": [],
+          "targets": [],
+          "multiTarget": false
+        },
+        "capabilities": [],
+        "requiredCapabilities": [],
+        "capabilityAlternatives": [],
+        "parameters": {
+          "defaultsRequired": []
+        },
+        "lifecycle": [
+          "on-enter"
+        ],
+        "constraints": [
+          "use-only-existing-scene-actors",
+          "use-only-contracted-blocks",
+          "return-complete-workspace",
+          "preserve-unrelated-logic"
+        ],
+        "narrowObjectControl": false,
+        "firstPersonRequested": false,
+        "replacementDirective": null,
+        "dynamicActorRelations": [],
+        "distanceActorRelations": [],
+        "cameraTargets": []
+      }
+    },
+    {
+      "instruction": "make the camera continuously follow FollowerActor",
+      "operation": "create",
+      "project": {
+        "actorContextAvailable": true,
+        "actors": [
+          {
+            "name": "LeaderActor",
+            "type": "model",
+            "tags": [],
+            "aliases": [],
+            "semanticRole": "source"
+          },
+          {
+            "name": "FollowerActor",
+            "type": "model",
+            "tags": [],
+            "aliases": []
+          }
+        ]
+      },
+      "expected": {
+        "operation": "create",
+        "actors": {
+          "mentioned": [
+            "FollowerActor"
+          ],
+          "control": [],
+          "source": [
+            "FollowerActor"
+          ],
+          "targets": [],
+          "multiTarget": false
+        },
+        "capabilities": [
+          "camera-follow"
+        ],
+        "requiredCapabilities": [
+          "camera-follow"
+        ],
+        "capabilityAlternatives": [],
+        "parameters": {
+          "defaultsRequired": []
+        },
+        "lifecycle": [
+          "while-active"
+        ],
+        "constraints": [
+          "use-only-existing-scene-actors",
+          "use-only-contracted-blocks",
+          "return-complete-workspace",
+          "preserve-unrelated-logic"
+        ],
+        "narrowObjectControl": false,
+        "firstPersonRequested": false,
+        "replacementDirective": null,
+        "dynamicActorRelations": [],
+        "distanceActorRelations": [],
+        "cameraTargets": [
+          "FollowerActor"
+        ]
+      }
+    },
+    {
+      "instruction": "make LeaderActor attract FollowerActor and have the camera follow FollowerActor",
+      "operation": "create",
+      "project": {
+        "actors": [
+          {
+            "name": "LeaderActor",
+            "type": "model",
+            "semanticRole": "source"
+          },
+          {
+            "name": "FollowerActor",
+            "type": "model"
+          }
+        ]
+      },
+      "expected": {
+        "operation": "create",
+        "actors": {
+          "mentioned": [
+            "LeaderActor",
+            "FollowerActor"
+          ],
+          "control": [],
+          "source": [
+            "LeaderActor"
+          ],
+          "targets": [
+            "FollowerActor"
+          ],
+          "multiTarget": false
+        },
+        "capabilities": [
+          "attraction",
+          "camera-follow"
+        ],
+        "requiredCapabilities": [
+          "attraction",
+          "camera-follow"
+        ],
+        "capabilityAlternatives": [],
+        "parameters": {
+          "defaultsRequired": [
+            "force"
+          ]
+        },
+        "lifecycle": [
+          "while-active"
+        ],
+        "constraints": [
+          "use-only-existing-scene-actors",
+          "use-only-contracted-blocks",
+          "return-complete-workspace",
+          "preserve-unrelated-logic"
+        ],
+        "narrowObjectControl": false,
+        "firstPersonRequested": false,
+        "replacementDirective": null,
+        "dynamicActorRelations": [
+          {
+            "kind": "attraction",
+            "source": "LeaderActor",
+            "targets": [
+              "FollowerActor"
+            ],
+            "axes": [
+              "X",
+              "Y",
+              "Z"
+            ]
+          }
+        ],
+        "distanceActorRelations": [],
+        "cameraTargets": [
+          "FollowerActor"
+        ]
+      }
+    },
+    {
+      "instruction": "移动 Player",
+      "operation": "create",
+      "project": {
+        "sceneName": "default",
+        "actors": [
+          {
+            "name": "Player",
+            "type": "model",
+            "tags": [
+              "player"
+            ],
+            "aliases": []
+          }
+        ]
+      },
+      "expected": {
+        "operation": "create",
+        "actors": {
+          "mentioned": [
+            "Player"
+          ],
+          "control": [
+            "Player"
+          ],
+          "source": [],
+          "targets": [
+            "Player"
+          ],
+          "multiTarget": false
+        },
+        "capabilities": [
+          "movement"
+        ],
+        "requiredCapabilities": [
+          "movement"
+        ],
+        "capabilityAlternatives": [],
+        "parameters": {
+          "defaultsRequired": [
+            "speed"
+          ]
+        },
+        "lifecycle": [
+          "while-active"
+        ],
+        "constraints": [
+          "use-only-existing-scene-actors",
+          "use-only-contracted-blocks",
+          "return-complete-workspace",
+          "preserve-unrelated-logic"
+        ],
+        "narrowObjectControl": false,
+        "firstPersonRequested": false,
+        "replacementDirective": null,
+        "dynamicActorRelations": [],
+        "distanceActorRelations": [],
+        "cameraTargets": []
+      }
+    },
+    {
+      "instruction": "让相机跟随 Player",
+      "operation": "create",
+      "project": {
+        "sceneName": "default",
+        "actors": [
+          {
+            "name": "Player",
+            "type": "model",
+            "tags": [
+              "player"
+            ],
+            "aliases": []
+          }
+        ]
+      },
+      "expected": {
+        "operation": "create",
+        "actors": {
+          "mentioned": [
+            "Player"
+          ],
+          "control": [],
+          "source": [
+            "Player"
+          ],
+          "targets": [],
+          "multiTarget": false
+        },
+        "capabilities": [
+          "camera-follow"
+        ],
+        "requiredCapabilities": [
+          "camera-follow"
+        ],
+        "capabilityAlternatives": [],
+        "parameters": {
+          "defaultsRequired": []
+        },
+        "lifecycle": [
+          "while-active"
+        ],
+        "constraints": [
+          "use-only-existing-scene-actors",
+          "use-only-contracted-blocks",
+          "return-complete-workspace",
+          "preserve-unrelated-logic"
+        ],
+        "narrowObjectControl": false,
+        "firstPersonRequested": false,
+        "replacementDirective": null,
+        "dynamicActorRelations": [],
+        "distanceActorRelations": [],
+        "cameraTargets": [
+          "Player"
+        ]
+      }
+    },
+    {
+      "instruction": "给 Player 开启物理和速度",
+      "operation": "create",
+      "project": {
+        "sceneName": "default",
+        "actors": [
+          {
+            "name": "Player",
+            "type": "model",
+            "tags": [
+              "player"
+            ],
+            "aliases": []
+          }
+        ]
+      },
+      "expected": {
+        "operation": "create",
+        "actors": {
+          "mentioned": [
+            "Player"
+          ],
+          "control": [],
+          "source": [],
+          "targets": [
+            "Player"
+          ],
+          "multiTarget": false
+        },
+        "capabilities": [
+          "physics"
+        ],
+        "requiredCapabilities": [
+          "physics"
+        ],
+        "capabilityAlternatives": [],
+        "parameters": {
+          "defaultsRequired": []
+        },
+        "lifecycle": [
+          "on-enter"
+        ],
+        "constraints": [
+          "use-only-existing-scene-actors",
+          "use-only-contracted-blocks",
+          "return-complete-workspace",
+          "preserve-unrelated-logic"
+        ],
+        "narrowObjectControl": false,
+        "firstPersonRequested": false,
+        "replacementDirective": null,
+        "dynamicActorRelations": [],
+        "distanceActorRelations": [],
+        "cameraTargets": []
+      }
+    },
+    {
+      "instruction": "检测 Player 距离是否小于 5",
+      "operation": "create",
+      "project": {
+        "sceneName": "default",
+        "actors": [
+          {
+            "name": "Player",
+            "type": "model",
+            "tags": [
+              "player"
+            ],
+            "aliases": []
+          }
+        ]
+      },
+      "expected": {
+        "operation": "create",
+        "actors": {
+          "mentioned": [
+            "Player"
+          ],
+          "control": [],
+          "source": [],
+          "targets": [
+            "Player"
+          ],
+          "multiTarget": false
+        },
+        "capabilities": [
+          "distance-check",
+          "threshold-action"
+        ],
+        "requiredCapabilities": [
+          "distance-check",
+          "threshold-action"
+        ],
+        "capabilityAlternatives": [],
+        "parameters": {
+          "numericMentions": [
+            {
+              "value": 5,
+              "context": "ayer 距离是否小于 5"
+            }
+          ],
+          "defaultsRequired": [
+            "distanceThreshold"
+          ]
+        },
+        "lifecycle": [
+          "on-enter"
+        ],
+        "constraints": [
+          "use-only-existing-scene-actors",
+          "use-only-contracted-blocks",
+          "return-complete-workspace",
+          "preserve-unrelated-logic"
+        ],
+        "narrowObjectControl": false,
+        "firstPersonRequested": false,
+        "replacementDirective": null,
+        "dynamicActorRelations": [],
+        "distanceActorRelations": [],
+        "cameraTargets": []
+      }
+    },
+    {
+      "instruction": "让 Player 持续旋转",
+      "operation": "create",
+      "project": {
+        "sceneName": "default",
+        "actors": [
+          {
+            "name": "Player",
+            "type": "model",
+            "tags": [
+              "player"
+            ],
+            "aliases": []
+          }
+        ]
+      },
+      "expected": {
+        "operation": "create",
+        "actors": {
+          "mentioned": [
+            "Player"
+          ],
+          "control": [],
+          "source": [
+            "Player"
+          ],
+          "targets": [],
+          "multiTarget": false
+        },
+        "capabilities": [
+          "rotation"
+        ],
+        "requiredCapabilities": [
+          "rotation"
+        ],
+        "capabilityAlternatives": [],
+        "parameters": {
+          "defaultsRequired": []
+        },
+        "lifecycle": [
+          "while-active"
+        ],
+        "constraints": [
+          "use-only-existing-scene-actors",
+          "use-only-contracted-blocks",
+          "return-complete-workspace",
+          "preserve-unrelated-logic"
+        ],
+        "narrowObjectControl": false,
+        "firstPersonRequested": false,
+        "replacementDirective": null,
+        "dynamicActorRelations": [],
+        "distanceActorRelations": [],
+        "cameraTargets": []
+      }
+    },
+    {
+      "instruction": "批量移动所有对象",
+      "operation": "create",
+      "project": {
+        "sceneName": "default",
+        "actors": [
+          {
+            "name": "Player",
+            "type": "model",
+            "tags": [
+              "player"
+            ],
+            "aliases": []
+          }
+        ]
+      },
+      "expected": {
+        "operation": "create",
+        "actors": {
+          "mentioned": [],
+          "control": [],
+          "source": [],
+          "targets": [
+            "Player"
+          ],
+          "multiTarget": true
+        },
+        "capabilities": [
+          "movement",
+          "multi-object"
+        ],
+        "requiredCapabilities": [
+          "movement",
+          "multi-object"
+        ],
+        "capabilityAlternatives": [],
+        "parameters": {
+          "defaultsRequired": [
+            "speed"
+          ]
+        },
+        "lifecycle": [
+          "while-active"
+        ],
+        "constraints": [
+          "use-only-existing-scene-actors",
+          "use-only-contracted-blocks",
+          "return-complete-workspace",
+          "preserve-unrelated-logic"
+        ],
+        "narrowObjectControl": false,
+        "firstPersonRequested": false,
+        "replacementDirective": null,
+        "dynamicActorRelations": [],
+        "distanceActorRelations": [],
+        "cameraTargets": []
+      }
+    },
+    {
+      "instruction": "创建一个神秘机制",
+      "operation": "create",
+      "project": {
+        "sceneName": "default",
+        "actors": [
+          {
+            "name": "Player",
+            "type": "model",
+            "tags": [
+              "player"
+            ],
+            "aliases": []
+          }
+        ]
+      },
+      "expected": {
+        "operation": "create",
+        "actors": {
+          "mentioned": [],
+          "control": [],
+          "source": [],
+          "targets": [],
+          "multiTarget": false
+        },
+        "capabilities": [],
+        "requiredCapabilities": [],
+        "capabilityAlternatives": [],
+        "parameters": {
+          "defaultsRequired": []
+        },
+        "lifecycle": [
+          "on-enter"
+        ],
+        "constraints": [
+          "use-only-existing-scene-actors",
+          "use-only-contracted-blocks",
+          "return-complete-workspace",
+          "preserve-unrelated-logic"
+        ],
+        "narrowObjectControl": false,
+        "firstPersonRequested": false,
+        "replacementDirective": null,
+        "dynamicActorRelations": [],
+        "distanceActorRelations": [],
+        "cameraTargets": []
+      }
+    },
+    {
+      "instruction": "make Player rotate continuously",
+      "operation": "create",
+      "project": {
+        "sceneName": "default",
+        "actors": [
+          {
+            "name": "Player",
+            "type": "model",
+            "tags": [
+              "player"
+            ],
+            "aliases": []
+          }
+        ]
+      },
+      "expected": {
+        "operation": "create",
+        "actors": {
+          "mentioned": [
+            "Player"
+          ],
+          "control": [],
+          "source": [
+            "Player"
+          ],
+          "targets": [],
+          "multiTarget": false
+        },
+        "capabilities": [
+          "rotation"
+        ],
+        "requiredCapabilities": [
+          "rotation"
+        ],
+        "capabilityAlternatives": [],
+        "parameters": {
+          "defaultsRequired": []
+        },
+        "lifecycle": [
+          "while-active"
+        ],
+        "constraints": [
+          "use-only-existing-scene-actors",
+          "use-only-contracted-blocks",
+          "return-complete-workspace",
+          "preserve-unrelated-logic"
+        ],
+        "narrowObjectControl": false,
+        "firstPersonRequested": false,
+        "replacementDirective": null,
+        "dynamicActorRelations": [],
+        "distanceActorRelations": [],
+        "cameraTargets": []
+      }
+    },
+    {
+      "instruction": "make FollowerActor continuously follow LeaderActor and hide FollowerActor when distance is less than 2",
+      "operation": "create",
+      "project": {
+        "actorContextAvailable": true,
+        "actors": [
+          {
+            "name": "LeaderActor",
+            "type": "model",
+            "tags": [],
+            "aliases": []
+          },
+          {
+            "name": "FollowerActor",
+            "type": "model",
+            "tags": [],
+            "aliases": []
+          }
+        ]
+      },
+      "expected": {
+        "operation": "create",
+        "actors": {
+          "mentioned": [
+            "FollowerActor",
+            "LeaderActor"
+          ],
+          "control": [
+            "FollowerActor"
+          ],
+          "source": [
+            "LeaderActor"
+          ],
+          "targets": [
+            "FollowerActor"
+          ],
+          "multiTarget": false
+        },
+        "capabilities": [
+          "distance-check",
+          "threshold-action",
+          "visibility",
+          "movement"
+        ],
+        "requiredCapabilities": [
+          "distance-check",
+          "threshold-action",
+          "visibility",
+          "movement"
+        ],
+        "capabilityAlternatives": [],
+        "parameters": {
+          "numericMentions": [
+            {
+              "value": 2,
+              "context": "s less than 2"
+            }
+          ],
+          "defaultsRequired": [
+            "speed",
+            "distanceThreshold"
+          ]
+        },
+        "lifecycle": [
+          "while-active"
+        ],
+        "constraints": [
+          "use-only-existing-scene-actors",
+          "use-only-contracted-blocks",
+          "return-complete-workspace",
+          "preserve-unrelated-logic"
+        ],
+        "narrowObjectControl": false,
+        "firstPersonRequested": false,
+        "replacementDirective": null,
+        "dynamicActorRelations": [
+          {
+            "kind": "follow",
+            "source": "LeaderActor",
+            "targets": [
+              "FollowerActor"
+            ],
+            "axes": [
+              "X",
+              "Y",
+              "Z"
+            ]
+          }
+        ],
+        "distanceActorRelations": [
+          {
+            "source": "LeaderActor",
+            "targets": [
+              "FollowerActor"
+            ],
+            "axes": [
+              "X",
+              "Y",
+              "Z"
+            ]
+          }
+        ],
+        "cameraTargets": []
+      }
+    },
+    {
+      "instruction": "将移动积木的对象改为 bunny2",
+      "operation": "edit",
+      "project": {
+        "actors": [
+          {
+            "name": "bunny1",
+            "type": "model",
+            "tags": [],
+            "aliases": []
+          },
+          {
+            "name": "bunny2",
+            "type": "model",
+            "tags": [],
+            "aliases": []
+          }
+        ]
+      },
+      "expected": {
+        "operation": "edit",
+        "actors": {
+          "mentioned": [
+            "bunny2"
+          ],
+          "control": [
+            "bunny2"
+          ],
+          "source": [],
+          "targets": [
+            "bunny2"
+          ],
+          "multiTarget": false
+        },
+        "capabilities": [
+          "movement"
+        ],
+        "requiredCapabilities": [
+          "movement"
+        ],
+        "capabilityAlternatives": [],
+        "parameters": {
+          "numericMentions": [
+            {
+              "value": 2,
+              "context": "木的对象改为 bunny2"
+            }
+          ],
+          "defaultsRequired": [
+            "speed"
+          ]
+        },
+        "lifecycle": [
+          "while-active"
+        ],
+        "constraints": [
+          "use-only-existing-scene-actors",
+          "use-only-contracted-blocks",
+          "return-complete-workspace",
+          "preserve-unrelated-logic"
+        ],
+        "narrowObjectControl": false,
+        "firstPersonRequested": false,
+        "replacementDirective": {
+          "source": "移动积木的对象",
+          "target": "bunny2"
+        },
+        "dynamicActorRelations": [],
+        "distanceActorRelations": [],
+        "cameraTargets": []
+      }
+    },
+    {
+      "instruction": "将移动积木的对象改为 bunny2",
+      "operation": "edit",
+      "project": {
+        "sceneName": "default",
+        "actors": [
+          {
+            "name": "Player",
+            "type": "model",
+            "tags": [
+              "player"
+            ],
+            "aliases": []
+          }
+        ]
+      },
+      "expected": {
+        "operation": "edit",
+        "actors": {
+          "mentioned": [],
+          "control": [],
+          "source": [],
+          "targets": [],
+          "multiTarget": false
+        },
+        "capabilities": [
+          "movement"
+        ],
+        "requiredCapabilities": [
+          "movement"
+        ],
+        "capabilityAlternatives": [],
+        "parameters": {
+          "numericMentions": [
+            {
+              "value": 2,
+              "context": "木的对象改为 bunny2"
+            }
+          ],
+          "defaultsRequired": [
+            "speed"
+          ]
+        },
+        "lifecycle": [
+          "while-active"
+        ],
+        "constraints": [
+          "use-only-existing-scene-actors",
+          "use-only-contracted-blocks",
+          "return-complete-workspace",
+          "preserve-unrelated-logic"
+        ],
+        "narrowObjectControl": false,
+        "firstPersonRequested": false,
+        "replacementDirective": {
+          "source": "移动积木的对象",
+          "target": "bunny2"
+        },
+        "dynamicActorRelations": [],
+        "distanceActorRelations": [],
+        "cameraTargets": []
+      }
+    },
+    {
+      "instruction": "make FollowerActor continuously follow LeaderActor",
+      "operation": "create",
+      "project": {
+        "actors": [
+          {
+            "name": "LeaderActor",
+            "type": "model"
+          },
+          {
+            "name": "FollowerActor",
+            "type": "model"
+          }
+        ]
+      },
+      "expected": {
+        "operation": "create",
+        "actors": {
+          "mentioned": [
+            "FollowerActor",
+            "LeaderActor"
+          ],
+          "control": [
+            "FollowerActor"
+          ],
+          "source": [
+            "LeaderActor"
+          ],
+          "targets": [
+            "FollowerActor"
+          ],
+          "multiTarget": false
+        },
+        "capabilities": [
+          "movement"
+        ],
+        "requiredCapabilities": [
+          "movement"
+        ],
+        "capabilityAlternatives": [],
+        "parameters": {
+          "defaultsRequired": [
+            "speed"
+          ]
+        },
+        "lifecycle": [
+          "while-active"
+        ],
+        "constraints": [
+          "use-only-existing-scene-actors",
+          "use-only-contracted-blocks",
+          "return-complete-workspace",
+          "preserve-unrelated-logic"
+        ],
+        "narrowObjectControl": false,
+        "firstPersonRequested": false,
+        "replacementDirective": null,
+        "dynamicActorRelations": [
+          {
+            "kind": "follow",
+            "source": "LeaderActor",
+            "targets": [
+              "FollowerActor"
+            ],
+            "axes": [
+              "X",
+              "Y",
+              "Z"
+            ]
+          }
+        ],
+        "distanceActorRelations": [],
+        "cameraTargets": []
+      }
+    },
+    {
+      "instruction": "Please create a dodgeball demo",
+      "operation": "create",
+      "project": {
+        "sceneName": "Scene/default.scene",
+        "actorContextAvailable": true,
+        "actors": [
+          {
+            "name": "modern chair 11 obj",
+            "type": "model",
+            "tags": [],
+            "aliases": []
+          }
+        ]
+      },
+      "expected": {
+        "operation": "create",
+        "actors": {
+          "mentioned": [],
+          "control": [],
+          "source": [],
+          "targets": [],
+          "multiTarget": false
+        },
+        "capabilities": [],
+        "requiredCapabilities": [],
+        "capabilityAlternatives": [],
+        "parameters": {
+          "defaultsRequired": []
+        },
+        "lifecycle": [
+          "on-enter"
+        ],
+        "constraints": [
+          "use-only-existing-scene-actors",
+          "use-only-contracted-blocks",
+          "return-complete-workspace",
+          "preserve-unrelated-logic"
+        ],
+        "narrowObjectControl": false,
+        "firstPersonRequested": false,
+        "replacementDirective": null,
+        "dynamicActorRelations": [],
+        "distanceActorRelations": [],
+        "cameraTargets": []
+      }
+    },
+    {
+      "instruction": "给兔子添加旋转功能",
+      "operation": "extend",
+      "project": {
+        "actors": [
+          {
+            "name": "bunny2",
+            "type": "model",
+            "tags": [],
+            "aliases": []
+          }
+        ]
+      },
+      "expected": {
+        "operation": "extend",
+        "actors": {
+          "mentioned": [],
+          "control": [],
+          "source": [],
+          "targets": [],
+          "multiTarget": false
+        },
+        "capabilities": [
+          "rotation"
+        ],
+        "requiredCapabilities": [
+          "rotation"
+        ],
+        "capabilityAlternatives": [],
+        "parameters": {
+          "defaultsRequired": []
+        },
+        "lifecycle": [
+          "while-active"
+        ],
+        "constraints": [
+          "use-only-existing-scene-actors",
+          "use-only-contracted-blocks",
+          "return-complete-workspace",
+          "preserve-unrelated-logic"
+        ],
+        "narrowObjectControl": false,
+        "firstPersonRequested": false,
+        "replacementDirective": null,
+        "dynamicActorRelations": [],
+        "distanceActorRelations": [],
+        "cameraTargets": []
+      }
+    },
+    {
+      "instruction": "给球加 WASD 和空格跳跃",
+      "operation": "extend",
+      "project": {
+        "actors": [
+          {
+            "name": "ball",
+            "type": "model",
+            "tags": [],
+            "aliases": []
+          },
+          {
+            "name": "other",
+            "type": "model",
+            "tags": [],
+            "aliases": []
+          }
+        ]
+      },
+      "expected": {
+        "operation": "extend",
+        "actors": {
+          "mentioned": [],
+          "control": [],
+          "source": [],
+          "targets": [],
+          "multiTarget": false
+        },
+        "capabilities": [
+          "input-control",
+          "wasd-object-movement",
+          "space-object-jump"
+        ],
+        "requiredCapabilities": [
+          "input-control",
+          "wasd-object-movement",
+          "space-object-jump"
+        ],
+        "capabilityAlternatives": [],
+        "parameters": {
+          "defaultsRequired": []
+        },
+        "lifecycle": [
+          "input-triggered"
+        ],
+        "constraints": [
+          "use-only-existing-scene-actors",
+          "use-only-contracted-blocks",
+          "return-complete-workspace",
+          "preserve-unrelated-logic"
+        ],
+        "narrowObjectControl": true,
+        "firstPersonRequested": false,
+        "replacementDirective": null,
+        "dynamicActorRelations": [],
+        "distanceActorRelations": [],
+        "cameraTargets": []
+      }
+    },
+    {
+      "instruction": "让黑洞持续吸附所有建筑",
+      "operation": "create",
+      "project": {
+        "actorContextAvailable": true,
+        "actors": [
+          {
+            "name": "黑洞",
+            "type": "actor",
+            "tags": [
+              "source"
+            ],
+            "aliases": []
+          },
+          {
+            "name": "建筑A",
+            "type": "actor",
+            "tags": [
+              "building"
+            ],
+            "aliases": []
+          },
+          {
+            "name": "建筑B",
+            "type": "actor",
+            "tags": [
+              "building"
+            ],
+            "aliases": []
+          }
+        ]
+      },
+      "expected": {
+        "operation": "create",
+        "actors": {
+          "mentioned": [
+            "黑洞",
+            "建筑A",
+            "建筑B"
+          ],
+          "control": [],
+          "source": [
+            "黑洞"
+          ],
+          "targets": [
+            "建筑A",
+            "建筑B"
+          ],
+          "multiTarget": true
+        },
+        "capabilities": [
+          "attraction",
+          "multi-object"
+        ],
+        "requiredCapabilities": [
+          "attraction",
+          "multi-object"
+        ],
+        "capabilityAlternatives": [],
+        "parameters": {
+          "defaultsRequired": [
+            "force"
+          ]
+        },
+        "lifecycle": [
+          "while-active"
+        ],
+        "constraints": [
+          "use-only-existing-scene-actors",
+          "use-only-contracted-blocks",
+          "return-complete-workspace",
+          "preserve-unrelated-logic"
+        ],
+        "narrowObjectControl": false,
+        "firstPersonRequested": false,
+        "replacementDirective": null,
+        "dynamicActorRelations": [
+          {
+            "kind": "attraction",
+            "source": "黑洞",
+            "targets": [
+              "建筑A",
+              "建筑B"
+            ],
+            "axes": [
+              "X",
+              "Y",
+              "Z"
+            ]
+          }
+        ],
+        "distanceActorRelations": [],
+        "cameraTargets": []
+      }
+    },
+    {
+      "instruction": "给球加 WASD 和空格跳跃",
+      "operation": "extend",
+      "project": {
+        "actors": [
+          {
+            "name": "ball",
+            "type": "model",
+            "tags": [],
+            "aliases": []
+          }
+        ]
+      },
+      "expected": {
+        "operation": "extend",
+        "actors": {
+          "mentioned": [],
+          "control": [],
+          "source": [],
+          "targets": [],
+          "multiTarget": false
+        },
+        "capabilities": [
+          "input-control",
+          "wasd-object-movement",
+          "space-object-jump"
+        ],
+        "requiredCapabilities": [
+          "input-control",
+          "wasd-object-movement",
+          "space-object-jump"
+        ],
+        "capabilityAlternatives": [],
+        "parameters": {
+          "defaultsRequired": []
+        },
+        "lifecycle": [
+          "input-triggered"
+        ],
+        "constraints": [
+          "use-only-existing-scene-actors",
+          "use-only-contracted-blocks",
+          "return-complete-workspace",
+          "preserve-unrelated-logic"
+        ],
+        "narrowObjectControl": true,
+        "firstPersonRequested": false,
+        "replacementDirective": null,
+        "dynamicActorRelations": [],
+        "distanceActorRelations": [],
+        "cameraTargets": []
+      }
+    },
+    {
+      "instruction": "edit the movement logic",
+      "operation": "edit",
+      "project": {
+        "sceneName": "default",
+        "actors": [
+          {
+            "name": "Player",
+            "type": "model",
+            "tags": [
+              "player"
+            ],
+            "aliases": []
+          }
+        ]
+      },
+      "expected": {
+        "operation": "edit",
+        "actors": {
+          "mentioned": [],
+          "control": [],
+          "source": [],
+          "targets": [],
+          "multiTarget": false
+        },
+        "capabilities": [
+          "movement"
+        ],
+        "requiredCapabilities": [
+          "movement"
+        ],
+        "capabilityAlternatives": [],
+        "parameters": {
+          "defaultsRequired": [
+            "speed"
+          ]
+        },
+        "lifecycle": [
+          "while-active"
+        ],
+        "constraints": [
+          "use-only-existing-scene-actors",
+          "use-only-contracted-blocks",
+          "return-complete-workspace",
+          "preserve-unrelated-logic"
+        ],
+        "narrowObjectControl": false,
+        "firstPersonRequested": false,
+        "replacementDirective": null,
+        "dynamicActorRelations": [],
+        "distanceActorRelations": [],
+        "cameraTargets": []
+      }
+    },
+    {
+      "instruction": "帮我给当前场景中的球加一个 WASD 和空格跳跃",
+      "operation": "extend",
+      "project": {
+        "sceneName": "default",
+        "actors": [
+          {
+            "name": "Player",
+            "type": "model",
+            "tags": [
+              "player"
+            ],
+            "aliases": []
+          }
+        ]
+      },
+      "expected": {
+        "operation": "extend",
+        "actors": {
+          "mentioned": [],
+          "control": [],
+          "source": [],
+          "targets": [],
+          "multiTarget": false
+        },
+        "capabilities": [
+          "input-control",
+          "wasd-object-movement",
+          "space-object-jump"
+        ],
+        "requiredCapabilities": [
+          "input-control",
+          "wasd-object-movement",
+          "space-object-jump"
+        ],
+        "capabilityAlternatives": [],
+        "parameters": {
+          "defaultsRequired": []
+        },
+        "lifecycle": [
+          "input-triggered"
+        ],
+        "constraints": [
+          "use-only-existing-scene-actors",
+          "use-only-contracted-blocks",
+          "return-complete-workspace",
+          "preserve-unrelated-logic"
+        ],
+        "narrowObjectControl": true,
+        "firstPersonRequested": false,
+        "replacementDirective": null,
+        "dynamicActorRelations": [],
+        "distanceActorRelations": [],
+        "cameraTargets": []
+      }
+    },
+    {
+      "instruction": "请将移动积木的对象改为 bunny2，",
+      "operation": null,
+      "project": {},
+      "expected": {
+        "operation": "create",
+        "actors": {
+          "mentioned": [],
+          "control": [],
+          "source": [],
+          "targets": [],
+          "multiTarget": false
+        },
+        "capabilities": [
+          "movement"
+        ],
+        "requiredCapabilities": [
+          "movement"
+        ],
+        "capabilityAlternatives": [],
+        "parameters": {
+          "numericMentions": [
+            {
+              "value": 2,
+              "context": "木的对象改为 bunny2，"
+            }
+          ],
+          "defaultsRequired": [
+            "speed"
+          ]
+        },
+        "lifecycle": [
+          "while-active"
+        ],
+        "constraints": [
+          "use-only-existing-scene-actors",
+          "use-only-contracted-blocks",
+          "return-complete-workspace",
+          "preserve-unrelated-logic"
+        ],
+        "narrowObjectControl": false,
+        "firstPersonRequested": false,
+        "replacementDirective": {
+          "source": "移动积木的对象",
+          "target": "bunny2"
+        },
+        "dynamicActorRelations": [],
+        "distanceActorRelations": [],
+        "cameraTargets": []
+      }
+    },
+    {
+      "instruction": "让场景中的黑洞持续吸附所有建筑，距离小于5后隐藏或销毁目标，同时相机跟随黑洞。",
+      "operation": "create",
+      "project": {
+        "actorContextAvailable": true,
+        "actors": [
+          {
+            "name": "黑洞",
+            "semanticRole": "attractor",
+            "tags": [
+              "source"
+            ]
+          },
+          {
+            "name": "建筑A",
+            "tags": [
+              "building"
+            ]
+          },
+          {
+            "name": "建筑B",
+            "tags": [
+              "building"
+            ]
+          }
+        ]
+      },
+      "expected": {
+        "operation": "create",
+        "actors": {
+          "mentioned": [
+            "黑洞",
+            "建筑A",
+            "建筑B"
+          ],
+          "control": [],
+          "source": [
+            "黑洞"
+          ],
+          "targets": [
+            "建筑A",
+            "建筑B"
+          ],
+          "multiTarget": true
+        },
+        "capabilities": [
+          "attraction",
+          "distance-check",
+          "threshold-action",
+          "object-removal",
+          "visibility",
+          "camera-follow",
+          "multi-object"
+        ],
+        "requiredCapabilities": [
+          "attraction",
+          "distance-check",
+          "threshold-action",
+          "object-removal",
+          "visibility",
+          "camera-follow",
+          "multi-object"
+        ],
+        "capabilityAlternatives": [
+          [
+            "visibility",
+            "object-removal"
+          ]
+        ],
+        "parameters": {
+          "distance": 5,
+          "numericMentions": [
+            {
+              "value": 5,
+              "context": "续吸附所有建筑，距离小于5后隐藏或销毁目标，同时相"
+            }
+          ],
+          "defaultsRequired": [
+            "force"
+          ]
+        },
+        "lifecycle": [
+          "while-active"
+        ],
+        "constraints": [
+          "use-only-existing-scene-actors",
+          "use-only-contracted-blocks",
+          "return-complete-workspace",
+          "preserve-unrelated-logic"
+        ],
+        "narrowObjectControl": false,
+        "firstPersonRequested": false,
+        "replacementDirective": null,
+        "dynamicActorRelations": [
+          {
+            "kind": "attraction",
+            "source": "黑洞",
+            "targets": [
+              "建筑A",
+              "建筑B"
+            ],
+            "axes": [
+              "X",
+              "Y",
+              "Z"
+            ]
+          }
+        ],
+        "distanceActorRelations": [
+          {
+            "source": "黑洞",
+            "targets": [
+              "建筑A",
+              "建筑B"
+            ],
+            "axes": [
+              "X",
+              "Y",
+              "Z"
+            ]
+          }
+        ],
+        "cameraTargets": [
+          "建筑B"
+        ]
+      }
+    },
+    {
+      "instruction": "给球加 WASD 和空格跳跃",
+      "operation": "extend",
+      "project": {
+        "sceneName": "default",
+        "actors": [
+          {
+            "name": "Player",
+            "type": "model",
+            "tags": [
+              "player"
+            ],
+            "aliases": []
+          }
+        ]
+      },
+      "expected": {
+        "operation": "extend",
+        "actors": {
+          "mentioned": [],
+          "control": [],
+          "source": [],
+          "targets": [],
+          "multiTarget": false
+        },
+        "capabilities": [
+          "input-control",
+          "wasd-object-movement",
+          "space-object-jump"
+        ],
+        "requiredCapabilities": [
+          "input-control",
+          "wasd-object-movement",
+          "space-object-jump"
+        ],
+        "capabilityAlternatives": [],
+        "parameters": {
+          "defaultsRequired": []
+        },
+        "lifecycle": [
+          "input-triggered"
+        ],
+        "constraints": [
+          "use-only-existing-scene-actors",
+          "use-only-contracted-blocks",
+          "return-complete-workspace",
+          "preserve-unrelated-logic"
+        ],
+        "narrowObjectControl": true,
+        "firstPersonRequested": false,
+        "replacementDirective": null,
+        "dynamicActorRelations": [],
+        "distanceActorRelations": [],
+        "cameraTargets": []
+      }
+    },
+    {
+      "instruction": "Give ball WASD control",
+      "operation": "create",
+      "project": {
+        "actorContextAvailable": true,
+        "actors": [
+          {
+            "name": "ball",
+            "type": "actor",
+            "tags": [],
+            "aliases": []
+          }
+        ]
+      },
+      "expected": {
+        "operation": "create",
+        "actors": {
+          "mentioned": [
+            "ball"
+          ],
+          "control": [
+            "ball"
+          ],
+          "source": [],
+          "targets": [
+            "ball"
+          ],
+          "multiTarget": false
+        },
+        "capabilities": [
+          "input-control",
+          "wasd-object-movement"
+        ],
+        "requiredCapabilities": [
+          "input-control",
+          "wasd-object-movement"
+        ],
+        "capabilityAlternatives": [],
+        "parameters": {
+          "defaultsRequired": []
+        },
+        "lifecycle": [
+          "input-triggered"
+        ],
+        "constraints": [
+          "use-only-existing-scene-actors",
+          "use-only-contracted-blocks",
+          "return-complete-workspace",
+          "preserve-unrelated-logic"
+        ],
+        "narrowObjectControl": true,
+        "firstPersonRequested": false,
+        "replacementDirective": null,
+        "dynamicActorRelations": [],
+        "distanceActorRelations": [],
+        "cameraTargets": []
+      }
+    },
+    {
+      "instruction": "让黑洞持续吸附所有建筑",
+      "operation": "create",
+      "project": {
+        "actorContextAvailable": true,
+        "actors": [
+          {
+            "name": "黑洞",
+            "type": "actor",
+            "tags": [],
+            "aliases": [],
+            "semanticRole": "source"
+          },
+          {
+            "name": "建筑A",
+            "type": "actor",
+            "tags": [
+              "building"
+            ],
+            "aliases": []
+          },
+          {
+            "name": "建筑B",
+            "type": "actor",
+            "tags": [
+              "building"
+            ],
+            "aliases": []
+          }
+        ]
+      },
+      "expected": {
+        "operation": "create",
+        "actors": {
+          "mentioned": [
+            "黑洞",
+            "建筑A",
+            "建筑B"
+          ],
+          "control": [],
+          "source": [
+            "黑洞"
+          ],
+          "targets": [
+            "建筑A",
+            "建筑B"
+          ],
+          "multiTarget": true
+        },
+        "capabilities": [
+          "attraction",
+          "multi-object"
+        ],
+        "requiredCapabilities": [
+          "attraction",
+          "multi-object"
+        ],
+        "capabilityAlternatives": [],
+        "parameters": {
+          "defaultsRequired": [
+            "force"
+          ]
+        },
+        "lifecycle": [
+          "while-active"
+        ],
+        "constraints": [
+          "use-only-existing-scene-actors",
+          "use-only-contracted-blocks",
+          "return-complete-workspace",
+          "preserve-unrelated-logic"
+        ],
+        "narrowObjectControl": false,
+        "firstPersonRequested": false,
+        "replacementDirective": null,
+        "dynamicActorRelations": [
+          {
+            "kind": "attraction",
+            "source": "黑洞",
+            "targets": [
+              "建筑A",
+              "建筑B"
+            ],
+            "axes": [
+              "X",
+              "Y",
+              "Z"
+            ]
+          }
+        ],
+        "distanceActorRelations": [],
+        "cameraTargets": []
+      }
+    }
+  ],
+  "semantics": [
+    {
+      "result": {
+        "schemaVersion": 1,
+        "requestId": "request-1",
+        "targetId": "node_graph:project:global",
+        "projectScopeId": "world-scope-1",
+        "baseGraphRevision": "revision-1",
+        "operation": "create",
+        "summary": "Generated the dodgeball node graph.",
+        "workspace": {
+          "version": 1,
+          "nodes": [
+            {
+              "id": "start",
+              "macroType": "state",
+              "nodeType": "start",
+              "name": "Start",
+              "customName": "Initialize",
+              "x": 80,
+              "y": 120,
+              "workspace": {}
+            }
+          ],
+          "edges": [],
+          "globalVariablesWorkspace": {}
+        }
+      },
+      "request": {
+        "schemaVersion": 1,
+        "requestId": "request-1",
+        "targetId": "node_graph:project:global",
+        "projectScopeId": "world-scope-1",
+        "baseGraphRevision": "revision-1",
+        "operation": "create",
+        "instruction": "Please create a dodgeball demo",
+        "responseLanguage": "en-US",
+        "workspace": {
+          "version": 1,
+          "nodes": [
+            {
+              "id": "start",
+              "macroType": "state",
+              "nodeType": "start",
+              "name": "Start",
+              "customName": "Initialize",
+              "x": 80,
+              "y": 120,
+              "workspace": {}
+            }
+          ],
+          "edges": [],
+          "globalVariablesWorkspace": {}
+        },
+        "projectContext": {
+          "sceneName": "default",
+          "actors": [
+            {
+              "name": "Player",
+              "type": "model",
+              "tags": [
+                "player"
+              ],
+              "aliases": []
+            }
+          ]
+        }
+      },
+      "accepted": true
+    },
+    {
+      "result": {
+        "workspace": {
+          "version": 1,
+          "nodes": [
+            {
+              "id": "start",
+              "macroType": "state",
+              "nodeType": "start",
+              "name": "Start",
+              "customName": "Initialize",
+              "x": 80,
+              "y": 120,
+              "workspace": {
+                "blocks": {
+                  "languageVersion": 0,
+                  "blocks": [
+                    {
+                      "type": "node_while_active",
+                      "id": "camera-active",
+                      "x": 24,
+                      "y": 24,
+                      "inputs": {
+                        "DO": {
+                          "block": {
+                            "type": "camera_follow_object",
+                            "id": "camera-follow",
+                            "fields": {
+                              "NAME": "FollowerActor"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          ],
+          "edges": [],
+          "globalVariablesWorkspace": {}
+        }
+      },
+      "request": {
+        "schemaVersion": 1,
+        "requestId": "request-1",
+        "targetId": "node_graph:project:global",
+        "projectScopeId": "world-scope-1",
+        "baseGraphRevision": "revision-1",
+        "operation": "create",
+        "instruction": "make the camera continuously follow FollowerActor",
+        "responseLanguage": "en-US",
+        "workspace": {
+          "version": 1,
+          "nodes": [
+            {
+              "id": "start",
+              "macroType": "state",
+              "nodeType": "start",
+              "name": "Start",
+              "customName": "Initialize",
+              "x": 80,
+              "y": 120,
+              "workspace": {}
+            }
+          ],
+          "edges": [],
+          "globalVariablesWorkspace": {}
+        },
+        "projectContext": {
+          "actorContextAvailable": true,
+          "actors": [
+            {
+              "name": "LeaderActor",
+              "type": "model",
+              "tags": [],
+              "aliases": [],
+              "semanticRole": "source"
+            },
+            {
+              "name": "FollowerActor",
+              "type": "model",
+              "tags": [],
+              "aliases": []
+            }
+          ]
+        }
+      },
+      "accepted": true
+    },
+    {
+      "result": {
+        "workspace": {
+          "version": 1,
+          "nodes": [
+            {
+              "id": "start",
+              "macroType": "state",
+              "nodeType": "start",
+              "name": "Start",
+              "customName": "Initialize",
+              "x": 80,
+              "y": 120,
+              "workspace": {
+                "blocks": {
+                  "languageVersion": 0,
+                  "blocks": [
+                    {
+                      "type": "node_while_active",
+                      "id": "camera-active",
+                      "x": 24,
+                      "y": 24,
+                      "inputs": {
+                        "DO": {
+                          "block": {
+                            "type": "camera_follow_object",
+                            "id": "camera-follow",
+                            "fields": {
+                              "NAME": "LeaderActor"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          ],
+          "edges": [],
+          "globalVariablesWorkspace": {}
+        }
+      },
+      "request": {
+        "schemaVersion": 1,
+        "requestId": "request-1",
+        "targetId": "node_graph:project:global",
+        "projectScopeId": "world-scope-1",
+        "baseGraphRevision": "revision-1",
+        "operation": "create",
+        "instruction": "make the camera continuously follow FollowerActor",
+        "responseLanguage": "en-US",
+        "workspace": {
+          "version": 1,
+          "nodes": [
+            {
+              "id": "start",
+              "macroType": "state",
+              "nodeType": "start",
+              "name": "Start",
+              "customName": "Initialize",
+              "x": 80,
+              "y": 120,
+              "workspace": {}
+            }
+          ],
+          "edges": [],
+          "globalVariablesWorkspace": {}
+        },
+        "projectContext": {
+          "actorContextAvailable": true,
+          "actors": [
+            {
+              "name": "LeaderActor",
+              "type": "model",
+              "tags": [],
+              "aliases": [],
+              "semanticRole": "source"
+            },
+            {
+              "name": "FollowerActor",
+              "type": "model",
+              "tags": [],
+              "aliases": []
+            }
+          ]
+        }
+      },
+      "accepted": false,
+      "error": "Camera follow block must target the requested actor FollowerActor"
+    },
+    {
+      "result": {
+        "workspace": {
+          "version": 1,
+          "nodes": [
+            {
+              "id": "start",
+              "macroType": "state",
+              "nodeType": "start",
+              "name": "Start",
+              "customName": "Initialize",
+              "x": 80,
+              "y": 120,
+              "workspace": {
+                "blocks": {
+                  "languageVersion": 0,
+                  "blocks": [
+                    {
+                      "type": "node_while_active",
+                      "id": "active",
+                      "x": 24,
+                      "y": 24,
+                      "inputs": {
+                        "DO": {
+                          "block": {
+                            "type": "object_set_position",
+                            "id": "follow-target",
+                            "fields": {
+                              "NAME": "FollowerActor",
+                              "X": 0,
+                              "Y": 0,
+                              "Z": 0
+                            },
+                            "inputs": {
+                              "X": {
+                                "block": {
+                                  "type": "object_get_x",
+                                  "id": "source-x",
+                                  "fields": {
+                                    "NAME": "LeaderActor"
+                                  }
+                                }
+                              },
+                              "Y": {
+                                "block": {
+                                  "type": "object_get_y",
+                                  "id": "source-y",
+                                  "fields": {
+                                    "NAME": "LeaderActor"
+                                  }
+                                }
+                              },
+                              "Z": {
+                                "block": {
+                                  "type": "object_get_z",
+                                  "id": "source-z",
+                                  "fields": {
+                                    "NAME": "LeaderActor"
+                                  }
+                                }
+                              }
+                            },
+                            "next": {
+                              "block": {
+                                "type": "control_if",
+                                "id": "hide-when-near",
+                                "inputs": {
+                                  "CONDITION": {
+                                    "block": {
+                                      "type": "detect_position_near",
+                                      "id": "target-near-source",
+                                      "fields": {
+                                        "NAME_TEXT": "FollowerActor",
+                                        "X_NUMBER": 0,
+                                        "Y_NUMBER": 0,
+                                        "Z_NUMBER": 0,
+                                        "TOLERANCE_NUMBER": 2
+                                      },
+                                      "inputs": {
+                                        "TOLERANCE": {
+                                          "shadow": {
+                                            "type": "math_number",
+                                            "id": "distance-threshold",
+                                            "fields": {
+                                              "NUM": 2
+                                            }
+                                          }
+                                        },
+                                        "X": {
+                                          "block": {
+                                            "type": "object_get_x",
+                                            "id": "distance-source-x",
+                                            "fields": {
+                                              "NAME": "LeaderActor"
+                                            }
+                                          }
+                                        },
+                                        "Y": {
+                                          "block": {
+                                            "type": "object_get_y",
+                                            "id": "distance-source-y",
+                                            "fields": {
+                                              "NAME": "LeaderActor"
+                                            }
+                                          }
+                                        },
+                                        "Z": {
+                                          "block": {
+                                            "type": "object_get_z",
+                                            "id": "distance-source-z",
+                                            "fields": {
+                                              "NAME": "LeaderActor"
+                                            }
+                                          }
+                                        }
+                                      }
+                                    }
+                                  },
+                                  "DO": {
+                                    "block": {
+                                      "type": "object_hide",
+                                      "id": "hide-target",
+                                      "fields": {
+                                        "NAME": "FollowerActor"
+                                      }
+                                    }
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          ],
+          "edges": [],
+          "globalVariablesWorkspace": {}
+        }
+      },
+      "request": {
+        "schemaVersion": 1,
+        "requestId": "request-1",
+        "targetId": "node_graph:project:global",
+        "projectScopeId": "world-scope-1",
+        "baseGraphRevision": "revision-1",
+        "operation": "create",
+        "instruction": "make FollowerActor continuously follow LeaderActor and hide FollowerActor when distance is less than 2",
+        "responseLanguage": "en-US",
+        "workspace": {
+          "version": 1,
+          "nodes": [
+            {
+              "id": "start",
+              "macroType": "state",
+              "nodeType": "start",
+              "name": "Start",
+              "customName": "Initialize",
+              "x": 80,
+              "y": 120,
+              "workspace": {}
+            }
+          ],
+          "edges": [],
+          "globalVariablesWorkspace": {}
+        },
+        "projectContext": {
+          "actorContextAvailable": true,
+          "actors": [
+            {
+              "name": "LeaderActor",
+              "type": "model",
+              "tags": [],
+              "aliases": []
+            },
+            {
+              "name": "FollowerActor",
+              "type": "model",
+              "tags": [],
+              "aliases": []
+            }
+          ]
+        }
+      },
+      "accepted": true
+    },
+    {
+      "result": {
+        "workspace": {
+          "version": 1,
+          "nodes": [
+            {
+              "id": "start",
+              "macroType": "state",
+              "nodeType": "start",
+              "name": "Start",
+              "customName": "Initialize",
+              "x": 80,
+              "y": 120,
+              "workspace": {
+                "blocks": {
+                  "languageVersion": 0,
+                  "blocks": [
+                    {
+                      "type": "node_while_active",
+                      "id": "active",
+                      "x": 24,
+                      "y": 24,
+                      "inputs": {
+                        "DO": {
+                          "block": {
+                            "type": "object_set_position",
+                            "id": "follow-target",
+                            "fields": {
+                              "NAME": "FollowerActor",
+                              "X": 0,
+                              "Y": 0,
+                              "Z": 0
+                            },
+                            "inputs": {
+                              "X": {
+                                "block": {
+                                  "type": "object_get_x",
+                                  "id": "source-x",
+                                  "fields": {
+                                    "NAME": "LeaderActor"
+                                  }
+                                }
+                              },
+                              "Y": {
+                                "block": {
+                                  "type": "object_get_y",
+                                  "id": "source-y",
+                                  "fields": {
+                                    "NAME": "LeaderActor"
+                                  }
+                                }
+                              },
+                              "Z": {
+                                "block": {
+                                  "type": "object_get_z",
+                                  "id": "source-z",
+                                  "fields": {
+                                    "NAME": "LeaderActor"
+                                  }
+                                }
+                              }
+                            },
+                            "next": {
+                              "block": {
+                                "type": "control_if",
+                                "id": "hide-when-near",
+                                "inputs": {
+                                  "CONDITION": {
+                                    "block": {
+                                      "type": "detect_position_near",
+                                      "id": "target-near-source",
+                                      "fields": {
+                                        "NAME_TEXT": "FollowerActor",
+                                        "X_NUMBER": 0,
+                                        "Y_NUMBER": 0,
+                                        "Z_NUMBER": 0,
+                                        "TOLERANCE_NUMBER": 2
+                                      },
+                                      "inputs": {
+                                        "TOLERANCE": {
+                                          "shadow": {
+                                            "type": "math_number",
+                                            "id": "distance-threshold",
+                                            "fields": {
+                                              "NUM": 2
+                                            }
+                                          }
+                                        }
+                                      }
+                                    }
+                                  },
+                                  "DO": {
+                                    "block": {
+                                      "type": "object_hide",
+                                      "id": "hide-target",
+                                      "fields": {
+                                        "NAME": "FollowerActor"
+                                      }
+                                    }
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          ],
+          "edges": [],
+          "globalVariablesWorkspace": {}
+        }
+      },
+      "request": {
+        "schemaVersion": 1,
+        "requestId": "request-1",
+        "targetId": "node_graph:project:global",
+        "projectScopeId": "world-scope-1",
+        "baseGraphRevision": "revision-1",
+        "operation": "create",
+        "instruction": "make FollowerActor continuously follow LeaderActor and hide FollowerActor when distance is less than 2",
+        "responseLanguage": "en-US",
+        "workspace": {
+          "version": 1,
+          "nodes": [
+            {
+              "id": "start",
+              "macroType": "state",
+              "nodeType": "start",
+              "name": "Start",
+              "customName": "Initialize",
+              "x": 80,
+              "y": 120,
+              "workspace": {}
+            }
+          ],
+          "edges": [],
+          "globalVariablesWorkspace": {}
+        },
+        "projectContext": {
+          "actorContextAvailable": true,
+          "actors": [
+            {
+              "name": "LeaderActor",
+              "type": "model",
+              "tags": [],
+              "aliases": []
+            },
+            {
+              "name": "FollowerActor",
+              "type": "model",
+              "tags": [],
+              "aliases": []
+            }
+          ]
+        }
+      },
+      "accepted": false,
+      "error": "Distance condition must contain both requested actors and use live coordinates: source=LeaderActor, missingTargets=FollowerActor"
+    },
+    {
+      "result": {
+        "workspace": {
+          "version": 1,
+          "nodes": [
+            {
+              "id": "start",
+              "macroType": "state",
+              "nodeType": "start",
+              "name": "Start",
+              "customName": "Initialize",
+              "x": 80,
+              "y": 120,
+              "workspace": {
+                "blocks": {
+                  "languageVersion": 0,
+                  "blocks": [
+                    {
+                      "type": "node_while_active",
+                      "id": "active",
+                      "x": 24,
+                      "y": 24,
+                      "inputs": {
+                        "DO": {
+                          "block": {
+                            "type": "object_set_position",
+                            "id": "follow-target",
+                            "fields": {
+                              "NAME": "FollowerActor",
+                              "X": 0,
+                              "Y": 0,
+                              "Z": 0
+                            },
+                            "next": {
+                              "block": {
+                                "type": "control_if",
+                                "id": "hide-when-near",
+                                "inputs": {
+                                  "CONDITION": {
+                                    "block": {
+                                      "type": "detect_position_near",
+                                      "id": "target-near-source",
+                                      "fields": {
+                                        "NAME_TEXT": "FollowerActor",
+                                        "X_NUMBER": 0,
+                                        "Y_NUMBER": 0,
+                                        "Z_NUMBER": 0,
+                                        "TOLERANCE_NUMBER": 2
+                                      },
+                                      "inputs": {
+                                        "TOLERANCE": {
+                                          "shadow": {
+                                            "type": "math_number",
+                                            "id": "distance-threshold",
+                                            "fields": {
+                                              "NUM": 2
+                                            }
+                                          }
+                                        },
+                                        "X": {
+                                          "block": {
+                                            "type": "object_get_x",
+                                            "id": "distance-source-x",
+                                            "fields": {
+                                              "NAME": "LeaderActor"
+                                            }
+                                          }
+                                        },
+                                        "Y": {
+                                          "block": {
+                                            "type": "object_get_y",
+                                            "id": "distance-source-y",
+                                            "fields": {
+                                              "NAME": "LeaderActor"
+                                            }
+                                          }
+                                        },
+                                        "Z": {
+                                          "block": {
+                                            "type": "object_get_z",
+                                            "id": "distance-source-z",
+                                            "fields": {
+                                              "NAME": "LeaderActor"
+                                            }
+                                          }
+                                        }
+                                      }
+                                    }
+                                  },
+                                  "DO": {
+                                    "block": {
+                                      "type": "object_hide",
+                                      "id": "hide-target",
+                                      "fields": {
+                                        "NAME": "FollowerActor"
+                                      }
+                                    }
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          ],
+          "edges": [],
+          "globalVariablesWorkspace": {}
+        }
+      },
+      "request": {
+        "schemaVersion": 1,
+        "requestId": "request-1",
+        "targetId": "node_graph:project:global",
+        "projectScopeId": "world-scope-1",
+        "baseGraphRevision": "revision-1",
+        "operation": "create",
+        "instruction": "make FollowerActor continuously follow LeaderActor and hide FollowerActor when distance is less than 2",
+        "responseLanguage": "en-US",
+        "workspace": {
+          "version": 1,
+          "nodes": [
+            {
+              "id": "start",
+              "macroType": "state",
+              "nodeType": "start",
+              "name": "Start",
+              "customName": "Initialize",
+              "x": 80,
+              "y": 120,
+              "workspace": {}
+            }
+          ],
+          "edges": [],
+          "globalVariablesWorkspace": {}
+        },
+        "projectContext": {
+          "actorContextAvailable": true,
+          "actors": [
+            {
+              "name": "LeaderActor",
+              "type": "model",
+              "tags": [],
+              "aliases": []
+            },
+            {
+              "name": "FollowerActor",
+              "type": "model",
+              "tags": [],
+              "aliases": []
+            }
+          ]
+        }
+      },
+      "accepted": false,
+      "error": "Dynamic actor dependency is incomplete: movement for each target must read the live X,Y,Z coordinates of LeaderActor; FollowerActor missing X,Y,Z"
+    },
+    {
+      "result": {
+        "schemaVersion": 1,
+        "requestId": "request-1",
+        "targetId": "node_graph:project:global",
+        "projectScopeId": "world-scope-1",
+        "baseGraphRevision": "revision-1",
+        "operation": "edit",
+        "summary": "已将移动积木的对象改为 bunny2。",
+        "workspace": {
+          "version": 1,
+          "nodes": [
+            {
+              "id": "start",
+              "macroType": "state",
+              "nodeType": "start",
+              "name": "Start",
+              "customName": "Initialize",
+              "x": 80,
+              "y": 120,
+              "workspace": {}
+            },
+            {
+              "id": "control",
+              "macroType": "state",
+              "nodeType": "custom",
+              "name": "球体控制",
+              "customName": "球体控制",
+              "x": 480,
+              "y": 120,
+              "workspace": {
+                "blocks": {
+                  "languageVersion": 0,
+                  "blocks": [
+                    {
+                      "type": "node_while_active",
+                      "id": "control-active",
+                      "x": 24,
+                      "y": 24,
+                      "inputs": {
+                        "DO": {
+                          "block": {
+                            "type": "object_third_person_move",
+                            "id": "move-ball",
+                            "fields": {
+                              "NAME": "bunny2",
+                              "SPEED": 0.18,
+                              "OBSTACLE_TAG": "obstacle",
+                              "MIN_X": -12,
+                              "MAX_X": 12,
+                              "MIN_Z": -12,
+                              "MAX_Z": 12
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          ],
+          "edges": [
+            {
+              "id": "start-control",
+              "source": {
+                "nodeId": "start",
+                "side": "right",
+                "index": 0
+              },
+              "target": {
+                "nodeId": "control",
+                "side": "left",
+                "index": 0
+              },
+              "name": "进入控制",
+              "conditionWorkspace": {
+                "blocks": {
+                  "languageVersion": 0,
+                  "blocks": [
+                    {
+                      "type": "logic_boolean",
+                      "id": "always-control",
+                      "fields": {
+                        "BOOL": "TRUE"
+                      },
+                      "x": 24,
+                      "y": 24
+                    }
+                  ]
+                }
+              }
+            }
+          ],
+          "globalVariablesWorkspace": {}
+        }
+      },
+      "request": {
+        "schemaVersion": 1,
+        "requestId": "request-1",
+        "targetId": "node_graph:project:global",
+        "projectScopeId": "world-scope-1",
+        "baseGraphRevision": "revision-1",
+        "operation": "edit",
+        "instruction": "将移动积木的对象改为 bunny2",
+        "responseLanguage": "zh-CN",
+        "workspace": {
+          "version": 1,
+          "nodes": [
+            {
+              "id": "start",
+              "macroType": "state",
+              "nodeType": "start",
+              "name": "Start",
+              "customName": "Initialize",
+              "x": 80,
+              "y": 120,
+              "workspace": {}
+            },
+            {
+              "id": "control",
+              "macroType": "state",
+              "nodeType": "custom",
+              "name": "球体控制",
+              "customName": "球体控制",
+              "x": 480,
+              "y": 120,
+              "workspace": {
+                "blocks": {
+                  "languageVersion": 0,
+                  "blocks": [
+                    {
+                      "type": "node_while_active",
+                      "id": "control-active",
+                      "x": 24,
+                      "y": 24,
+                      "inputs": {
+                        "DO": {
+                          "block": {
+                            "type": "object_third_person_move",
+                            "id": "move-ball",
+                            "fields": {
+                              "NAME": "bunny1",
+                              "SPEED": 0.18,
+                              "OBSTACLE_TAG": "obstacle",
+                              "MIN_X": -12,
+                              "MAX_X": 12,
+                              "MIN_Z": -12,
+                              "MAX_Z": 12
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          ],
+          "edges": [
+            {
+              "id": "start-control",
+              "source": {
+                "nodeId": "start",
+                "side": "right",
+                "index": 0
+              },
+              "target": {
+                "nodeId": "control",
+                "side": "left",
+                "index": 0
+              },
+              "name": "进入控制",
+              "conditionWorkspace": {
+                "blocks": {
+                  "languageVersion": 0,
+                  "blocks": [
+                    {
+                      "type": "logic_boolean",
+                      "id": "always-control",
+                      "fields": {
+                        "BOOL": "TRUE"
+                      },
+                      "x": 24,
+                      "y": 24
+                    }
+                  ]
+                }
+              }
+            }
+          ],
+          "globalVariablesWorkspace": {}
+        },
+        "projectContext": {
+          "actors": [
+            {
+              "name": "bunny1",
+              "type": "model",
+              "tags": [],
+              "aliases": []
+            },
+            {
+              "name": "bunny2",
+              "type": "model",
+              "tags": [],
+              "aliases": []
+            }
+          ]
+        }
+      },
+      "accepted": true
+    },
+    {
+      "result": {
+        "schemaVersion": 1,
+        "requestId": "request-1",
+        "targetId": "node_graph:project:global",
+        "projectScopeId": "world-scope-1",
+        "baseGraphRevision": "revision-1",
+        "operation": "extend",
+        "summary": "已为兔子添加旋转功能。",
+        "workspace": {
+          "version": 1,
+          "nodes": [
+            {
+              "id": "start",
+              "macroType": "state",
+              "nodeType": "start",
+              "name": "Start",
+              "customName": "Initialize",
+              "x": 80,
+              "y": 120,
+              "workspace": {
+                "blocks": {
+                  "languageVersion": 0,
+                  "blocks": [
+                    {
+                      "type": "node_while_active",
+                      "id": "active-root",
+                      "x": 24,
+                      "y": 24,
+                      "inputs": {
+                        "DO": {
+                          "block": {
+                            "type": "control_if",
+                            "id": "legacy-if",
+                            "inputs": {
+                              "DO": {
+                                "block": {
+                                  "type": "engine_rotateZ",
+                                  "id": "legacy-rotate",
+                                  "fields": {
+                                    "ANGLE": 15
+                                  },
+                                  "inputs": {
+                                    "OBJECT": {
+                                      "block": {
+                                        "type": "object_reference",
+                                        "id": "ai_repair_object_2",
+                                        "fields": {
+                                          "OBJECT": "bunny2",
+                                          "MANUAL": ""
+                                        }
+                                      }
+                                    }
+                                  }
+                                }
+                              },
+                              "CONDITION": {
+                                "block": {
+                                  "type": "logic_boolean",
+                                  "id": "ai_repair_condition_1",
+                                  "fields": {
+                                    "BOOL": "TRUE"
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          ],
+          "edges": [],
+          "globalVariablesWorkspace": {}
+        }
+      },
+      "request": {
+        "schemaVersion": 1,
+        "requestId": "request-1",
+        "targetId": "node_graph:project:global",
+        "projectScopeId": "world-scope-1",
+        "baseGraphRevision": "revision-1",
+        "operation": "extend",
+        "instruction": "给兔子添加旋转功能",
+        "responseLanguage": "zh-CN",
+        "workspace": {
+          "version": 1,
+          "nodes": [
+            {
+              "id": "start",
+              "macroType": "state",
+              "nodeType": "start",
+              "name": "Start",
+              "customName": "Initialize",
+              "x": 80,
+              "y": 120,
+              "workspace": {}
+            }
+          ],
+          "edges": [],
+          "globalVariablesWorkspace": {}
+        },
+        "projectContext": {
+          "actors": [
+            {
+              "name": "bunny2",
+              "type": "model",
+              "tags": [],
+              "aliases": []
+            }
+          ]
+        }
+      },
+      "accepted": true
+    },
+    {
+      "result": {
+        "schemaVersion": 1,
+        "requestId": "request-1",
+        "targetId": "node_graph:project:global",
+        "projectScopeId": "world-scope-1",
+        "baseGraphRevision": "revision-1",
+        "operation": "extend",
+        "summary": "已添加移动和跳跃。",
+        "workspace": {
+          "version": 1,
+          "nodes": [
+            {
+              "id": "start",
+              "macroType": "state",
+              "nodeType": "start",
+              "name": "Start",
+              "customName": "Initialize",
+              "x": 80,
+              "y": 120,
+              "workspace": {}
+            },
+            {
+              "id": "control",
+              "macroType": "state",
+              "nodeType": "custom",
+              "name": "球体控制",
+              "customName": "球体控制",
+              "x": 480,
+              "y": 120,
+              "workspace": {
+                "blocks": {
+                  "languageVersion": 0,
+                  "blocks": [
+                    {
+                      "type": "node_while_active",
+                      "id": "control-active",
+                      "x": 24,
+                      "y": 24,
+                      "inputs": {
+                        "DO": {
+                          "block": {
+                            "type": "object_third_person_move",
+                            "id": "move-ball",
+                            "fields": {
+                              "NAME": "ball",
+                              "SPEED": 0.18,
+                              "OBSTACLE_TAG": "obstacle",
+                              "MIN_X": -12,
+                              "MAX_X": 12,
+                              "MIN_Z": -12,
+                              "MAX_Z": 12
+                            },
+                            "next": {
+                              "block": {
+                                "type": "object_arcade_jump",
+                                "id": "jump-ball",
+                                "fields": {
+                                  "NAME": "other",
+                                  "POWER": 0.28,
+                                  "GRAVITY": 0.025,
+                                  "GROUND_Y": 0.8
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          ],
+          "edges": [
+            {
+              "id": "start-control",
+              "source": {
+                "nodeId": "start",
+                "side": "right",
+                "index": 0
+              },
+              "target": {
+                "nodeId": "control",
+                "side": "left",
+                "index": 0
+              },
+              "name": "进入控制",
+              "conditionWorkspace": {
+                "blocks": {
+                  "languageVersion": 0,
+                  "blocks": [
+                    {
+                      "type": "logic_boolean",
+                      "id": "always-control",
+                      "fields": {
+                        "BOOL": "TRUE"
+                      },
+                      "x": 24,
+                      "y": 24
+                    }
+                  ]
+                }
+              }
+            }
+          ],
+          "globalVariablesWorkspace": {}
+        }
+      },
+      "request": {
+        "schemaVersion": 1,
+        "requestId": "request-1",
+        "targetId": "node_graph:project:global",
+        "projectScopeId": "world-scope-1",
+        "baseGraphRevision": "revision-1",
+        "operation": "extend",
+        "instruction": "给球加 WASD 和空格跳跃",
+        "responseLanguage": "zh-CN",
+        "workspace": {
+          "version": 1,
+          "nodes": [
+            {
+              "id": "start",
+              "macroType": "state",
+              "nodeType": "start",
+              "name": "Start",
+              "customName": "Initialize",
+              "x": 80,
+              "y": 120,
+              "workspace": {}
+            }
+          ],
+          "edges": [],
+          "globalVariablesWorkspace": {}
+        },
+        "projectContext": {
+          "actors": [
+            {
+              "name": "ball",
+              "type": "model",
+              "tags": [],
+              "aliases": []
+            },
+            {
+              "name": "other",
+              "type": "model",
+              "tags": [],
+              "aliases": []
+            }
+          ]
+        }
+      },
+      "accepted": false,
+      "error": "WASD 移动和空格跳跃必须绑定同一个对象"
+    },
+    {
+      "result": {
+        "workspace": {
+          "version": 1,
+          "nodes": [
+            {
+              "id": "start",
+              "macroType": "state",
+              "nodeType": "start",
+              "name": "Start",
+              "customName": "Initialize",
+              "x": 80,
+              "y": 120,
+              "workspace": {}
+            },
+            {
+              "id": "control",
+              "macroType": "state",
+              "nodeType": "custom",
+              "name": "球体控制",
+              "customName": "球体控制",
+              "x": 480,
+              "y": 120,
+              "workspace": {
+                "blocks": {
+                  "languageVersion": 0,
+                  "blocks": [
+                    {
+                      "type": "node_while_active",
+                      "id": "control-active",
+                      "x": 24,
+                      "y": 24,
+                      "inputs": {
+                        "DO": {
+                          "block": {
+                            "type": "object_move_tag",
+                            "id": "move-buildings",
+                            "fields": {
+                              "TAG_TEXT": "building"
+                            },
+                            "inputs": {
+                              "DX": {
+                                "block": {
+                                  "type": "object_get_x",
+                                  "id": "move-buildings-source-x",
+                                  "fields": {
+                                    "NAME": "黑洞"
+                                  }
+                                }
+                              },
+                              "DY": {
+                                "block": {
+                                  "type": "object_get_y",
+                                  "id": "move-buildings-source-y",
+                                  "fields": {
+                                    "NAME": "黑洞"
+                                  }
+                                }
+                              },
+                              "DZ": {
+                                "block": {
+                                  "type": "object_get_z",
+                                  "id": "move-buildings-source-z",
+                                  "fields": {
+                                    "NAME": "黑洞"
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          ],
+          "edges": [
+            {
+              "id": "start-control",
+              "source": {
+                "nodeId": "start",
+                "side": "right",
+                "index": 0
+              },
+              "target": {
+                "nodeId": "control",
+                "side": "left",
+                "index": 0
+              },
+              "name": "进入控制",
+              "conditionWorkspace": {
+                "blocks": {
+                  "languageVersion": 0,
+                  "blocks": [
+                    {
+                      "type": "logic_boolean",
+                      "id": "always-control",
+                      "fields": {
+                        "BOOL": "TRUE"
+                      },
+                      "x": 24,
+                      "y": 24
+                    }
+                  ]
+                }
+              }
+            }
+          ],
+          "globalVariablesWorkspace": {}
+        }
+      },
+      "request": {
+        "schemaVersion": 1,
+        "requestId": "request-1",
+        "targetId": "node_graph:project:global",
+        "projectScopeId": "world-scope-1",
+        "baseGraphRevision": "revision-1",
+        "operation": "create",
+        "instruction": "让黑洞持续吸附所有建筑",
+        "responseLanguage": "zh-CN",
+        "workspace": {
+          "version": 1,
+          "nodes": [
+            {
+              "id": "start",
+              "macroType": "state",
+              "nodeType": "start",
+              "name": "Start",
+              "customName": "Initialize",
+              "x": 80,
+              "y": 120,
+              "workspace": {}
+            }
+          ],
+          "edges": [],
+          "globalVariablesWorkspace": {}
+        },
+        "projectContext": {
+          "actorContextAvailable": true,
+          "actors": [
+            {
+              "name": "黑洞",
+              "type": "actor",
+              "tags": [
+                "source"
+              ],
+              "aliases": []
+            },
+            {
+              "name": "建筑A",
+              "type": "actor",
+              "tags": [
+                "building"
+              ],
+              "aliases": []
+            },
+            {
+              "name": "建筑B",
+              "type": "actor",
+              "tags": [
+                "building"
+              ],
+              "aliases": []
+            }
+          ]
+        }
+      },
+      "accepted": true
+    },
+    {
+      "result": {
+        "workspace": {
+          "version": 1,
+          "nodes": [
+            {
+              "id": "start",
+              "macroType": "state",
+              "nodeType": "start",
+              "name": "Start",
+              "customName": "Initialize",
+              "x": 80,
+              "y": 120,
+              "workspace": {}
+            },
+            {
+              "id": "control",
+              "macroType": "state",
+              "nodeType": "custom",
+              "name": "球体控制",
+              "customName": "球体控制",
+              "x": 480,
+              "y": 120,
+              "workspace": {
+                "blocks": {
+                  "languageVersion": 0,
+                  "blocks": [
+                    {
+                      "type": "node_while_active",
+                      "id": "control-active",
+                      "x": 24,
+                      "y": 24,
+                      "inputs": {
+                        "DO": {
+                          "block": {
+                            "type": "object_move_tag",
+                            "id": "move-buildings",
+                            "fields": {
+                              "TAG_TEXT": "unrelated"
+                            },
+                            "inputs": {
+                              "DX": {
+                                "block": {
+                                  "type": "object_get_x",
+                                  "id": "move-buildings-source-x",
+                                  "fields": {
+                                    "NAME": "黑洞"
+                                  }
+                                }
+                              },
+                              "DY": {
+                                "block": {
+                                  "type": "object_get_y",
+                                  "id": "move-buildings-source-y",
+                                  "fields": {
+                                    "NAME": "黑洞"
+                                  }
+                                }
+                              },
+                              "DZ": {
+                                "block": {
+                                  "type": "object_get_z",
+                                  "id": "move-buildings-source-z",
+                                  "fields": {
+                                    "NAME": "黑洞"
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          ],
+          "edges": [
+            {
+              "id": "start-control",
+              "source": {
+                "nodeId": "start",
+                "side": "right",
+                "index": 0
+              },
+              "target": {
+                "nodeId": "control",
+                "side": "left",
+                "index": 0
+              },
+              "name": "进入控制",
+              "conditionWorkspace": {
+                "blocks": {
+                  "languageVersion": 0,
+                  "blocks": [
+                    {
+                      "type": "logic_boolean",
+                      "id": "always-control",
+                      "fields": {
+                        "BOOL": "TRUE"
+                      },
+                      "x": 24,
+                      "y": 24
+                    }
+                  ]
+                }
+              }
+            }
+          ],
+          "globalVariablesWorkspace": {}
+        }
+      },
+      "request": {
+        "schemaVersion": 1,
+        "requestId": "request-1",
+        "targetId": "node_graph:project:global",
+        "projectScopeId": "world-scope-1",
+        "baseGraphRevision": "revision-1",
+        "operation": "create",
+        "instruction": "让黑洞持续吸附所有建筑",
+        "responseLanguage": "zh-CN",
+        "workspace": {
+          "version": 1,
+          "nodes": [
+            {
+              "id": "start",
+              "macroType": "state",
+              "nodeType": "start",
+              "name": "Start",
+              "customName": "Initialize",
+              "x": 80,
+              "y": 120,
+              "workspace": {}
+            }
+          ],
+          "edges": [],
+          "globalVariablesWorkspace": {}
+        },
+        "projectContext": {
+          "actorContextAvailable": true,
+          "actors": [
+            {
+              "name": "黑洞",
+              "type": "actor",
+              "tags": [
+                "source"
+              ],
+              "aliases": []
+            },
+            {
+              "name": "建筑A",
+              "type": "actor",
+              "tags": [
+                "building"
+              ],
+              "aliases": []
+            },
+            {
+              "name": "建筑B",
+              "type": "actor",
+              "tags": [
+                "building"
+              ],
+              "aliases": []
+            }
+          ]
+        }
+      },
+      "accepted": false,
+      "error": "多目标请求没有覆盖以下明确目标：建筑A, 建筑B"
+    },
+    {
+      "result": {
+        "schemaVersion": 1,
+        "requestId": "request-1",
+        "targetId": "node_graph:project:global",
+        "projectScopeId": "world-scope-1",
+        "baseGraphRevision": "revision-1",
+        "operation": "extend",
+        "summary": "已添加球体控制。",
+        "workspace": {
+          "version": 1,
+          "nodes": [
+            {
+              "id": "start",
+              "macroType": "state",
+              "nodeType": "start",
+              "name": "Start",
+              "customName": "Initialize",
+              "x": 80,
+              "y": 120,
+              "workspace": {}
+            },
+            {
+              "id": "control",
+              "macroType": "state",
+              "nodeType": "custom",
+              "name": "球体控制",
+              "customName": "球体控制",
+              "x": 480,
+              "y": 120,
+              "workspace": {
+                "blocks": {
+                  "languageVersion": 0,
+                  "blocks": [
+                    {
+                      "type": "node_while_active",
+                      "id": "control-active",
+                      "x": 24,
+                      "y": 24,
+                      "inputs": {
+                        "DO": {
+                          "block": {
+                            "type": "object_third_person_move",
+                            "id": "move-ball",
+                            "fields": {
+                              "NAME": "ball",
+                              "SPEED": 0.18,
+                              "OBSTACLE_TAG": "obstacle",
+                              "MIN_X": -12,
+                              "MAX_X": 12,
+                              "MIN_Z": -12,
+                              "MAX_Z": 12
+                            },
+                            "next": {
+                              "block": {
+                                "type": "object_arcade_jump",
+                                "id": "jump-ball",
+                                "fields": {
+                                  "NAME": "ball",
+                                  "POWER": 0.28,
+                                  "GRAVITY": 0.025,
+                                  "GROUND_Y": 0.8
+                                },
+                                "next": {
+                                  "block": {
+                                    "type": "ui_set_score",
+                                    "id": "unrequested-score",
+                                    "fields": {
+                                      "VALUE": 0
+                                    }
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          ],
+          "edges": [
+            {
+              "id": "start-control",
+              "source": {
+                "nodeId": "start",
+                "side": "right",
+                "index": 0
+              },
+              "target": {
+                "nodeId": "control",
+                "side": "left",
+                "index": 0
+              },
+              "name": "进入控制",
+              "conditionWorkspace": {
+                "blocks": {
+                  "languageVersion": 0,
+                  "blocks": [
+                    {
+                      "type": "logic_boolean",
+                      "id": "always-control",
+                      "fields": {
+                        "BOOL": "TRUE"
+                      },
+                      "x": 24,
+                      "y": 24
+                    }
+                  ]
+                }
+              }
+            }
+          ],
+          "globalVariablesWorkspace": {}
+        }
+      },
+      "request": {
+        "schemaVersion": 1,
+        "requestId": "request-1",
+        "targetId": "node_graph:project:global",
+        "projectScopeId": "world-scope-1",
+        "baseGraphRevision": "revision-1",
+        "operation": "extend",
+        "instruction": "给球加 WASD 和空格跳跃",
+        "responseLanguage": "zh-CN",
+        "workspace": {
+          "version": 1,
+          "nodes": [
+            {
+              "id": "start",
+              "macroType": "state",
+              "nodeType": "start",
+              "name": "Start",
+              "customName": "Initialize",
+              "x": 80,
+              "y": 120,
+              "workspace": {}
+            }
+          ],
+          "edges": [],
+          "globalVariablesWorkspace": {}
+        },
+        "projectContext": {
+          "actors": [
+            {
+              "name": "ball",
+              "type": "model",
+              "tags": [],
+              "aliases": []
+            }
+          ]
+        }
+      },
+      "accepted": false,
+      "error": "局部对象控制请求不应新增计分、生命、胜负或战斗模板：ui_set_score"
+    },
+    {
+      "result": {
+        "schemaVersion": 1,
+        "requestId": "request-1",
+        "targetId": "node_graph:project:global",
+        "projectScopeId": "world-scope-1",
+        "baseGraphRevision": "revision-1",
+        "operation": "extend",
+        "summary": "已添加球体控制。",
+        "workspace": {
+          "version": 1,
+          "nodes": [
+            {
+              "id": "start",
+              "macroType": "state",
+              "nodeType": "start",
+              "name": "Start",
+              "customName": "Initialize",
+              "x": 80,
+              "y": 120,
+              "workspace": {}
+            },
+            {
+              "id": "control",
+              "macroType": "state",
+              "nodeType": "custom",
+              "name": "球体控制",
+              "customName": "球体控制",
+              "x": 480,
+              "y": 120,
+              "workspace": {
+                "blocks": {
+                  "languageVersion": 0,
+                  "blocks": [
+                    {
+                      "type": "node_while_active",
+                      "id": "control-active",
+                      "x": 24,
+                      "y": 24,
+                      "inputs": {
+                        "DO": {
+                          "block": {
+                            "type": "object_set_tag_velocity_axis",
+                            "id": "wrong-tag-velocity",
+                            "fields": {
+                              "TAG_TEXT": "ball",
+                              "AXIS": "X",
+                              "VALUE_NUMBER": 0.1
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          ],
+          "edges": [
+            {
+              "id": "start-control",
+              "source": {
+                "nodeId": "start",
+                "side": "right",
+                "index": 0
+              },
+              "target": {
+                "nodeId": "control",
+                "side": "left",
+                "index": 0
+              },
+              "name": "进入控制",
+              "conditionWorkspace": {
+                "blocks": {
+                  "languageVersion": 0,
+                  "blocks": [
+                    {
+                      "type": "logic_boolean",
+                      "id": "always-control",
+                      "fields": {
+                        "BOOL": "TRUE"
+                      },
+                      "x": 24,
+                      "y": 24
+                    }
+                  ]
+                }
+              }
+            }
+          ],
+          "globalVariablesWorkspace": {}
+        }
+      },
+      "request": {
+        "schemaVersion": 1,
+        "requestId": "request-1",
+        "targetId": "node_graph:project:global",
+        "projectScopeId": "world-scope-1",
+        "baseGraphRevision": "revision-1",
+        "operation": "extend",
+        "instruction": "给球加 WASD 和空格跳跃",
+        "responseLanguage": "zh-CN",
+        "workspace": {
+          "version": 1,
+          "nodes": [
+            {
+              "id": "start",
+              "macroType": "state",
+              "nodeType": "start",
+              "name": "Start",
+              "customName": "Initialize",
+              "x": 80,
+              "y": 120,
+              "workspace": {}
+            }
+          ],
+          "edges": [],
+          "globalVariablesWorkspace": {}
+        },
+        "projectContext": {
+          "actors": [
+            {
+              "name": "ball",
+              "type": "model",
+              "tags": [],
+              "aliases": []
+            }
+          ]
+        }
+      },
+      "accepted": false,
+      "error": "请求的控制能力没有完整实现：node_while_active 中的 object_third_person_move；同一持续循环中的 object_arcade_jump"
+    },
+    {
+      "result": {
+        "schemaVersion": 1,
+        "requestId": "request-1",
+        "targetId": "node_graph:project:global",
+        "projectScopeId": "world-scope-1",
+        "baseGraphRevision": "revision-1",
+        "operation": "extend",
+        "summary": "已为球添加 WASD 移动和空格跳跃。",
+        "workspace": {
+          "version": 1,
+          "nodes": [
+            {
+              "id": "start",
+              "macroType": "state",
+              "nodeType": "start",
+              "name": "Start",
+              "customName": "Initialize",
+              "x": 80,
+              "y": 120,
+              "workspace": {}
+            },
+            {
+              "id": "control",
+              "macroType": "state",
+              "nodeType": "custom",
+              "name": "球体控制",
+              "customName": "球体控制",
+              "x": 480,
+              "y": 120,
+              "workspace": {
+                "blocks": {
+                  "languageVersion": 0,
+                  "blocks": [
+                    {
+                      "type": "node_while_active",
+                      "id": "control-active",
+                      "x": 24,
+                      "y": 24,
+                      "inputs": {
+                        "DO": {
+                          "block": {
+                            "type": "object_third_person_move",
+                            "id": "move-ball",
+                            "fields": {
+                              "NAME": "ball",
+                              "SPEED": 0.18,
+                              "OBSTACLE_TAG": "obstacle",
+                              "MIN_X": -12,
+                              "MAX_X": 12,
+                              "MIN_Z": -12,
+                              "MAX_Z": 12
+                            },
+                            "next": {
+                              "block": {
+                                "type": "object_arcade_jump",
+                                "id": "jump-ball",
+                                "fields": {
+                                  "NAME": "ball",
+                                  "POWER": 0.28,
+                                  "GRAVITY": 0.025,
+                                  "GROUND_Y": 0.8
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          ],
+          "edges": [
+            {
+              "id": "start-control",
+              "source": {
+                "nodeId": "start",
+                "side": "right",
+                "index": 0
+              },
+              "target": {
+                "nodeId": "control",
+                "side": "left",
+                "index": 0
+              },
+              "name": "进入控制",
+              "conditionWorkspace": {
+                "blocks": {
+                  "languageVersion": 0,
+                  "blocks": [
+                    {
+                      "type": "logic_boolean",
+                      "id": "always-control",
+                      "fields": {
+                        "BOOL": "TRUE"
+                      },
+                      "x": 24,
+                      "y": 24
+                    }
+                  ]
+                }
+              }
+            }
+          ],
+          "globalVariablesWorkspace": {}
+        }
+      },
+      "request": {
+        "schemaVersion": 1,
+        "requestId": "request-1",
+        "targetId": "node_graph:project:global",
+        "projectScopeId": "world-scope-1",
+        "baseGraphRevision": "revision-1",
+        "operation": "extend",
+        "instruction": "给球加 WASD 和空格跳跃",
+        "responseLanguage": "zh-CN",
+        "workspace": {
+          "version": 1,
+          "nodes": [
+            {
+              "id": "start",
+              "macroType": "state",
+              "nodeType": "start",
+              "name": "Start",
+              "customName": "Initialize",
+              "x": 80,
+              "y": 120,
+              "workspace": {}
+            }
+          ],
+          "edges": [],
+          "globalVariablesWorkspace": {}
+        },
+        "projectContext": {
+          "actors": [
+            {
+              "name": "ball",
+              "type": "model",
+              "tags": [],
+              "aliases": []
+            }
+          ]
+        }
+      },
+      "accepted": true
+    },
+    {
+      "result": {
+        "schemaVersion": 1,
+        "requestId": "request-1",
+        "targetId": "node_graph:project:global",
+        "projectScopeId": "world-scope-1",
+        "baseGraphRevision": "revision-1",
+        "operation": "extend",
+        "summary": "已添加球体控制。",
+        "workspace": {
+          "version": 1,
+          "nodes": [
+            {
+              "id": "start",
+              "macroType": "state",
+              "nodeType": "start",
+              "name": "Start",
+              "customName": "Initialize",
+              "x": 80,
+              "y": 120,
+              "workspace": {}
+            },
+            {
+              "id": "control",
+              "macroType": "state",
+              "nodeType": "custom",
+              "name": "球体控制",
+              "customName": "球体控制",
+              "x": 480,
+              "y": 120,
+              "workspace": {
+                "blocks": {
+                  "languageVersion": 0,
+                  "blocks": [
+                    {
+                      "type": "node_while_active",
+                      "id": "control-active",
+                      "x": 24,
+                      "y": 24,
+                      "inputs": {
+                        "DO": {
+                          "block": {
+                            "type": "object_set_tag_velocity_axis",
+                            "id": "wrong-tag-velocity",
+                            "fields": {
+                              "TAG_TEXT": "ball",
+                              "AXIS": "X",
+                              "VALUE_NUMBER": 0.1
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          ],
+          "edges": [
+            {
+              "id": "start-control",
+              "source": {
+                "nodeId": "start",
+                "side": "right",
+                "index": 0
+              },
+              "target": {
+                "nodeId": "control",
+                "side": "left",
+                "index": 0
+              },
+              "name": "进入控制",
+              "conditionWorkspace": {
+                "blocks": {
+                  "languageVersion": 0,
+                  "blocks": [
+                    {
+                      "type": "logic_boolean",
+                      "id": "always-control",
+                      "fields": {
+                        "BOOL": "TRUE"
+                      },
+                      "x": 24,
+                      "y": 24
+                    }
+                  ]
+                }
+              }
+            }
+          ],
+          "globalVariablesWorkspace": {}
+        }
+      },
+      "request": {
+        "schemaVersion": 1,
+        "requestId": "request-1",
+        "targetId": "node_graph:project:global",
+        "projectScopeId": "world-scope-1",
+        "baseGraphRevision": "revision-1",
+        "operation": "extend",
+        "instruction": "给球加 WASD 和空格跳跃",
+        "responseLanguage": "zh-CN",
+        "workspace": {
+          "version": 1,
+          "nodes": [
+            {
+              "id": "start",
+              "macroType": "state",
+              "nodeType": "start",
+              "name": "Start",
+              "customName": "Initialize",
+              "x": 80,
+              "y": 120,
+              "workspace": {}
+            }
+          ],
+          "edges": [],
+          "globalVariablesWorkspace": {}
+        },
+        "projectContext": {
+          "sceneName": "default",
+          "actors": [
+            {
+              "name": "Player",
+              "type": "model",
+              "tags": [
+                "player"
+              ],
+              "aliases": []
+            }
+          ]
+        }
+      },
+      "accepted": false,
+      "error": "请求的控制能力没有完整实现：node_while_active 中的 object_third_person_move；同一持续循环中的 object_arcade_jump"
+    },
+    {
+      "result": {
+        "workspace": {
+          "version": 1,
+          "nodes": [
+            {
+              "id": "start",
+              "macroType": "state",
+              "nodeType": "start",
+              "name": "Start",
+              "customName": "Initialize",
+              "x": 80,
+              "y": 120,
+              "workspace": {}
+            },
+            {
+              "id": "control",
+              "macroType": "state",
+              "nodeType": "custom",
+              "name": "球体控制",
+              "customName": "球体控制",
+              "x": 480,
+              "y": 120,
+              "workspace": {
+                "blocks": {
+                  "languageVersion": 0,
+                  "blocks": [
+                    {
+                      "type": "node_while_active",
+                      "id": "control-active",
+                      "x": 24,
+                      "y": 24,
+                      "inputs": {
+                        "DO": {
+                          "block": {
+                            "type": "object_third_person_move",
+                            "id": "move-ball",
+                            "fields": {
+                              "NAME": "ball",
+                              "SPEED": 0.18,
+                              "OBSTACLE_TAG": "obstacle",
+                              "MIN_X": -12,
+                              "MAX_X": 12,
+                              "MIN_Z": -12,
+                              "MAX_Z": 12
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          ],
+          "edges": [],
+          "globalVariablesWorkspace": {}
+        }
+      },
+      "request": {
+        "schemaVersion": 1,
+        "requestId": "request-1",
+        "targetId": "node_graph:project:global",
+        "projectScopeId": "world-scope-1",
+        "baseGraphRevision": "revision-1",
+        "operation": "create",
+        "instruction": "Give ball WASD control",
+        "responseLanguage": "en-US",
+        "workspace": {
+          "version": 1,
+          "nodes": [
+            {
+              "id": "start",
+              "macroType": "state",
+              "nodeType": "start",
+              "name": "Start",
+              "customName": "Initialize",
+              "x": 80,
+              "y": 120,
+              "workspace": {}
+            }
+          ],
+          "edges": [],
+          "globalVariablesWorkspace": {}
+        },
+        "projectContext": {
+          "actorContextAvailable": true,
+          "actors": [
+            {
+              "name": "ball",
+              "type": "actor",
+              "tags": [],
+              "aliases": []
+            }
+          ]
+        }
+      },
+      "accepted": false,
+      "error": "请求的控制能力没有完整实现：node_while_active 中的 object_third_person_move"
+    },
+    {
+      "result": {
+        "workspace": {
+          "version": 1,
+          "nodes": [
+            {
+              "id": "start",
+              "macroType": "state",
+              "nodeType": "start",
+              "name": "Start",
+              "customName": "Initialize",
+              "x": 80,
+              "y": 120,
+              "workspace": {}
+            },
+            {
+              "id": "control",
+              "macroType": "state",
+              "nodeType": "custom",
+              "name": "球体控制",
+              "customName": "球体控制",
+              "x": 480,
+              "y": 120,
+              "workspace": {
+                "blocks": {
+                  "languageVersion": 0,
+                  "blocks": [
+                    {
+                      "type": "node_while_active",
+                      "id": "control-active",
+                      "x": 24,
+                      "y": 24,
+                      "inputs": {
+                        "DO": {
+                          "block": {
+                            "type": "object_move_tag",
+                            "id": "reachable-wrong-tag",
+                            "fields": {
+                              "TAG_TEXT": "unrelated",
+                              "DX_NUMBER": 0,
+                              "DY_NUMBER": 0,
+                              "DZ_NUMBER": 0
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "id": "detached",
+              "macroType": "state",
+              "nodeType": "custom",
+              "name": "Detached",
+              "customName": "Detached",
+              "x": 900,
+              "y": 500,
+              "workspace": {
+                "blocks": {
+                  "languageVersion": 0,
+                  "blocks": [
+                    {
+                      "type": "node_while_active",
+                      "id": "detached-active",
+                      "inputs": {
+                        "DO": {
+                          "block": {
+                            "type": "object_move_tag",
+                            "id": "detached-correct-tag",
+                            "fields": {
+                              "TAG_TEXT": "building",
+                              "DX_NUMBER": 0,
+                              "DY_NUMBER": 0,
+                              "DZ_NUMBER": 0
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          ],
+          "edges": [
+            {
+              "id": "start-control",
+              "source": {
+                "nodeId": "start",
+                "side": "right",
+                "index": 0
+              },
+              "target": {
+                "nodeId": "control",
+                "side": "left",
+                "index": 0
+              },
+              "name": "进入控制",
+              "conditionWorkspace": {
+                "blocks": {
+                  "languageVersion": 0,
+                  "blocks": [
+                    {
+                      "type": "logic_boolean",
+                      "id": "always-control",
+                      "fields": {
+                        "BOOL": "TRUE"
+                      },
+                      "x": 24,
+                      "y": 24
+                    }
+                  ]
+                }
+              }
+            }
+          ],
+          "globalVariablesWorkspace": {}
+        }
+      },
+      "request": {
+        "schemaVersion": 1,
+        "requestId": "request-1",
+        "targetId": "node_graph:project:global",
+        "projectScopeId": "world-scope-1",
+        "baseGraphRevision": "revision-1",
+        "operation": "create",
+        "instruction": "让黑洞持续吸附所有建筑",
+        "responseLanguage": "zh-CN",
+        "workspace": {
+          "version": 1,
+          "nodes": [
+            {
+              "id": "start",
+              "macroType": "state",
+              "nodeType": "start",
+              "name": "Start",
+              "customName": "Initialize",
+              "x": 80,
+              "y": 120,
+              "workspace": {}
+            }
+          ],
+          "edges": [],
+          "globalVariablesWorkspace": {}
+        },
+        "projectContext": {
+          "actorContextAvailable": true,
+          "actors": [
+            {
+              "name": "黑洞",
+              "type": "actor",
+              "tags": [],
+              "aliases": [],
+              "semanticRole": "source"
+            },
+            {
+              "name": "建筑A",
+              "type": "actor",
+              "tags": [
+                "building"
+              ],
+              "aliases": []
+            },
+            {
+              "name": "建筑B",
+              "type": "actor",
+              "tags": [
+                "building"
+              ],
+              "aliases": []
+            }
+          ]
+        }
+      },
+      "accepted": false,
+      "error": "多目标请求没有覆盖以下明确目标：建筑A, 建筑B"
+    }
+  ]
+}

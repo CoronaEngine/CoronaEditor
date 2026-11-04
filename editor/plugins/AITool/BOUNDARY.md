@@ -1,71 +1,13 @@
-# `AITool` 插件边界
+# AITool 插件边界
 
-`AITool` 为当前前端提供 Cabbage 对话、任务和 NodeGraph 检查/生成。它是业务编排层，不是 C++
-引擎对象、Vue transport、Python host lifecycle 或公共 manifest 的 owner。
+canonical owner：AITool model transport。不负责 Web 业务策略、场景数据或公共 manifest。
 
-## 子目录职责
+AITool 只连接 DeepSeek。main.py 保留 ai.submitRequest 的注册、初始化、设置和关闭；services/model_service.py 负责有界任务队列、配置快照、流式文本和取消；deepseek_client.py 负责 HTTP/JSON/SSE。configuration/ 负责本地密钥与模型设置，密钥不进入 Web。
 
-| 路径 | canonical owner | 负责内容 | 不负责 |
-|---|---|---|---|
-| `configuration/` | AITool configuration owner | `.env`、API key 和本地配置读取 | 不保存密钥到源码、日志或 Vue bundle |
-| `deepseek_client.py` | DeepSeek HTTP 客户端 | 构造 HTTP 请求、读取 JSON 响应和 SSE 文本 | 业务提示词、任务状态和取消策略由调用服务负责 |
-| `cabbage_chat_policy.json` | 普通聊天的双语文案与引导映射 | Web 构建时打包，旧版上下文请求复用同一份数据 | 调度、状态和网络请求 |
-| `services/` | AITool service owner | 节点检查、聊天、生成和 Cabbage 上下文四个服务 | 不直接操作 `Actor`/`Scene`，不定义公共 manifest |
-| `compat/`、`utils/` | removed compatibility code | 目录和旧导入入口已删除；配置统一由 `configuration/` 负责 | 不得重新创建旧入口 |
+运行时只接受 model.start/status/cancel 和 ai.settings.get/set。model.start 接受最终 messages 与模型 options。Python 不读取节点图、教程、任务、助手历史或项目文档，不准备业务提示词，不解析业务 JSON。Web 的 aiService.js 保持页面调用接口，aiWorkflows.js 负责领域编排。
 
-## 依赖与生命周期
+runtime/registry.py 负责生命周期。ready 前保留 initializing；初始化失败进入 degraded。初始化、关闭和迟到 worker 结果必须正确处理，不创建第二套宿主或引擎对象。所有模型请求复用标准库客户端，不恢复 Quasar、provider 注册、工具或媒体工作链。LANChat、Actor、资产、场景同步由原生系统负责。
 
-- `runtime/registry.py` 负责注册、后台初始化和关闭；插件不得自行创建第二套 host
-  lifecycle。
-- 引擎场景只能通过 `api.editor_api`
-  访问；不得直接导入 `CoronaCore`、native `Actor`、`Scene` 或底层 binding。
-- 当前场景统一通过 native `scene.get_snapshot` 获取；不提供场景列表或场景切换。
-- 项目上下文由 `runtime.project_context` 提供；不以进程 cwd 作为活动项目。
-- API key 只能由 `configuration/` 从 `.env` 或受控本地配置读取，日志不得输出秘钥。
-- 基础 API 在 runtime ready 前必须保留 `initializing` 语义；初始化失败进入
-  `degraded`，不得无界重试。
-- 初始化先加载本地密钥与模型设置，再加载四个服务。初始化期间关闭或失败必须释放已创建
-  的服务，不得发布迟到的结果；重复关闭不重复释放服务。
-- `ai.submitRequest` 是唯一 AI manifest 方法。支持节点检查、聊天和生成的异步操作、
-  Cabbage 上下文/任务/评分操作及 `ai.settings.get/set`；不再接受旧通用聊天请求。
-- LANChat 房间、Actor、资产和场景同步由现有原生网络系统维护，不依赖 AI worker。
+API key 仍来自 editor/.env，进程环境优先，按 CORONA_DEEPSEEK_API_KEY、DEEPSEEK_API_KEY 读取。设置保存后新请求使用新值，已有请求使用其配置快照。读取与保存只返回 configured 和 masked_key。非密钥 deepseek_settings.json 在启动时读取，节点生成继续支持 node_graph 配置覆盖。模型默认 deepseek-v4-flash，地址保持 DeepSeek 官方 API。
 
-## 删除条件
-
-Agent Runtime、Agent Collaboration、LANChat AI 编排及旧聊天/媒体链已经退役，其专属
-测试随功能移除。Actor 物理契约与原生同步测试必须保留；禁止恢复旧工具注册入口。
-Quasar 子模块、配置桥接和专属依赖已移除。四个服务通过共享客户端使用标准库调用 DeepSeek 官方 API。
-项目上下文、用户密钥和媒体数据不属于源码清理范围。
-
-## DeepSeek 配置
-
-`configuration/deepseek_settings.py` 是模型配置 owner。未提供覆盖时，模型保持
-`deepseek-v4-flash`；审查/评分使用 0.1/1200，聊天使用 0.25/1400，目标规划使用
-0.25/3600，节点生成使用 0.05/12000（temperature/max_tokens）。默认关闭 thinking。
-普通聊天沿用 `node_graph.review.chat.start/status/cancel`。Web 在发送时准备 `modelMessages` 与 `guidance`，
-Python 校验消息结构，通过共享客户端发送并在成功完成时返回引导；原始上下文输入仍由旧格式分支处理。
-审查、节点生成和目标规划继续在各自的服务中准备提示词和校验业务结果。
-
-可选的 `editor/deepseek_settings.json` 仅存放非密钥参数，启动时读取一次。例如迁移原
-provider.model 和 node_graph 设置时，使用：
-
-```json
-{
-  "model": "deepseek-v4-flash",
-  "node_graph": {
-    "model": "deepseek-v4-flash",
-    "temperature": 0.05,
-    "max_tokens": 12000,
-    "thinking": false
-  }
-}
-```
-
-节点生成模型优先于全局模型；空值回退、数字转换和 thinking 仅接受布尔 true 的语义保持
-不变。只连接 DeepSeek 官方地址，不提供 provider 注册或第三方 base_url 覆盖。
-旧 CORONA_LLM_MODEL/PROVIDER 环境变量原本不控制这些服务，现在也不读取。
-
-密钥仍来自 `editor/.env`，进程环境优先，依次读取 `CORONA_DEEPSEEK_API_KEY` 和
-`DEEPSEEK_API_KEY`。设置页保存时更新两个别名及当前密钥，新请求立即使用新值；已有请求
-保留其配置快照，模型参数不会随密钥刷新。读取/保存接口只返回 configured 和 masked_key。
-不监听外部文件编辑；修改模型配置后需重新启动编辑器。文件不应包含 api_key。
+删除条件：Web 业务回归、源目录与部署目录的标准库运行验证、HTTP/JSON/SSE 和取消测试全部通过。禁止在 Python 服务中重新引入业务策略。

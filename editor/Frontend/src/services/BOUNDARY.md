@@ -69,3 +69,5 @@ Agent runtime、Scene/Actor 权威状态或公共引擎 API。
 删除任一兼容 facade 前必须确认外部宿主和旧面板完成迁移，并通过对应的 JS/Python 边界
 测试；删除节点图或 Cabbage service 前必须先迁移所有组件调用方和持久化/事件回归。任何
 删除都不能改变 `editorApi` manifest contract。
+
+AI 业务 owner：aiService.js 保持页面接口；aiModelService.js 经 editorApi 的 model.start/status/cancel 调用 Python 传输。aiWorkflows.js 管理 Web 任务、世界归属、取消和持久化；aiGraphDomain.js、aiGraphRequirements.js 负责审查与生成校验；aiPlanningDomain.js 负责计划与评分；cabbageDomain.js、aiPolicy.json 负责教程、任务和问题记忆。聊天策略归 cabbageChatRequest.js、cabbageChatPolicy.json。积木合同唯一来源是 aiBlockContract.xml，Python 仅在开发期检查目录一致性。助手文档通过原生 projectSettings.readProjectDocument/commitProjectDocument 原子比较版本保存。删除条件：Web 领域回归、模型取消、跨世界隔离和合同检查全部通过。

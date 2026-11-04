@@ -813,6 +813,8 @@ const editorApiStatic = {
       call_manifest_editor_api('main.updateViewToolState', [toolId, !!enabled]),
   },
   projectSettings: {
+    readProjectDocument: (request) => call_manifest_editor_api('projectSettings.readProjectDocument', [request]),
+    commitProjectDocument: (request) => call_manifest_editor_api('projectSettings.commitProjectDocument', [request]),
     getActiveProjectInfo: () => call_manifest_editor_api('projectSettings.getActiveProjectInfo', []),
     saveActiveProjectInfo: (settings) =>
       call_manifest_editor_api('projectSettings.saveActiveProjectInfo', [settings || {}]),

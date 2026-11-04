@@ -1,0 +1,849 @@
+[
+  {
+    "result": {
+      "hasProblems": false,
+      "summary": "",
+      "issues": [],
+      "optimizationTip": {
+        "tipKey": "tip",
+        "title": "Title",
+        "message": "Message"
+      }
+    },
+    "request": {
+      "workspace": {
+        "version": 1,
+        "nodes": [],
+        "edges": [],
+        "globalVariablesWorkspace": {}
+      },
+      "projectContext": {
+        "optimizationHintsEnabled": false
+      }
+    },
+    "accepted": true,
+    "expected": {
+      "hasProblems": false,
+      "summary": "",
+      "issues": [],
+      "optimizationTip": null,
+      "summaryEn": ""
+    }
+  },
+  {
+    "result": {
+      "hasProblems": false,
+      "summary": "",
+      "issues": [],
+      "optimizationTip": {
+        "tipKey": "tip",
+        "title": "",
+        "message": "Message"
+      }
+    },
+    "request": {
+      "workspace": {
+        "version": 1,
+        "nodes": [],
+        "edges": [],
+        "globalVariablesWorkspace": {}
+      },
+      "projectContext": {
+        "optimizationHintsEnabled": true
+      }
+    },
+    "accepted": true,
+    "expected": {
+      "hasProblems": false,
+      "summary": "",
+      "issues": [],
+      "optimizationTip": null,
+      "summaryEn": ""
+    }
+  },
+  {
+    "result": {
+      "hasProblems": true,
+      "summary": "Obstacle tag is empty",
+      "issues": [
+        {
+          "nodeId": "start",
+          "blockId": "move_1",
+          "code": "empty_obstacle_tag",
+          "confidence": 0.95,
+          "message": "OBSTACLE_TAG is empty",
+          "pattern": {
+            "missingInput": "OBSTACLE_TAG"
+          }
+        }
+      ]
+    },
+    "request": {
+      "workspace": {
+        "version": 1,
+        "nodes": [
+          {
+            "id": "start",
+            "nodeType": "start",
+            "workspace": {
+              "blocks": {
+                "blocks": [
+                  {
+                    "type": "object_third_person_move",
+                    "id": "move_1",
+                    "fields": {
+                      "NAME": "Ball",
+                      "OBSTACLE_TAG": "",
+                      "SPEED": 0.18,
+                      "MIN_X": -12,
+                      "MAX_X": 12,
+                      "MIN_Z": -12,
+                      "MAX_Z": 12
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        ],
+        "edges": [],
+        "globalVariablesWorkspace": {}
+      },
+      "projectContext": {
+        "actorContextAvailable": true,
+        "actors": [
+          {
+            "name": "Ball"
+          }
+        ]
+      }
+    },
+    "accepted": true,
+    "expected": {
+      "hasProblems": false,
+      "summary": "",
+      "issues": [],
+      "summaryEn": "",
+      "optimizationTip": null
+    }
+  },
+  {
+    "result": {
+      "hasProblems": true,
+      "summary": "计分逻辑有问题；连接正确的加分积木就好了。",
+      "issues": [
+        {
+          "severity": "warning",
+          "confidence": 0.9,
+          "nodeId": "play",
+          "blockId": "add_score",
+          "code": "wrong_score_update",
+          "title": "修正计分逻辑",
+          "message": "当前积木没有更新胜利条件读取的分数。",
+          "suggestion": "把命中分支连接到正确的加分积木。"
+        }
+      ]
+    },
+    "request": {
+      "workspace": {
+        "version": 1,
+        "nodes": [
+          {
+            "id": "play",
+            "nodeType": "custom",
+            "workspace": {
+              "blocks": {
+                "blocks": [
+                  {
+                    "type": "ui_add_score",
+                    "id": "add_score"
+                  }
+                ]
+              }
+            }
+          }
+        ],
+        "edges": [],
+        "globalVariablesWorkspace": {}
+      }
+    },
+    "accepted": true,
+    "expected": {
+      "hasProblems": true,
+      "summary": "计分逻辑有问题；连接正确的加分积木就好了。",
+      "issues": [
+        {
+          "issueKey": "wrong_score_update|play|add_score",
+          "severity": "warning",
+          "confidence": 0.9,
+          "nodeId": "play",
+          "blockId": "add_score",
+          "edgeId": "",
+          "code": "wrong_score_update",
+          "pattern": {
+            "blockType": "ui_add_score"
+          },
+          "title": "修正计分逻辑",
+          "titleEn": "修正计分逻辑",
+          "message": "当前积木没有更新胜利条件读取的分数。",
+          "messageEn": "计分逻辑有问题；连接正确的加分积木就好了。",
+          "suggestion": "把命中分支连接到正确的加分积木。",
+          "suggestionEn": "计分逻辑有问题；连接正确的加分积木就好了。"
+        }
+      ],
+      "summaryEn": "计分逻辑有问题；连接正确的加分积木就好了。",
+      "optimizationTip": null
+    }
+  },
+  {
+    "result": {
+      "hasProblems": true,
+      "summary": "Invalid graph.",
+      "issues": [
+        {
+          "severity": "warning",
+          "confidence": 0.95,
+          "nodeId": "start",
+          "edgeId": "invented_edge",
+          "code": "invalid_edge_endpoint"
+        }
+      ]
+    },
+    "request": {
+      "workspace": {
+        "version": 1,
+        "nodes": [
+          {
+            "id": "start",
+            "nodeType": "start",
+            "workspace": {}
+          }
+        ],
+        "edges": [],
+        "globalVariablesWorkspace": {}
+      }
+    },
+    "accepted": true,
+    "expected": {
+      "hasProblems": false,
+      "summary": "",
+      "issues": [],
+      "summaryEn": "",
+      "optimizationTip": null
+    }
+  },
+  {
+    "result": {
+      "hasProblems": true,
+      "summary": "The edge endpoint is invalid.",
+      "issues": [
+        {
+          "severity": "warning",
+          "confidence": 0.95,
+          "edgeId": "edge_1",
+          "code": "dangling_edge",
+          "pattern": {
+            "relationType": "transition",
+            "edgeId": "invented"
+          }
+        }
+      ]
+    },
+    "request": {
+      "workspace": {
+        "version": 1,
+        "nodes": [
+          {
+            "id": "start",
+            "nodeType": "start",
+            "workspace": {}
+          },
+          {
+            "id": "play",
+            "nodeType": "custom",
+            "workspace": {}
+          }
+        ],
+        "edges": [
+          {
+            "id": "edge_1",
+            "source": {
+              "nodeId": "start"
+            },
+            "target": {
+              "nodeId": "missing"
+            },
+            "conditionWorkspace": {}
+          }
+        ],
+        "globalVariablesWorkspace": {}
+      }
+    },
+    "accepted": true,
+    "expected": {
+      "hasProblems": true,
+      "summary": "The edge endpoint is invalid.",
+      "issues": [
+        {
+          "issueKey": "invalid_edge_endpoint|||edge_1",
+          "severity": "warning",
+          "confidence": 0.95,
+          "nodeId": "",
+          "blockId": "",
+          "edgeId": "edge_1",
+          "code": "invalid_edge_endpoint",
+          "pattern": {
+            "relationType": "transition",
+            "edgeId": "edge_1"
+          },
+          "title": "节点逻辑需要调整",
+          "titleEn": "节点逻辑需要调整",
+          "message": "The edge endpoint is invalid.",
+          "messageEn": "The edge endpoint is invalid.",
+          "suggestion": "The edge endpoint is invalid.",
+          "suggestionEn": "The edge endpoint is invalid."
+        }
+      ],
+      "summaryEn": "The edge endpoint is invalid.",
+      "optimizationTip": null
+    }
+  },
+  {
+    "result": {
+      "hasProblems": true,
+      "summary": "也许可以增加更多玩法",
+      "issues": [
+        {
+          "code": "speculative",
+          "confidence": 0.4
+        }
+      ]
+    },
+    "request": {
+      "workspace": {
+        "version": 1,
+        "nodes": [],
+        "edges": [],
+        "globalVariablesWorkspace": {}
+      }
+    },
+    "accepted": true,
+    "expected": {
+      "hasProblems": false,
+      "summary": "",
+      "issues": [],
+      "summaryEn": "",
+      "optimizationTip": null
+    }
+  },
+  {
+    "result": {
+      "hasProblems": true,
+      "summary": "Actor reference problem",
+      "issues": [
+        {
+          "nodeId": "start",
+          "blockId": "move_1",
+          "code": "missing_actor_target",
+          "confidence": 0.95
+        }
+      ]
+    },
+    "request": {
+      "workspace": {
+        "version": 1,
+        "nodes": [
+          {
+            "id": "start",
+            "nodeType": "start",
+            "workspace": {
+              "blocks": {
+                "blocks": [
+                  {
+                    "type": "object_third_person_move",
+                    "id": "move_1",
+                    "fields": {
+                      "NAME": "Ball",
+                      "OBSTACLE_TAG": "",
+                      "SPEED": 0.18,
+                      "MIN_X": -12,
+                      "MAX_X": 12,
+                      "MIN_Z": -12,
+                      "MAX_Z": 12
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        ],
+        "edges": [],
+        "globalVariablesWorkspace": {}
+      },
+      "projectContext": {
+        "actorContextAvailable": true,
+        "actors": [
+          {
+            "name": "Ball"
+          }
+        ]
+      }
+    },
+    "accepted": true,
+    "expected": {
+      "hasProblems": false,
+      "summary": "",
+      "issues": [],
+      "summaryEn": "",
+      "optimizationTip": null
+    }
+  },
+  {
+    "result": {
+      "hasProblems": true,
+      "summary": "Actor reference problem",
+      "issues": [
+        {
+          "nodeId": "start",
+          "blockId": "move_1",
+          "code": "actor_target_not_found",
+          "confidence": 0.95
+        }
+      ]
+    },
+    "request": {
+      "workspace": {
+        "version": 1,
+        "nodes": [
+          {
+            "id": "start",
+            "nodeType": "start",
+            "workspace": {
+              "blocks": {
+                "blocks": [
+                  {
+                    "type": "object_third_person_move",
+                    "id": "move_1",
+                    "fields": {
+                      "NAME": "Ball",
+                      "OBSTACLE_TAG": "",
+                      "SPEED": 0.18,
+                      "MIN_X": -12,
+                      "MAX_X": 12,
+                      "MIN_Z": -12,
+                      "MAX_Z": 12
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        ],
+        "edges": [],
+        "globalVariablesWorkspace": {}
+      },
+      "projectContext": {
+        "actorContextAvailable": true,
+        "actors": [
+          {
+            "name": "Ball"
+          }
+        ]
+      }
+    },
+    "accepted": true,
+    "expected": {
+      "hasProblems": false,
+      "summary": "",
+      "issues": [],
+      "summaryEn": "",
+      "optimizationTip": null
+    }
+  },
+  {
+    "result": {
+      "hasProblems": false,
+      "summary": "还可以增加更多玩法",
+      "issues": [
+        {
+          "code": "optional_feature"
+        }
+      ]
+    },
+    "request": {
+      "workspace": {
+        "version": 1,
+        "nodes": [],
+        "edges": [],
+        "globalVariablesWorkspace": {}
+      }
+    },
+    "accepted": true,
+    "expected": {
+      "hasProblems": false,
+      "summary": "",
+      "issues": [],
+      "summaryEn": "",
+      "optimizationTip": null
+    }
+  },
+  {
+    "result": {
+      "hasProblems": false,
+      "summary": "",
+      "issues": [],
+      "optimizationTip": {
+        "tipKey": "reuse_condition",
+        "title": "Reuse condition result",
+        "message": "Keep repeated Boolean checks in one data flow."
+      }
+    },
+    "request": {
+      "workspace": {
+        "version": 1,
+        "nodes": [],
+        "edges": [],
+        "globalVariablesWorkspace": {}
+      },
+      "projectContext": {
+        "optimizationHintsEnabled": true
+      }
+    },
+    "accepted": true,
+    "expected": {
+      "hasProblems": false,
+      "summary": "",
+      "issues": [],
+      "optimizationTip": {
+        "tipKey": "reuse_condition",
+        "title": "Reuse condition result",
+        "titleEn": "Reuse condition result",
+        "message": "Keep repeated Boolean checks in one data flow.",
+        "messageEn": "Keep repeated Boolean checks in one data flow."
+      },
+      "summaryEn": ""
+    }
+  },
+  {
+    "result": {
+      "hasProblems": true,
+      "summary": "Connect a concrete actor reference.",
+      "issues": [
+        {
+          "nodeId": "start",
+          "blockId": "move_1",
+          "code": "missing_actor_target",
+          "confidence": 0.95
+        }
+      ],
+      "optimizationTip": {
+        "tipKey": "unrelated",
+        "title": "Optimization",
+        "message": "Must not be shown"
+      }
+    },
+    "request": {
+      "workspace": {
+        "version": 1,
+        "nodes": [
+          {
+            "id": "start",
+            "nodeType": "start",
+            "workspace": {
+              "blocks": {
+                "blocks": [
+                  {
+                    "type": "object_third_person_move",
+                    "id": "move_1",
+                    "fields": {
+                      "NAME": "",
+                      "OBSTACLE_TAG": "",
+                      "SPEED": 0.18,
+                      "MIN_X": -12,
+                      "MAX_X": 12,
+                      "MIN_Z": -12,
+                      "MAX_Z": 12
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        ],
+        "edges": [],
+        "globalVariablesWorkspace": {}
+      },
+      "projectContext": {
+        "optimizationHintsEnabled": true,
+        "actorContextAvailable": true,
+        "actors": [
+          {
+            "name": "Ball"
+          }
+        ]
+      }
+    },
+    "accepted": true,
+    "expected": {
+      "hasProblems": true,
+      "summary": "Connect a concrete actor reference.",
+      "issues": [
+        {
+          "issueKey": "missing_actor_target|start|move_1",
+          "severity": "warning",
+          "confidence": 0.95,
+          "nodeId": "start",
+          "blockId": "move_1",
+          "edgeId": "",
+          "code": "missing_actor_target",
+          "pattern": {
+            "blockType": "object_third_person_move",
+            "missingInput": "NAME",
+            "objectRequirement": "scene_actor"
+          },
+          "title": "节点逻辑需要调整",
+          "titleEn": "节点逻辑需要调整",
+          "message": "Connect a concrete actor reference.",
+          "messageEn": "Connect a concrete actor reference.",
+          "suggestion": "Connect a concrete actor reference.",
+          "suggestionEn": "Connect a concrete actor reference."
+        }
+      ],
+      "optimizationTip": null,
+      "summaryEn": "Connect a concrete actor reference."
+    }
+  },
+  {
+    "result": {
+      "hasProblems": true,
+      "summary": "错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错",
+      "issues": [
+        {
+          "nodeId": "start",
+          "blockId": "enter",
+          "code": "certain_problem",
+          "confidence": 0.95
+        }
+      ]
+    },
+    "request": {
+      "workspace": {
+        "version": 1,
+        "nodes": [
+          {
+            "id": "start",
+            "nodeType": "start",
+            "workspace": {
+              "blocks": {
+                "blocks": [
+                  {
+                    "type": "node_when_enter",
+                    "id": "enter"
+                  }
+                ]
+              }
+            }
+          }
+        ],
+        "edges": [],
+        "globalVariablesWorkspace": {}
+      }
+    },
+    "accepted": true,
+    "expected": {
+      "hasProblems": true,
+      "summary": "错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错",
+      "issues": [
+        {
+          "issueKey": "certain_problem|start|enter",
+          "severity": "warning",
+          "confidence": 0.95,
+          "nodeId": "start",
+          "blockId": "enter",
+          "edgeId": "",
+          "code": "certain_problem",
+          "pattern": {
+            "blockType": "node_when_enter"
+          },
+          "title": "节点逻辑需要调整",
+          "titleEn": "节点逻辑需要调整",
+          "message": "错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错",
+          "messageEn": "错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错",
+          "suggestion": "错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错",
+          "suggestionEn": "错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错"
+        }
+      ],
+      "summaryEn": "错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错",
+      "optimizationTip": null
+    }
+  },
+  {
+    "result": {
+      "hasProblems": false,
+      "summary": "",
+      "issues": []
+    },
+    "request": {
+      "schemaVersion": 1,
+      "requestId": "",
+      "graphRevision": "abc123",
+      "targetId": "node_graph:project:global",
+      "workspace": {
+        "version": 1,
+        "nodes": [],
+        "edges": [],
+        "globalVariablesWorkspace": {}
+      },
+      "projectContext": {}
+    },
+    "accepted": true,
+    "expected": {
+      "hasProblems": false,
+      "summary": "",
+      "issues": [],
+      "summaryEn": "",
+      "optimizationTip": null
+    }
+  },
+  {
+    "result": {
+      "hasProblems": true,
+      "summary": "中文总结",
+      "summaryEn": "English Summary",
+      "issues": [
+        {
+          "nodeId": "start",
+          "blockId": "enter_1",
+          "code": "custom_logic_issue",
+          "confidence": 0.95,
+          "title": "中文标题",
+          "titleEn": "English Title",
+          "message": "中文原因",
+          "messageEn": "English Cause",
+          "suggestion": "中文建议",
+          "suggestionEn": "English Suggestion"
+        }
+      ]
+    },
+    "request": {
+      "workspace": {
+        "version": 1,
+        "nodes": [
+          {
+            "id": "start",
+            "nodeType": "start",
+            "workspace": {
+              "blocks": {
+                "blocks": [
+                  {
+                    "type": "node_when_enter",
+                    "id": "enter_1"
+                  }
+                ]
+              }
+            }
+          }
+        ],
+        "edges": [],
+        "globalVariablesWorkspace": {}
+      }
+    },
+    "accepted": true,
+    "expected": {
+      "hasProblems": true,
+      "summary": "中文总结",
+      "summaryEn": "English Summary",
+      "issues": [
+        {
+          "issueKey": "custom_logic_issue|start|enter_1",
+          "severity": "warning",
+          "confidence": 0.95,
+          "nodeId": "start",
+          "blockId": "enter_1",
+          "edgeId": "",
+          "code": "custom_logic_issue",
+          "pattern": {
+            "blockType": "node_when_enter"
+          },
+          "title": "中文标题",
+          "titleEn": "English Title",
+          "message": "中文原因",
+          "messageEn": "English Cause",
+          "suggestion": "中文建议",
+          "suggestionEn": "English Suggestion"
+        }
+      ],
+      "optimizationTip": null
+    }
+  },
+  {
+    "result": {
+      "hasProblems": true,
+      "summary": "有问题",
+      "issues": [
+        {
+          "nodeId": "missing",
+          "blockId": "",
+          "code": "bad",
+          "confidence": 0.95
+        },
+        {
+          "nodeId": "start",
+          "blockId": "enter_1",
+          "code": "good",
+          "confidence": 0.95
+        }
+      ]
+    },
+    "request": {
+      "workspace": {
+        "version": 1,
+        "nodes": [
+          {
+            "id": "start",
+            "nodeType": "start",
+            "workspace": {
+              "blocks": {
+                "blocks": [
+                  {
+                    "type": "node_when_enter",
+                    "id": "enter_1"
+                  }
+                ]
+              }
+            }
+          }
+        ],
+        "edges": [],
+        "globalVariablesWorkspace": {}
+      }
+    },
+    "accepted": true,
+    "expected": {
+      "hasProblems": true,
+      "summary": "有问题",
+      "issues": [
+        {
+          "issueKey": "good|start|enter_1",
+          "severity": "warning",
+          "confidence": 0.95,
+          "nodeId": "start",
+          "blockId": "enter_1",
+          "edgeId": "",
+          "code": "good",
+          "pattern": {
+            "blockType": "node_when_enter"
+          },
+          "title": "节点逻辑需要调整",
+          "titleEn": "节点逻辑需要调整",
+          "message": "有问题",
+          "messageEn": "有问题",
+          "suggestion": "有问题",
+          "suggestionEn": "有问题"
+        }
+      ],
+      "summaryEn": "有问题",
+      "optimizationTip": null
+    }
+  }
+]

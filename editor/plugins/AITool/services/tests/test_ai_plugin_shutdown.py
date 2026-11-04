@@ -27,15 +27,7 @@ def runtime():
 
     services = []
     factories = []
-    for attribute, methods in (
-        ("_node_graph_review_service", ("start", "status")),
-        ("_node_graph_review_chat_service", ("start", "status", "cancel")),
-        ("_node_graph_generation_service", ("start", "status", "cancel")),
-        ("_cabbage_context_service", (
-            "load", "record_event", "update_task", "append_message",
-            "start_goal_plan", "goal_plan_status", "start_score_update", "score_update_status",
-        )),
-    ):
+    for attribute, methods in (("_model_service", ("start", "status", "cancel")),):
         service = SimpleNamespace(shutdown=Mock())
         for method in methods:
             setattr(service, method, Mock(return_value={"success": True}))
@@ -63,22 +55,9 @@ def test_initialize_is_idempotent_and_cleanup_closes_each_service_once(runtime):
 
 
 @pytest.mark.parametrize("operation,index,method,argument", [
-    ("node_graph.review.start", 0, "start", {"workspace": {}}),
-    ("node_graph.review.status", 0, "status", "task-1"),
-    ("node_graph.review.chat.start", 1, "start", {"messages": []}),
-    ("node_graph.review.chat.status", 1, "status", "task-1"),
-    ("node_graph.review.chat.cancel", 1, "cancel", "task-1"),
-    ("node_graph.generate.start", 2, "start", {"prompt": "move"}),
-    ("node_graph.generate.status", 2, "status", "task-1"),
-    ("node_graph.generate.cancel", 2, "cancel", "task-1"),
-    ("cabbage.context.load", 3, "load", {}),
-    ("cabbage.context.record_event", 3, "record_event", {"event": "opened"}),
-    ("cabbage.context.update_task", 3, "update_task", {"taskId": "task-1"}),
-    ("cabbage.context.append_message", 3, "append_message", {"content": "hello"}),
-    ("cabbage.goal_plan.start", 3, "start_goal_plan", {"prompt": "build"}),
-    ("cabbage.goal_plan.status", 3, "goal_plan_status", "task-1"),
-    ("cabbage.profile.score.start", 3, "start_score_update", {}),
-    ("cabbage.profile.score.status", 3, "score_update_status", "task-1"),
+    ("model.start", 0, "start", {"messages": []}),
+    ("model.status", 0, "status", "task-1"),
+    ("model.cancel", 0, "cancel", "task-1"),
 ])
 def test_current_operations_reach_their_service(runtime, operation, index, method, argument):
     app, services, _ = runtime
@@ -92,8 +71,8 @@ def test_current_operations_reach_their_service(runtime, operation, index, metho
 def test_task_id_alias_is_preserved(runtime):
     app, services, _ = runtime
     app.initialize_runtime()
-    app.submit_request({"operation": "node_graph.generate.cancel", "task_id": "task-2"})
-    services[2].cancel.assert_called_once_with("task-2")
+    app.submit_request({"operation": "model.cancel", "task_id": "task-2"})
+    services[0].cancel.assert_called_once_with("task-2")
 
 
 @pytest.mark.parametrize("payload", [None, [], "{bad", {}, {"operation": []}])
@@ -134,13 +113,11 @@ def test_pre_requested_stop_does_not_load_configuration_or_services(runtime):
 
 def test_partial_initialization_failure_closes_owned_services_and_never_retries(runtime):
     app, services, factories = runtime
-    factories[1][1].side_effect = RuntimeError("factory unavailable")
+    factories.append(("_unpublished", Mock(side_effect=RuntimeError("factory unavailable"))))
     assert not app.initialize_runtime()
     services[0].shutdown.assert_called_once()
-    services[1].shutdown.assert_not_called()
-    factories[2][1].assert_not_called()
     assert app.runtime_state() == ("failed", "factory unavailable")
-    assert app.submit_request({"operation": "node_graph.review.start"})["status"] == "degraded"
+    assert app.submit_request({"operation": "model.start"})["status"] == "degraded"
     assert not app.initialize_runtime()
     app._configure_runtime.assert_called_once()
 
@@ -168,18 +145,17 @@ def test_shutdown_during_factory_call_closes_late_results_without_publishing(run
     worker.start()
     try:
         assert entered.wait(2)
-        assert app.submit_request({"operation": "node_graph.review.start"})["status"] == "initializing"
+        assert app.submit_request({"operation": "model.start"})["status"] == "initializing"
         assert not app.initialize_runtime()
         app.cleanup()
-        assert app.submit_request({"operation": "node_graph.review.start"})["status"] == "degraded"
+        assert app.submit_request({"operation": "model.start"})["status"] == "degraded"
     finally:
         release.set()
         worker.join(3)
     assert not worker.is_alive()
     assert results == [False]
     services[0].shutdown.assert_called_once()
-    factories[1][1].assert_not_called()
-    assert app._node_graph_review_service is None
+    assert app._model_service is None
     assert app.runtime_state()[0] == "stopped"
 
 
@@ -188,7 +164,7 @@ def test_initializer_cancellation_still_closes_partial_services(runtime):
         pass
 
     app, services, factories = runtime
-    factories[1][1].side_effect = CancelInitialization()
+    factories.append(("_unpublished", Mock(side_effect=CancelInitialization())))
     with pytest.raises(CancelInitialization):
         app.initialize_runtime()
     services[0].shutdown.assert_called_once()

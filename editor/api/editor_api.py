@@ -430,6 +430,14 @@ class _ProjectSettingsApi(_DynamicApiNamespace):
         super().__init__("project_settings")
 
     @staticmethod
+    def read_project_document(request):
+        return _invoke_manifest_cpp_api("project_settings.read_project_document", [request or {}])
+
+    @staticmethod
+    def commit_project_document(request):
+        return _invoke_manifest_cpp_api("project_settings.commit_project_document", [request or {}])
+
+    @staticmethod
     def get_active_project_info():
         return _invoke_manifest_cpp_api("project_settings.get_active_project_info", [])
 

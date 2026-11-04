@@ -1,0 +1,725 @@
+{
+  "tutorialSteps": [
+    {
+      "task": "tutorial.basics.viewport_focus",
+      "event": {
+        "type": "viewport_focused",
+        "details": {},
+        "success": true,
+        "timestamp": 100000
+      },
+      "completed": [
+        "tutorial.basics.viewport_focus"
+      ]
+    },
+    {
+      "task": "tutorial.basics.camera_forward_back",
+      "event": {
+        "type": "camera_moved",
+        "details": {
+          "key": "W",
+          "axisGroup": "forward_back",
+          "actualDelta": 1
+        },
+        "success": true,
+        "timestamp": 101000
+      },
+      "completed": [
+        "tutorial.basics.camera_forward_back"
+      ]
+    },
+    {
+      "task": "tutorial.basics.camera_left_right",
+      "event": {
+        "type": "camera_moved",
+        "details": {
+          "key": "A",
+          "axisGroup": "left_right",
+          "actualDelta": 1
+        },
+        "success": true,
+        "timestamp": 102000
+      },
+      "completed": [
+        "tutorial.basics.camera_left_right"
+      ]
+    },
+    {
+      "task": "tutorial.basics.camera_up_down",
+      "event": {
+        "type": "camera_moved",
+        "details": {
+          "key": "E",
+          "axisGroup": "up_down",
+          "actualDelta": 1
+        },
+        "success": true,
+        "timestamp": 103000
+      },
+      "completed": [
+        "tutorial.basics.camera_up_down"
+      ]
+    },
+    {
+      "task": "tutorial.basics.camera_rotate",
+      "event": {
+        "type": "camera_rotated",
+        "details": {
+          "interaction": "right_mouse_drag",
+          "actualDelta": 1
+        },
+        "success": true,
+        "timestamp": 104000
+      },
+      "completed": [
+        "tutorial.basics.camera_rotate"
+      ]
+    },
+    {
+      "task": "tutorial.basics.camera_wheel",
+      "event": {
+        "type": "camera_moved",
+        "details": {
+          "interaction": "wheel",
+          "actualDelta": 1
+        },
+        "success": true,
+        "timestamp": 105000
+      },
+      "completed": [
+        "tutorial.basics.camera_wheel"
+      ]
+    },
+    {
+      "task": "tutorial.basics.open_scene_manager",
+      "event": {
+        "type": "panel_opened",
+        "details": {
+          "panelId": "SceneTools",
+          "source": "user"
+        },
+        "success": true,
+        "timestamp": 106000
+      },
+      "completed": [
+        "tutorial.basics.open_scene_manager"
+      ]
+    },
+    {
+      "task": "tutorial.basics.import_model",
+      "event": {
+        "type": "model_imported",
+        "details": {
+          "sceneName": "Scene",
+          "actorName": "TutorialActor",
+          "actorId": "actor-1",
+          "resourcePath": "cache/tutorial.glb"
+        },
+        "success": true,
+        "timestamp": 107000
+      },
+      "completed": [
+        "tutorial.basics.import_model"
+      ]
+    },
+    {
+      "task": "tutorial.basics.select_model",
+      "event": {
+        "type": "actor_selected",
+        "details": {
+          "actorName": "TutorialActor",
+          "actorId": "actor-1",
+          "source": "scene_tree"
+        },
+        "success": true,
+        "timestamp": 108000
+      },
+      "completed": [
+        "tutorial.basics.select_model"
+      ]
+    },
+    {
+      "task": "tutorial.basics.set_position_x",
+      "event": {
+        "type": "transform_position",
+        "details": {
+          "actorName": "TutorialActor",
+          "actorId": "actor-1",
+          "axis": "x",
+          "value": 1
+        },
+        "success": true,
+        "timestamp": 109000
+      },
+      "completed": [
+        "tutorial.basics.set_position_x"
+      ]
+    },
+    {
+      "task": "tutorial.basics.set_rotation_y",
+      "event": {
+        "type": "transform_rotation",
+        "details": {
+          "actorName": "TutorialActor",
+          "actorId": "actor-1",
+          "axis": "y",
+          "value": 45
+        },
+        "success": true,
+        "timestamp": 110000
+      },
+      "completed": [
+        "tutorial.basics.set_rotation_y"
+      ]
+    },
+    {
+      "task": "tutorial.basics.set_scale_x",
+      "event": {
+        "type": "transform_scale",
+        "details": {
+          "actorName": "TutorialActor",
+          "actorId": "actor-1",
+          "axis": "x",
+          "value": 1.5
+        },
+        "success": true,
+        "timestamp": 111000
+      },
+      "completed": [
+        "tutorial.basics.set_scale_x"
+      ]
+    },
+    {
+      "task": "tutorial.basics.enable_physics",
+      "event": {
+        "type": "physics_changed",
+        "details": {
+          "actorName": "TutorialActor",
+          "actorId": "actor-1",
+          "operation": "SetPhysicsEnabled",
+          "value": true
+        },
+        "success": true,
+        "timestamp": 112000
+      },
+      "completed": [
+        "tutorial.basics.enable_physics"
+      ]
+    },
+    {
+      "task": "tutorial.basics.set_mass",
+      "event": {
+        "type": "physics_changed",
+        "details": {
+          "actorName": "TutorialActor",
+          "actorId": "actor-1",
+          "operation": "SetMass",
+          "value": 10
+        },
+        "success": true,
+        "timestamp": 113000
+      },
+      "completed": [
+        "tutorial.basics.set_mass"
+      ]
+    },
+    {
+      "task": "tutorial.basics.set_light_x",
+      "event": {
+        "type": "lighting_changed",
+        "details": {
+          "sceneName": "Scene",
+          "axis": "x",
+          "value": 0.5
+        },
+        "success": true,
+        "timestamp": 114000
+      },
+      "completed": [
+        "tutorial.basics.set_light_x"
+      ]
+    },
+    {
+      "task": "tutorial.basics.open_nodes",
+      "event": {
+        "type": "panel_opened",
+        "details": {
+          "panelId": "NodeGraphPanel",
+          "source": "user"
+        },
+        "success": true,
+        "timestamp": 115000
+      },
+      "completed": [
+        "tutorial.basics.open_nodes"
+      ]
+    },
+    {
+      "task": "tutorial.basics.confirm_start_node",
+      "event": {
+        "type": "node_selected",
+        "details": {
+          "nodeId": "start-1",
+          "nodeType": "start",
+          "uniqueStart": true,
+          "source": "user"
+        },
+        "success": true,
+        "timestamp": 116000
+      },
+      "completed": [
+        "tutorial.basics.confirm_start_node"
+      ]
+    },
+    {
+      "task": "tutorial.basics.create_custom_node",
+      "event": {
+        "type": "node_created",
+        "details": {
+          "nodeId": "custom-1",
+          "nodeType": "custom"
+        },
+        "success": true,
+        "timestamp": 117000
+      },
+      "completed": [
+        "tutorial.basics.create_custom_node"
+      ]
+    },
+    {
+      "task": "tutorial.basics.select_custom_node",
+      "event": {
+        "type": "node_selected",
+        "details": {
+          "nodeId": "custom-1",
+          "nodeType": "custom",
+          "mode": "select",
+          "source": "user"
+        },
+        "success": true,
+        "timestamp": 118000
+      },
+      "completed": [
+        "tutorial.basics.select_custom_node"
+      ]
+    },
+    {
+      "task": "tutorial.basics.move_custom_node",
+      "event": {
+        "type": "node_moved",
+        "details": {
+          "nodeId": "custom-1",
+          "actualDelta": 20,
+          "mode": "select",
+          "source": "user"
+        },
+        "success": true,
+        "timestamp": 119000
+      },
+      "completed": [
+        "tutorial.basics.move_custom_node"
+      ]
+    },
+    {
+      "task": "tutorial.basics.create_delete_practice_node",
+      "event": {
+        "type": "node_created",
+        "details": {
+          "nodeId": "delete-practice-1",
+          "nodeType": "custom"
+        },
+        "success": true,
+        "timestamp": 120000
+      },
+      "completed": [
+        "tutorial.basics.create_delete_practice_node"
+      ]
+    },
+    {
+      "task": "tutorial.basics.delete_practice_node",
+      "event": {
+        "type": "node_deleted",
+        "details": {
+          "nodeId": "delete-practice-1",
+          "nodeType": "custom",
+          "mode": "delete",
+          "source": "user"
+        },
+        "success": true,
+        "timestamp": 121000
+      },
+      "completed": [
+        "tutorial.basics.delete_practice_node"
+      ]
+    },
+    {
+      "task": "tutorial.basics.return_select_tool",
+      "event": {
+        "type": "node_tool_mode_changed",
+        "details": {
+          "mode": "select",
+          "source": "user"
+        },
+        "success": true,
+        "timestamp": 122000
+      },
+      "completed": [
+        "tutorial.basics.return_select_tool"
+      ]
+    },
+    {
+      "task": "tutorial.basics.connect_nodes",
+      "event": {
+        "type": "node_connected",
+        "details": {
+          "sourceNodeId": "start-1",
+          "targetNodeId": "custom-1",
+          "edgeId": "edge-1"
+        },
+        "success": true,
+        "timestamp": 123000
+      },
+      "completed": [
+        "tutorial.basics.connect_nodes"
+      ]
+    },
+    {
+      "task": "tutorial.basics.open_custom_node",
+      "event": {
+        "type": "node_selected",
+        "details": {
+          "nodeId": "custom-1",
+          "source": "user"
+        },
+        "success": true,
+        "timestamp": 124000
+      },
+      "completed": [
+        "tutorial.basics.open_custom_node"
+      ]
+    },
+    {
+      "task": "tutorial.basics.add_when_enter",
+      "event": {
+        "type": "block_added",
+        "details": {
+          "nodeId": "custom-1",
+          "blockId": "enter-1",
+          "blockType": "node_when_enter"
+        },
+        "success": true,
+        "timestamp": 125000
+      },
+      "completed": [
+        "tutorial.basics.add_when_enter"
+      ]
+    },
+    {
+      "task": "tutorial.basics.add_set_position",
+      "event": {
+        "type": "block_connected",
+        "details": {
+          "nodeId": "custom-1",
+          "blockId": "position-1",
+          "blockType": "object_set_position",
+          "parentBlockType": "node_when_enter",
+          "connected": true
+        },
+        "success": true,
+        "timestamp": 126000
+      },
+      "completed": [
+        "tutorial.basics.add_set_position"
+      ]
+    },
+    {
+      "task": "tutorial.basics.set_position_model",
+      "event": {
+        "type": "block_parameter_changed",
+        "details": {
+          "nodeId": "custom-1",
+          "blockId": "position-1",
+          "blockType": "object_set_position",
+          "fieldName": "NAME",
+          "parentBlockType": "node_when_enter",
+          "connected": true,
+          "newValue": "TutorialActor",
+          "modelName": "TutorialActor"
+        },
+        "success": true,
+        "timestamp": 127000
+      },
+      "completed": [
+        "tutorial.basics.set_position_model"
+      ]
+    },
+    {
+      "task": "tutorial.basics.set_start_x",
+      "event": {
+        "type": "block_parameter_changed",
+        "details": {
+          "nodeId": "custom-1",
+          "blockId": "position-1",
+          "blockType": "object_set_position",
+          "fieldName": "X",
+          "parentBlockType": "node_when_enter",
+          "connected": true,
+          "newValue": -3,
+          "modelName": "TutorialActor",
+          "x": -3,
+          "y": 0,
+          "z": 0
+        },
+        "success": true,
+        "timestamp": 128000
+      },
+      "completed": [
+        "tutorial.basics.set_start_x"
+      ]
+    },
+    {
+      "task": "tutorial.basics.add_while_active",
+      "event": {
+        "type": "block_added",
+        "details": {
+          "nodeId": "custom-1",
+          "blockId": "active-1",
+          "blockType": "node_while_active",
+          "parentBlockType": "",
+          "connected": false
+        },
+        "success": true,
+        "timestamp": 129000
+      },
+      "completed": [
+        "tutorial.basics.add_while_active"
+      ]
+    },
+    {
+      "task": "tutorial.basics.add_move_direction",
+      "event": {
+        "type": "block_connected",
+        "details": {
+          "nodeId": "custom-1",
+          "blockId": "move-1",
+          "blockType": "object_move_direction",
+          "parentBlockType": "node_while_active",
+          "connected": true
+        },
+        "success": true,
+        "timestamp": 130000
+      },
+      "completed": [
+        "tutorial.basics.add_move_direction"
+      ]
+    },
+    {
+      "task": "tutorial.basics.set_move_model",
+      "event": {
+        "type": "block_parameter_changed",
+        "details": {
+          "nodeId": "custom-1",
+          "blockId": "move-1",
+          "blockType": "object_move_direction",
+          "fieldName": "NAME",
+          "parentBlockType": "node_while_active",
+          "connected": true,
+          "newValue": "TutorialActor",
+          "modelName": "TutorialActor"
+        },
+        "success": true,
+        "timestamp": 131000
+      },
+      "completed": [
+        "tutorial.basics.set_move_model"
+      ]
+    },
+    {
+      "task": "tutorial.basics.set_move_direction",
+      "event": {
+        "type": "block_parameter_changed",
+        "details": {
+          "nodeId": "custom-1",
+          "blockId": "move-1",
+          "blockType": "object_move_direction",
+          "fieldName": "DIRECTION",
+          "parentBlockType": "node_while_active",
+          "connected": true,
+          "newValue": "RIGHT",
+          "direction": "RIGHT",
+          "modelName": "TutorialActor"
+        },
+        "success": true,
+        "timestamp": 132000
+      },
+      "completed": [
+        "tutorial.basics.set_move_direction"
+      ]
+    },
+    {
+      "task": "tutorial.basics.set_move_speed",
+      "event": {
+        "type": "block_parameter_changed",
+        "details": {
+          "nodeId": "custom-1",
+          "blockId": "move-1",
+          "blockType": "object_move_direction",
+          "fieldName": "SPEED",
+          "parentBlockType": "node_while_active",
+          "connected": true,
+          "newValue": 2,
+          "modelName": "TutorialActor",
+          "direction": "RIGHT",
+          "speed": 2
+        },
+        "success": true,
+        "timestamp": 133000
+      },
+      "completed": [
+        "tutorial.basics.set_move_speed"
+      ]
+    },
+    {
+      "task": "tutorial.basics.run_graph",
+      "event": {
+        "type": "run_clicked",
+        "details": {
+          "source": "user"
+        },
+        "success": true,
+        "timestamp": 134000
+      },
+      "completed": [
+        "tutorial.basics.run_graph"
+      ]
+    },
+    {
+      "task": "tutorial.basics.focus_ai_composer",
+      "event": {
+        "type": "ai_composer_focused",
+        "details": {
+          "source": "user"
+        },
+        "success": true,
+        "timestamp": 135000
+      },
+      "completed": [
+        "tutorial.basics.focus_ai_composer"
+      ]
+    },
+    {
+      "task": "tutorial.basics.ask_ai",
+      "event": {
+        "type": "ai_question_answered",
+        "details": {
+          "prompt": "Explain why the model starts at X=-3 and moves right; do not modify anything.",
+          "mode": "ask",
+          "responseReceived": true
+        },
+        "success": true,
+        "timestamp": 136000
+      },
+      "completed": [
+        "tutorial.basics.ask_ai"
+      ]
+    },
+    {
+      "task": "tutorial.basics.modify_with_ai",
+      "event": {
+        "type": "ai_node_graph_changed",
+        "details": {
+          "prompt": "Change the continuous movement speed from 2 to 4 and keep everything else.",
+          "mode": "modify",
+          "operation": "edit",
+          "applied": true
+        },
+        "success": true,
+        "timestamp": 137000
+      },
+      "completed": [
+        "tutorial.basics.modify_with_ai"
+      ]
+    },
+    {
+      "task": "tutorial.basics.generate_with_ai",
+      "event": {
+        "type": "ai_node_graph_changed",
+        "details": {
+          "prompt": "Add an End node and connect the Custom node to it.",
+          "mode": "generate",
+          "operation": "extend",
+          "applied": true,
+          "createdNodeIds": [
+            "ai-end-1"
+          ],
+          "createdEdgeIds": [
+            "ai-edge-1"
+          ]
+        },
+        "success": true,
+        "timestamp": 138000
+      },
+      "completed": [
+        "tutorial.basics.generate_with_ai"
+      ]
+    }
+  ],
+  "tutorialBindings": {
+    "sceneName": "Scene",
+    "modelActorName": "TutorialActor",
+    "modelActorId": "actor-1",
+    "modelResourcePath": "cache/tutorial.glb",
+    "startNodeId": "start-1",
+    "startNodeCreatedByTutorial": false,
+    "customNodeId": "custom-1",
+    "deletePracticeNodeId": "delete-practice-1",
+    "edgeId": "edge-1",
+    "whenEnterBlockId": "enter-1",
+    "setPositionBlockId": "position-1",
+    "whileActiveBlockId": "active-1",
+    "moveDirectionBlockId": "move-1",
+    "waitBlockId": "",
+    "conditionBlockId": ""
+  },
+  "tutorialHistory": [
+    "tutorial.basics.viewport_focus",
+    "tutorial.basics.camera_forward_back",
+    "tutorial.basics.camera_left_right",
+    "tutorial.basics.camera_up_down",
+    "tutorial.basics.camera_rotate",
+    "tutorial.basics.camera_wheel",
+    "tutorial.basics.open_scene_manager",
+    "tutorial.basics.import_model",
+    "tutorial.basics.select_model",
+    "tutorial.basics.set_position_x",
+    "tutorial.basics.set_rotation_y",
+    "tutorial.basics.set_scale_x",
+    "tutorial.basics.enable_physics",
+    "tutorial.basics.set_mass",
+    "tutorial.basics.set_light_x",
+    "tutorial.basics.open_nodes",
+    "tutorial.basics.confirm_start_node",
+    "tutorial.basics.create_custom_node",
+    "tutorial.basics.select_custom_node",
+    "tutorial.basics.move_custom_node",
+    "tutorial.basics.create_delete_practice_node",
+    "tutorial.basics.delete_practice_node",
+    "tutorial.basics.return_select_tool",
+    "tutorial.basics.connect_nodes",
+    "tutorial.basics.open_custom_node",
+    "tutorial.basics.add_when_enter",
+    "tutorial.basics.add_set_position",
+    "tutorial.basics.set_position_model",
+    "tutorial.basics.set_start_x",
+    "tutorial.basics.add_while_active",
+    "tutorial.basics.add_move_direction",
+    "tutorial.basics.set_move_model",
+    "tutorial.basics.set_move_direction",
+    "tutorial.basics.set_move_speed",
+    "tutorial.basics.run_graph",
+    "tutorial.basics.focus_ai_composer",
+    "tutorial.basics.ask_ai",
+    "tutorial.basics.modify_with_ai",
+    "tutorial.basics.generate_with_ai"
+  ]
+}

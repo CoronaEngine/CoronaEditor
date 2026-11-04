@@ -174,7 +174,7 @@ async function sendEvent(event) {
     timestamp: Number(event?.timestamp) || Date.now(),
   });
   const context = responseContext(response);
-  if (context) publishBackendContext(context);
+  if (context && (!event.projectPath || event.projectPath===currentProjectPath()) && (event.projectRevision==null || event.projectRevision===worldModeState.revision)) publishBackendContext(context);
   if (response?.success === true && (
     Array.isArray(response.completedTaskKeys) && response.completedTaskKeys.length
     || ['run_started', 'run_succeeded', 'run_failed', 'node_issue_found', 'node_issue_fixed'].includes(event?.type)
@@ -233,10 +233,12 @@ export function readCabbageAssistantContext(projectScopeId = '') {
 export async function loadCurrentWorld() {
   cancelPendingTransformEvents();
   const expectedWorldId = currentWorldId();
-  const response = await aiService.loadCabbageContext({ worldId: expectedWorldId });
+  const expectedPath=currentProjectPath(),revision=worldModeState.revision;
+  const response = await aiService.loadCabbageContext({ worldId: expectedWorldId,projectPath:expectedPath,projectRevision:revision });
   if (response?.success !== true || !response?.context) {
     throw createServiceResponseError(response, '加载当前世界的包菜上下文失败');
   }
+  if(revision!==worldModeState.revision || expectedPath!==currentProjectPath())return null;
   const loadedWorldId = String(response.context.worldId || '');
   if (expectedWorldId && loadedWorldId !== expectedWorldId) {
     throw new Error(`后端返回了其他世界的上下文（${loadedWorldId || '未知'}），已拒绝加载`);
@@ -316,7 +318,7 @@ async function initializeWorldTasksNow({ prompt = '', mode = 'story', waitForCom
 }
 
 export function recordEvent(event = {}) {
-  const normalized = { ...clone(event, {}), timestamp: Number(event.timestamp) || Date.now() };
+  const normalized = { ...clone(event, {}),projectPath:currentProjectPath(),projectRevision:worldModeState.revision, timestamp: Number(event.timestamp) || Date.now() };
   if (['transform_position', 'transform_rotation', 'transform_scale'].includes(normalized.type)) {
     const key = transformKey(normalized);
     const previous = pendingTransforms.get(key);
@@ -335,33 +337,37 @@ export function recordEvent(event = {}) {
 }
 
 export function updateTask(payload = {}) {
+  payload={...payload,projectPath:currentProjectPath(),projectRevision:worldModeState.revision};
   return enqueue(async () => {
     const response = await aiService.updateCabbageTask({
       ...payload,
       worldId: String(payload?.worldId || latestSnapshot?.worldId || ''),
     });
     const context = responseContext(response);
-    if (context) publishBackendContext(context);
+    if (context && payload.projectPath===currentProjectPath() && payload.projectRevision===worldModeState.revision) publishBackendContext(context);
     return response;
   });
 }
 
 export function appendMessage(message = {}) {
+  message={...message,projectPath:currentProjectPath(),projectRevision:worldModeState.revision};
   return enqueue(async () => {
     const response = await aiService.appendCabbageMessage({
       ...message,
       worldId: String(message?.worldId || latestSnapshot?.worldId || ''),
     });
     const context = responseContext(response);
-    if (context) publishBackendContext(context);
+    if (context && message.projectPath===currentProjectPath() && message.projectRevision===worldModeState.revision) publishBackendContext(context);
     return response;
   });
 }
 
 async function pollScoreUpdate(taskId) {
+  const scope=currentScopeId(),revision=worldModeState.revision;
   while (activeScoreUpdateTaskId === taskId) {
     const response = await aiService.getCabbageProfileScoreStatus(taskId);
-    if (response?.success !== true) break;
+    if(revision!==worldModeState.revision || scope!==currentScopeId()){activeScoreUpdateTaskId='';return null;}
+    if (response?.success !== true){activeScoreUpdateTaskId='';break;}
     if (response.status === 'completed') {
       activeScoreUpdateTaskId = '';
       const result = response.result || {};

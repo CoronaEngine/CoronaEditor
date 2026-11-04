@@ -66,7 +66,7 @@ def test_canonical_services_delegate_to_editor_api():
     for service_name in (
         "lanChatService.js",
         "networkService.js",
-        "aiService.js",
+        "aiModelService.js",
         "projectLauncherService.js",
     ):
         source = (SERVICES_ROOT / service_name).read_text(encoding="utf-8")

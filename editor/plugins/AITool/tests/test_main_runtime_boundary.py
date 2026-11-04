@@ -33,11 +33,7 @@ def test_ai_services_only_contain_current_frontend_features():
         for path in (AI_ROOT / "services").rglob("*.py")
         if "tests" not in path.parts
     }
-    assert sources == {
-        "__init__.py", "node_graph_review_service.py",
-        "node_graph_review_chat_service.py", "node_graph_generation_service.py",
-        "cabbage_context_service.py",
-    }
+    assert sources == {"__init__.py", "model_service.py"}
     assert not (AI_ROOT / "Quasar").exists()
     assert not any((AI_ROOT / "cai_extensions").rglob("*.py"))
 
@@ -50,8 +46,8 @@ def test_frontend_ai_operations_match_backend_routes():
         if isinstance(node, ast.Assign)
         and any(isinstance(target, ast.Name) and target.id == "_OPERATIONS" for target in node.targets)
     )
-    frontend = (EDITOR_ROOT / "Frontend/src/services/aiService.js").read_text(encoding="utf-8")
-    operations = set(re.findall(r"operation: '([^']+)'", frontend))
+    frontend = (EDITOR_ROOT / "Frontend/src/services/aiModelService.js").read_text(encoding="utf-8")
+    operations = set(re.findall(r"call\('([^']+)'", frontend))
     assert operations == set(ast.literal_eval(routes))
 
 

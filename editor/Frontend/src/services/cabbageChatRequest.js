@@ -1,4 +1,4 @@
-import policy from '../../../plugins/AITool/cabbage_chat_policy.json' with { type: 'json' };
+import policy from './cabbageChatPolicy.json' with { type: 'json' };
 
 const MESSAGE_LIMIT = 24;
 const TASK_LIMIT = 20;

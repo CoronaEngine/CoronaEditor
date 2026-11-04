@@ -1,4 +1,4 @@
-"""Lifecycle and request routing for the editor's Cabbage/NodeGraph services."""
+"""Lifecycle and request routing for the editor's model transport."""
 
 import json
 import logging
@@ -22,28 +22,12 @@ class AITool(PluginBase):
     _runtime_state = "cold"
     _runtime_error = ""
     _runtime_stop = threading.Event()
-    _node_graph_review_service = None
-    _node_graph_review_chat_service = None
-    _node_graph_generation_service = None
-    _cabbage_context_service = None
+    _model_service = None
 
     _OPERATIONS = {
-        "node_graph.review.start": ("_node_graph_review_service", "start"),
-        "node_graph.review.status": ("_node_graph_review_service", "status"),
-        "node_graph.review.chat.start": ("_node_graph_review_chat_service", "start"),
-        "node_graph.review.chat.status": ("_node_graph_review_chat_service", "status"),
-        "node_graph.review.chat.cancel": ("_node_graph_review_chat_service", "cancel"),
-        "node_graph.generate.start": ("_node_graph_generation_service", "start"),
-        "node_graph.generate.status": ("_node_graph_generation_service", "status"),
-        "node_graph.generate.cancel": ("_node_graph_generation_service", "cancel"),
-        "cabbage.context.load": ("_cabbage_context_service", "load"),
-        "cabbage.context.record_event": ("_cabbage_context_service", "record_event"),
-        "cabbage.context.update_task": ("_cabbage_context_service", "update_task"),
-        "cabbage.context.append_message": ("_cabbage_context_service", "append_message"),
-        "cabbage.goal_plan.start": ("_cabbage_context_service", "start_goal_plan"),
-        "cabbage.goal_plan.status": ("_cabbage_context_service", "goal_plan_status"),
-        "cabbage.profile.score.start": ("_cabbage_context_service", "start_score_update"),
-        "cabbage.profile.score.status": ("_cabbage_context_service", "score_update_status"),
+        "model.start": ("_model_service", "start"),
+        "model.status": ("_model_service", "status"),
+        "model.cancel": ("_model_service", "cancel"),
     }
 
     @classmethod
@@ -71,17 +55,8 @@ class AITool(PluginBase):
 
     @staticmethod
     def _service_factories():
-        from .services.node_graph_review_service import get_node_graph_review_service
-        yield "_node_graph_review_service", get_node_graph_review_service
-
-        from .services.node_graph_review_chat_service import get_node_graph_review_chat_service
-        yield "_node_graph_review_chat_service", get_node_graph_review_chat_service
-
-        from .services.node_graph_generation_service import get_node_graph_generation_service
-        yield "_node_graph_generation_service", get_node_graph_generation_service
-
-        from .services.cabbage_context_service import get_cabbage_context_service
-        yield "_cabbage_context_service", get_cabbage_context_service
+        from .services.model_service import get_model_service
+        yield "_model_service", get_model_service
 
     @staticmethod
     def _shutdown_services(services):
@@ -124,7 +99,7 @@ class AITool(PluginBase):
                     setattr(cls, attribute, service)
                 cls._runtime_state = "ready"
                 published = True
-            logger.info("AITool Cabbage/NodeGraph services ready")
+            logger.info("AITool model service ready")
             return True
         except Exception as error:
             with cls._runtime_lock:
