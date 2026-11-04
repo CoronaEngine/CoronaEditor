@@ -9,6 +9,7 @@
 |---|---|---|---|
 | `configuration/` | AITool configuration owner | `.env`、API key 和本地配置读取 | 不保存密钥到源码、日志或 Vue bundle |
 | `deepseek_client.py` | DeepSeek HTTP 客户端 | 构造 HTTP 请求、读取 JSON 响应和 SSE 文本 | 业务提示词、任务状态和取消策略由调用服务负责 |
+| `cabbage_chat_policy.json` | 普通聊天的双语文案与引导映射 | Web 构建时打包，旧版上下文请求复用同一份数据 | 调度、状态和网络请求 |
 | `services/` | AITool service owner | 节点检查、聊天、生成和 Cabbage 上下文四个服务 | 不直接操作 `Actor`/`Scene`，不定义公共 manifest |
 | `compat/`、`utils/` | removed compatibility code | 目录和旧导入入口已删除；配置统一由 `configuration/` 负责 | 不得重新创建旧入口 |
 
@@ -41,7 +42,9 @@ Quasar 子模块、配置桥接和专属依赖已移除。四个服务通过共�
 `configuration/deepseek_settings.py` 是模型配置 owner。未提供覆盖时，模型保持
 `deepseek-v4-flash`；审查/评分使用 0.1/1200，聊天使用 0.25/1400，目标规划使用
 0.25/3600，节点生成使用 0.05/12000（temperature/max_tokens）。默认关闭 thinking。
-四个服务保留各自的提示词、超时、请求参数、错误处理和业务校验。
+普通聊天沿用 `node_graph.review.chat.start/status/cancel`。Web 在发送时准备 `modelMessages` 与 `guidance`，
+Python 校验消息结构，通过共享客户端发送并在成功完成时返回引导；原始上下文输入仍由旧格式分支处理。
+审查、节点生成和目标规划继续在各自的服务中准备提示词和校验业务结果。
 
 可选的 `editor/deepseek_settings.json` 仅存放非密钥参数，启动时读取一次。例如迁移原
 provider.model 和 node_graph 设置时，使用：

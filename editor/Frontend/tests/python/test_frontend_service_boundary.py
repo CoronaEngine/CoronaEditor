@@ -13,6 +13,7 @@ EXPECTED_SERVICES = (
     "networkService.js",
     "scriptingService.js",
     "aiService.js",
+    "cabbageChatRequest.js",
     "projectLauncherService.js",
     "fileService.js",
     "projectSettingsService.js",
