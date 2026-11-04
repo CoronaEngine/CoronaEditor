@@ -98,6 +98,14 @@ def _parse_actor(
             path=str(asset_path),
             details={"actor_name": section.get(f"{key}.name", key)},
         )
+    if route and asset_path.suffix.lower() == ".actor" and asset_path.is_file():
+        from .assets import actor_descriptor
+        try:
+            asset_path = Path(actor_descriptor(asset_path, project_root)["model"])
+        except (OSError, ValueError, configparser.Error) as exc:
+            raise ArchiveParseError("INVALID_ACTOR_DESCRIPTOR", str(exc), path=str(asset_path)) from exc
+        if not asset_path.is_relative_to(project_root.resolve()):
+            raise ArchiveParseError("RESOURCE_PATH_OUTSIDE_PROJECT", "Actor model escapes project", path=str(asset_path))
     collision = section.get(f"{key}.mechanics.collision_type", "").strip().lower()
     if not collision:
         collision = (

@@ -161,13 +161,17 @@ export function projectIdentity(payload = {}) {
   return projectPath;
 }
 
+async function documentScope(projectPath) {
+  const scene = unwrap(await editorApi.scene.readActive());
+  if (!scene?.archive_session || normalizePath(scene.project_path) !== normalizePath(projectPath))
+    throw new Error('当前世界已切换');
+  return { project_path: projectPath, archive_session: scene.archive_session, document: documentName };
+}
+
 export async function readContext(projectPath) {
   projectIdentity({ projectPath });
   const read = unwrap(
-    await editorApi.projectSettings.readProjectDocument({
-      project_path: projectPath,
-      document: documentName,
-    })
+    await editorApi.projectSettings.readProjectDocument(await documentScope(projectPath))
   );
   projectIdentity({ projectPath });
   if (!read?.success) throw new Error(read?.error || '读取助手状态失败');
@@ -181,9 +185,9 @@ export async function contextTransaction(
 ) {
   if (!projectPath || normalizePath(projectPath) !== normalizePath(activeProjectPath()))
     throw new Error('当前世界已切换');
+  const request = await documentScope(projectPath);
   for (let attempt = 0; attempt < 12; attempt++) {
     if (signal?.aborted || revision !== worldModeState.revision) throw new Error('当前任务已取消');
-    const request = { project_path: projectPath, document: documentName };
     const read = unwrap(await editorApi.projectSettings.readProjectDocument(request));
     if (!read?.success) throw new Error(read?.error || '读取助手状态失败');
     const context = normalizeContext(read.content, projectPath);

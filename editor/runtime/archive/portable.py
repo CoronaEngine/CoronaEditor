@@ -1,6 +1,9 @@
 """Portable scene file transactions and asset-reference validation."""
 
+import configparser
 import hashlib
+import io
+import re
 import json
 import os
 from pathlib import Path, PurePosixPath, PureWindowsPath
@@ -21,6 +24,29 @@ def atomic_replace(path, content):
     finally:
         if temporary is not None:
             temporary.unlink(missing_ok=True)
+
+
+def write_ini_sections(path, original, updates):
+    # Replace only edited sections, retaining user comments/formatting elsewhere.
+    text = path.read_bytes().decode("utf-8-sig") if path.exists() else ""
+    newline = "\r\n" if "\r\n" in text else "\n"
+    chunks = re.split(r"(?m)^(?=[ \t]*\[)", text.replace("\r\n", "\n"))
+    pending = {}
+    for name in updates:
+        partial = configparser.ConfigParser(interpolation=None)
+        partial.optionxform = original.optionxform
+        partial[name] = dict(original.items(name, raw=True))
+        stream = io.StringIO()
+        partial.write(stream)
+        pending[name] = stream.getvalue()
+    for index, chunk in enumerate(chunks):
+        header = re.match(r"[ \t]*\[([^]\n]+)\]", chunk)
+        if header and header[1] in pending:
+            chunks[index] = pending.pop(header[1])
+    output = "".join(chunks)
+    if pending:
+        output = (output.rstrip("\n") + "\n\n" if output else "") + "".join(pending.values())
+    atomic_replace(path, output.replace("\n", newline).encode("utf-8"))
 
 
 def recover_scene(root):

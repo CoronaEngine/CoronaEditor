@@ -27,7 +27,7 @@ def test_native_main_init_owns_current_scene_resolution():
     assert '{"on_init", script_method}' not in main_view
     assert '{"on_init", []' in main_view
     assert "make_native_main_init_payload" in main_view
-    assert "read_ini_file" in source
+    assert "read_ini_file" not in source
     assert "split_csv_routes" not in source
     assert "reload_native_editor_scene" in source
 

@@ -181,6 +181,7 @@ const handleContextMenu = (event, item) => {
   event.preventDefault();
   event.stopPropagation(); // 防止事件冒泡
 
+  const scope = { archive_session: fileTree.value.archive_session };
   // 关闭已有的右键菜单
   contextMenu.value.show = false;
 
@@ -191,6 +192,7 @@ const handleContextMenu = (event, item) => {
       x: event.clientX,
       y: event.clientY,
       item: item || null,
+      scope,
     };
   });
 };
@@ -203,6 +205,7 @@ const closeContextMenu = () => {
 // 打开新建文件夹对话框
 const handleNewFolder = () => {
   dialog.value = {
+    scope: contextMenu.value.scope,
     show: true,
     title: '新建文件夹',
     placeholder: '输入文件夹名称',
@@ -217,6 +220,7 @@ const handleNewFolder = () => {
 // 打开新建单位对话框
 const handleNewActor = () => {
   dialog.value = {
+    scope: contextMenu.value.scope,
     show: true,
     title: '新建单位',
     placeholder: '输入单位名称 (.actor)',
@@ -232,6 +236,7 @@ const handleRename = () => {
   if (!contextMenu.value.item) return;
 
   dialog.value = {
+    scope: contextMenu.value.scope,
     show: true,
     title: '重命名',
     placeholder: '输入新名称',
@@ -248,7 +253,7 @@ const handleDelete = async () => {
   if (!contextMenu.value.item) return;
 
   if (confirm(translateUiText(`确定要删除 "${contextMenu.value.item.name}" 吗？`))) {
-    const res = await editorApi.files.deleteItem(contextMenu.value.item.path);
+    const res = await editorApi.files.deleteItem(contextMenu.value.item.path, contextMenu.value.scope);
     if (res?.data) {
       await loadFileTree();
     }
@@ -279,18 +284,18 @@ const handleDialogConfirm = async () => {
 
   switch (dialog.value.type) {
     case 'newFolder':
-      await editorApi.files.createFolder(dialog.value.targetPath, name);
+      await editorApi.files.createFolder(dialog.value.targetPath, name, dialog.value.scope);
       break;
     case 'newActor':
       // 创建.actor文件
-          await editorApi.files.createFile(
+      await editorApi.files.createFile(
         dialog.value.targetPath,
         name.endsWith('.actor') ? name : name + '.actor',
-        'actor'
+        'actor', dialog.value.scope
       );
       break;
     case 'rename':
-          await editorApi.files.renameItem(dialog.value.targetPath, name);
+      await editorApi.files.renameItem(dialog.value.targetPath, name, dialog.value.scope);
       break;
   }
 

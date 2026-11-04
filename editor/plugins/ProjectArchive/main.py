@@ -15,6 +15,10 @@ from runtime.archive.parser import parse_archive
 from runtime.archive.portable import recover_scene, validate_assets
 from runtime.archive.writer import save_scene
 from runtime.archive.project import create_project, project_info, update_metadata, validate_project
+from runtime.archive.assets import asset_operation
+from runtime.archive.documents import read_document, commit_document
+from runtime.archive.editor_settings import editor_settings
+from runtime.archive.project_files import file_manager
 from runtime.plugin_base import PluginBase
 
 
@@ -22,6 +26,11 @@ from runtime.plugin_base import PluginBase
 class ProjectArchive(PluginBase):
     """Internal Script Service facade for the pure archive parser."""
 
+    asset_operation = staticmethod(asset_operation)
+    read_document = staticmethod(read_document)
+    commit_document = staticmethod(commit_document)
+    editor_settings = staticmethod(editor_settings)
+    file_manager = staticmethod(file_manager)
     create_project = staticmethod(create_project)
     project_info = staticmethod(project_info)
     validate_project = staticmethod(validate_project)

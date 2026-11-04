@@ -1897,7 +1897,7 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
             "listActorTree: (sceneName) => call_manifest_editor_api('scene.listActorTree', [sceneName])",
             "listSceneTree: (sceneName, query) => call_manifest_editor_api('sceneTools.listSceneTree', query ? [sceneName, query] : [sceneName])",
             "createActor: (sceneName, objPath, actorType = 'model', actorData = null) =>",
-            "call_manifest_editor_api('sceneTools.createActor',",
+            "callProjectAssetOperation('sceneTools.createActor',",
             "removeActor: (sceneName, actorName) =>",
             "call_manifest_editor_api('sceneTools.removeActor', [sceneName, actorName])",
             "openActor: (sceneName, actorName) =>",
@@ -1966,8 +1966,8 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
         )
         for wrapper in expected_wrappers:
             with self.subTest(wrapper=wrapper):
-                if wrapper == "sceneTools.selectActor":
-                    self.assertIn("'sceneTools.selectActor',", scene_tools_section)
+                if wrapper in ("sceneTools.selectActor", "sceneTools.createActor"):
+                    self.assertIn(f"'{wrapper}',", scene_tools_section)
                 else:
                     self.assertIn(f"call_manifest_editor_api('{wrapper}'", scene_tools_section)
         self.assertNotIn("SceneTools.", scene_tools_section)
@@ -2212,9 +2212,9 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
         source = self._editor_api_source()
 
         expected = {
-            "FileManager.create_file": ("kFileManagerCreateFileParams", "EditorApiValueType::Boolean"),
+            "FileManager.create_file": ("kFileManagerCreateFileParams", "EditorApiValueType::Object"),
             "FileManager.create_folder": ("kFileManagerCreateFolderParams", "EditorApiValueType::Boolean"),
-            "FileManager.delete_item": ("kPathParam", "EditorApiValueType::Boolean"),
+            "FileManager.delete_item": ("kFileManagerDeleteParams", "EditorApiValueType::Boolean"),
             "FileManager.get_file_tree": ("kPathOptionalParam", "EditorApiValueType::Object"),
             "FileManager.get_files": ("kPathOptionalParam", "EditorApiValueType::Array"),
             "FileManager.get_project_info": ("kNoParams", "EditorApiValueType::Object"),
@@ -2244,7 +2244,7 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
             "getFileTree: (relPath = '') =>",
             "createFolder: (path, folderName) =>",
             "createFile: (path, fileName, type) =>",
-            "deleteItem: (path) => call_manifest_editor_api('files.deleteItem', [path])",
+            "deleteItem: (path, scope) => callProjectFileMutation('files.deleteItem', [path], scope)",
             "renameItem: (oldPath, newName) =>",
             "openFile: (filePath, fileType) =>",
             "getProjectInfo: () => editorApi.files.getProjectInfo()",
@@ -3507,7 +3507,7 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
         start = handler_source.index("NativeResult create_native_editor_actor")
         end = handler_source.index("NativeResult remove_native_editor_actor", start)
         body = handler_source[start:end]
-        self.assertLess(body.index("skip_if_exists"), body.index("portable_store.emplace"))
+        self.assertLess(body.index("skip_if_exists"), body.index("SceneAssetStore store"))
 
     def test_scene_save_returns_structured_portable_validation_diagnostics(self):
         repo_root = self._repo_root()

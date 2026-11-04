@@ -28,6 +28,22 @@ const INTERACTIVE_FILE_PICKER_APIS = new Set([
 // How long a non-interactive manifest-backed request waits for a native reply before failing.
 // Exposed so an embedding host can tune it without reaching into module internals; native CEF
 // calls have no built-in deadline, so an unanswered non-interactive request would hang forever.
+async function scopedAssetPayload(payload = {}) {
+  if (payload?.archive_session) return payload;
+  const state = (await editorApi.scene.readActive()).data;
+  if (!state?.archive_session || state.read_only) throw new Error('没有可写的活动项目');
+  return { ...payload, archive_session: state.archive_session };
+}
+
+async function callProjectAssetOperation(wrapper, payload = {}, args = []) {
+  return call_manifest_editor_api(wrapper, [...args, await scopedAssetPayload(payload)]);
+}
+
+async function callProjectFileMutation(wrapper, args, scope) {
+  if (scope && !scope.archive_session) throw new Error('项目会话已失效');
+  return callProjectAssetOperation(wrapper, scope, args);
+}
+
 export const editorApiTransportLimits = {
   responseTimeoutMs: 30_000,
 };
@@ -529,13 +545,13 @@ const editorApiStatic = {
     getProjectInfo: () => call_manifest_editor_api('files.getProjectInfo', []),
     getFiles: (relPath = '') => call_manifest_editor_api('files.getFiles', [relPath || '']),
     getFileTree: (relPath = '') => call_manifest_editor_api('files.getFileTree', [relPath || '']),
-    createFolder: (path, folderName) =>
-      call_manifest_editor_api('files.createFolder', [path, folderName]),
-    createFile: (path, fileName, type) =>
-      call_manifest_editor_api('files.createFile', [path, fileName, type]),
-    deleteItem: (path) => call_manifest_editor_api('files.deleteItem', [path]),
-    renameItem: (oldPath, newName) =>
-      call_manifest_editor_api('files.renameItem', [oldPath, newName]),
+    createFolder: (path, folderName, scope) =>
+      callProjectFileMutation('files.createFolder', [path, folderName], scope),
+    createFile: (path, fileName, type, scope) =>
+      callProjectFileMutation('files.createFile', [path, fileName, type], scope),
+    deleteItem: (path, scope) => callProjectFileMutation('files.deleteItem', [path], scope),
+    renameItem: (oldPath, newName, scope) =>
+      callProjectFileMutation('files.renameItem', [oldPath, newName], scope),
     openFile: (filePath, fileType) =>
       call_manifest_editor_api('files.openFile', [filePath, fileType]),
   },
@@ -629,9 +645,9 @@ const editorApiStatic = {
     validatePortableScene: (payload) =>
       call_manifest_editor_api('project.validatePortableScene', [payload || {}]),
     importPortableAsset: (payload) =>
-      call_manifest_editor_api('project.importPortableAsset', [payload || {}]),
+      callProjectAssetOperation('project.importPortableAsset', payload),
     cleanupPortableSceneAssets: (payload) =>
-      call_manifest_editor_api('project.cleanupPortableSceneAssets', [payload || {}]),
+      callProjectAssetOperation('project.cleanupPortableSceneAssets', payload),
     getAppVersion: () => call_manifest_editor_api('project.getAppVersion', []),
     getDefaultProjectPath: () => call_manifest_editor_api('project.getDefaultProjectPath', []),
     getProjectLoadStatus: () => call_manifest_editor_api('project.getProjectLoadStatus', []),
@@ -695,12 +711,10 @@ const editorApiStatic = {
       call_manifest_editor_api('sceneTools.setEnvironment', [sceneName, state || {}]),
     reloadScene: (sceneName, projectPath = '') =>
       call_manifest_editor_api('sceneTools.reloadScene', projectPath ? [sceneName, projectPath] : [sceneName]),
-    rebindActorResource: (sceneName, actorGuid, path) =>
-      call_manifest_editor_api('sceneTools.rebindActorResource', [sceneName, actorGuid, path]),
+    rebindActorResource: (sceneName, actorGuid, path, scope) =>
+      callProjectFileMutation('sceneTools.rebindActorResource', [sceneName, actorGuid, path], scope),
     createActor: (sceneName, objPath, actorType = 'model', actorData = null) =>
-      call_manifest_editor_api('sceneTools.createActor',
-        actorData ? [sceneName, objPath, actorType, actorData] : [sceneName, objPath, actorType],
-      ),
+      callProjectAssetOperation('sceneTools.createActor', actorData || {}, [sceneName, objPath, actorType]),
     removeActor: (sceneName, actorName) =>
       call_manifest_editor_api('sceneTools.removeActor', [sceneName, actorName]),
     renameActor: (sceneName, actorName, name) =>
@@ -715,7 +729,9 @@ const editorApiStatic = {
     focusActor: (sceneName, actorName, cameraName) =>
       call_manifest_editor_api('sceneTools.focusActor', [sceneName, actorName, cameraName]),
     setActorState: (sceneName, actorName, state) =>
-      call_manifest_editor_api('sceneTools.setActorState', [sceneName, actorName, state]),
+      state?.animation_sources
+        ? callProjectAssetOperation('sceneTools.setActorState', state, [sceneName, actorName])
+        : call_manifest_editor_api('sceneTools.setActorState', [sceneName, actorName, state || {}]),
     setActorAnimation: (sceneName, actorName, animation, blendSeconds = 0.2) =>
       call_manifest_editor_api('sceneTools.setActorAnimation', [sceneName, actorName, animation, blendSeconds]),
     saveActor: (sceneName, actorName, session) =>

@@ -209,12 +209,12 @@ class EditorAggregateApiTest(unittest.TestCase):
             return_value={"status": "success", "actor": {"actor_guid": "a1"}},
         ) as invoke:
             adapter = get_scene_tools_adapter(NativeEngine())
-            result = adapter.create_actor("level.scene", "chair.glb", "model", {"actor_name": "Chair"})
+            result = adapter.create_actor("level.scene", "chair.glb", "model", {"actor_name": "Chair", "archive_session": "fixture"})
 
         self.assertEqual(result["actor"]["actor_guid"], "a1")
         invoke.assert_called_once_with(
             "scene_tools.create_actor",
-            ["level.scene", "chair.glb", "model", {"actor_name": "Chair"}],
+            ["level.scene", "chair.glb", "model", {"actor_name": "Chair", "archive_session": "fixture"}],
         )
 
     def test_scene_tools_adapter_falls_back_only_for_legacy_engine(self):

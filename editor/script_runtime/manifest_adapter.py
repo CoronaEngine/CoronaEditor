@@ -43,6 +43,19 @@ class ScriptRuntimeSceneToolsAdapter:
         self._invoke_manifest = invoke_manifest
 
     def create_actor(self, scene_name, source_path, actor_type, actor_data):
+        from pathlib import Path
+        from script_runtime.file_api import current_run
+        run = current_run()
+        if run is not None:
+            actor_data = {**(actor_data or {}), "archive_session": run.session}
+        if Path(source_path).suffix.lower() == ".actor" and not (actor_data or {}).get("resolved_model"):
+            from runtime.archive.assets import actor_descriptor
+            active = self._invoke_manifest("scene.read_active_scene", [])
+            root = Path(active["project_path"]).resolve()
+            descriptor = (root / source_path).resolve()
+            if not descriptor.is_relative_to(root):
+                raise ValueError("Actor descriptor escapes project")
+            actor_data = {**(actor_data or {}), "resolved_model": actor_descriptor(descriptor, root)["model"]}
         return self._invoke_manifest(
             "scene_tools.create_actor",
             [scene_name, source_path, actor_type, actor_data],

@@ -396,22 +396,25 @@ class _FilesApi(_DynamicApiNamespace):
         return _invoke_manifest_cpp_api("files.get_file_tree", [relative_path or ""])
 
     @staticmethod
-    def create_folder(path, folder_name):
-        return _invoke_manifest_cpp_api("files.create_folder", [path, folder_name])
+    def _mutate(method, args, scope):
+        state = scope or get_script_runtime_editor_api().scene.read_active()
+        return _invoke_manifest_cpp_api(method, [*args, {"archive_session": state.get("archive_session", "")}])
 
     @staticmethod
-    def create_file(path, file_name, file_type):
-        return _invoke_manifest_cpp_api(
-            "files.create_file", [path, file_name, file_type]
-        )
+    def create_folder(path, folder_name, scope=None):
+        return _FilesApi._mutate("files.create_folder", [path, folder_name], scope)
 
     @staticmethod
-    def delete_item(path):
-        return _invoke_manifest_cpp_api("files.delete_item", [path])
+    def create_file(path, file_name, file_type, scope=None):
+        return _FilesApi._mutate("files.create_file", [path, file_name, file_type], scope)
 
     @staticmethod
-    def rename_item(old_path, new_name):
-        return _invoke_manifest_cpp_api("files.rename_item", [old_path, new_name])
+    def delete_item(path, scope=None):
+        return _FilesApi._mutate("files.delete_item", [path], scope)
+
+    @staticmethod
+    def rename_item(old_path, new_name, scope=None):
+        return _FilesApi._mutate("files.rename_item", [old_path, new_name], scope)
 
     @staticmethod
     def open_file(path, file_type):
@@ -715,7 +718,15 @@ class _SceneToolsApi(_DynamicApiNamespace):
         )
 
     @staticmethod
+    def rebind_actor_resource(scene_name, actor_guid, path, scope=None):
+        scope = scope or get_script_runtime_editor_api().scene.read_active()
+        return _invoke_manifest_cpp_api("scene_tools.rebind_actor_resource", [scene_name, actor_guid, path, scope])
+
+    @staticmethod
     def create_actor(scene_name, source_path, actor_type, actor_data):
+        actor_data = dict(actor_data or {})
+        if "archive_session" not in actor_data:
+            actor_data["archive_session"] = get_script_runtime_editor_api().scene.read_active()["archive_session"]
         return _invoke_manifest_cpp_api(
             "scene_tools.create_actor",
             [scene_name, source_path, actor_type, actor_data],
@@ -736,6 +747,8 @@ class _SceneToolsApi(_DynamicApiNamespace):
     @staticmethod
     def set_actor_state(scene_name, actor_name, state):
         """Update editor-owned actor state through the SceneTools contract."""
+        if "animation_sources" in state and "archive_session" not in state:
+            state = {**state, "archive_session": get_script_runtime_editor_api().scene.read_active()["archive_session"]}
         return _invoke_manifest_cpp_api(
             "scene_tools.set_actor_state", [scene_name, actor_name, state]
         )

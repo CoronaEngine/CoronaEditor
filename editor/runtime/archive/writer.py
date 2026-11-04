@@ -1,13 +1,11 @@
 """Write live editor values into a portable scene without touching unrelated files."""
 
-import configparser
-import io
 import json
 import re
 from pathlib import Path
 
 from .parser import _actor_fields, _resolve_source
-from .portable import atomic_replace, recover_scene, validate_assets
+from .portable import recover_scene, validate_assets, write_ini_sections
 
 
 def _value(value):
@@ -137,22 +135,4 @@ def replace_sections(path, original, updates):
             original.set(name, key, _value(value).replace("%", "%%"))
     validate_assets(path.parent, {s: dict(original[s]) for s in original.sections()}, verify_hashes=False)
 
-    # Replace only edited sections, retaining user comments/formatting elsewhere.
-    text = path.read_bytes().decode("utf-8-sig")
-    newline = "\r\n" if "\r\n" in text else "\n"
-    chunks = re.split(r"(?m)^(?=[ \t]*\[)", text.replace("\r\n", "\n"))
-    pending = {}
-    for name in updates:
-        partial = configparser.ConfigParser(interpolation=None)
-        partial[name] = dict(original.items(name, raw=True))
-        stream = io.StringIO()
-        partial.write(stream)
-        pending[name] = stream.getvalue()
-    for index, chunk in enumerate(chunks):
-        header = re.match(r"[ \t]*\[([^]\n]+)\]", chunk)
-        if header and header[1] in pending:
-            chunks[index] = pending.pop(header[1])
-    output = "".join(chunks)
-    if pending:
-        output = output.rstrip("\n") + "\n\n" + "".join(pending.values())
-    atomic_replace(path, output.replace("\n", newline).encode("utf-8"))
+    write_ini_sections(path, original, updates)
