@@ -133,6 +133,7 @@ def _current_context() -> ScratchRuntimeContext:
         if run is not None:
             ctx = create_context(run.id, run.target_type, run.scene_name, run.actor_name)
             bind_context(ctx)
+
             def input_event(kind, *args):
                 if kind == "key_down":
                     handle_key_event(*args)
@@ -151,9 +152,14 @@ def _current_context() -> ScratchRuntimeContext:
                     return "stopped", reason or "stopped"
                 return None
 
+            def close():
+                # Broadcasts and clones can still be running if the main file raises.
+                request_stop_all()
+                release_context(ctx)
+
             run.on_input = input_event
             run.on_stop = lambda: request_stop(run.id)
-            run.on_close = lambda: release_context(ctx)
+            run.on_close = close
             run.on_quarantine = lambda reason: isolate_context(run.id, reason)
             run.child_threads = lambda: active_child_threads({run.id})
             run.keep_alive = lambda: not ctx.stop_requested and has_runtime_handlers(ctx)
@@ -188,6 +194,8 @@ def create_context(
         ctx.target_actor_name = ctx.actor_name
         ctx.external_target = True
     with _context_lock:
+        if parent and (parent.stop_requested or parent.isolated):
+            raise SystemExit(0)
         _contexts[ctx.context_id] = ctx
     return ctx
 
