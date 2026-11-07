@@ -49,3 +49,38 @@ test('retired bridge error messages no longer appear in the DOM translation cata
   const source = fs.readFileSync(path.join(sourceRoot, 'i18n/domTranslator.js'), 'utf8');
   assert.equal(/coronaBridge\.(?:actorTransform|cameraMove)|coronaBridge 缺失/.test(source), false);
 });
+
+
+test('unused network Web methods and forwarding wrappers are absent', () => {
+  for (const method of [
+    'broadcastActorCreate', 'broadcastActorDelete', 'broadcastActorStateUpdate',
+    'broadcastActorTransform', 'broadcastIntent', 'broadcastSceneSnapshot',
+    'checkPreviewCollision', 'claimActorOwnership', 'getLockOwner',
+    'getPeerCount', 'lockObject', 'pollPendingActorCreate',
+    'pollPendingActorDelete', 'pollPendingActorStateUpdate', 'pollPendingActorTransform',
+    'pollPendingSceneSnapshot', 'pollPendingSceneSnapshotRequest', 'registerActorIdentity',
+    'requestSceneSnapshot', 'setSyncPaused', 'unlockObject',
+  ]) {
+    assert.equal(editorApi.network[method], undefined, method);
+    for (const file of sources) {
+      assert.doesNotMatch(fs.readFileSync(path.join(sourceRoot, file), 'utf8'),
+        new RegExp(`\\b${method}\\b`), `${method}: ${file}`);
+    }
+  }
+});
+
+
+test('unused lanChat Web methods and forwarding wrappers are absent', () => {
+  for (const method of [
+    'getHistory', 'listAgents', 'pollAgentTrigger',
+    'pollCoordinatorSyncMessage', 'pollRoomEvent', 'pollSyncEvent',
+    'sendAgentReply', 'sendSystemMessage', 'sendSystemMessageToHost',
+    'sendSystemMessageToUser',
+  ]) {
+    assert.equal(editorApi.lanChat[method], undefined, method);
+    for (const file of sources) {
+      assert.doesNotMatch(fs.readFileSync(path.join(sourceRoot, file), 'utf8'),
+        new RegExp(`\\b${method}\\b`), `${method}: ${file}`);
+    }
+  }
+});

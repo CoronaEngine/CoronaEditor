@@ -51,16 +51,16 @@ class EditorApiAggregateWrapperTests(unittest.TestCase):
             self.assertIn(f'window.corona.projectSettings.{method}(', self.api_source)
             self.assertNotIn(f"call_manifest_editor_api('projectSettings.{method}'", self.api_source)
 
-    def test_frontend_exposes_project_network_and_lan_chat_aggregates(self):
-        for marker in (
-            "lockObject: (objectId, userId, operation = 'modify')",
-            "broadcastIntent: (userId, tooltip, position, status = 'placing_object')",
-            "sendAgentReply: (payload)",
-            "sendSystemMessageToHost: (payload)",
-            "pollAgentTrigger: ()",
-            "pollSyncEvent: ()",
-        ):
-            self.assertIn(marker, self.api_source)
+    def test_frontend_exposes_only_consumed_network_and_lan_chat_aggregates(self):
+        for method in ('getSessionInfo', 'setProjectRoot', 'startSession', 'stopSession',
+                       'clearDiscoveredPeers', 'getDiscoveredPeers', 'searchLan', 'connectToPeer',
+                       'startRoom', 'startLocalRoom', 'stopRoom', 'stopLocalRoom', 'joinRoom',
+                       'leaveRoom', 'sendMessage', 'listHistoryRooms', 'loadHistoryRoom',
+                       'getLocalIp', 'addAgent', 'removeAgent'):
+            self.assertIn(f'{method}:', self.api_source)
+        for method in ('lockObject', 'broadcastIntent', 'sendAgentReply',
+                       'sendSystemMessageToHost', 'pollAgentTrigger', 'pollSyncEvent'):
+            self.assertNotIn(f'{method}:', self.api_source)
 
     def test_active_consumers_use_aggregate_contracts(self):
         views = (

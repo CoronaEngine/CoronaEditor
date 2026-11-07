@@ -330,77 +330,27 @@ const editorApiStatic = {
     stopRoom: () => call_manifest_editor_api('lanChat.stopRoom', []),
     stopLocalRoom: () => call_manifest_editor_api('lanChat.stopLocalRoom', []),
     joinRoom: (payload) => call_manifest_editor_api('lanChat.joinRoom', [payload || {}]),
-    getHistory: () => call_manifest_editor_api('lanChat.getHistory', []),
     listHistoryRooms: () => call_manifest_editor_api('lanChat.listHistoryRooms', []),
     loadHistoryRoom: (room) => call_manifest_editor_api('lanChat.loadHistoryRoom', [{ room }]),
     leaveRoom: () => call_manifest_editor_api('lanChat.leaveRoom', []),
     sendMessage: (text, options = {}) =>
       call_manifest_editor_api('lanChat.sendMessage', [{ text, ...(options || {}) }]),
-    sendAgentReply: (payload) =>
-      call_manifest_editor_api('lanChat.sendAgentReply', [payload || {}]),
-    sendSystemMessage: (payload) =>
-      call_manifest_editor_api('lanChat.sendSystemMessage', [payload || {}]),
-    sendSystemMessageToHost: (payload) =>
-      call_manifest_editor_api('lanChat.sendSystemMessageToHost', [payload || {}]),
-    sendSystemMessageToUser: (payload) =>
-      call_manifest_editor_api('lanChat.sendSystemMessageToUser', [payload || {}]),
-    pollAgentTrigger: () => call_manifest_editor_api('lanChat.pollAgentTrigger', []),
-    pollCoordinatorSyncMessage: () =>
-      call_manifest_editor_api('lanChat.pollCoordinatorSyncMessage', []),
-    pollRoomEvent: () => call_manifest_editor_api('lanChat.pollRoomEvent', []),
-    pollSyncEvent: () => call_manifest_editor_api('lanChat.pollSyncEvent', []),
     getLocalIp: () => call_manifest_editor_api('lanChat.getLocalIp', []),
     addAgent: (payload) => call_manifest_editor_api('lanChat.addAgent', [payload || {}]),
     removeAgent: (agentId) => call_manifest_editor_api('lanChat.removeAgent', [{ agent_id: agentId }]),
-    listAgents: () => call_manifest_editor_api('lanChat.listAgents', []),
   },
   network: {
     startSession: (instanceName, projectId, port = 27960, role = 'host') =>
       call_manifest_editor_api('network.startSession', [instanceName, projectId, port, role]),
     stopSession: () => call_manifest_editor_api('network.stopSession', []),
-    getPeerCount: () => call_manifest_editor_api('network.getPeerCount', []),
     getSessionInfo: () => call_manifest_editor_api('network.getSessionInfo', []),
     getDiscoveredPeers: () => call_manifest_editor_api('network.getDiscoveredPeers', []),
     clearDiscoveredPeers: () => call_manifest_editor_api('network.clearDiscoveredPeers', []),
     searchLan: () => call_manifest_editor_api('network.searchLan', []),
     connectToPeer: (ip, port, peerName) =>
       call_manifest_editor_api('network.connectToPeer', [ip, port, peerName]),
-    lockObject: (objectId, userId, operation = 'modify') =>
-      call_manifest_editor_api('network.lockObject', [objectId, userId, operation]),
-    unlockObject: (objectId, userId) =>
-      call_manifest_editor_api('network.unlockObject', [objectId, userId]),
-    getLockOwner: (objectId) =>
-      call_manifest_editor_api('network.getLockOwner', [objectId]),
-    broadcastIntent: (userId, tooltip, position, status = 'placing_object') =>
-      call_manifest_editor_api('network.broadcastIntent', [userId, tooltip, position, status]),
-    checkPreviewCollision: (userId, position, delta = 0.5) =>
-      call_manifest_editor_api('network.checkPreviewCollision', [userId, position, delta]),
     setProjectRoot: (projectRoot) =>
       call_manifest_editor_api('network.setProjectRoot', [projectRoot]),
-    broadcastActorCreate: (actorGuid, sceneName, modelPath, actorData) =>
-      call_manifest_editor_api('network.broadcastActorCreate', [actorGuid, sceneName, modelPath, actorData]),
-    broadcastActorTransform: (actorGuid, sceneName, actorData) =>
-      call_manifest_editor_api('network.broadcastActorTransform', [actorGuid, sceneName, actorData]),
-    broadcastActorDelete: (actorGuid, sceneName, actorName) =>
-      call_manifest_editor_api('network.broadcastActorDelete', [actorGuid, sceneName, actorName]),
-    requestSceneSnapshot: (sceneName) =>
-      call_manifest_editor_api('network.requestSceneSnapshot', [sceneName]),
-    broadcastSceneSnapshot: (sceneName, snapshot) =>
-      call_manifest_editor_api('network.broadcastSceneSnapshot', [sceneName, snapshot]),
-    broadcastActorStateUpdate: (actorGuid, sceneName, actorData) =>
-      call_manifest_editor_api('network.broadcastActorStateUpdate', [actorGuid, sceneName, actorData]),
-    pollPendingActorCreate: () => call_manifest_editor_api('network.pollPendingActorCreate', []),
-    pollPendingActorTransform: () => call_manifest_editor_api('network.pollPendingActorTransform', []),
-    pollPendingActorDelete: () => call_manifest_editor_api('network.pollPendingActorDelete', []),
-    pollPendingSceneSnapshotRequest: () =>
-      call_manifest_editor_api('network.pollPendingSceneSnapshotRequest', []),
-    pollPendingSceneSnapshot: () => call_manifest_editor_api('network.pollPendingSceneSnapshot', []),
-    pollPendingActorStateUpdate: () => call_manifest_editor_api('network.pollPendingActorStateUpdate', []),
-    setSyncPaused: (paused) => call_manifest_editor_api('network.setSyncPaused', [!!paused]),
-    registerActorIdentity: (actorGuid, actorHandle, locallyOwned = true) =>
-      call_manifest_editor_api('network.registerActorIdentity', [actorGuid, String(actorHandle || ''), !!locallyOwned]),
-    claimActorOwnership: (actorGuid) =>
-      call_manifest_editor_api('network.claimActorOwnership', [actorGuid]),
   },
   project: {
     createMultiplayerProject: request => window.corona.project.createMultiplayerProject(request),
