@@ -7,9 +7,6 @@ import { createSceneReader } from './sceneReader.js';
 let editorApiMethodSpecs = null;
 let editorApiMethodSpecsByWrapper = null;
 let editorApiManifestPromise = null;
-let editorApiEventSpecs = null;
-let editorApiEventSpecsByWrapper = null;
-let editorApiEventManifestPromise = null;
 const EDITOR_API_CALLER_CEF = 1;
 
 // How long a non-interactive manifest-backed request waits for a native reply before failing.
@@ -106,21 +103,6 @@ export class Bridge {
     }
   }
 
-  static validateEditorApiEventWrapperMethods() {
-    if (!editorApiEventSpecs) return;
-    const missing = [];
-    for (const spec of editorApiEventSpecs.values()) {
-      const wrapperPath = spec?.js_wrapper;
-      if (!wrapperPath) continue;
-      if (typeof Bridge.resolveEditorApiWrapperPath(wrapperPath) !== 'function') {
-        missing.push(`${spec.event} -> ${wrapperPath}`);
-      }
-    }
-    if (missing.length > 0) {
-      console.warn(`Frontend event wrapper path is not implemented: ${missing.join(', ')}`);
-    }
-  }
-
   static validateEditorApiWrapperPath(apiName, spec, wrapperPath) {
     if (spec?.js_wrapper && spec.js_wrapper !== wrapperPath) {
       throw new Error(`Frontend wrapper path is not defined by C++ manifest: ${wrapperPath} for ${apiName}`);
@@ -167,50 +149,7 @@ export class Bridge {
     }
   }
 
-  static async ensureEditorApiEventManifest() {
-    if (!editorApiEventSpecs) {
-      if (!editorApiEventManifestPromise) {
-        editorApiEventManifestPromise = call_editor_api('EditorApi.list_events', [])
-          .then((response) => {
-            const events = response?.data?.events ?? response?.events ?? [];
-            editorApiEventSpecs = new Map(
-              events
-                .filter((event) => typeof event?.event === 'string')
-                .map((event) => [event.event, event]),
-            );
-            editorApiEventSpecsByWrapper = Bridge.indexWrappersByName(
-              editorApiEventSpecs,
-              'js_wrapper',
-            );
-            Bridge.validateEditorApiEventWrapperMethods();
-            return editorApiEventSpecs;
-          })
-          .finally(() => {
-            editorApiEventManifestPromise = null;
-          });
-      }
-      await editorApiEventManifestPromise;
-    }
-    return editorApiEventSpecs;
-  }
 
-  static async ensureEditorApiEvent(eventName) {
-    await Bridge.ensureEditorApiEventManifest();
-    const eventSpec = editorApiEventSpecs?.get(eventName);
-    if (!eventSpec) {
-      throw new Error(`Editor API event is not defined by C++ manifest: ${eventName}`);
-    }
-    Bridge.validateEditorApiCaller(eventName, eventSpec, EDITOR_API_CALLER_CEF, 'CEF');
-    return eventSpec;
-  }
-
-  static validateEditorApiEventPayload(eventName, payload, eventSpec) {
-    if (!eventSpec) return;
-    const payloadType = eventSpec.payload || 'any';
-    if (!Bridge.editorApiValueMatchesType(payload, payloadType)) {
-      throw new Error(`Editor API event payload schema mismatch for ${eventName}: payload must be ${payloadType}`);
-    }
-  }
 }
 
 const call_editor_api = async (apiName, args) => {
@@ -240,44 +179,11 @@ const call_typed_editor_api = async (apiName, wrapperPath, args) => {
   return call_editor_api(apiName, args);
 };
 
-const register_editor_api_callback = async (eventName, callback) => {
-  const eventSpec = await Bridge.ensureEditorApiEvent(eventName);
-  const callbackToken = await window.corona.editor.on(eventName, (payload, emittedEvent) => {
-    Bridge.validateEditorApiEventPayload(eventName, payload, eventSpec);
-    callback(payload, emittedEvent || eventName);
-  });
-  if (!callbackToken) {
-    throw new Error(`Editor API event registration failed: ${eventName}`);
-  }
-  return callbackToken;
-};
-
-const register_typed_editor_api_callback = async (eventName, wrapperName, callback) => {
-  const eventSpec = await Bridge.ensureEditorApiEvent(eventName);
-  if (eventSpec?.js_wrapper !== wrapperName) {
-    throw new Error(`Editor API event wrapper is not defined by C++ manifest: ${wrapperName}`);
-  }
-  return register_editor_api_callback(eventName, callback);
-};
-
 const unregister_callback = (callbackToken) => window.corona.editor.off(callbackToken);
 
 const find_editor_api_method_by_js_wrapper = async (wrapperPath) => {
   await Bridge.ensureEditorApiManifest();
   return editorApiMethodSpecsByWrapper?.get(wrapperPath) ?? null;
-};
-
-const find_editor_api_event_by_js_wrapper = async (wrapperPath) => {
-  await Bridge.ensureEditorApiEventManifest();
-  return editorApiEventSpecsByWrapper?.get(wrapperPath) ?? null;
-};
-
-const register_manifest_editor_api_callback = async (wrapperPath, callback) => {
-  const eventSpec = await find_editor_api_event_by_js_wrapper(wrapperPath);
-  if (!eventSpec?.event) {
-    throw new Error(`Editor API event wrapper path is not defined by C++ manifest: ${wrapperPath}`);
-  }
-  return register_typed_editor_api_callback(eventSpec.event, wrapperPath, callback);
 };
 
 const call_manifest_editor_api = async (wrapperPath, args) => {
@@ -302,16 +208,6 @@ const editorApiStatic = {
   listMethods: () => call_editor_api('EditorApi.list_methods', []),
   listEvents: () => call_editor_api('EditorApi.list_events', []),
   off: async (callbackToken) => callbackToken < 0 ? sceneReader.off(callbackToken) : unregister_callback(callbackToken),
-  events: {
-    onNetworkActorDeleteSyncBroadcastRequested: (callback) => register_manifest_editor_api_callback('events.onNetworkActorDeleteSyncBroadcastRequested', callback),
-    onNetworkActorOwnershipClaimed: (callback) => register_manifest_editor_api_callback('events.onNetworkActorOwnershipClaimed', callback),
-    onNetworkActorStateSyncBroadcastRequested: (callback) => register_manifest_editor_api_callback('events.onNetworkActorStateSyncBroadcastRequested', callback),
-    onNetworkActorSyncBroadcastRequested: (callback) => register_manifest_editor_api_callback('events.onNetworkActorSyncBroadcastRequested', callback),
-    onNetworkActorTransformSyncBroadcastRequested: (callback) => register_manifest_editor_api_callback('events.onNetworkActorTransformSyncBroadcastRequested', callback),
-    onNetworkAssetImportCompleted: (callback) => register_manifest_editor_api_callback('events.onNetworkAssetImportCompleted', callback),
-    onNetworkFileSyncStatusChanged: (callback) => register_manifest_editor_api_callback('events.onNetworkFileSyncStatusChanged', callback),
-    onNetworkSyncPauseRequested: (callback) => register_manifest_editor_api_callback('events.onNetworkSyncPauseRequested', callback),
-  },
   app: {
     closeProcess: () => call_manifest_editor_api('app.closeProcess', []),
   },

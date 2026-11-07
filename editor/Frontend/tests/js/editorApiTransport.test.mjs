@@ -153,18 +153,18 @@ async function loadEditorApi() {
 
 test('retired log subscription is absent before and after loading native events', async () => {
   const { editorApi } = await loadEditorApi();
-  assert.equal(editorApi.events.onLogBatch, undefined);
+  assert.equal(editorApi.events?.onLogBatch, undefined);
   const stop = editorApi.lanChat.onEvent(() => {});
-  assert.equal(editorApi.events.onLogBatch, undefined);
+  assert.equal(editorApi.events?.onLogBatch, undefined);
   stop();
-  assert.equal(editorApi.events.onExtension, undefined, 'native discovery cannot add implicit capabilities');
+  assert.equal(editorApi.events?.onExtension, undefined, 'native discovery cannot add implicit capabilities');
 });
 
 test('orphan mesh movement subscription is absent before and after loading native events', async () => {
   const { editorApi } = await loadEditorApi();
-  assert.equal(editorApi.events.onMeshMoveResult, undefined);
+  assert.equal(editorApi.events?.onMeshMoveResult, undefined);
   const stop = editorApi.lanChat.onEvent(() => {});
-  assert.equal(editorApi.events.onMeshMoveResult, undefined);
+  assert.equal(editorApi.events?.onMeshMoveResult, undefined);
   stop();
 });
 
@@ -224,7 +224,7 @@ async function withShortTimeout(limits, body) {
 test('LANChat direct subscription needs no manifest and releases its native callback', async () => {
   const { editorApi, host } = await loadEditorApi();
   const seen = [];
-  assert.equal(editorApi.events.onLanChatEvent, undefined);
+  assert.equal(editorApi.events?.onLanChatEvent, undefined);
   const stop = editorApi.lanChat.onEvent(payload => seen.push(payload));
   host.emit(42, { n: 1 });
   assert.deepEqual(seen, [{ n: 1 }]);

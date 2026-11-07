@@ -49,7 +49,7 @@ test('LANChat event subscription returns the native disposer without manifest di
   globalThis.window = { corona: { lanChat: { onEvent(receive) { callback = receive; return stop; } },
     editor: { invoke() { throw Error('No event manifest lookup'); }, on() { throw Error('No generic subscription'); } } } };
   try {
-    assert.equal(editorApi.events.onLanChatEvent, undefined);
+    assert.equal(editorApi.events?.onLanChatEvent, undefined);
     assert.equal(editorApi.lanChat.onEvent(value => seen.push(value)), stop);
     callback(event);
     assert.equal(seen[0], event);

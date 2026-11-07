@@ -33,7 +33,7 @@ test('viewport facade references one direct native pick binding without legacy t
   assert.equal(await editorApi.viewport.pick('scene.ini', 'camera-a', options), 'picked');
   assert.deepEqual(calls, [['scene.ini', 'camera-a', options]]);
   assert.equal('pickActor' in (editorApi.sceneTools || {}), false);
-  assert.equal(editorApi.events.onActorPickResult, undefined);
+  assert.equal(editorApi.events?.onActorPickResult, undefined);
 });
 
 test('pick sends exact archive/camera and render coordinates then selects authoritative identity without numeric handles', async () => {

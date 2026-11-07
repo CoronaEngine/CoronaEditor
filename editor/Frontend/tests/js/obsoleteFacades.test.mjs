@@ -9,6 +9,14 @@ const retired = ['sceneService', 'fileService', 'projectService', 'projectSettin
 const sources = fs.readdirSync(sourceRoot, { recursive: true })
   .filter(file => /\.(js|vue)$/.test(file));
 
+test('unused Network event wrappers cannot acquire Web consumers', () => {
+  assert.equal(editorApi.events, undefined);
+  for (const file of sources) {
+    assert.doesNotMatch(fs.readFileSync(path.join(sourceRoot, file), 'utf8'),
+      /onNetwork(?:Actor|Asset|File|Sync)/, file);
+  }
+});
+
 test('unused project launch operations have no Web facade or production consumer', () => {
   for (const method of ['browseFolder', 'getDefaultProjectPath', 'createProject',
     'validatePortableScene', 'importPortableAsset', 'cleanupPortableSceneAssets']) {

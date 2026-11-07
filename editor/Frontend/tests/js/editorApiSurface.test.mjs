@@ -30,7 +30,8 @@ test('the public event surface exactly matches the remaining native events', () 
   const expected = nativeEvents.split('\n')
     .filter(line => !line.includes('~caller_mask(EditorApiCaller::Cef)'))
     .map(line => line.match(/"events\.([^"]+)"/)?.[1]).filter(Boolean).sort();
-  assert.deepEqual(Object.keys(editorApi.events).sort(), expected);
+  assert.deepEqual(Object.keys(editorApi.events ?? {}).sort(), expected);
+  assert.equal(editorApi.events, undefined, 'all remaining events belong to non-Web callers');
 });
 
 test('unknown and retired capabilities are absent without mutating the API surface', () => {
