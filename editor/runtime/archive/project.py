@@ -5,6 +5,7 @@ import io
 import json
 from pathlib import Path
 import tempfile
+import time
 
 from .errors import ArchiveParseError
 from .parser import _resolve_source
@@ -57,7 +58,16 @@ def create_project(request):
         config.write(stream)
         atomic_replace(staged / "scene.ini", stream.getvalue().encode())
         atomic_replace(staged / "assets.manifest.json", b'{"format":"corona_scene_assets","version":1,"bundles":[]}\n')
-        staged.rename(target)
+        # Keep publication atomic when Windows briefly holds the staged directory.
+        for attempt in range(6):
+            try:
+                staged.rename(target)
+                break
+            except OSError as error:
+                if (getattr(error, 'winerror', None) not in {5, 32, 33}
+                        or target.exists() or attempt == 5):
+                    raise
+                time.sleep(0.025 * 2 ** attempt)
     return {"path": str(target)}
 
 
