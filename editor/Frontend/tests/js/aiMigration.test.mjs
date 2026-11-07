@@ -132,7 +132,7 @@ test('CAS conflicts replay pure changes on latest state without losing another w
     first = true;
   editorApi.scene.readActive = async () => ({ archive_session: 'fixture', project_path: 'E:/World/FixtureWorld' });
   editorApi.projectSettings.readProjectDocument = async () => ({
-    data: { success: true, content: structuredClone(content), version },
+    success: true, content: structuredClone(content), revision: version,
   });
   editorApi.projectSettings.commitProjectDocument = async (request) => {
     if (first) {
@@ -140,12 +140,12 @@ test('CAS conflicts replay pure changes on latest state without losing another w
       content = normalizeContext(null, 'E:/World/FixtureWorld');
       content.metrics.modelImports = 7;
       version = '1';
-      return { data: { success: false, error: 'DOCUMENT_CONFLICT' } };
+      return { success: false, error: 'DOCUMENT_CONFLICT' };
     }
-    assert.equal(request.version, version);
+    assert.equal(request.revision, version);
     content = request.content;
     version = '2';
-    return { data: { success: true } };
+    return { success: true };
   };
   const result = await contextTransaction('E:/World/FixtureWorld', (context) => {
     context.metrics.nodeEdits++;
@@ -357,14 +357,14 @@ function documentFixture(initial) {
     version = 0;
   editorApi.scene.readActive = async () => ({ archive_session: 'fixture', project_path: 'E:/World/FixtureWorld' });
   editorApi.projectSettings.readProjectDocument = async () => ({
-    data: { success: true, content: structuredClone(content), version: String(version) },
+    success: true, content: structuredClone(content), revision: String(version),
   });
   editorApi.projectSettings.commitProjectDocument = async (request) => {
-    if (request.version !== String(version))
-      return { data: { success: false, error: 'DOCUMENT_CONFLICT' } };
+    if (request.revision !== String(version))
+      return { success: false, error: 'DOCUMENT_CONFLICT' };
     content = structuredClone(request.content);
     version++;
-    return { data: { success: true } };
+    return { success: true };
   };
   return () => content;
 }

@@ -28,7 +28,7 @@ test('focus applies once through scoped V8 and has no obsolete focus facades or 
   assert.equal(await editorApi.scene.focusActor('scene.ini', 'actor-guid', 'camera-id', scope), result);
   assert.deepEqual(calls, [['scene.ini', 'actor-guid', 'camera-id', scope]]);
   assert.equal('focusActor' in (editorApi.sceneTools || {}), false);
-  assert.equal('focusActor' in editorApi.resourceSearch, false);
+  assert.equal(editorApi.resourceSearch?.focusActor, undefined);
   assert.equal('onFocusPoseResult' in editorApi.events, false);
   const failure = Object.assign(new Error('old archive'), { code: 'PROJECT_CONTEXT_CHANGED' });
   native.focusActor = () => Promise.reject(failure);

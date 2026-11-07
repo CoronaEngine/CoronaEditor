@@ -11,8 +11,6 @@ let editorApiEventSpecs = null;
 let editorApiEventSpecsByWrapper = null;
 let editorApiEventManifestPromise = null;
 const EDITOR_API_CALLER_CEF = 1;
-// Default caller for the manifest-backed resource-search namespace.
-const CURRENT_CALLER = 'SceneBar';
 // Native pickers wait for a user decision, which has no RPC execution deadline.
 const INTERACTIVE_FILE_PICKER_APIS = new Set([
   'ProjectLauncher.open_project_file',
@@ -33,10 +31,6 @@ async function callProjectAssetOperation(wrapper, payload = {}, args = []) {
   return call_manifest_editor_api(wrapper, [...args, await scopedAssetPayload(payload)]);
 }
 
-async function callProjectFileMutation(wrapper, args, scope) {
-  if (scope && !scope.archive_session) throw new Error('项目会话已失效');
-  return callProjectAssetOperation(wrapper, scope, args);
-}
 
 export const editorApiTransportLimits = {
   responseTimeoutMs: 30_000,
@@ -342,18 +336,12 @@ const editorApiStatic = {
     closeProcess: () => call_manifest_editor_api('app.closeProcess', []),
   },
   files: {
-    getProjectInfo: () => call_manifest_editor_api('files.getProjectInfo', []),
-    getFiles: (relPath = '') => call_manifest_editor_api('files.getFiles', [relPath || '']),
-    getFileTree: (relPath = '') => call_manifest_editor_api('files.getFileTree', [relPath || '']),
-    createFolder: (path, folderName, scope) =>
-      callProjectFileMutation('files.createFolder', [path, folderName], scope),
-    createFile: (path, fileName, type, scope) =>
-      callProjectFileMutation('files.createFile', [path, fileName, type], scope),
-    deleteItem: (path, scope) => callProjectFileMutation('files.deleteItem', [path], scope),
-    renameItem: (oldPath, newName, scope) =>
-      callProjectFileMutation('files.renameItem', [oldPath, newName], scope),
-    openFile: (filePath, fileType) =>
-      call_manifest_editor_api('files.openFile', [filePath, fileType]),
+    getFileTree: request => window.corona.files.getFileTree(request),
+    createFolder: request => window.corona.files.createFolder(request),
+    createActorTemplate: request => window.corona.files.createActorTemplate(request),
+    deleteItem: request => window.corona.files.deleteItem(request),
+    renameItem: request => window.corona.files.renameItem(request),
+    openFile: request => window.corona.files.openFile(request),
   },
   lanChat: {
     startRoom: (payload) => call_manifest_editor_api('lanChat.startRoom', [payload || {}]),
@@ -526,39 +514,23 @@ const editorApiStatic = {
     dispatch: (sceneName, cameraId, event) => window.corona.input.dispatch(sceneName, cameraId, event),
   },
   scripts: {
-    getStatus: () => call_manifest_editor_api('scripts.getStatus', []),
-    runFile: (request) => call_manifest_editor_api('scripts.runFile', [request]),
-    getRun: (requestId) => call_manifest_editor_api('scripts.getRun', [{ requestId }]),
+    getStatus: () => window.corona.scripts.getStatus(),
+    runFile: (request) => window.corona.scripts.runFile(request),
+    getRun: (requestId) => window.corona.scripts.getRun(requestId),
     stop: (runId, restoreState = true, requestId) =>
-      call_manifest_editor_api('scripts.stop', [{ runId, requestId, restore_state: restoreState }]),
+      window.corona.scripts.stop(runId, restoreState, requestId),
   },
   projectFiles: {
-    save: request => call_manifest_editor_api('projectFiles.save', [request]),
-    load: request => call_manifest_editor_api('projectFiles.load', [request]),
+    save: request => window.corona.projectFiles.save(request),
+    load: request => window.corona.projectFiles.load(request),
   },
   projectSettings: {
-    readProjectDocument: (request) => call_manifest_editor_api('projectSettings.readProjectDocument', [request]),
-    commitProjectDocument: (request) => call_manifest_editor_api('projectSettings.commitProjectDocument', [request]),
-    getActiveProjectInfo: () => call_manifest_editor_api('projectSettings.getActiveProjectInfo', []),
-    saveActiveProjectInfo: (settings) =>
-      call_manifest_editor_api('projectSettings.saveActiveProjectInfo', [settings || {}]),
+    readProjectDocument: request => window.corona.projectSettings.readProjectDocument(request),
+    commitProjectDocument: request => window.corona.projectSettings.commitProjectDocument(request),
+    getActiveProjectInfo: () => window.corona.projectSettings.getActiveProjectInfo(),
+    saveActiveProjectInfo: settings => window.corona.projectSettings.saveActiveProjectInfo(settings),
   },
-  resourceSearch: {
-    prepareIndex: (caller = CURRENT_CALLER) =>
-      call_manifest_editor_api('resourceSearch.prepareIndex', [caller]),
-    fuzzySearch: (query, topK = 20, typeFilter = null, caller = CURRENT_CALLER) =>
-      call_manifest_editor_api('resourceSearch.fuzzySearch', [query, topK, typeFilter, caller]),
-    imageSearch: (imageB64, topK = 20, threshold = 10, caller = CURRENT_CALLER) =>
-      call_manifest_editor_api('resourceSearch.imageSearch', [imageB64, topK, threshold, caller]),
-    listTypes: (caller = CURRENT_CALLER) =>
-      call_manifest_editor_api('resourceSearch.listTypes', [caller]),
-    rebuildIndex: (caller = CURRENT_CALLER) =>
-      call_manifest_editor_api('resourceSearch.rebuildIndex', [caller]),
-    getStats: (caller = CURRENT_CALLER) =>
-      call_manifest_editor_api('resourceSearch.getStats', [caller]),
-    markIndexDirty: (reason = 'frontend', caller = CURRENT_CALLER) =>
-      call_manifest_editor_api('resourceSearch.markIndexDirty', [reason, caller]),
-  },
+
 };
 
 export const editorApi = editorApiStatic;

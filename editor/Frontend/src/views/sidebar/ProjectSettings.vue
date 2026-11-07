@@ -66,7 +66,7 @@
       </button>
       <button
         class="px-4 py-1.5 bg-[#b3995d] hover:bg-[#6f8d4b] rounded text-xs text-white disabled:opacity-50"
-        :disabled="saving"
+        :disabled="saving || form.read_only"
         @click="handleSave"
       >
         {{ saving ? t('common.saving') : t('common.save') }}
@@ -76,10 +76,15 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, onUnmounted } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { editorApi } from '@/api/editorApi.js';
 
+import { createViewLifetime } from '@/utils/viewLifetime.js';
+import { worldModeState } from '@/services/worldModeService.js';
+
+const projectRevision = worldModeState.revision;
+const lifetime = createViewLifetime(() => projectRevision === worldModeState.revision);
 const { t } = useI18n();
 
 const loading = ref(true);
@@ -95,56 +100,63 @@ const form = ref({
   last_opened: '',
 });
 
+let generation = 0;
+let statusTimer;
+const clearStatus = () => {
+  clearTimeout(statusTimer);
+  statusMsg.value = '';
+};
 const setStatus = (msg, ok = true) => {
+  clearStatus();
   statusMsg.value = msg;
   statusOk.value = ok;
-  if (msg) {
-    setTimeout(() => {
-      statusMsg.value = '';
-    }, 3000);
-  }
+  if (msg) statusTimer = setTimeout(() => {
+    if (lifetime.current()) statusMsg.value = '';
+  }, 3000);
 };
 
 const loadSettings = async () => {
+  if (!lifetime.current()) return;
+  const current = ++generation;
+  const owns = () => lifetime.current() && current === generation;
   loading.value = true;
+  saving.value = false;
   errorMsg.value = '';
+  clearStatus();
   try {
-    const res = await editorApi.projectSettings.getActiveProjectInfo();
-    if (res && res.status === 'success' && res.data) {
-      form.value = { ...form.value, ...res.data };
-    } else {
-      errorMsg.value = (res && res.error) || t('projectSettings.loadFailed');
-    }
+    const info = await editorApi.projectSettings.getActiveProjectInfo();
+    if (!owns()) return;
+    if (!info?.archive_session || !info.project_path) throw new Error(t('projectSettings.loadFailed'));
+    form.value = { ...info };
   } catch (e) {
-    errorMsg.value = String(e);
+    if (owns()) errorMsg.value = String(e);
   } finally {
-    loading.value = false;
+    if (owns()) loading.value = false;
   }
 };
 
 const handleSave = async () => {
+  if (!lifetime.current() || saving.value || loading.value || errorMsg.value || form.value.read_only) return;
+  const current = generation;
+  const owns = () => lifetime.current() && current === generation;
+  const payload = {
+    archive_session: form.value.archive_session,
+    project_path: form.value.project_path,
+    name: form.value.name,
+    core_version: form.value.core_version,
+  };
   saving.value = true;
   try {
-    const payload = {
-      archive_session: form.value.archive_session,
-      name: form.value.name,
-      core_version: form.value.core_version,
-    };
-    const res = await editorApi.projectSettings.saveActiveProjectInfo(payload);
-    if (res && res.status === 'success') {
-      setStatus(t('projectSettings.saveSuccess'), true);
-    } else {
-      setStatus((res && res.error) || t('projectSettings.saveFailed'), false);
-    }
+    await editorApi.projectSettings.saveActiveProjectInfo(payload);
+    if (owns()) setStatus(t('projectSettings.saveSuccess'), true);
   } catch (e) {
-    setStatus(String(e), false);
+    if (owns()) setStatus(String(e), false);
   } finally {
-    saving.value = false;
+    if (owns()) saving.value = false;
   }
 };
 
-
-
+onUnmounted(() => { clearTimeout(statusTimer); void lifetime.dispose(); });
 onMounted(loadSettings);
 </script>
 

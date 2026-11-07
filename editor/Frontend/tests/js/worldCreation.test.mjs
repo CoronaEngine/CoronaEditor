@@ -60,15 +60,15 @@ async function mountCreationPage(t, { stopResult = idle(), wrapped = true } = {}
   });
   t.mock.method(console, 'error', () => {});
   t.mock.method(editorApi.project, 'getProjectLoadStatus', async () => wrap({ archive_service_ready: true }));
-  t.mock.method(editorApi.projectSettings, 'getActiveProjectInfo', async () => wrap({ project_path: activePath, mode: 'creative' }));
+  t.mock.method(editorApi.projectSettings, 'getActiveProjectInfo', async () => ({ project_path: activePath, mode: 'creative' }));
   t.mock.method(editorApi.project, 'createWorldProject', async payload => {
     calls.push(['create', payload]);
     return wrap({ name: `创造世界_${++sequence}`, path: `creative-world-${sequence}` });
   });
-  t.mock.method(editorApi.scripts, 'getStatus', async () => wrap({ runId: 'current', snapshotCaptured: true }));
+  t.mock.method(editorApi.scripts, 'getStatus', async () => ({ runId: 'current', snapshotCaptured: true }));
   t.mock.method(editorApi.scripts, 'stop', async (id, restore) => {
     calls.push(['script', restore]);
-    return wrap(await scriptResult);
+    return await scriptResult;
   });
   t.mock.method(editorApi.project, 'openProject', async path => {
     calls.push(['open', path]);

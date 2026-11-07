@@ -153,12 +153,7 @@ const normalizeProjectPath = (value) => String(value || '')
   .replace(/\/+$/, '')
   .toLocaleLowerCase('en-US');
 
-const activeProjectPathFrom = (response) => String(
-  response?.project_path
-    || response?.data?.project_path
-    || response?.data?.data?.project_path
-    || '',
-);
+const activeProjectPathFrom = (response) => String(response?.project_path || '');
 
 const waitForPythonProjectActivation = async (expectedPath, timeoutMs = 7000) => {
   const expected = normalizeProjectPath(expectedPath);

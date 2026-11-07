@@ -9,9 +9,8 @@ export const normalizeWorldMode = () => 'creative';
 export const normalizeProjectPath = (path) => String(path || '').trim()
   .replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase();
 
-export function unwrapProjectInfo(response) {
-  let info = response;
-  for (let i = 0; i < 3 && info?.data && !info?.project_path; i++) info = info.data;
+export function requireProjectInfo(response) {
+  const info = response;
   if (typeof info?.project_path !== 'string' || !info.project_path.trim()) {
     throw new Error('无法读取当前项目，请重新打开世界。');
   }
@@ -19,7 +18,7 @@ export function unwrapProjectInfo(response) {
 }
 
 export async function readWorldProjectInfo(api) {
-  return unwrapProjectInfo(await api.projectSettings.getActiveProjectInfo());
+  return requireProjectInfo(await api.projectSettings.getActiveProjectInfo());
 }
 
 export function createWorldModeController({ readProjectInfo, publish = () => {} }) {
@@ -56,7 +55,7 @@ export function createWorldModeController({ readProjectInfo, publish = () => {} 
     const request = { expected, promise: null };
     request.promise = (async () => {
       try {
-        const info = unwrapProjectInfo(await readProjectInfo());
+        const info = requireProjectInfo(await readProjectInfo());
         if (revision !== state.revision) return null;
         if (request.expected && normalizeProjectPath(info.project_path) !== request.expected) {
           throw new Error('当前世界已改变，请重新打开目标世界。');

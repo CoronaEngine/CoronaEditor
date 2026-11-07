@@ -55,7 +55,7 @@ def test_environment_has_one_scoped_v8_read_and_patch_without_granular_web_alias
             if retired.search(path.read_text(encoding='utf-8-sig'))] == []
     page = (SOURCE_ROOT / 'views/layout/MainPage.vue').read_text(encoding='utf-8-sig')
     assert 'archive_session: environmentArchiveSession.value' in page
-    assert 'environmentArchiveSession.value = payload.archive_session' in page
+    assert 'environmentArchiveSession.value = active.archive_session' in page
 
 
 def test_migrated_web_broadcast_and_drag_regions_do_not_use_dock_commands():

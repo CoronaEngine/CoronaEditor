@@ -1,7 +1,34 @@
 import hashlib
+import json
 from concurrent.futures import ThreadPoolExecutor
 
 from runtime.archive import script_files
+
+
+def test_structured_identity_reads_and_updates_the_existing_storage_key(tmp_path, monkeypatch):
+    scope = {"archive_session": "A", "project_path": str(tmp_path)}
+    monkeypatch.setattr("runtime.project_context.read_project_session", lambda: scope)
+    identity = ["node_graph", "actor", "scene.ini", '角色:"A"']
+    key = json.dumps(identity, ensure_ascii=False, separators=(",", ":"))
+    document = {"target": {"id": "unchanged"}, "workspace": {"nodes": [None, True, 1.5, "世界"]}}
+    original = script_files.ProjectFiles.save({**scope, "key": key, "document": document, "code": "# 旧代码"})
+    loaded = script_files.ProjectFiles.load({**scope, "identity": identity})
+    assert loaded == {**original, "status": "loaded"}
+    updated = script_files.ProjectFiles.save({**scope, "identity": identity, "document": document, "code": "# 新代码"})
+    assert updated["status"] == "saved"
+    assert updated["document_path"] == original["document_path"]
+    assert (tmp_path / updated["code_path"]).read_bytes() == "# 新代码".encode()
+    assert script_files.ProjectFiles.load({**scope, "key": key}) == {**updated, "status": "loaded"}
+
+
+def test_identity_cannot_change_shape_or_override_the_document_key(tmp_path, monkeypatch):
+    scope = {"archive_session": "A", "project_path": str(tmp_path)}
+    monkeypatch.setattr("runtime.project_context.read_project_session", lambda: scope)
+    for identity in [[], ["node_graph", "actor", "scene.ini", 1],
+                     ["node_graph", "project", "wrong-scene", ""],
+                     ["node_graph", "actor", "", ""], ["node_graph", "other", "", ""]]:
+        result = script_files.ProjectFiles.load({**scope, "key": "must-not-fallback", "identity": identity})
+        assert result["status"] == "error", identity
 
 
 def test_document_always_points_to_one_complete_revision(tmp_path, monkeypatch):

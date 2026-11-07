@@ -80,14 +80,9 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
             "services": {
                 "appService.js",
                 "aiService.js",
-                "fileService.js",
                 "lanChatService.js",
                 "networkService.js",
                 "projectLauncherService.js",
-                "projectSettingsService.js",
-                "projectService.js",
-                "sceneService.js",
-                "scriptingService.js",
             },
         }.items():
             source_paths.extend(frontend_root / directory / name for name in sorted(names))
@@ -2144,18 +2139,12 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
             with self.subTest(snippet=snippet):
                 self.assertIn(snippet, bridge_source)
 
-    def test_project_settings_frontend_wrappers_are_manifest_driven(self):
-        bridge_source = self._frontend_bridge_source()
-        start = bridge_source.find("projectSettings: {")
-        end = bridge_source.find("resourceSearch: {", start)
-        self.assertGreaterEqual(start, 0)
-        self.assertGreater(end, start)
-        project_settings_section = bridge_source[start:end]
-
-        self.assertIn("call_manifest_editor_api('projectSettings.getActiveProjectInfo'", project_settings_section)
-        self.assertIn("call_manifest_editor_api('projectSettings.saveActiveProjectInfo'", project_settings_section)
-        self.assertNotIn("browseSceneFile", project_settings_section)
-        self.assertNotIn("ProjectSettings.", project_settings_section)
+    def test_project_settings_frontend_wrappers_use_named_v8(self):
+        source = self._frontend_bridge_source()
+        section = source.split('  projectSettings: {', 1)[1].split('\n};', 1)[0]
+        for method in ('getActiveProjectInfo', 'saveActiveProjectInfo', 'readProjectDocument', 'commitProjectDocument'):
+            self.assertIn(f'window.corona.projectSettings.{method}(', section)
+        self.assertNotIn('call_manifest_editor_api(', section)
 
     def test_file_manager_editor_apis_have_explicit_schema(self):
         source = self._editor_api_source()
@@ -2183,91 +2172,42 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
                     f"{api_name} must keep an explicit C++ schema",
                 )
 
-    def test_file_manager_apis_use_frontend_typed_wrappers(self):
-        bridge_source = self._frontend_bridge_source()
+    def test_file_manager_apis_use_named_v8_with_explicit_scope(self):
+        source = self._frontend_bridge_source()
+        section = source.split('  files: {', 1)[1].split('  lanChat:', 1)[0]
+        for method in ('getFileTree', 'createFolder', 'createActorTemplate', 'deleteItem', 'renameItem', 'openFile'):
+            self.assertIn(f'{method}: request => window.corona.files.{method}(request)', section)
+        self.assertNotIn('call_manifest_editor_api(', section)
+        self.assertNotIn('getProjectInfo:', section)
+        self.assertNotIn('getFiles:', section)
+        self.assertNotIn('createFile:', section)
 
-        for snippet in (
-            "files: {",
-            "getProjectInfo: () => call_manifest_editor_api('files.getProjectInfo', [])",
-            "getFiles: (relPath = '') =>",
-            "getFileTree: (relPath = '') =>",
-            "createFolder: (path, folderName) =>",
-            "createFile: (path, fileName, type) =>",
-            "deleteItem: (path, scope) => callProjectFileMutation('files.deleteItem', [path], scope)",
-            "renameItem: (oldPath, newName) =>",
-            "openFile: (filePath, fileType) =>",
-            "getProjectInfo: () => editorApi.files.getProjectInfo()",
-            "getFiles: (relPath) => editorApi.files.getFiles(relPath)",
-            "getFileTree: (relPath) => editorApi.files.getFileTree(relPath)",
-            "createFolder: (path, folderName) =>\n    editorApi.files.createFolder",
-            "createFile: (path, fileName, type) =>\n    editorApi.files.createFile",
-            "deleteItem: (path) => editorApi.files.deleteItem(path)",
-            "renameItem: (oldPath, newName) =>\n    editorApi.files.renameItem",
-            "openFile: (filePath, fileType) =>\n    editorApi.files.openFile",
-        ):
-            with self.subTest(snippet=snippet):
-                self.assertIn(snippet, bridge_source)
-
-    def test_file_manager_frontend_wrappers_are_manifest_driven(self):
-        bridge_source = self._frontend_bridge_source()
-        start = bridge_source.find("files: {")
-        end = bridge_source.find("lanChat: {", start)
-        self.assertGreaterEqual(start, 0)
-        self.assertGreater(end, start)
-        files_section = bridge_source[start:end]
-
-        self.assertIn("call_manifest_editor_api('files.getProjectInfo'", files_section)
-        self.assertIn("call_manifest_editor_api('files.openFile'", files_section)
-        self.assertNotIn("FileManager.", files_section)
-
-    def test_resource_search_editor_apis_have_explicit_schema(self):
+    def test_file_manager_legacy_schema_retains_python_without_cef(self):
         source = self._editor_api_source()
+        entries = [line for line in source.splitlines() if 'WRAPPED_CALLERS(FileManager,' in line]
+        self.assertEqual(len(entries), 8)
+        for entry in entries:
+            self.assertIn('all_callers() & ~caller_mask(EditorApiCaller::Cef)', entry)
+            self.assertIn(', "", "files.', entry)
 
+    def test_resource_search_retains_explicit_python_schema_without_web_permission(self):
+        source = self._editor_api_source()
         expected = {
-            "ResourceSearch.fuzzy_search": ("kResourceSearchFuzzySearchParams", "EditorApiValueType::Object"),
-            "ResourceSearch.get_stats": ("kCallerParam", "EditorApiValueType::Object"),
-            "ResourceSearch.image_search": ("kResourceSearchImageSearchParams", "EditorApiValueType::Object"),
-            "ResourceSearch.list_types": ("kCallerParam", "EditorApiValueType::Object"),
-            "ResourceSearch.mark_index_dirty": ("kResourceSearchMarkIndexDirtyParams", "EditorApiValueType::Object"),
-            "ResourceSearch.prepare_index": ("kCallerParam", "EditorApiValueType::Object"),
-            "ResourceSearch.rebuild_index": ("kCallerParam", "EditorApiValueType::Object"),
+            'fuzzy_search': 'kResourceSearchFuzzySearchParams', 'get_stats': 'kCallerParam',
+            'image_search': 'kResourceSearchImageSearchParams', 'list_types': 'kCallerParam',
+            'mark_index_dirty': 'kResourceSearchMarkIndexDirtyParams', 'prepare_index': 'kCallerParam',
+            'rebuild_index': 'kCallerParam',
         }
-        for api_name, (params_name, return_type) in expected.items():
-            module, method = api_name.split(".", 1)
-            with self.subTest(api_name=api_name):
-                wrapped_schema_prefix = (
-                    f"EDITOR_API_METHOD_SCHEMA_WRAPPED({module}, {method}, {params_name}, "
-                )
-                self.assertIn(
-                    wrapped_schema_prefix,
-                    source,
-                    f"{api_name} must expose one manifest-backed aggregate wrapper",
-                )
+        for method, params in expected.items():
+            entry = next(line for line in source.splitlines() if f'ResourceSearch, {method},' in line)
+            self.assertIn(f'WRAPPED_CALLERS(ResourceSearch, {method}, {params}, "", "resource_search.{method}"', entry)
+            self.assertIn('all_callers() & ~caller_mask(EditorApiCaller::Cef)', entry)
+            self.assertIn('EditorApiValueType::Object', entry)
 
-        self.assertNotIn('"resourceSearch.focusActor"', source)
-        self.assertIn('"resourceSearch.fuzzySearch"', source)
-        self.assertIn('"resourceSearch.getStats"', source)
-        self.assertIn('"resourceSearch.imageSearch"', source)
-        self.assertIn('"resourceSearch.listTypes"', source)
-        self.assertIn('"resourceSearch.markIndexDirty"', source)
-        self.assertIn('"resourceSearch.prepareIndex"', source)
-        self.assertIn('"resourceSearch.rebuildIndex"', source)
-
-    def test_resource_search_frontend_wrappers_are_manifest_driven(self):
-        bridge_source = self._frontend_bridge_source()
-        start = bridge_source.find("resourceSearch: {")
-        end = bridge_source.find("\n};", start)
-        self.assertGreaterEqual(start, 0)
-        self.assertGreater(end, start)
-        resource_search_section = bridge_source[start:end]
-
-        for method in (
-            "prepareIndex", "fuzzySearch", "imageSearch", "listTypes",
-            "rebuildIndex", "getStats", "markIndexDirty",
-        ):
-            with self.subTest(method=method):
-                self.assertIn(f"call_manifest_editor_api('resourceSearch.{method}'", resource_search_section)
-        self.assertNotIn("ResourceSearch.", resource_search_section)
+    def test_unused_resource_search_frontend_namespace_is_retired(self):
+        source = self._frontend_bridge_source()
+        self.assertNotIn('resourceSearch:', source)
+        self.assertNotIn("call_manifest_editor_api('resourceSearch.", source)
 
     def test_network_editor_apis_have_explicit_schema(self):
         source = self._editor_api_source()

@@ -1202,7 +1202,7 @@ scheduleDragRegionSync, { flush: 'post' });
 
 const pollScriptInputLock = async () => {
   try {
-    const scriptStatus = unwrap(await editorApi.scripts.getStatus()) || {};
+    const scriptStatus = (await editorApi.scripts.getStatus()) || {};
     nodeGraphInputLocked.value = Boolean(scriptStatus.inputLocked);
     if (nodeGraphInputLocked.value) resetCameraInput();
   } catch {

@@ -17,7 +17,6 @@ const normalizePath = (value) =>
 export function activeProjectPath() {
   return String(worldModeState.activeProjectPath || '');
 }
-const unwrap = (response) => response?.data ?? response;
 const number = (data, ...keys) => {
   for (const key of keys)
     if (data[key] != null && data[key] !== '' && Number.isFinite(Number(data[key])))
@@ -170,9 +169,7 @@ async function documentScope(projectPath) {
 
 export async function readContext(projectPath) {
   projectIdentity({ projectPath });
-  const read = unwrap(
-    await editorApi.projectSettings.readProjectDocument(await documentScope(projectPath))
-  );
+  const read = await editorApi.projectSettings.readProjectDocument(await documentScope(projectPath));
   projectIdentity({ projectPath });
   if (!read?.success) throw new Error(read?.error || '读取助手状态失败');
   return { success: true, status: 'ok', context: normalizeContext(read.content, projectPath) };
@@ -188,7 +185,7 @@ export async function contextTransaction(
   const request = await documentScope(projectPath);
   for (let attempt = 0; attempt < 12; attempt++) {
     if (signal?.aborted || revision !== worldModeState.revision) throw new Error('当前任务已取消');
-    const read = unwrap(await editorApi.projectSettings.readProjectDocument(request));
+    const read = await editorApi.projectSettings.readProjectDocument(request);
     if (!read?.success) throw new Error(read?.error || '读取助手状态失败');
     const context = normalizeContext(read.content, projectPath);
     const result = await reducer(context);
@@ -197,13 +194,11 @@ export async function contextTransaction(
     if (signal?.aborted || revision !== worldModeState.revision) throw new Error('当前任务已取消');
     fillSlots(context, Date.now());
     context.updatedAt = Math.max(Date.now(), context.updatedAt + 1);
-    const saved = unwrap(
-      await editorApi.projectSettings.commitProjectDocument({
-        ...request,
-        version: read.version,
-        content: context,
-      })
-    );
+    const saved = await editorApi.projectSettings.commitProjectDocument({
+      ...request,
+      revision: read.revision,
+      content: context,
+    });
     if (saved?.success) return { success: true, status: 'ok', context, ...result };
     if (saved?.error !== 'DOCUMENT_CONFLICT') throw new Error(saved?.error || '保存助手状态失败');
   }

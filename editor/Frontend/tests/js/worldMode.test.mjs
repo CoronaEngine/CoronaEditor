@@ -3,13 +3,13 @@ import { memoryStorage } from './windowSessionFixtures.mjs';
 import { setImmediate } from 'node:timers';
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { createWorldModeController, createWorldModeRouteGuard, normalizeWorldMode, normalizeProjectPath, unwrapProjectInfo, worldModeService } from '../../src/services/worldModeService.js';
+import { createWorldModeController, createWorldModeRouteGuard, normalizeWorldMode, normalizeProjectPath, requireProjectInfo, worldModeService } from '../../src/services/worldModeService.js';
 import { editorApi } from '../../src/api/editorApi.js';
 import { appService } from '../../src/services/appService.js';
 import { projectLauncherService, resolveOpenedProjectScene, stopWorldRuntimeBeforeOpen } from '../../src/services/projectLauncherService.js';
 
 const deferred = () => { let resolve, reject; const promise = new Promise((yes, no) => { resolve = yes; reject = no; }); return { promise, resolve, reject }; };
-const info = (path, mode) => ({ data: { project_path: path, mode } });
+const info = (path, mode) => ({ project_path: path, mode });
 
 test('opens the single materialized scene', () => {
   assert.equal(resolveOpenedProjectScene({ scene: { path: 'scene.ini' } }), 'scene.ini');
@@ -25,8 +25,8 @@ test('legacy story metadata uses the single editable world mode', () => {
   assert.equal(normalizeWorldMode('story'), 'creative');
   for (const mode of [undefined, null, '', 'creative', '3d', 'multiplayer', 'Story']) assert.equal(normalizeWorldMode(mode), 'creative');
   assert.equal(normalizeProjectPath('D:\\Worlds\\Demo\\'), 'd:/worlds/demo');
-  assert.equal(unwrapProjectInfo({ data: info('demo', 'story') }).mode, 'story');
-  for (const invalid of [{}, { data: {} }, { project_path: '  ' }]) assert.throws(() => unwrapProjectInfo(invalid));
+  assert.equal(requireProjectInfo(info('demo', 'story')).mode, 'story');
+  for (const invalid of [{}, { data: {} }, { data: info('demo', 'creative') }, { project_path: '  ' }]) assert.throws(() => requireProjectInfo(invalid));
 });
 
 test('mode resolution is fail closed and does not mount an editor while pending', async () => {
@@ -213,12 +213,23 @@ function runningApi(stop) {
   return { scripts: {getStatus: async () => ({runId: 'current', snapshotCaptured: true}), stop} };
 }
 
+test('world cleanup refuses obsolete script envelopes rather than treating them as idle or stopped', async () => {
+  for (const wrapper of [value => ({ data: value }), value => ({ status: 'success', data: value })]) {
+    await assert.rejects(stopWorldRuntimeBeforeOpen({ scripts: {
+      getStatus: async () => wrapper({ status: 'idle' }), stop: assert.fail,
+    } }), /已取消切换世界/);
+    await assert.rejects(stopWorldRuntimeBeforeOpen(runningApi(async () => wrapper({
+      status: 'stopped', restored: true,
+    }))), /已取消切换世界/);
+  }
+});
+
 test('world cleanup skips an idle runtime and restores the current file by ID', async () => {
   await stopWorldRuntimeBeforeOpen({scripts: {getStatus: async () => ({status: 'idle'}), stop: assert.fail}});
   const calls = [];
   await stopWorldRuntimeBeforeOpen(runningApi(async (id, restore) => {
     calls.push([id, restore]);
-    return {data: {status: 'stopped', restored: false}};
+    return {status: 'stopped', restored: false};
   }));
   assert.deepEqual(calls, [['current', true]]);
 });
@@ -232,9 +243,7 @@ test('world cleanup still rejects real script restoration and stop failures', as
   ];
   for (const failure of failures) {
     await t.test(JSON.stringify(failure), async () => {
-      for (const wrap of [result => result, result => ({ data: result })]) {
-        await assert.rejects(stopWorldRuntimeBeforeOpen(runningApi(async () => wrap(failure))), /旧世界脚本尚未停止或恢复失败，已取消切换世界/);
-      }
+      await assert.rejects(stopWorldRuntimeBeforeOpen(runningApi(async () => failure)), /旧世界脚本尚未停止或恢复失败，已取消切换世界/);
     });
   }
 });
@@ -255,8 +264,8 @@ test('legacy projects open only after safe cleanup and can retry genuine failure
     worldModeService.invalidate();
   });
   t.mock.method(editorApi.projectSettings, 'getActiveProjectInfo', async () => info(activePath, activeMode));
-  t.mock.method(editorApi.scripts, 'getStatus', async () => ({ data: { runId: 'current', threadAlive: true } }));
-  t.mock.method(editorApi.scripts, 'stop', async (id, restore) => { calls.push(`script:${restore}`); return { data: stopResult }; });
+  t.mock.method(editorApi.scripts, 'getStatus', async () => ({ runId: 'current', threadAlive: true }));
+  t.mock.method(editorApi.scripts, 'stop', async (id, restore) => { calls.push(`script:${restore}`); return stopResult; });
   t.mock.method(editorApi.project, 'openProject', async path => {
     calls.push(`open:${path}`);
     activePath = path;
@@ -305,13 +314,11 @@ test('script cleanup reports concrete failures without treating restored=false a
   ];
   for (const [result, detail] of failures) {
     await t.test(JSON.stringify(result), async () => {
-      for (const wrap of [value => value, value => ({ data: value })]) {
-        await assert.rejects(stopWorldRuntimeBeforeOpen(runningApi(async () => wrap(result))), error => {
-          assert.match(error.message, /旧世界脚本尚未停止或恢复失败，已取消切换世界/);
-          assert.ok(error.message.includes(detail), error.message);
-          return true;
-        });
-      }
+      await assert.rejects(stopWorldRuntimeBeforeOpen(runningApi(async () => result)), error => {
+        assert.match(error.message, /旧世界脚本尚未停止或恢复失败，已取消切换世界/);
+        assert.ok(error.message.includes(detail), error.message);
+        return true;
+      });
     });
   }
 });

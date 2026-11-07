@@ -2395,7 +2395,7 @@ async function saveNow(targetOverride = null, { force = false } = {}) {
 
   saveInFlight = (async () => {
     try {
-      const response = bridgeResult(await saveBlocklyTarget({
+      const response = await saveBlocklyTarget({
         target_type: target.targetType === 'model' ? 'actor' : target.targetType || 'actor',
         scene_name: isProject ? '' : target.sceneName || '',
         actor_name: isProject ? '' : target.actorName || '',
@@ -2406,7 +2406,7 @@ async function saveNow(targetOverride = null, { force = false } = {}) {
         enabled: targetEnabledByKey.get(storageKeyForTarget(target)) ?? true,
         runnable,
         validation_errors: validationErrors,
-      }));
+      });
       if (response?.status === 'error') {
         throw new Error(response.message || '保存节点图失败');
       }
@@ -2469,10 +2469,10 @@ async function loadGraphForCurrentTarget() {
     const target = currentTarget(scope.project_path);
     target.archiveSession = scope.archive_session;
     const isProject = target.targetType === 'project';
-    const response = bridgeResult(await loadBlocklyTarget({
+    const response = await loadBlocklyTarget({
       ...scope, target_type: target.targetType, script_kind: 'node_graph',
       scene_name: isProject ? '' : target.sceneName || '', actor_name: isProject ? '' : target.actorName || '',
-    }));
+    });
     if (!componentMounted || loadSequence !== graphLoadSequence) return;
     if (response?.status === 'error') throw new Error(response.message || '节点图加载失败');
     loadedArchiveSession = scope.archive_session;
@@ -2516,12 +2516,8 @@ async function loadGraphForCurrentTarget() {
   }
 }
 
-function bridgeResult(response) {
-  return response?.data?.data ?? response?.data ?? response ?? {};
-}
-
 function normalizeNodeGraphScriptStatus(response = {}) {
-  const status = bridgeResult(response) || {};
+  const status = response || {};
   return {
     ...status,
     status: String(status.status || status.state || '').trim().toLowerCase(),
@@ -2804,7 +2800,7 @@ async function stopNodeGraphRun(statusText = '已停止', restoreState = false) 
   clearRunPoll();
   try {
     if (fileRunId || pendingFileRequest) {
-      const response = bridgeResult(await editorApi.scripts.stop(fileRunId, true, pendingFileRequest));
+      const response = await editorApi.scripts.stop(fileRunId, true, pendingFileRequest);
       if (response.status === 'error' || response.restoreError) throw new Error(response.message || response.restoreError);
       fileRunId = '';
       pendingFileRequest = '';
@@ -2896,13 +2892,11 @@ async function handleToggleRun() {
     runStatus.value = '启动中...';
     const requestId = crypto.randomUUID();
     pendingFileRequest = requestId;
-    const response = bridgeResult(
-      await startScriptFile({
+    const response = await startScriptFile({
         requestId,
         archive_session: runTarget.archiveSession, project_path: saved.project_path, path: saved.target.code_path, revision: saved.target.revision,
         target_type: saved.target.target_type, scene_name: saved.target.scene_name, actor_name: saved.target.actor_name,
-      })
-    );
+      });
     pendingFileRequest = '';
     if (panelClosing || !componentMounted || loadedArchiveSession !== runTarget.archiveSession || storageKeyForTarget(currentTarget()) !== storageKeyForTarget(runTarget)) {
       if (response.runId) await editorApi.scripts.stop(response.runId);

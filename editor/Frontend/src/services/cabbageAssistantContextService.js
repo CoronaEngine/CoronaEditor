@@ -532,7 +532,7 @@ window.addEventListener(AI_SETTINGS_CHANGED,()=>{
   const revision=worldModeState.revision;
   void editorApi.projectSettings.getActiveProjectInfo().then(response=>{
     if(revision!==worldModeState.revision||!editorUiAllowed())return;
-    const info=response?.data??response;
+    const info=response;
     const prompt=String(info?.world_prompt||info?.prompt||'').trim();
     if(prompt)return initializeWorldTasks({prompt,mode:info.mode||'creative',waitForCompletion:false});
   }).catch(error=>console.warn('[CabbageContext] session planning retry failed',error?.message||error));

@@ -1471,7 +1471,7 @@ async function reconcileEditorCameraInputLocks() {
   try {
     const result = await editorApi.scripts.getStatus();
     if (!viewCurrent() || token !== cameraInputLockReconcileToken) return;
-    const state = unwrapBridgeData(result) || {};
+    const state = result || {};
     setEditorCameraInputLock('node_graph', Boolean(state.threadAlive && state.inputLocked));
   } catch (error) {
     logWarn('无法读取脚本输入状态', error);

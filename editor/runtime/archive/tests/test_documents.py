@@ -34,6 +34,46 @@ class ArchiveOwnershipTests(unittest.TestCase):
                          "PROJECT_CONTEXT_CHANGED")
         self.assertEqual(read_document({**request, **self.active}), current)
 
+    def test_structured_document_revision_conflicts_without_returning_source_text(self):
+        request = {**self.scope, "document": "notes/task.json", "revision_only": True}
+        initial = read_document(request)
+        self.assertNotIn("version", initial)
+        self.assertEqual(initial["revision"], hashlib.sha256(b"").hexdigest())
+        content = {"unicode": "中文\u0000", "array": [None, {}, [], 4294967297]}
+        with ThreadPoolExecutor(4) as pool:
+            results = list(pool.map(lambda _: commit_document({**request,
+                "revision": initial["revision"], "content": content}), range(4)))
+        self.assertEqual(sum(r["success"] for r in results), 1)
+        self.assertEqual(sum(r.get("error") == "DOCUMENT_CONFLICT" for r in results), 3)
+        current = read_document(request)
+        self.assertNotIn("version", current)
+        self.assertEqual(current["content"], content)
+        raw = (self.root / request["document"]).read_bytes()
+        self.assertEqual(current["revision"], hashlib.sha256(raw).hexdigest())
+        self.assertEqual(read_document({**request, "revision_only": False})["version"], raw.decode("utf8"))
+        self.assertEqual(commit_document({**request, "version": raw.decode("utf8"), "content": {}})["error"],
+                         "DOCUMENT_CONFLICT")
+        self.active["archive_session"] = "second"
+        self.assertEqual(commit_document({**request, "revision": current["revision"], "content": {}})["error"],
+                         "PROJECT_CONTEXT_CHANGED")
+
+    def test_structured_document_corrupt_backup_and_run_fence(self):
+        path = self.root / "broken.json"
+        path.write_bytes(b"{broken")
+        request = {**self.scope, "document": path.name, "revision_only": True}
+        result = read_document(request)
+        self.assertNotIn("version", result)
+        self.assertTrue(result["corrupt"])
+        self.assertEqual(result["revision"], hashlib.sha256(b"{broken").hexdigest())
+        write = {**request, "revision": result["revision"], "content": {"fixed": True}}
+        with patch("script_runtime.file_runner.FileScripts.has_restore_snapshot", return_value=True):
+            self.assertEqual(commit_document(write)["error"], "RUN_ACTIVE")
+        saved = commit_document(write)
+        self.assertTrue(saved["success"])
+        self.assertNotIn("version", saved)
+        self.assertEqual(saved["revision"], read_document(request)["revision"])
+        self.assertEqual(next(self.root.glob("*.corrupt.json")).read_bytes(), b"{broken")
+
     def test_document_corrupt_backup_and_path_boundary(self):
         path = self.root / "broken.json"
         path.write_bytes(b"{broken")

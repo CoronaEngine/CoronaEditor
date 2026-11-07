@@ -9,7 +9,8 @@
       </div>
     </div>
 
-    <div class="flex-1 overflow-y-auto custom-scrollbar p-2">
+    <div class="flex-1 overflow-y-auto custom-scrollbar p-2" @contextmenu.prevent="handleContextMenu($event, null)">
+      <div v-if="errorMsg" class="text-red-400 text-xs p-2">{{ errorMsg }}</div>
       <FileTreeNode
         v-if="fileTree.children"
         :nodes="fileTree.children"
@@ -36,6 +37,7 @@
     <!-- 右键菜单 -->
     <div
       v-if="contextMenu.show"
+      data-file-context-menu
       :style="{ left: contextMenu.x + 'px', top: contextMenu.y + 'px' }"
       class="fixed z-[100] bg-[#121a14] border border-[#3a4a3c] shadow-xl py-1 min-w-[150px] text-xs"
     >
@@ -50,8 +52,8 @@
         <div class="h-[1px] bg-[#2b362d] my-1"></div>
         <div v-if="contextMenu.item?.name !== 'scene.ini'" class="px-4 py-2 hover:bg-[#b3995d] cursor-pointer" @click="handleRename">重命名</div>
         <div
-          class="px-4 py-2 hover:bg-red-600 cursor-pointer text-red-400 hover:text-white"
           v-if="contextMenu.item?.name !== 'scene.ini'"
+          class="px-4 py-2 hover:bg-red-600 cursor-pointer text-red-400 hover:text-white"
           @click="handleDelete"
         >
           删除
@@ -60,12 +62,12 @@
 
       <!-- 文件特有菜单 -->
       <template v-else-if="contextMenu.item">
-        <div class="px-4 py-2 hover:bg-[#b3995d] cursor-pointer" @click="handleOpenFile">打开</div>
+        <div class="px-4 py-2 hover:bg-[#b3995d] cursor-pointer" @click="handleOpenFile()">打开</div>
         <div class="h-[1px] bg-[#2b362d] my-1"></div>
         <div v-if="contextMenu.item?.name !== 'scene.ini'" class="px-4 py-2 hover:bg-[#b3995d] cursor-pointer" @click="handleRename">重命名</div>
         <div
-          class="px-4 py-2 hover:bg-red-600 cursor-pointer text-red-400 hover:text-white"
           v-if="contextMenu.item?.name !== 'scene.ini'"
+          class="px-4 py-2 hover:bg-red-600 cursor-pointer text-red-400 hover:text-white"
           @click="handleDelete"
         >
           删除
@@ -86,10 +88,12 @@
     <!-- 新建/重命名对话框 -->
     <div
       v-if="dialog.show"
+      data-file-dialog
       class="fixed inset-0 bg-black/50 flex items-center justify-center z-[200]"
     >
       <div class="bg-[#121a14] border border-[#3a4a3c] p-4 rounded w-80">
         <div class="text-[#b3995d] font-bold mb-3">{{ dialog.title }}</div>
+        <div v-if="errorMsg" class="text-red-400 text-xs mb-2">{{ errorMsg }}</div>
         <input
           v-model="dialog.value"
           type="text"
@@ -106,6 +110,7 @@
           </button>
           <button
             class="px-3 py-1 text-sm bg-[#b3995d] hover:bg-[#6b8a4a] rounded"
+            :disabled="busy"
             @click="handleDialogConfirm"
           >
             确认
@@ -117,197 +122,149 @@
 </template>
 
 <script setup>
-import { ref, onMounted, nextTick } from 'vue';
+import { ref, onMounted, onUnmounted, nextTick } from 'vue';
 import { editorApi } from '@/api/editorApi.js';
 import FileTreeNode from '@/components/ui/FileTreeNode.vue';
 import { translateUiText } from '@/i18n/domTranslator.js';
+import { createViewLifetime } from '@/utils/viewLifetime.js';
+import { worldModeState } from '@/services/worldModeService.js';
 
-
+const projectRevision = worldModeState.revision;
+const lifetime = createViewLifetime(() => projectRevision === worldModeState.revision);
 const projectName = ref('Corona Project');
 const fileTree = ref({ children: [] });
 const loading = ref(false);
+const busy = ref(false);
+const errorMsg = ref('');
 const contextMenu = ref({ show: false, x: 0, y: 0, item: null });
-const dialog = ref({
-  show: false,
-  title: '',
-  placeholder: '',
-  value: '',
-  type: '', // 'newFolder', 'newActor', 'rename'
-  targetPath: '',
-});
+const dialog = ref({ show: false, title: '', placeholder: '', value: '', type: '', targetPath: '' });
+let scope = null;
+let readSequence = 0;
+let menuSequence = 0;
+const owns = captured => lifetime.current() && captured?.archive_session === scope?.archive_session
+  && captured?.project_path === scope?.project_path;
 
-
-// 加载文件树
 const loadFileTree = async () => {
+  if (!scope || !lifetime.current()) return;
+  const captured = scope;
+  const sequence = ++readSequence;
+  const current = () => owns(captured) && sequence === readSequence;
   loading.value = true;
-  const res = await editorApi.files.getFileTree('');
-  if (res && res.data) {
-    fileTree.value = res.data;
+  errorMsg.value = '';
+  try {
+    const tree = await editorApi.files.getFileTree({ ...captured, path: '' });
+    if (!current()) return;
+    if (tree.archive_session !== captured.archive_session) throw new Error('项目会话已失效');
+    fileTree.value = tree;
+  } catch (error) {
+    if (current()) errorMsg.value = String(error);
+  } finally {
+    if (current()) loading.value = false;
   }
-  loading.value = false;
 };
 
-// 初始化
 const init = async () => {
-  const info = await editorApi.files.getProjectInfo();
-  if (info?.data?.exists) {
-    projectName.value = info.data.name;
+  try {
+    const info = await editorApi.projectSettings.getActiveProjectInfo();
+    if (!lifetime.current()) return;
+    if (!info.archive_session || !info.project_path || info.read_only) return;
+    scope = { archive_session: info.archive_session, project_path: info.project_path };
+    projectName.value = info.name;
     await loadFileTree();
+  } catch (error) {
+    if (lifetime.current()) errorMsg.value = String(error);
   }
 };
 
-// 处理节点单击（只处理文件夹展开/收起）
-const handleNodeClick = (node) => {
-  if (node.isDirectory) {
-    // 切换展开/收起状态
-    node.expanded = !node.expanded;
-  }
-  // 文件单击不做任何事
+const handleNodeClick = node => {
+  if (lifetime.current() && node.isDirectory) node.expanded = !node.expanded;
 };
-
-// 处理节点双击（打开文件）
-const handleNodeDblClick = (node) => {
-  if (!node.isDirectory) {
-    if (node.name === 'scene.ini') {
-      editorApi.files.openFile(node.path, 'scene');
-    } else if (node.name.endsWith('.actor')) {
-      editorApi.files.openFile(node.path, 'actor');
-    }
-  }
+const closeContextMenu = () => {
+  menuSequence++;
+  contextMenu.value.show = false;
 };
-
-// 处理右键菜单
 const handleContextMenu = (event, item) => {
   event.preventDefault();
-  event.stopPropagation(); // 防止事件冒泡
-
-  const scope = { archive_session: fileTree.value.archive_session };
-  // 关闭已有的右键菜单
-  contextMenu.value.show = false;
-
-  // 使用 nextTick 确保上一个菜单关闭后再打开新的
+  event.stopPropagation();
+  if (!scope || !lifetime.current()) return;
+  closeContextMenu();
+  const sequence = menuSequence, captured = scope;
   nextTick(() => {
-    contextMenu.value = {
-      show: true,
-      x: event.clientX,
-      y: event.clientY,
-      item: item || null,
-      scope,
-    };
+    if (sequence !== menuSequence || !owns(captured)) return;
+    contextMenu.value = { show: true, x: event.clientX, y: event.clientY, item: item || null, scope: captured };
   });
 };
-
-// 关闭右键菜单
-const closeContextMenu = () => {
-  contextMenu.value.show = false;
-};
-
-// 打开新建文件夹对话框
-const handleNewFolder = () => {
-  dialog.value = {
-    scope: contextMenu.value.scope,
-    show: true,
-    title: '新建文件夹',
-    placeholder: '输入文件夹名称',
-    value: '',
-    type: 'newFolder',
-    targetPath: contextMenu.value.item?.path || '',
-  };
+const openDialog = (type, title, placeholder) => {
+  const menu = contextMenu.value;
+  if (!owns(menu.scope) || (type === 'rename' && !menu.item)) return;
+  errorMsg.value = '';
+  dialog.value = { show: true, type, title, placeholder, scope: menu.scope,
+    value: type === 'rename' ? menu.item.name : '', targetPath: menu.item?.path || '' };
   closeContextMenu();
 };
+const handleNewFolder = () => openDialog('newFolder', '新建文件夹', '输入文件夹名称');
+const handleNewActor = () => openDialog('newActor', '新建单位', '输入单位名称 (.actor)');
+const handleRename = () => openDialog('rename', '重命名', '输入新名称');
 
-
-// 打开新建单位对话框
-const handleNewActor = () => {
-  dialog.value = {
-    scope: contextMenu.value.scope,
-    show: true,
-    title: '新建单位',
-    placeholder: '输入单位名称 (.actor)',
-    value: '',
-    type: 'newActor',
-    targetPath: contextMenu.value.item?.path || '',
-  };
+const handleOpenFile = async (node = contextMenu.value.item, captured = contextMenu.value.scope) => {
   closeContextMenu();
+  if (!node || node.isDirectory || !owns(captured)) return;
+  const file_type = node.name === 'scene.ini' ? 'scene' : node.name.endsWith('.actor') ? 'actor' : '';
+  if (!file_type) return;
+  try {
+    await editorApi.files.openFile({ ...captured, path: node.path, file_type });
+  } catch (error) {
+    if (owns(captured)) errorMsg.value = String(error);
+  }
 };
+const handleNodeDblClick = node => handleOpenFile(node, scope);
 
-// 打开重命名对话框
-const handleRename = () => {
-  if (!contextMenu.value.item) return;
-
-  dialog.value = {
-    scope: contextMenu.value.scope,
-    show: true,
-    title: '重命名',
-    placeholder: '输入新名称',
-    value: contextMenu.value.item.name,
-    type: 'rename',
-    targetPath: contextMenu.value.item.path,
-    oldName: contextMenu.value.item.name,
-  };
-  closeContextMenu();
-};
-
-// 处理删除
 const handleDelete = async () => {
-  if (!contextMenu.value.item) return;
-
-  if (confirm(translateUiText(`确定要删除 "${contextMenu.value.item.name}" 吗？`))) {
-    const res = await editorApi.files.deleteItem(contextMenu.value.item.path, contextMenu.value.scope);
-    if (res?.data) {
-      await loadFileTree();
-    }
-  }
+  const menu = contextMenu.value, captured = menu.scope, item = menu.item;
   closeContextMenu();
+  if (!item || !owns(captured) || busy.value ||
+      !confirm(translateUiText(`确定要删除 "${item.name}" 吗？`))) return;
+  busy.value = true;
+  try {
+    await editorApi.files.deleteItem({ ...captured, path: item.path });
+    if (owns(captured)) await loadFileTree();
+  } catch (error) {
+    if (owns(captured)) errorMsg.value = String(error);
+  } finally {
+    if (owns(captured)) busy.value = false;
+  }
 };
 
-// 处理打开文件（从右击调用）
-const handleOpenFile = (node) => {
-  if (node && !node.isDirectory) {
-    if (node.name === 'scene.ini') {
-      editorApi.files.openFile(node.path, 'scene');
-    } else if (node.name.endsWith('.actor')) {
-      editorApi.files.openFile(node.path, 'actor');
-    }
-  }
-  closeContextMenu();
-};
-
-// 处理对话框确认
 const handleDialogConfirm = async () => {
-  if (!dialog.value.value.trim()) {
-    alert(translateUiText('名称不能为空'));
-    return;
+  const active = dialog.value, captured = active.scope;
+  if (!active.show || !owns(captured) || busy.value) return;
+  const name = active.value.trim();
+  if (!name) { errorMsg.value = translateUiText('名称不能为空'); return; }
+  const method = { newFolder: 'createFolder', newActor: 'createActorTemplate', rename: 'renameItem' }[active.type];
+  if (!method) return;
+  const current = () => owns(captured) && dialog.value === active;
+  busy.value = true;
+  errorMsg.value = '';
+  try {
+    await editorApi.files[method]({ ...captured, path: active.targetPath, name });
+    if (!current()) return;
+    active.show = false;
+    await loadFileTree();
+  } catch (error) {
+    if (current()) errorMsg.value = String(error);
+  } finally {
+    if (owns(captured)) busy.value = false;
   }
-
-  const name = dialog.value.value.trim();
-
-  switch (dialog.value.type) {
-    case 'newFolder':
-      await editorApi.files.createFolder(dialog.value.targetPath, name, dialog.value.scope);
-      break;
-    case 'newActor':
-      // 创建.actor文件
-      await editorApi.files.createFile(
-        dialog.value.targetPath,
-        name.endsWith('.actor') ? name : name + '.actor',
-        'actor', dialog.value.scope
-      );
-      break;
-    case 'rename':
-      await editorApi.files.renameItem(dialog.value.targetPath, name, dialog.value.scope);
-      break;
-  }
-
-  dialog.value.show = false;
-  await loadFileTree();
 };
-
-// 关闭浮动窗口
 
 onMounted(() => {
-  init();
   window.addEventListener('click', closeContextMenu);
+  return init();
+});
+onUnmounted(() => {
+  closeContextMenu();
+  void lifetime.dispose();
+  window.removeEventListener('click', closeContextMenu);
 });
 </script>
 

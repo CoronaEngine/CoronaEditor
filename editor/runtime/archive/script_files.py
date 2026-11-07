@@ -18,7 +18,20 @@ class ProjectFiles:
             if error:
                 return error
             try:
-                key = request["key"]
+                if "identity" in request:
+                    identity = request["identity"]
+                    if (not isinstance(identity, list) or len(identity) != 4
+                            or not all(isinstance(part, str) and "\0" not in part for part in identity)
+                            or not identity[0] or identity[1] not in ("actor", "project")
+                            or (identity[1] == "actor" and not all(identity[2:]))
+                            or (identity[1] == "project" and any(identity[2:]))):
+                        raise ValueError("Invalid document identity")
+                    # Keep existing content-addressed folders readable. This is
+                    # storage-key encoding, performed only by the file owner.
+                    key = json.dumps(identity, ensure_ascii=False, separators=(",", ":"))
+                else:
+                    # The independent Python storage API retains opaque keys.
+                    key = request["key"]
                 if not isinstance(key, str) or not 0 < len(key) <= 2048:
                     raise ValueError("Invalid document key")
                 folder = root / "Scripts" / "files" / hashlib.sha256(key.encode("utf-8")).hexdigest()

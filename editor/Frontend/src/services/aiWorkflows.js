@@ -101,7 +101,7 @@ function cancel(taskId) {
 async function load(payload = {}) {
   const path = projectIdentity(payload);
   const loaded = await contextTransaction(path, () => ({}));
-  const metadata = unwrap(await editorApi.projectSettings.getActiveProjectInfo());
+  const metadata = await editorApi.projectSettings.getActiveProjectInfo();
   projectIdentity({ projectPath: path });
   const prompt = String(metadata?.world_prompt || metadata?.prompt || '').trim();
   if (

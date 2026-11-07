@@ -220,7 +220,7 @@ test('unreadable session state fails closed before sending window commands', asy
 
 test('world mode uses authoritative native scene metadata', async () => {
   const info = { project_path: 'D:/world', mode: 'creative' };
-  const api = { projectSettings: { getActiveProjectInfo: async () => ({ data: info }) } };
+  const api = { projectSettings: { getActiveProjectInfo: async () => info } };
   assert.deepEqual(await readWorldProjectInfo(api), info);
   info.mode = 'story';
   assert.equal((await readWorldProjectInfo(api)).mode, 'story');

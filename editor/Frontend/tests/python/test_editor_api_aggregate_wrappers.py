@@ -35,8 +35,8 @@ class EditorApiAggregateWrapperTests(unittest.TestCase):
             "readActorIndex: (sceneName, scope)",
             "readActorProperties: (sceneName, actor, scope)",
             "setActorTransform: (sceneName, actorName, transform)",
-            "saveActor: (sceneName, actorName, session)",
-            "selectModelFile: (sceneName, actorName, fileType = 'model')",
+            "save: (sceneName, scope)",
+            "selectModelFile: (sceneName, fileType = 'model', scope)",
             "setActorProperties: (sceneName, actorName, patch)",
             "captureScreenshot: (sceneName, cameraId, options)",
             "setCameraProperties: (sceneName, cameraId, patch)",
@@ -44,6 +44,12 @@ class EditorApiAggregateWrapperTests(unittest.TestCase):
             self.assertIn(marker, self.api_source)
         self.assertNotIn('getSnapshot:', self.api_source)
         self.assertNotIn('listCameraViews:', self.api_source)
+        self.assertNotIn('saveActor:', self.api_source)
+
+    def test_project_settings_has_only_named_web_bindings(self):
+        for method in ('readProjectDocument', 'commitProjectDocument', 'getActiveProjectInfo', 'saveActiveProjectInfo'):
+            self.assertIn(f'window.corona.projectSettings.{method}(', self.api_source)
+            self.assertNotIn(f"call_manifest_editor_api('projectSettings.{method}'", self.api_source)
 
     def test_frontend_exposes_project_network_and_lan_chat_aggregates(self):
         for marker in (
