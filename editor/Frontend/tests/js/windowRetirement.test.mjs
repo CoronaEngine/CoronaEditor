@@ -37,7 +37,7 @@ async function waitForBarrier(barriers, index) {
 test('real Vue watcher and launcher concurrent cleanup opens native project once', async (t) => {
   const { barriers: sent, barrierReply: reply } = nativeSurface(t);
   let nativeOpens = 0;
-  t.mock.method(editorApi.project, 'openProject', async path => { nativeOpens++; return { data: { ok: true, path } }; });
+  t.mock.method(editorApi.project, 'openProject', async path => { nativeOpens++; return { ok: true, path }; });
   t.mock.method(editorApi.projectSettings, 'getActiveProjectInfo', async () => ({ project_path: 'story', mode: 'story' }));
   worldModeService.invalidate();
   const watched = [];
@@ -128,7 +128,7 @@ test('launcher and watcher save the old archive in every Web document before nat
   t.after(() => { state.dispose(); peer.dispose(); messages.dispose(); });
   t.mock.method(editorApi.scripts, 'getStatus', async () => ({ status: 'idle' }));
   t.mock.method(editorApi.project, 'openProject', async () => {
-    assert.equal(calls, 1); opens++; archive = 'new-archive'; return { data: { ok: true, path: 'new' } };
+    assert.equal(calls, 1); opens++; archive = 'new-archive'; return { ok: true, path: 'new' };
   });
   t.mock.method(editorApi.projectSettings, 'getActiveProjectInfo', async () => ({ project_path: opens ? 'new' : 'old', mode: 'creative' }));
   const watched=[];
@@ -165,7 +165,7 @@ test('launcher blocks on a failed unmounted graph and saves retained state on ex
   });
   await assert.rejects(registration.retire(), { code: 'GRAPH_SAVE_FAILED' });
   t.mock.method(editorApi.project, 'openProject', async () => {
-    opens++; archive = 'new-archive'; return { data: { ok: true, path: 'new' } };
+    opens++; archive = 'new-archive'; return { ok: true, path: 'new' };
   });
   await assert.rejects(projectLauncherService.openProject('new'), { code: 'GRAPH_SAVE_FAILED' });
   assert.equal(opens, 0);

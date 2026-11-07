@@ -34,13 +34,12 @@ const deferred = () => {
   return { promise, resolve };
 };
 
-async function mountCreationPage(t, { stopResult = idle(), wrapped = true } = {}) {
+async function mountCreationPage(t, { stopResult = idle() } = {}) {
   const calls = [], alerts = [], saves = [], mounted = [], unmounted = [];
   let activePath = 'creative-world';
   let route = '/NewGame';
   let sequence = 0;
   let scriptResult = stopResult;
-  const wrap = result => wrapped ? { data: result } : result;
   const previous = { window: globalThis.window, CustomEvent: globalThis.CustomEvent, alert: globalThis.alert };
   const timers = new Map();
   globalThis.window = {
@@ -73,7 +72,7 @@ async function mountCreationPage(t, { stopResult = idle(), wrapped = true } = {}
   t.mock.method(editorApi.project, 'openProject', async path => {
     calls.push(['open', path]);
     activePath = path;
-    return wrap({ ok: true, path });
+    return { ok: true, path };
   });
   t.mock.method(lanchat, 'openRoom', async () => {});
   t.mock.method(lanchat, 'setWorkspaceMode', () => {});

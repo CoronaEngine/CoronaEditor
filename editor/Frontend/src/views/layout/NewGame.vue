@@ -181,7 +181,7 @@ const handleCreate = async () => {
     if (info && info.path) {
       const opened = await projectLauncherService.openProject(info.path, { newProject: true });
       if (disposed || isProjectOpenSuperseded(opened)) return;
-      const openResult = opened?.data ?? opened;
+      const openResult = opened;
       if (openResult?.status === 'service_initializing') {
         alert('存档服务正在初始化，请稍后重试');
         return;

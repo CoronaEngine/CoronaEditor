@@ -409,7 +409,7 @@ const editorApiStatic = {
     getProjectLoadStatus: () => window.corona.project.getProjectLoadStatus(),
     getRecentProjects: () => window.corona.project.getRecentProjects(),
     openProject: (projectPath, options = {}) =>
-      call_manifest_editor_api('project.openProject', [projectPath, options]),
+      window.corona.project.openProject(projectPath, options),
     openProjectFile: () => window.corona.project.openProjectFile(),
   },
   audio: {

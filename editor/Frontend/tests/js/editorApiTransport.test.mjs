@@ -13,11 +13,6 @@ const CALLER_CEF = 1;
 
 const MANIFEST_METHODS = [
   {
-    api: 'ProjectLauncher.open_project', js_wrapper: 'project.openProject',
-    params: [{ name: 'path', type: 'string' }, { name: 'options', type: 'object', optional: true }],
-    return: 'object', allowed_callers: CALLER_CEF,
-  },
-  {
     api: 'SceneTools.get_model_nodes',
     js_wrapper: 'sceneTools.getModelNodes',
     params: [{ name: 'scene_name', type: 'string' }, { name: 'actor_name', type: 'string' },
@@ -80,6 +75,12 @@ function createFakeCefHost() {
     callbacks,
     corona: {
       project: {
+        openProject(...args) {
+          const api = 'corona.project.openProject';
+          requests.push({ api, args });
+          if (hangFor.has(api)) return new Promise((resolve, reject) => pending.set(api, { resolve, reject }));
+          return Promise.resolve({ ok: true, status: 'opened', path: args[0] });
+        },
         openProjectFile(...args) {
           const api = 'corona.project.openProjectFile';
           requests.push({ api, args });
@@ -193,10 +194,10 @@ test('camera render settings use one scoped V8 patch and expose no legacy Web se
 
 test('editor API calls pass structured values through the typed V8 binding', async () => {
   const { editorApi, host } = await loadEditorApi();
-  const options = { restore_session: true };
+  const options = { load_policy: 'degraded' };
   await editorApi.project.openProject('C:/Projects/Kitchen/Kitchen.corona', options);
 
-  const call = host.requests.find((request) => request.api === 'ProjectLauncher.open_project');
+  const call = host.requests.find((request) => request.api === 'corona.project.openProject');
   assert.deepEqual(call.args, ['C:/Projects/Kitchen/Kitchen.corona', options]);
   assert.equal(host.cefQuery, undefined);
 });
@@ -327,18 +328,20 @@ test('a picker still rejects a native error after waiting past the ordinary RPC 
   });
 });
 
-test('loading a selected project still times out and ignores its late native reply', async () => {
+test('a native project open remains pending past the ordinary manifest deadline', async () => {
   const { editorApi, host, limits } = await loadEditorApi();
-
   await withShortTimeout(limits, async () => {
-    host.hangFor.add('ProjectLauncher.open_project');
-    await assert.rejects(
-      () => editorApi.project.openProject('C:/Projects/Kitchen/Kitchen.corona'),
-      (error) => error.code === 'EDITOR_API_TIMEOUT',
-    );
-    assert.doesNotThrow(() => host.pending.get('ProjectLauncher.open_project').resolve(
-      { status: 'success', data: {} },
-    ));
+    host.hangFor.add('corona.project.openProject');
+    const outcome = editorApi.project.openProject('C:/Projects/World', { load_policy: 'degraded' })
+      .then(value => ({ value }), error => ({ error }));
+    await new Promise(resolve => setTimeout(resolve, 60));
+    const reply = { ok: false, status: 'decision_required', diagnostics: [{ code: 'RESOURCE_NOT_FOUND' }] };
+    host.pending.get('corona.project.openProject').resolve(reply);
+    const actual = await outcome;
+    assert.ifError(actual.error);
+    assert.equal(actual.value, reply);
+    assert.deepEqual(host.requests, [{ api: 'corona.project.openProject',
+      args: ['C:/Projects/World', { load_policy: 'degraded' }] }]);
   });
 });
 

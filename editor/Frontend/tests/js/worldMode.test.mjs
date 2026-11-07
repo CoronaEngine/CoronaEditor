@@ -185,7 +185,7 @@ test('project opening is serialized and commits only verified authoritative worl
   let activePath = 'first';
   t.mock.method(editorApi.project, 'openProject', async (path) => {
     paths.push(path); if (path === 'first') await first.promise;
-    activePath = path; return { data: { ok: true, path } };
+    activePath = path; return { ok: true, path };
   });
   t.mock.method(editorApi.projectSettings, 'getActiveProjectInfo', async () => info(activePath, 'story'));
   const previousWindow = globalThis.window, previousEvent = globalThis.CustomEvent;
@@ -270,7 +270,7 @@ test('legacy projects open only after safe cleanup and can retry genuine failure
     calls.push(`open:${path}`);
     activePath = path;
     activeMode = 'story';
-    return { data: { ok: true, path } };
+    return { ok: true, path };
   });
 
   for (const initialResult of [
@@ -291,7 +291,7 @@ test('legacy projects open only after safe cleanup and can retry genuine failure
       calls.length = 0;
       stopResult = idle;
     }
-    assert.equal((await projectLauncherService.openProject('story')).data.ok, true);
+    assert.equal((await projectLauncherService.openProject('story')).ok, true);
     assert.deepEqual(calls, ['script:true', 'open:story']);
     assert.equal(worldModeService.state.mode, 'creative');
     assert.equal(worldModeService.state.projectPath, 'story');

@@ -12,8 +12,7 @@ let projectOpenQueue = Promise.resolve();
 let selectionVersion = 0;
 let runtimeCleanupRequired = false;
 const superseded = () => ({ ok: false, status: 'superseded' });
-export const projectOpenResult = (result) => result?.data ?? result;
-export const isProjectOpenSuperseded = (result) => projectOpenResult(result)?.status === 'superseded';
+export const isProjectOpenSuperseded = (result) => result?.status === 'superseded';
 
 export const resolveOpenedProjectScene = (payload = {}) => {
   const route = payload?.scene?.path;
@@ -89,7 +88,7 @@ export const projectLauncherService = {
         // Native scene replacement is serialized even if this selection becomes stale.
         const result = await editorApi.project.openProject(projectPath, { load_policy: loadPolicy });
         if (!current()) return superseded();
-        const opened = projectOpenResult(result);
+        const opened = result;
         const activeProjectPath = opened?.path || projectPath;
         if (!opened?.ok) {
           worldModeService.fail(new Error(opened?.message || '打开世界失败'));

@@ -29,7 +29,7 @@ def test_project_lifecycle_manifest_methods_have_public_wrappers():
         'ProjectLauncher.get_app_version', 'ProjectLauncher.get_recent_projects',
         'ProjectLauncher.get_project_load_status',
         'ProjectLauncher.create_world_project', 'ProjectLauncher.create_multiplayer_project',
-        'ProjectLauncher.open_project_file',
+        'ProjectLauncher.open_project_file', 'ProjectLauncher.open_project',
         'ProjectSettings.save_active_project_info', 'MainView.on_init',
     }
     for api_name, (js_wrapper, python_wrapper) in expected.items():

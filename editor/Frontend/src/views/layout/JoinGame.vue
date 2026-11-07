@@ -293,7 +293,7 @@ const prepareMultiplayerProject = async (role) => {
 
   const opened = await projectLauncherService.openProject(project.path);
   if (isProjectOpenSuperseded(opened)) return null;
-  const openedOk = opened?.data ?? opened;
+  const openedOk = opened;
   if (!openedOk?.ok) {
     throw new Error('打开联机存档失败');
   }

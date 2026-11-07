@@ -140,7 +140,6 @@ onMounted(async () => {
   }
 });
 
-const unwrapResponse = (response) => response?.data ?? response;
 
 onUnmounted(() => {
   void lifetime.dispose();
@@ -169,7 +168,7 @@ const handleOpenProject = async (path, project = null) => {
   try {
     let result = await projectLauncherService.openProject(path);
     if (!lifetime.current() || isProjectOpenSuperseded(result)) return;
-    let opened = unwrapResponse(result);
+    let opened = result;
     if (opened?.status === 'decision_required') {
       const details = archiveDiagnostics(opened);
       const proceed = window.confirm(
@@ -178,7 +177,7 @@ const handleOpenProject = async (path, project = null) => {
       if (!proceed) return;
       result = await projectLauncherService.openProject(path, { loadPolicy: 'degraded' });
       if (!lifetime.current() || isProjectOpenSuperseded(result)) return;
-      opened = unwrapResponse(result);
+      opened = result;
     }
     if (opened?.status === 'invalid_archive') {
       window.alert(`无法打开存档：\n${archiveDiagnostics(opened)}`);

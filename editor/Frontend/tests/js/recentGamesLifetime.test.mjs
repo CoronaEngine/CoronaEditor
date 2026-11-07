@@ -26,7 +26,7 @@ function mount(t, overrides = {}) {
     'projectLauncherService', 'isProjectOpenSuperseded', 'notifyWorldError', compiled)(
     ref, fn => { mounted = fn; }, fn => { unmounted = fn; }, createViewLifetime,
     () => ({ push: path => routes.push(path), replace: async path => routes.push(path) }), { project },
-    { openProject: async path => ({ ok: true, path }) }, () => false, () => {});
+    { openProject: overrides.openProject || (async path => ({ ok: true, path })) }, () => false, () => {});
   const state = component.setup({}, { expose() {} });
   return { state, calls, routes, timers, ready: mounted(), dispose: () => unmounted() };
 }
@@ -91,5 +91,37 @@ test('a project picker completing after retirement does not open a project', asy
   page.dispose();
   pending.resolve({ name: 'World', path: 'world' });
   await importing;
+  assert.deepEqual(page.routes, []);
+});
+
+test('direct open diagnostics reach confirmation before a degraded retry', async t => {
+  const calls = [], confirmations = [];
+  const page = mount(t, { openProject: async (path, options) => {
+    calls.push({ path, options });
+    return calls.length === 1 ? { ok: false, status: 'decision_required', diagnostics: [
+      { actor_name: 'Chair', resource_path: 'Assets/chair.ply', count: 2, message: 'Missing geometry' },
+    ] } : { ok: true, status: 'opened_degraded', path };
+  } });
+  window.confirm = message => { confirmations.push(message); return true; };
+  await page.ready;
+  await page.state.handleOpenProject('world');
+  assert.deepEqual(calls, [{ path: 'world', options: undefined },
+    { path: 'world', options: { loadPolicy: 'degraded' } }]);
+  assert.equal(confirmations.length, 1);
+  for (const detail of ['Chair', 'Assets/chair.ply', '2', 'Missing geometry'])
+    assert.ok(confirmations[0].includes(detail), detail);
+  assert.deepEqual(page.routes, ['/']);
+});
+
+test('declining direct open diagnostics leaves the project unopened', async t => {
+  let opens = 0;
+  const page = mount(t, { openProject: async () => {
+    ++opens;
+    return { ok: false, status: 'decision_required', diagnostics: [{ code: 'RESOURCE_NOT_FOUND' }] };
+  } });
+  window.confirm = () => false;
+  await page.ready;
+  await page.state.handleOpenProject('world');
+  assert.equal(opens, 1);
   assert.deepEqual(page.routes, []);
 });
