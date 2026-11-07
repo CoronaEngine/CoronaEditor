@@ -27,7 +27,9 @@ test('all manifest-declared Web methods have explicit own wrappers before discov
 });
 
 test('the public event surface exactly matches the remaining native events', () => {
-  const expected = nativeEvents.split('\n').map(line => line.match(/"events\.([^"]+)"/)?.[1]).filter(Boolean).sort();
+  const expected = nativeEvents.split('\n')
+    .filter(line => !line.includes('~caller_mask(EditorApiCaller::Cef)'))
+    .map(line => line.match(/"events\.([^"]+)"/)?.[1]).filter(Boolean).sort();
   assert.deepEqual(Object.keys(editorApi.events).sort(), expected);
 });
 

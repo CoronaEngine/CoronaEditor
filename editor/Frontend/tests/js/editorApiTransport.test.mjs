@@ -74,6 +74,13 @@ function createFakeCefHost() {
     pending,
     callbacks,
     corona: {
+      lanChat: {
+        onEvent(callback) {
+          callbacks.set(42, { callback });
+          requests.push({ api: 'corona.lanChat.onEvent' });
+          return () => callbacks.delete(42);
+        },
+      },
       project: {
         openProject(...args) {
           const api = 'corona.project.openProject';
@@ -147,18 +154,18 @@ async function loadEditorApi() {
 test('retired log subscription is absent before and after loading native events', async () => {
   const { editorApi } = await loadEditorApi();
   assert.equal(editorApi.events.onLogBatch, undefined);
-  const token = await editorApi.events.onLanChatEvent(() => {});
+  const stop = editorApi.lanChat.onEvent(() => {});
   assert.equal(editorApi.events.onLogBatch, undefined);
-  await editorApi.off(token);
+  stop();
   assert.equal(editorApi.events.onExtension, undefined, 'native discovery cannot add implicit capabilities');
 });
 
 test('orphan mesh movement subscription is absent before and after loading native events', async () => {
   const { editorApi } = await loadEditorApi();
   assert.equal(editorApi.events.onMeshMoveResult, undefined);
-  const token = await editorApi.events.onLanChatEvent(() => {});
+  const stop = editorApi.lanChat.onEvent(() => {});
   assert.equal(editorApi.events.onMeshMoveResult, undefined);
-  await editorApi.off(token);
+  stop();
 });
 
 test('model node operations are not exposed through the manifest transport', async () => {
@@ -214,24 +221,17 @@ async function withShortTimeout(limits, body) {
   }
 }
 
-test('a callback whose unregister failed must not stay reachable', async () => {
+test('LANChat direct subscription needs no manifest and releases its native callback', async () => {
   const { editorApi, host } = await loadEditorApi();
   const seen = [];
-
-  const token = await editorApi.events.onLanChatEvent((payload) => seen.push(payload));
-  assert.equal(token, 42, 'the registration must return the native callback token');
-
-  // Sanity: while registered, the event reaches the handler.
-  host.emit(token, { n: 1 }, 'events.onLanChatEvent');
+  assert.equal(editorApi.events.onLanChatEvent, undefined);
+  const stop = editorApi.lanChat.onEvent(payload => seen.push(payload));
+  host.emit(42, { n: 1 });
   assert.deepEqual(seen, [{ n: 1 }]);
-
-  // Native refuses the unregister. The local registration must still be dropped, otherwise
-  // the handler (and everything it closes over) leaks for the lifetime of the page.
-  host.failFor.add('EditorApi.off');
-  await assert.rejects(() => editorApi.off(token));
-
-  host.emit(token, { n: 2 }, 'events.onLanChatEvent');
-  assert.deepEqual(seen, [{ n: 1 }], 'a handler whose unregister failed must not stay reachable');
+  stop(); stop();
+  host.emit(42, { n: 2 });
+  assert.deepEqual(seen, [{ n: 1 }]);
+  assert.deepEqual(host.requests, [{ api: 'corona.lanChat.onEvent' }]);
 });
 
 test('a request with no native reply must fail with a diagnosable timeout', async () => {

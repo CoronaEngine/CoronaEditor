@@ -188,7 +188,7 @@ function onLanChatEvent(payload) {
 async function registerLanChatEvent() {
   try {
     await viewLifetime.subscribe(
-      callback => editorApi.events.onLanChatEvent(callback), onLanChatEvent, token => editorApi.off(token));
+      callback => editorApi.lanChat.onEvent(callback), onLanChatEvent, stop => stop());
   } catch (error) {
     if (viewLifetime.current()) {
       console.warn('[App] failed to subscribe to LANChat events', error);

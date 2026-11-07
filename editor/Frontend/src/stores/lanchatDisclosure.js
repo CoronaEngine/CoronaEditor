@@ -36,16 +36,8 @@ const DISCLOSURE_PUBLIC_KEYS = new Set([
   'created_at',
 ]);
 
-export function parseDisclosureMetadata(msg = {}) {
-  if (msg.metadata && typeof msg.metadata === 'object') return msg.metadata;
-  const raw = msg.metadata_json || '';
-  if (!raw || typeof raw !== 'string') return {};
-  try {
-    const parsed = JSON.parse(raw);
-    return parsed && typeof parsed === 'object' ? parsed : {};
-  } catch (e) {
-    return {};
-  }
+export function messageMetadata(msg = {}) {
+  return msg.metadata && typeof msg.metadata === 'object' ? msg.metadata : {};
 }
 
 export function safeDisclosureMetadata(input = {}) {
@@ -85,7 +77,7 @@ function safeDisclosureSource(input = {}) {
 }
 
 export function extractDisclosureFromMessage(message = {}, fallbackRoom = '', role = '') {
-  const metadata = parseDisclosureMetadata(message);
+  const metadata = messageMetadata(message);
   const shouldUseHostDisclosure = String(role || '') === 'host'
     && metadata.host_disclosure
     && typeof metadata.host_disclosure === 'object';

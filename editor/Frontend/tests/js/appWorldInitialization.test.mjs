@@ -56,7 +56,7 @@ for (const first of ['guard', 'observer']) {
       '@/services/appService.js': { appService: {} },
       '@/api/editorApi.js': { editorApi: {
         scene: { observe: async (_topic, handler) => { observer = handler; return 1; } },
-        events: { onLanChatEvent: async () => 2 }, off: async () => {},
+        lanChat: { onEvent: () => () => {} }, off: async () => {},
       } },
       '@/utils/eventBus.js': { coronaEventBus: { on: noop, off: noop } },
       '@/utils/viewLifetime.js': { createViewLifetime },
@@ -122,7 +122,7 @@ function mountLifecycleApp(t, role = 'peer') {
     } },
     '@/api/editorApi.js': { editorApi: {
       scene: { observe: (_topic, callback) => { projectCallback = callback; return projectRegistration.promise; } },
-      events: { onLanChatEvent: callback => { chatCallback = callback; return chatRegistration.promise; } },
+      lanChat: { onEvent: callback => { chatCallback = callback; return chatRegistration.promise; } },
       off: async token => { removed.push(token); },
     } },
     '@/api/webDocument.js': { getWebDocumentIdentity: () => ({ role }) },
@@ -160,7 +160,7 @@ test('late project and LAN callbacks are fenced while native registration is pen
   app.chat({ text: 'queued native event' });
   app.project({ path: 'D:/retired', archive_session: 'old' });
   app.projectRegistration.resolve(-7);
-  app.chatRegistration.resolve(9);
+  app.chatRegistration.resolve(() => app.removed.push(9));
   await new Promise(resolve => setImmediate(resolve));
   assert.deepEqual(app.chats, []);
   assert.deepEqual(app.removed.sort((left, right) => left - right), [-7, 9]);

@@ -38,3 +38,36 @@ test('LANChat uses named bindings with direct replies and structured metadata', 
     globalThis.window = previous;
   }
 });
+
+
+test('LANChat event subscription returns the native disposer without manifest discovery', () => {
+  const previous = globalThis.window;
+  const seen = [];
+  const event = { event: 'message', metadata: { disclosure: { stage: '中文' } } };
+  let callback;
+  const stop = () => { callback = undefined; };
+  globalThis.window = { corona: { lanChat: { onEvent(receive) { callback = receive; return stop; } },
+    editor: { invoke() { throw Error('No event manifest lookup'); }, on() { throw Error('No generic subscription'); } } } };
+  try {
+    assert.equal(editorApi.events.onLanChatEvent, undefined);
+    assert.equal(editorApi.lanChat.onEvent(value => seen.push(value)), stop);
+    callback(event);
+    assert.equal(seen[0], event);
+    stop(); stop();
+    assert.equal(callback, undefined);
+  } finally { globalThis.window = previous; }
+});
+
+test('LANChat metadata is shared object projection with no encoded fallback', async () => {
+  const module = await import('../../src/stores/lanchatDisclosure.js');
+  assert.equal(typeof module.messageMetadata, 'function');
+  const metadata = { disclosure: { stage: '中文' }, nested: [1, { flag: true }] };
+  const parse = JSON.parse;
+  JSON.parse = () => { throw Error('Encoded metadata transport is forbidden'); };
+  try {
+    assert.equal(module.messageMetadata({ metadata }), metadata);
+    assert.deepEqual(module.messageMetadata({ metadata_json: '{"stage":"retired"}' }), {});
+    assert.deepEqual(module.messageMetadata({ metadata: null }), {});
+    assert.equal(module.extractDisclosureFromMessage({ metadata }).stage, '中文');
+  } finally { JSON.parse = parse; }
+});

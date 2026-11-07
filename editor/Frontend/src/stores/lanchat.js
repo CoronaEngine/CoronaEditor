@@ -15,13 +15,14 @@ import {
   disclosureVisibleForRole,
   disclosureVisibleForRoom,
   extractDisclosureFromMessage,
+  messageMetadata,
 } from './lanchatDisclosure.js';
 
 // 连接状态机：idle（未进房）-> hosting/joined（在房）
 const ROLE = { NONE: 'none', HOST: 'host', GUEST: 'guest' };
 const LOCAL_SINGLE_PLAYER_PEER_ID = 'local-single-player';
 
-// 房主在房间内的显示昵称。必须与 C++ LANChat 快速通道保持一致；
+// 房主在房间内的显示昵称。必须与 C++ LANChat 领域保持一致；
 // 房主消息由 NetworkSystem 用该名盖章，前端据此判定 self（消息气泡右对齐）。
 const HOST_NICKNAME = '房主';
 
@@ -131,18 +132,6 @@ function messageSelf(msg, fallback = false) {
   return fallback;
 }
 
-function parseMetadata(msg = {}) {
-  if (msg.metadata && typeof msg.metadata === 'object') return msg.metadata;
-  const raw = msg.metadata_json || '';
-  if (!raw || typeof raw !== 'string') return {};
-  try {
-    const parsed = JSON.parse(raw);
-    return parsed && typeof parsed === 'object' ? parsed : {};
-  } catch (e) {
-    return {};
-  }
-}
-
 function upsertDisclosureFromMessage(message) {
   const disclosure = extractDisclosureFromMessage(message, state.room, state.role);
   if (!disclosure || !disclosure.public_message) return;
@@ -247,8 +236,7 @@ function normalizeMessage(msg, self = false) {
     target_agent_id: msg.target_agent_id || '',
     source_user_id: msg.source_user_id || '',
     correlation_id: msg.correlation_id || '',
-    metadata_json: msg.metadata_json || '',
-    metadata: parseMetadata(msg),
+    metadata: messageMetadata(msg),
     self: messageSelf(msg, self),
   };
 }

@@ -311,7 +311,6 @@ const editorApiStatic = {
     onNetworkAssetImportCompleted: (callback) => register_manifest_editor_api_callback('events.onNetworkAssetImportCompleted', callback),
     onNetworkFileSyncStatusChanged: (callback) => register_manifest_editor_api_callback('events.onNetworkFileSyncStatusChanged', callback),
     onNetworkSyncPauseRequested: (callback) => register_manifest_editor_api_callback('events.onNetworkSyncPauseRequested', callback),
-    onLanChatEvent: (callback) => register_manifest_editor_api_callback('events.onLanChatEvent', callback),
   },
   app: {
     closeProcess: () => call_manifest_editor_api('app.closeProcess', []),
@@ -325,6 +324,7 @@ const editorApiStatic = {
     openFile: request => window.corona.files.openFile(request),
   },
   lanChat: {
+    onEvent: callback => window.corona.lanChat.onEvent(callback),
     startRoom: payload => window.corona.lanChat.startRoom(payload),
     startLocalRoom: payload => window.corona.lanChat.startLocalRoom(payload),
     stopRoom: () => window.corona.lanChat.stopRoom(),
@@ -452,6 +452,6 @@ export const editorApi = editorApiStatic;
 
 // 快捷访问
 // LAN transport belongs to C++ NetworkSystem; Web calls native V8 contracts.
-// LANChat 主事件由 C++ Editor API registry 定义为 LANChat.event。
+// LANChat events use the named V8 subscription and its native disposer.
 
 // End of manifest-backed editor API definitions.
