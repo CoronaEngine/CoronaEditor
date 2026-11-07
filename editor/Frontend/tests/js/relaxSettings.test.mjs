@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { setImmediate } from 'node:timers';
 import { effectScope, reactive } from 'vue';
 import { relaxDefaults, validateRelaxSettings, useRelaxSettings } from '../../src/utils/relaxSettings.js';
 
@@ -13,12 +14,12 @@ function fixture(api = {}) {
     setRelaxSettings: async (...args) => { sent.push(args); return { settings: args[2], pending: true }; },
     readCameraRenderSettings: async (...args) => {
       const result = await (api.getRelaxSettings || (async () => ({ settings: { diffuse_history: 18, anti_firefly: false } })))(args[0], args[1]);
-      return result?.data ?? result;
+      return result;
     },
     setCameraRenderSettings: async (...args) => {
       if (!api.setRelaxSettings) sent.push([args[0], args[1], args[2].settings]);
       const result = await (api.setRelaxSettings || (async () => ({ settings: args[2].settings, pending: true })))(args[0], args[1], args[2].settings);
-      return result?.data ?? result;
+      return result;
     },
     ...api,
   }));
@@ -53,11 +54,11 @@ test('rejects invalid and inconsistent input before sending changes', async t =>
   assert.equal(f.sent.length, 0);
 });
 
-test('unwraps native CEF responses when loading and applying parameters', async t => {
+test('consumes direct V8 responses when loading and applying parameters', async t => {
   const f = fixture({
-    getRelaxSettings: async () => ({ success: true, data: { settings: { diffuse_history: 22, roughness_relaxation: 0.5,
-      lobe_fraction: 0.15000000596046448, depth_threshold: 0.019999999552965164 } } }),
-    setRelaxSettings: async () => ({ success: true, data: { settings: { diffuse_history: 20 }, pending: true } }),
+    getRelaxSettings: async () => ({ settings: { diffuse_history: 22, roughness_relaxation: 0.5,
+      lobe_fraction: 0.15000000596046448, depth_threshold: 0.019999999552965164 } }),
+    setRelaxSettings: async () => ({ settings: { diffuse_history: 20 }, pending: true }),
   });
   t.after(f.stop);
   f.state.open.value = true; await settle();

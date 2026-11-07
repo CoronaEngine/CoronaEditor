@@ -2984,15 +2984,9 @@ async function refreshSceneActorOptions({ rescan = false } = {}) {
     if (response?.success === false || response?.status === 'error') {
       throw new Error(response?.message || 'Actor tree query failed');
     }
-    const payload = response?.data ?? response?.result ?? response;
-    const hasActorContainer = Array.isArray(payload) || (
-      payload
-      && typeof payload === 'object'
-      && ['actors', 'data', 'result', 'children', 'items'].some((field) => field in payload)
-    );
-    if (!hasActorContainer) throw new Error('Actor tree response has no actor list');
+    if (!Array.isArray(response.actors)) throw new Error('Actor tree response has no actor list');
     const actorsByName = new Map();
-    actorRecordsFromSceneTree(payload).forEach((actor) => {
+    actorRecordsFromSceneTree(response.actors).forEach((actor) => {
       actorsByName.set(actorContextNameKey(actor.name), actor);
     });
     if (props.actorName) {

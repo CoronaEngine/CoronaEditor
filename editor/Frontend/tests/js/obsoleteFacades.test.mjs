@@ -10,6 +10,19 @@ const retired = ['sceneService', 'fileService', 'projectService', 'projectSettin
 const sources = fs.readdirSync(sourceRoot, { recursive: true })
   .filter(file => /\.(js|vue)$/.test(file));
 
+test('migrated native consumers do not accept retired data envelopes', () => {
+  for (const file of [
+    'views/tools/CameraView.vue', 'views/layout/MainPage.vue', 'views/sidebar/Object.vue',
+    'views/sidebar/SceneBar.vue', 'views/sidebar/EditorSettings.vue',
+    'components/ui/ModelNodeHierarchy.vue', 'blockly/components/NodeGraphWorkspace.vue',
+    'utils/ptSettings.js', 'utils/restirSettings.js', 'utils/reblurSettings.js', 'utils/relaxSettings.js',
+    'services/editorWindowSession.js', 'services/nativePanelHosts.js', 'services/worldRenderPolicy.js',
+  ]) {
+    assert.doesNotMatch(fs.readFileSync(path.join(sourceRoot, file), 'utf8'),
+      /\?\.data\s*\?\?|\?\.data\?\.tab_id/, file);
+  }
+});
+
 test('generic discovery and Bridge exports are retired', () => {
   assert.equal(apiModule.Bridge, undefined);
   assert.equal(apiModule.editorApiTransportLimits, undefined);

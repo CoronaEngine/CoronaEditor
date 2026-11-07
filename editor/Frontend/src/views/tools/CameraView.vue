@@ -273,8 +273,6 @@ const viewportUiModeItems = [
   { mode: 'stereo3d', label: '3D UI', title: '光场屏立体 UI' },
 ];
 
-const unwrap = (result) => result?.data ?? result;
-
 const loadCamera = async () => {
   if (!cameraArchiveSession || !viewLifetime.current()) return false;
   const [listResult, visionResult] = await Promise.all([
@@ -282,12 +280,12 @@ const loadCamera = async () => {
     editorApi.scene.isVisionAvailable(),
   ]);
   if (!viewLifetime.current() || listResult.archive_session !== cameraArchiveSession || listResult.scene !== sceneId) return false;
-  const payload = unwrap(listResult);
+  const payload = listResult;
   camera.value = payload?.cameras?.find(
     (item) => String(item.camera_id || item.id) === cameraId,
   );
   if (!camera.value) throw new Error(`Camera ${cameraId} was not found`);
-  visionAvailable.value = !!unwrap(visionResult)?.available;
+  visionAvailable.value = !!visionResult?.available;
   cameraName.value = camera.value.name;
   backend.value = camera.value.render_backend || 'native';
   visionAccumulation.value = visionAccumulationFromCamera(camera.value);
@@ -324,9 +322,9 @@ const loadCamera = async () => {
 const renameCamera = async () => {
   if (!camera.value || !cameraName.value.trim() || cameraName.value === camera.value.name) return;
   try {
-    const result = unwrap(await editorApi.scene.renameCamera(sceneId, cameraId, cameraName.value.trim(), {
+    const result = await editorApi.scene.renameCamera(sceneId, cameraId, cameraName.value.trim(), {
       archive_session: cameraArchiveSession,
-    }));
+    });
     Object.assign(camera.value, result);
     cameraName.value = result.name;
   } catch (error) {
@@ -337,14 +335,14 @@ const renameCamera = async () => {
 
 const changeBackend = async () => {
   try {
-    const result = unwrap(await editorApi.scene.setCameraRenderSettings(sceneId, cameraId, {
+    const result = await editorApi.scene.setCameraRenderSettings(sceneId, cameraId, {
       archive_session: cameraArchiveSession,
       render_backend: backend.value,
       ...(backend.value === 'vision' ? {
         output_mode: 'final_color',
         vision: { render_mode: visionRenderMode.value },
       } : {}),
-    }));
+    });
     backend.value = result.render_backend;
     if (backend.value === 'vision') {
       outputMode.value = 'final_color';
@@ -368,12 +366,12 @@ const selectVisionRenderMode = async (mode) => {
   visionModeMenuOpen.value = false;
   if (visionRenderMode.value === mode && backend.value === 'vision') return;
   try {
-    const result = unwrap(await editorApi.scene.setCameraRenderSettings(sceneId, cameraId, {
+    const result = await editorApi.scene.setCameraRenderSettings(sceneId, cameraId, {
       archive_session: cameraArchiveSession,
       render_backend: 'vision',
       output_mode: 'final_color',
       vision: { render_mode: mode },
-    }));
+    });
     visionRenderMode.value = result?.pending ? mode : result?.vision?.render_mode || mode;
     backend.value = result?.render_backend || 'vision';
     if (camera.value) {
@@ -395,10 +393,10 @@ const toggleVisionAccumulation = async () => {
   visionAccumulation.value = next;
   errorText.value = '';
   try {
-    const result = unwrap(await editorApi.scene.setCameraRenderSettings(sceneId, cameraId, {
+    const result = await editorApi.scene.setCameraRenderSettings(sceneId, cameraId, {
       archive_session: cameraArchiveSession,
       vision: { accumulation: next },
-    }));
+    });
     visionAccumulation.value = result?.pending || typeof result?.vision?.accumulation !== 'boolean'
       ? next : result.vision.accumulation;
     if (camera.value) camera.value.vision_accumulation = visionAccumulation.value;
@@ -422,10 +420,10 @@ const toggleVisionDenoise = async () => {
   visionDenoise.value = next;
   errorText.value = '';
   try {
-    const result = unwrap(await editorApi.scene.setCameraRenderSettings(sceneId, cameraId, {
+    const result = await editorApi.scene.setCameraRenderSettings(sceneId, cameraId, {
       archive_session: cameraArchiveSession,
       vision: { denoise: next },
-    }));
+    });
     visionDenoise.value = result?.pending || typeof result?.vision?.denoise !== 'boolean'
       ? next : result.vision.denoise;
     if (camera.value) camera.value.vision_denoise = visionDenoise.value;
@@ -452,10 +450,10 @@ const selectVisionDenoiser = async (type) => {
   visionDenoiser.value = type;
   errorText.value = '';
   try {
-    const result = unwrap(await editorApi.scene.setCameraRenderSettings(sceneId, cameraId, {
+    const result = await editorApi.scene.setCameraRenderSettings(sceneId, cameraId, {
       archive_session: cameraArchiveSession,
       vision: { denoiser: type },
-    }));
+    });
     if (isCurrent()) {
       if (!result?.pending && result?.vision?.denoiser) selection.type = result.vision.denoiser;
       visionDenoiser.value = selection.type;
@@ -487,10 +485,10 @@ const toggleVisionStablePlanes = async () => {
   visionStablePlanes.value = selection.enabled;
   errorText.value = '';
   try {
-    const result = unwrap(await editorApi.scene.setCameraRenderSettings(sceneId, cameraId, {
+    const result = await editorApi.scene.setCameraRenderSettings(sceneId, cameraId, {
       archive_session: cameraArchiveSession,
       vision: { stable_planes: selection.enabled },
-    }));
+    });
     if (isCurrent()) {
       selection.enabled = result?.pending || typeof result?.vision?.stable_planes !== 'boolean'
         ? selection.enabled : result.vision.stable_planes;
@@ -694,14 +692,14 @@ const saveSettings = async () => {
   try {
     const width = Math.max(Number(renderWidth.value) || 960, 64);
     const height = Math.max(Number(renderHeight.value) || 540, 64);
-    const result = unwrap(await editorApi.scene.setCameraProperties(sceneId, cameraId, {
+    const result = await editorApi.scene.setCameraProperties(sceneId, cameraId, {
       archive_session: camera.value?.archive_session,
       move_speed: Math.max(Number(moveSpeed.value) || 1, 0.01),
       width,
       height,
       view_width: width,
       view_height: height,
-    }));
+    });
     Object.assign(camera.value, result.camera);
     renderWidth.value = result.camera.width || width;
     renderHeight.value = result.camera.height || height;
@@ -732,14 +730,14 @@ const syncWindowSize = async (force = false) => {
   renderWidth.value = width;
   renderHeight.value = height;
   try {
-    const result = unwrap(await editorApi.scene.setCameraProperties(sceneId, cameraId, {
+    const result = await editorApi.scene.setCameraProperties(sceneId, cameraId, {
       archive_session: camera.value?.archive_session,
       width,
       height,
       view_width: width,
       view_height: height,
       move_speed: Math.max(Number(moveSpeed.value) || 1, 0.01),
-    }));
+    });
     Object.assign(camera.value, result.camera);
   } catch (error) {
     errorText.value = error.message;

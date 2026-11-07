@@ -1,8 +1,8 @@
 /**
  * Canonical application/Dock service for Vue callers.
  *
- * The manifest transport remains owned by `src/api/editorApi.js`; this service
- * only assembles Dock/window commands and application lifecycle operations.
+ * This service assembles Web-owned Dock sessions and uses named V8 window
+ * bindings for native window operations.
  */
 
 import { editorApi } from '../api/editorApi.js';

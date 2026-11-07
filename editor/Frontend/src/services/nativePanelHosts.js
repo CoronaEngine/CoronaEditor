@@ -31,7 +31,7 @@ export function createNativePanelHosts({ open, close, focus = async () => {}, on
           return;
         }
         const result = await open(panel);
-        const tabId = result?.tab_id ?? result?.data?.tab_id;
+        const tabId = result?.tab_id;
         if (!Number.isInteger(tabId)) throw new Error(`Missing tab_id for ${id}`);
         host.tabId = tabId;
         if (disposed || !host.wanted) {

@@ -63,6 +63,13 @@ test('a rejected Vision selection does not bind a Native viewport as successful 
   assert.match(host.creativeRenderDefaultsError.value, /Vision/);
 });
 
+test('a retired render envelope cannot report a successful viewport initialization', async () => {
+  const { host } = creative({ reply: () => ({ data: { render_backend: 'vision' } }) });
+  assert.equal(await host.initializeCreativeRenderMode(), false);
+  assert.equal(host.bindings, 0);
+  assert.match(host.creativeRenderDefaultsError.value, /Vision/);
+});
+
 test('stale world selection cannot start or finish rendering initialization', async () => {
   let current = false, calls = 0, resolve;
   const api = { scene: { setCameraRenderSettings: () => {

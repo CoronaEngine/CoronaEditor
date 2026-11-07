@@ -140,7 +140,6 @@ const selectedNode = computed(
 );
 
 const pageKey = (parentIndex) => String(parentIndex);
-const responseData = (result) => result?.data ?? result ?? {};
 const rowKey = (row) =>
   row.kind === 'more' ? `more-${row.parentKey}` : `node-${row.node.node_index}`;
 const isSelected = (node) =>
@@ -158,10 +157,10 @@ const persistNodePatch = (node, patch) => {
     if (identity.archive_session !== archiveSession.value || identity.scene !== props.sceneName || identity.actor_guid !== actorGuid.value) {
       throw new Error('Model node edit belongs to an inactive Actor');
     }
-    const data = responseData(await editorApi.scene.setModelNodeState({
+    const data = await editorApi.scene.setModelNodeState({
       ...identity,
       expected_actor_version: actorVersion.value,
-    }, patch));
+    }, patch);
     actorVersion.value = Number(data.actor_version || actorVersion.value);
     return data;
   });
@@ -177,15 +176,13 @@ const loadPage = async (parentIndex, offset = 0) => {
   pages.value = { ...pages.value, [key]: { ...(pages.value[key] || {}), loading: true } };
   loading.value = true;
   try {
-    const data = responseData(
-      await editorApi.scene.readModelNodes(props.sceneName, {
-        archive_session: archiveSession.value,
-        actor_guid: actorGuid.value,
-        parent_index: parentIndex,
-        offset,
-        limit: pageSize,
-      })
-    );
+    const data = await editorApi.scene.readModelNodes(props.sceneName, {
+      archive_session: archiveSession.value,
+      actor_guid: actorGuid.value,
+      parent_index: parentIndex,
+      offset,
+      limit: pageSize,
+    });
     if (token !== request) return null;
     const previous = pages.value[key]?.items || [];
     const incoming = Array.isArray(data.nodes) ? data.nodes : [];

@@ -27,9 +27,25 @@ test('world teardown closes a browser whose create reply arrives late', async ()
   hosts.reconcile([{ id: 'FileManager' }]);
   await tick();
   hosts.dispose();
-  reply({ data: { tab_id: 19 } });
+  reply({ tab_id: 19 });
   await tick();
   assert.deepEqual(closed, [[19, 'FileManager']]);
+});
+
+test('a retired envelope cannot focus or register a native panel', async () => {
+  const errors = [], focused = [];
+  const hosts = createNativePanelHosts({
+    open: async () => ({ data: { tab_id: 19 } }), close: async () => {},
+    focus: async id => focused.push(id), onError: error => errors.push(error),
+  });
+  hosts.reconcile([{ id: 'FileManager' }]);
+  await tick();
+  assert.equal(await hosts.focusPanel('FileManager'), false);
+  assert.equal(hosts.closed('FileManager', 19), false);
+  assert.deepEqual(focused, []);
+  assert.equal(errors.length, 1);
+  assert.match(errors[0].message, /Missing tab_id/);
+  hosts.dispose();
 });
 test('an old close event cannot close a replacement panel', async () => {
   let id = 0;

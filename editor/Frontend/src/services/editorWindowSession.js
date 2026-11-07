@@ -1,7 +1,6 @@
 /** Web-owned window sessions. Native Dock remains a mode-agnostic transport. */
 import { isSecondaryWebDocument } from '../api/webDocument.js';
 const uniqueId = () => `${Date.now()}_${Math.random().toString(36).slice(2)}`;
-const unwrap = value => value?.data ?? value;
 
 export function createEditorWindowSession({ state, send, publish, getWorld, getQuery, owner = uniqueId(),
   activities = { begin: () => null, end: () => {}, drain: async () => {} },
@@ -135,7 +134,7 @@ export function createEditorWindowSession({ state, send, publish, getWorld, getQ
     const request = { ...command };
     if (record.kind !== 'operation') request.routePath = taggedRoute(command.routePath, current.generation, id, current.owner);
     const finish = async result => {
-      record.tabId = unwrap(result)?.tab_id;
+      record.tabId = result?.tab_id;
       record.status = 'settling';
       if (record.kind !== 'operation') await save(record);
       if (record.kind === 'operation') {

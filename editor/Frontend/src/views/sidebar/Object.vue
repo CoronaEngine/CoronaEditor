@@ -393,7 +393,6 @@ const actor = reactive({
   },
 });
 
-const unwrap = (value) => value?.data ?? value ?? {};
 const aliasDirty = computed(() => aliasDraft.value.trim() !== actor.name);
 const normalizeBodyType = (value) => {
   const candidate = String(value ?? '').trim().toLowerCase();
@@ -631,11 +630,9 @@ async function setRenderSpace(enabled) {
 async function selectModelFile() {
   if (!selectedActorName.value) return;
   try {
-    const raw = await editorApi.scene.selectModelFile(
+    const path = await editorApi.scene.selectModelFile(
       selectedSceneName.value, 'model', { archive_session: archiveSession.value },
     );
-    const payload = unwrap(raw);
-    const path = typeof payload === 'string' ? payload : payload?.path || payload?.data || '';
     if (path) actor.modelPath = String(path);
   } catch (error) {
     logError('选择模型资源失败', error);
@@ -646,22 +643,15 @@ async function rebindPlaceholderResource() {
   if (!selectedActorName.value || !actor.actorGuid || placeholderRebinding.value) return;
   placeholderRebinding.value = true;
   try {
-    const selected = unwrap(
-      await editorApi.scene.selectModelFile(
-        selectedSceneName.value, 'model', { archive_session: archiveSession.value },
-      )
+    const path = await editorApi.scene.selectModelFile(
+      selectedSceneName.value, 'model', { archive_session: archiveSession.value },
     );
-    const path = typeof selected === 'string'
-      ? selected
-      : selected?.path || selected?.data || '';
     if (!path) return;
-    const result = unwrap(
-      await editorApi.scene.rebindActorResource(
-        selectedSceneName.value,
-        actor.actorGuid,
-        path,
-        { archive_session: archiveSession.value }
-      )
+    const result = await editorApi.scene.rebindActorResource(
+      selectedSceneName.value,
+      actor.actorGuid,
+      path,
+      { archive_session: archiveSession.value }
     );
     if (!result || result.status === 'error' || result.ok === false) {
       throw new Error(result?.message || '重新绑定资源失败');

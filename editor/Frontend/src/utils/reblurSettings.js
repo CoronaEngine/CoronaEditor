@@ -57,7 +57,7 @@ export function useReblurSettings(props, api) {
     try {
       const result = await api.readCameraRenderSettings(props.sceneId, props.cameraId,
         { archive_session: props.archiveSession, family: 'reblur' });
-      const response = result?.data ?? result;
+      const response = result;
       if (token !== generation) return;
       if (response?.status === 'error') throw new Error(response.message || '读取参数失败');
       draft.value = { ...reblurDefaults, ...response.settings };
@@ -86,7 +86,7 @@ export function useReblurSettings(props, api) {
     try {
       const result = await api.setCameraRenderSettings(props.sceneId, props.cameraId,
         { archive_session: props.archiveSession, family: 'reblur', settings });
-      const response = result?.data ?? result;
+      const response = result;
       if (token !== generation) return false;
       if (response?.status === 'error') throw new Error(response.message || '应用参数失败');
       draft.value = { ...settings, ...response.settings };

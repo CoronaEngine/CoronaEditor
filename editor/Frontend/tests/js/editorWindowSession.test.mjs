@@ -76,6 +76,13 @@ const panel = { cmd: 'createPanelTab', panelId: 'Object', routePath: '/Object' }
 const camera = { cmd: 'createCameraView', sceneId: 'scene.ini', cameraId: 'camera1', archiveSession: 'archive',
   routePath: '/CameraView?scene=scene.ini&camera=camera1' };
 
+test('window sessions reject retired envelope replies instead of recording a ready tab', async () => {
+  const h = harness({ send: async command => command.cmd.startsWith('create') ? { data: { tab_id: 9 } } : {} });
+  await h.main.prepare(true);
+  await assert.rejects(h.main.open(panel), /tab_id/);
+  assert.equal(h.main.policy().records.some(record => record.status === 'ready'), false);
+});
+
 test('main policy is Web-owned; standalone windows inherit immutable session tokens', async () => {
   const h = harness();
   await h.main.prepare(true);

@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { setImmediate } from 'node:timers';
 import { effectScope, reactive } from 'vue';
 import { reblurDefaults, validateReblurSettings, useReblurSettings } from '../../src/utils/reblurSettings.js';
 
@@ -13,12 +14,12 @@ function fixture(api = {}) {
     setReblurSettings: async (...args) => { sent.push(args); return { settings: args[2], pending: true }; },
     readCameraRenderSettings: async (...args) => {
       const result = await (api.getReblurSettings || (async () => ({ settings: { max_history: 18, anti_firefly: false } })))(args[0], args[1]);
-      return result?.data ?? result;
+      return result;
     },
     setCameraRenderSettings: async (...args) => {
       if (!api.setReblurSettings) sent.push([args[0], args[1], args[2].settings]);
       const result = await (api.setReblurSettings || (async () => ({ settings: args[2].settings, pending: true })))(args[0], args[1], args[2].settings);
-      return result?.data ?? result;
+      return result;
     },
     ...api,
   }));
@@ -52,11 +53,11 @@ test('rejects invalid and inconsistent input before sending changes', async t =>
   assert.equal(f.sent.length, 0);
 });
 
-test('unwraps native CEF responses when loading and applying parameters', async t => {
+test('consumes direct V8 responses when loading and applying parameters', async t => {
   const f = fixture({
-    getReblurSettings: async () => ({ success: true, data: { settings: { max_history: 22, stabilization: 0.5,
-      lobe_fraction: 0.15000000596046448, plane_sensitivity: 0.019999999552965164 } } }),
-    setReblurSettings: async () => ({ success: true, data: { settings: { max_history: 20 }, pending: true } }),
+    getReblurSettings: async () => ({ settings: { max_history: 22, stabilization: 0.5,
+      lobe_fraction: 0.15000000596046448, plane_sensitivity: 0.019999999552965164 } }),
+    setReblurSettings: async () => ({ settings: { max_history: 20 }, pending: true }),
   });
   t.after(f.stop);
   f.state.open.value = true; await settle();

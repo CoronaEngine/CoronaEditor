@@ -22,7 +22,6 @@ import { worldModeState } from './worldModeService.js';
 import policy from './aiPolicy.json' with { type: 'json' };
 
 const jobs = new Map();
-const unwrap = (value) => value?.data ?? value;
 const keyFor = (path) => path.replaceAll('\\', '/').replace(/\/+$/, '').toLowerCase();
 function assertJob(job) {
   projectIdentity({ projectPath: job.project });

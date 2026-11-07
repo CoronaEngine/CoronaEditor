@@ -87,10 +87,10 @@ function mountCreative(t, { native = true } = {}) {
     invalidate: () => { current = false; }, refreshes: () => refreshes };
 }
 
-test('creative binds native snapshots with a string scene route and optional envelopes', t => {
+test('creative binds native snapshots with a string scene route', t => {
   const h = mountCreative(t), p = h.page;
   const native = { ...snapshot(25, [1, 2, 3]), scene: 'Scene/default.scene' };
-  for (const payload of [native, { data: native }, { scene: native }, { data: { scene: native } }]) {
+  for (const payload of [native]) {
     p.applySceneSnapshot(native.scene, payload); h.step(0);
     assert.equal(p.cameraBindingState.value.cameraHandle, 25);
     assert.equal(p.cameraBindingState.value.sceneId, native.scene);
@@ -99,6 +99,17 @@ test('creative binds native snapshots with a string scene route and optional env
       archive_session: 'host-archive', position: [1, 2, 3], forward: [0, 0, 1], world_up: [0, 1, 0], fov: 60,
     }]);
   }
+});
+
+test('retired snapshot envelopes cannot bind or move the main camera', t => {
+  const h = mountCreative(t), p = h.page;
+  const native = { ...snapshot(25, [1, 2, 3]), scene: 'Scene/default.scene' };
+  h.calls.length = 0;
+  for (const payload of [{ data: native }, { scene: native }, { data: { scene: native } }]) {
+    p.applySceneSnapshot(native.scene, payload); h.step(0);
+    assert.equal(p.cameraBindingState.value.cameraHandle, null);
+  }
+  assert.deepEqual(h.calls, []);
 });
 
 test('creative host keeps controls and analytics while forwarding only scoped mouse input', t => {
@@ -148,7 +159,7 @@ test('creative host rebinding, focus loss and invalidation cancel old movement',
 test('creative same-binding refresh preserves input, but invalid rebinding clears the old handle', t => {
   const h = mountCreative(t), p = h.page; h.step(0);
   p.handleKeyDown(input({ code: 'KeyW', key: 'w' }));
-  p.applySceneSnapshot('scene.ini', { data: snapshot(12, [9, 9, 9]) }, { preservePose: true });
+  p.applySceneSnapshot('scene.ini', snapshot(12, [9, 9, 9]), { preservePose: true });
   assert.equal(p.cameraControls.isInputActive(), true);
   assert.deepEqual(p.cameraState.value.position, [0, 0, 0]);
   h.step(50);

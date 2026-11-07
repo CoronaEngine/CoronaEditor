@@ -867,10 +867,10 @@ const selectMainRenderMode = async (mode) => {
         expiresAt: Date.now() + 3000,
       };
       mainRenderBackend.value = 'native';
-      const result = unwrapBridgeData(await editorApi.scene.setCameraRenderSettings(sceneId, cameraId, {
+      const result = await editorApi.scene.setCameraRenderSettings(sceneId, cameraId, {
         archive_session: cameraBindingState.value.archiveSession,
         render_backend: 'native',
-      }));
+      });
       mainRenderBackend.value = result?.render_backend || 'native';
       await syncSceneCameraBinding(sceneId);
       return true;
@@ -886,12 +886,12 @@ const selectMainRenderMode = async (mode) => {
     mainRenderBackend.value = 'vision';
     mainVisionRenderMode.value = mode;
 
-    const result = unwrapBridgeData(await editorApi.scene.setCameraRenderSettings(sceneId, cameraId, {
+    const result = await editorApi.scene.setCameraRenderSettings(sceneId, cameraId, {
       archive_session: cameraBindingState.value.archiveSession,
       render_backend: 'vision',
       output_mode: 'final_color',
       vision: { render_mode: mode },
-    }));
+    });
     mainVisionRenderMode.value = result?.pending ? mode : result?.vision?.render_mode || mode;
     mainRenderBackend.value = result?.render_backend || 'native';
     if (mainRenderBackend.value !== 'vision') {
@@ -923,10 +923,10 @@ const toggleMainVisionAccumulation = async () => {
   mainVisionAccumulation.value = selection.enabled;
   mainVisionAccumulationError.value = '';
   try {
-    const result = unwrapBridgeData(await editorApi.scene.setCameraRenderSettings(sceneId, cameraId, {
+    const result = await editorApi.scene.setCameraRenderSettings(sceneId, cameraId, {
       archive_session: cameraBindingState.value.archiveSession,
       vision: { accumulation: selection.enabled },
-    }));
+    });
     if (isCurrent()) {
       selection.enabled = result?.pending || typeof result?.vision?.accumulation !== 'boolean'
         ? selection.enabled : result.vision.accumulation;
@@ -962,12 +962,10 @@ const toggleMainVisionDenoise = async () => {
   mainVisionDenoise.value = selection.enabled;
   mainVisionDenoiseError.value = '';
   try {
-    const result = unwrapBridgeData(
-      await editorApi.scene.setCameraRenderSettings(sceneId, cameraId, {
-        archive_session: cameraBindingState.value.archiveSession,
-        vision: { denoise: selection.enabled },
-      }),
-    );
+    const result = await editorApi.scene.setCameraRenderSettings(sceneId, cameraId, {
+      archive_session: cameraBindingState.value.archiveSession,
+      vision: { denoise: selection.enabled },
+    });
     if (isCurrent()) {
       selection.enabled = result?.pending || typeof result?.vision?.denoise !== 'boolean'
         ? selection.enabled : result.vision.denoise;
@@ -1004,12 +1002,10 @@ const selectMainVisionDenoiser = async (type) => {
   mainVisionDenoiser.value = type;
   mainVisionDenoiserError.value = '';
   try {
-    const result = unwrapBridgeData(
-      await editorApi.scene.setCameraRenderSettings(sceneId, cameraId, {
-        archive_session: cameraBindingState.value.archiveSession,
-        vision: { denoiser: type },
-      }),
-    );
+    const result = await editorApi.scene.setCameraRenderSettings(sceneId, cameraId, {
+      archive_session: cameraBindingState.value.archiveSession,
+      vision: { denoiser: type },
+    });
     if (isCurrent()) {
       if (!result?.pending && result?.vision?.denoiser) selection.type = result.vision.denoiser;
       mainVisionDenoiser.value = selection.type;
@@ -1044,12 +1040,10 @@ const toggleMainVisionStablePlanes = async () => {
   mainVisionStablePlanes.value = selection.enabled;
   mainVisionStablePlanesError.value = '';
   try {
-    const result = unwrapBridgeData(
-      await editorApi.scene.setCameraRenderSettings(sceneId, cameraId, {
-        archive_session: cameraBindingState.value.archiveSession,
-        vision: { stable_planes: selection.enabled },
-      }),
-    );
+    const result = await editorApi.scene.setCameraRenderSettings(sceneId, cameraId, {
+      archive_session: cameraBindingState.value.archiveSession,
+      vision: { stable_planes: selection.enabled },
+    });
     if (isCurrent()) {
       selection.enabled = result?.pending || typeof result?.vision?.stable_planes !== 'boolean'
         ? selection.enabled : result.vision.stable_planes;
@@ -1085,10 +1079,7 @@ const sceneGridEnabledFromSnapshot = (snapshot = {}) => {
 };
 
 const applySceneSnapshot = (sceneId, payload, { preservePose = false } = {}) => {
-  // Native snapshots use `scene` for the route, not a nested snapshot.
-  const data = payload?.data ?? payload;
-  const snapshot = data?.scene && typeof data.scene === 'object' && !Array.isArray(data.scene)
-    ? data.scene : data;
+  const snapshot = payload;
   if (!snapshot || typeof snapshot !== 'object' || Array.isArray(snapshot)) {
     resetRealtimeCameraInput();
     currentMainCamera.value = null;
@@ -1744,8 +1735,6 @@ const loadPhysicsParams = async () => {
     return false;
   }
 };
-
-const unwrapBridgeData = (result) => result?.data ?? result;
 
 const stopProjectResourceLoadPolling = () => {
   if (projectResourceLoadPollTimer !== null) {

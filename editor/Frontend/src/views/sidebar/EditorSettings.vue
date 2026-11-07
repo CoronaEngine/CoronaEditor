@@ -325,7 +325,7 @@ function normalizeAiKeyStatus(payload) {
 async function loadAiKeyStatus() {
   try {
     const response = await aiSettings.get();
-    const data = response?.data ?? response;
+    const data = response;
     aiKeyStatus.value = normalizeAiKeyStatus(data);
     if (!aiKeyEditing.value) {
       aiKeyInput.value = aiKeyStatus.value.configured
@@ -359,7 +359,7 @@ async function saveAiKey() {
   aiKeyMessage.value = '';
   try {
     const response = await aiSettings.saveApiKey(key);
-    const data = response?.data ?? response;
+    const data = response;
     aiKeyStatus.value = normalizeAiKeyStatus(data);
     aiKeyEditing.value = false;
     aiKeyInput.value = aiKeyStatus.value.configured

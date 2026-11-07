@@ -760,7 +760,7 @@ const RebindActorResource = async (scene) => {
     const selected = await editorApi.scene.selectModelFile(
       currentSceneName.value, 'model', { archive_session: archiveSession.value },
     );
-    const path = selected?.data ?? selected;
+    const path = selected;
     if (!path) return;
     const result = await editorApi.scene.rebindActorResource(
       currentSceneName.value,
@@ -768,7 +768,7 @@ const RebindActorResource = async (scene) => {
       path,
       { archive_session: archiveSession.value }
     );
-    const rebound = result?.data ?? result;
+    const rebound = result;
     if (!rebound?.ok) {
       const message = rebound?.diagnostics?.[0]?.message || '资源重新绑定失败';
       window.alert(message);
