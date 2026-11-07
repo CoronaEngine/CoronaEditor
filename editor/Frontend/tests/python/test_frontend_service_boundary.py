@@ -8,7 +8,6 @@ COMPAT_ROOT = FRONTEND_ROOT / "src" / "compat"
 EXPECTED_SERVICES = (
     "appService.js",
     "lanChatService.js",
-    "networkService.js",
     "aiService.js",
     "cabbageChatRequest.js",
     "projectLauncherService.js",
@@ -54,7 +53,6 @@ def test_canonical_services_delegate_to_editor_api():
 
     for service_name in (
         "lanChatService.js",
-        "networkService.js",
         "projectLauncherService.js",
     ):
         source = (SERVICES_ROOT / service_name).read_text(encoding="utf-8")

@@ -225,7 +225,6 @@
 import { onMounted, onUnmounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { editorApi } from '@/api/editorApi.js';
-import { networkService } from '@/services/networkService.js';
 import { projectLauncherService, isProjectOpenSuperseded } from '@/services/projectLauncherService.js';
 
 const router = useRouter();
@@ -275,9 +274,9 @@ const runBusy = async (message, work) => {
 
 const stopExistingSession = async () => {
   try {
-    const info = await networkService.getSessionInfo();
+    const info = await editorApi.network.getSessionInfo();
     if (info?.active) {
-      await networkService.stopSession();
+      await editorApi.network.stopSession();
     }
   } catch (_) {
     // 没有会话或读取失败时，后续 startSession 会给出明确错误。
@@ -298,7 +297,7 @@ const prepareMultiplayerProject = async (role) => {
     throw new Error('打开联机存档失败');
   }
 
-  const rootResult = await networkService.setProjectRoot(project.path);
+  const rootResult = await editorApi.network.setProjectRoot(project.path);
   if (rootResult?.ok === false) {
     throw new Error(rootResult.error || '设置联机项目目录失败');
   }
@@ -307,7 +306,7 @@ const prepareMultiplayerProject = async (role) => {
 
 const startSession = async (role, port, instanceName = playerName()) => {
   busyText.value = role === 'host' ? '正在创建房间…' : '正在启动本地客户端…';
-  const result = await networkService.startSession(instanceName, 0, port, role);
+  const result = await editorApi.network.startSession(instanceName, 0, port, role);
   if (!result?.ok) {
     throw new Error(result?.error || '启动联机会话失败');
   }
@@ -318,11 +317,11 @@ const startSession = async (role, port, instanceName = playerName()) => {
 const handleRefresh = () => {
   if (scanning.value) return;
   scanning.value = true;
-  networkService.clearDiscoveredPeers()
+  editorApi.network.clearDiscoveredPeers()
     .catch(() => {})
-    .then(() => networkService.searchLan())
+    .then(() => editorApi.network.searchLan())
     .then(() => new Promise((resolve) => setTimeout(resolve, 1500)))
-    .then(() => networkService.getDiscoveredPeers())
+    .then(() => editorApi.network.getDiscoveredPeers())
     .then((result) => {
       const peers = Array.isArray(result?.peers) ? result.peers : [];
       rooms.value = peers
@@ -349,7 +348,7 @@ const joinHost = async ({ ip, port, peerName = '' }) => {
     await startSession('client', port);
 
     busyText.value = '正在连接房主…';
-    const result = await networkService.connectToPeer(ip, port, peerName || playerName());
+    const result = await editorApi.network.connectToPeer(ip, port, peerName || playerName());
     if (!result?.ok) {
       throw new Error(result?.error || '连接房主失败');
     }

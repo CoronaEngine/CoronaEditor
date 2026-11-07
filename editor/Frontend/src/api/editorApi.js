@@ -341,16 +341,14 @@ const editorApiStatic = {
   },
   network: {
     startSession: (instanceName, projectId, port = 27960, role = 'host') =>
-      call_manifest_editor_api('network.startSession', [instanceName, projectId, port, role]),
-    stopSession: () => call_manifest_editor_api('network.stopSession', []),
-    getSessionInfo: () => call_manifest_editor_api('network.getSessionInfo', []),
-    getDiscoveredPeers: () => call_manifest_editor_api('network.getDiscoveredPeers', []),
-    clearDiscoveredPeers: () => call_manifest_editor_api('network.clearDiscoveredPeers', []),
-    searchLan: () => call_manifest_editor_api('network.searchLan', []),
-    connectToPeer: (ip, port, peerName) =>
-      call_manifest_editor_api('network.connectToPeer', [ip, port, peerName]),
-    setProjectRoot: (projectRoot) =>
-      call_manifest_editor_api('network.setProjectRoot', [projectRoot]),
+      window.corona.network.startSession(instanceName, projectId, port, role),
+    stopSession: () => window.corona.network.stopSession(),
+    getSessionInfo: () => window.corona.network.getSessionInfo(),
+    getDiscoveredPeers: () => window.corona.network.getDiscoveredPeers(),
+    clearDiscoveredPeers: () => window.corona.network.clearDiscoveredPeers(),
+    searchLan: () => window.corona.network.searchLan(),
+    connectToPeer: (ip, port, peerName) => window.corona.network.connectToPeer(ip, port, peerName),
+    setProjectRoot: (projectRoot) => window.corona.network.setProjectRoot(projectRoot),
   },
   project: {
     createMultiplayerProject: request => window.corona.project.createMultiplayerProject(request),

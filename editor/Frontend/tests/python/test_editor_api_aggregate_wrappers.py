@@ -19,7 +19,6 @@ class EditorApiAggregateWrapperTests(unittest.TestCase):
         for name in (
             "appService",
             "lanChatService",
-            "networkService",
             "aiService",
             "projectLauncherService",
         ):

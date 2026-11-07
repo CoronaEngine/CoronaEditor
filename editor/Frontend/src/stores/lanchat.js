@@ -11,7 +11,7 @@
 import { reactive, readonly } from 'vue';
 import { trackWorldSessionWork } from '../services/worldSessionLifecycle.js';
 import { lanChatService } from '../services/lanChatService.js';
-import { networkService } from '../services/networkService.js';
+import { editorApi } from '../api/editorApi.js';
 import {
   disclosureVisibleForRole,
   disclosureVisibleForRoom,
@@ -341,7 +341,7 @@ async function resolveRoomDisplayAddress(roomResponse = {}) {
   if (responseIp) return responseIp;
 
   try {
-    const info = await networkService.getSessionInfo();
+    const info = await editorApi.network.getSessionInfo();
     const localIp = String(info?.local_ip || '').trim();
     if (localIp) return localIp;
   } catch (_) {
