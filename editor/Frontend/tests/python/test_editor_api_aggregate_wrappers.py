@@ -9,9 +9,10 @@ class EditorApiAggregateWrapperTests(unittest.TestCase):
             encoding="utf-8"
         )
 
-    def test_manifest_contract_has_a_single_frontend_owner(self):
-        self.assertIn("export class Bridge", self.api_source)
-        self.assertIn("window.corona.editor.invoke", self.api_source)
+    def test_web_uses_named_bindings_without_a_manifest_owner(self):
+        self.assertNotIn("export class Bridge", self.api_source)
+        self.assertNotIn("window.corona.editor", self.api_source)
+        self.assertNotIn("call_manifest_editor_api", self.api_source)
         self.assertFalse((self.source_root / "utils" / "bridge.js").exists())
         self.assertFalse((self.source_root / "compat").exists())
 

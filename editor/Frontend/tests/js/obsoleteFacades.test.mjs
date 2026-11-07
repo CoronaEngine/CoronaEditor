@@ -3,11 +3,25 @@ import fs from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
 import { editorApi } from '../../src/api/editorApi.js';
+import * as apiModule from '../../src/api/editorApi.js';
 
 const sourceRoot = path.resolve(import.meta.dirname, '../../src');
 const retired = ['sceneService', 'fileService', 'projectService', 'projectSettingsService', 'scriptingService', 'networkService', 'lanChatService'];
 const sources = fs.readdirSync(sourceRoot, { recursive: true })
   .filter(file => /\.(js|vue)$/.test(file));
+
+test('generic discovery and Bridge exports are retired', () => {
+  assert.equal(apiModule.Bridge, undefined);
+  assert.equal(apiModule.editorApiTransportLimits, undefined);
+  assert.equal(editorApi.listMethods, undefined);
+  assert.equal(editorApi.listEvents, undefined);
+});
+
+test('scene listener cleanup never falls back to a native callback token', async () => {
+  const previous = globalThis.window;
+  globalThis.window = { corona: new Proxy({}, { get() { throw Error('native cleanup forbidden'); } }) };
+  try { await editorApi.off(42); } finally { globalThis.window = previous; }
+});
 
 test('unused Network event wrappers cannot acquire Web consumers', () => {
   assert.equal(editorApi.events, undefined);

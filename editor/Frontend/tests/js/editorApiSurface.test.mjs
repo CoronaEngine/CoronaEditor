@@ -42,9 +42,9 @@ test('unknown and retired capabilities are absent without mutating the API surfa
   assert.deepEqual(Object.keys(editorApi.scene), before);
 });
 
-test('generic callback and manifest discovery aliases are not exposed twice', () => {
+test('generic native callback and manifest discovery are absent', () => {
   assert.equal(editorApi.editor, undefined);
   assert.equal(typeof editorApi.off, 'function');
-  assert.equal(typeof editorApi.listMethods, 'function');
-  assert.equal(typeof editorApi.listEvents, 'function');
+  assert.equal(editorApi.listMethods, undefined);
+  assert.equal(editorApi.listEvents, undefined);
 });

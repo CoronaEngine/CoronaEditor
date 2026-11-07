@@ -7,61 +7,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-// Mirrors the shape of the C++ Editor API manifest closely enough for the JS validator:
-// every entry needs `allowed_callers` to include the CEF caller bit (1).
-const CALLER_CEF = 1;
-
-const MANIFEST_METHODS = [
-  {
-    api: 'SceneTools.get_model_nodes',
-    js_wrapper: 'sceneTools.getModelNodes',
-    params: [{ name: 'scene_name', type: 'string' }, { name: 'actor_name', type: 'string' },
-      { name: 'parent_index', type: 'integer', optional: true }, { name: 'offset', type: 'integer', optional: true },
-      { name: 'limit', type: 'integer', optional: true }],
-    return: 'object', allowed_callers: CALLER_CEF,
-  },
-  {
-    api: 'SceneTools.set_model_node_state',
-    js_wrapper: 'sceneTools.setModelNodeState',
-    params: [{ name: 'scene_name', type: 'string' }, { name: 'actor_name', type: 'string' },
-      { name: 'node_index', type: 'integer' }, { name: 'state', type: 'object' }],
-    return: 'object', allowed_callers: CALLER_CEF,
-  },
-  { api: 'EditorApi.list_methods', params: [], return: 'object', allowed_callers: CALLER_CEF },
-  { api: 'EditorApi.list_events', params: [], return: 'object', allowed_callers: CALLER_CEF },
-  {
-    api: 'EditorApi.register_callback',
-    params: [
-      { name: 'event', type: 'string' },
-      { name: 'spec', type: 'object', optional: true },
-    ],
-    return: 'object',
-    allowed_callers: CALLER_CEF,
-  },
-  {
-    api: 'EditorApi.unregister_callback',
-    params: [{ name: 'token', type: 'integer' }],
-    return: 'object',
-    allowed_callers: CALLER_CEF,
-  },
-
-];
-
-const MANIFEST_EVENTS = [
-  {
-    event: 'LANChat.event',
-    js_wrapper: 'events.onLanChatEvent',
-    payload: 'object',
-    allowed_callers: CALLER_CEF,
-  },
-  {
-    event: 'Test.extension', js_wrapper: 'events.onExtension',
-    payload: 'object', allowed_callers: CALLER_CEF,
-  },
-];
-
 function createFakeCefHost() {
-  const failFor = new Set();
   const hangFor = new Set();
   const requests = [];
   const pending = new Map();
@@ -69,7 +15,6 @@ function createFakeCefHost() {
 
   return {
     requests,
-    failFor,
     hangFor,
     pending,
     callbacks,
@@ -104,38 +49,6 @@ function createFakeCefHost() {
           return Promise.resolve({ archive_session: args[2].archive_session, scene: args[0], camera_id: args[1] });
         },
       },
-      editor: {
-        invoke(api, args) {
-          const payload = { api, args };
-          requests.push(payload);
-          if (hangFor.has(api)) {
-            return new Promise((resolve, reject) => pending.set(api, { resolve, reject }));
-          }
-          if (failFor.has(api)) {
-            return Promise.reject(Object.assign(new Error(`${api} refused by native`), { code: '-2' }));
-          }
-          if (api === 'EditorApi.list_methods') {
-            return Promise.resolve({ status: 'success', data: { methods: MANIFEST_METHODS } });
-          }
-          if (api === 'EditorApi.list_events') {
-            return Promise.resolve({ status: 'success', data: { events: MANIFEST_EVENTS } });
-          }
-          return Promise.resolve({ status: 'success', data: {} });
-        },
-        on(event, callback) {
-          callbacks.set(42, { event, callback });
-          requests.push({ api: 'EditorApi.on', args: [event] });
-          return Promise.resolve(42);
-        },
-        off(token) {
-          requests.push({ api: 'EditorApi.off', args: [token] });
-          callbacks.delete(token);
-          if (failFor.has('EditorApi.off')) {
-            return Promise.reject(Object.assign(new Error('EditorApi.off refused by native'), { code: '-2' }));
-          }
-          return Promise.resolve(true);
-        },
-      },
     },
     emit(token, payload, event) {
       callbacks.get(token)?.callback(payload, event);
@@ -148,7 +61,7 @@ async function loadEditorApi() {
   const host = createFakeCefHost();
   globalThis.window = host;
   const module = await import(`../../src/api/editorApi.js?fresh=${Date.now()}${Math.random()}`);
-  return { editorApi: module.editorApi, host, limits: module.editorApiTransportLimits };
+  return { editorApi: module.editorApi, host };
 }
 
 test('retired log subscription is absent before and after loading native events', async () => {
@@ -209,18 +122,6 @@ test('editor API calls pass structured values through the typed V8 binding', asy
   assert.equal(host.cefQuery, undefined);
 });
 
-// Runs `body` with a short transport wait so timeout behaviour is exercised without
-// making the suite wait for the production 30s limit.
-async function withShortTimeout(limits, body) {
-  const original = limits.responseTimeoutMs;
-  limits.responseTimeoutMs = 20;
-  try {
-    return await body();
-  } finally {
-    limits.responseTimeoutMs = original;
-  }
-}
-
 test('LANChat direct subscription needs no manifest and releases its native callback', async () => {
   const { editorApi, host } = await loadEditorApi();
   const seen = [];
@@ -234,48 +135,6 @@ test('LANChat direct subscription needs no manifest and releases its native call
   assert.deepEqual(host.requests, [{ api: 'corona.lanChat.onEvent' }]);
 });
 
-test('a request with no native reply must fail with a diagnosable timeout', async () => {
-  const { editorApi, host, limits } = await loadEditorApi();
-
-  await withShortTimeout(limits, async () => {
-    host.hangFor.add('EditorApi.list_methods');
-
-    await assert.rejects(
-      () => editorApi.listMethods(),
-      (error) => {
-        assert.equal(error.code, 'EDITOR_API_TIMEOUT');
-        assert.match(error.message, /EditorApi\.list_methods/);
-        // The native side may still be working; the message must not claim it was cancelled.
-        assert.match(error.message, /may still be in progress/i);
-        return true;
-      }
-    );
-  });
-});
-
-test('a reply that arrives within the limit must still resolve', async () => {
-  const { editorApi, limits } = await loadEditorApi();
-
-  await withShortTimeout(limits, async () => {
-    const response = await editorApi.listMethods();
-    assert.ok(response, 'a prompt native reply must resolve normally');
-  });
-});
-
-test('a late native reply after a timeout must be ignored', async () => {
-  const { editorApi, host, limits } = await loadEditorApi();
-
-  await withShortTimeout(limits, async () => {
-    host.hangFor.add('EditorApi.list_methods');
-    await assert.rejects(() => editorApi.listMethods());
-
-    // The native handler finally answers. This must neither throw nor try to settle twice.
-    const late = host.pending.get('EditorApi.list_methods');
-    assert.ok(late, 'the fake host must have captured the hung request');
-    assert.doesNotThrow(() => late.resolve({ status: 'success', data: { methods: MANIFEST_METHODS } }));
-  });
-});
-
 const PICKER_CASES = [
   {
     api: 'corona.project.openProjectFile',
@@ -287,66 +146,58 @@ const PICKER_CASES = [
 
 for (const picker of PICKER_CASES) {
   for (const result of ['selected', 'canceled']) {
-    test(`${picker.api} accepts a ${result} result after the ordinary RPC deadline`, async () => {
-      const { editorApi, host, limits } = await loadEditorApi();
+    test(`${picker.api} accepts a ${result} result after waiting for user selection`, async () => {
+      const { editorApi, host } = await loadEditorApi();
 
-      await withShortTimeout(limits, async () => {
-        host.hangFor.add(picker.api);
-        // Observe rejection immediately so the old timeout produces an assertion failure,
-        // not an unhandled rejection before the simulated user finishes the dialog.
-        const outcome = picker.invoke(editorApi).then(
-          (value) => ({ value }), (error) => ({ error }),
-        );
-        await new Promise((resolve) => setTimeout(resolve, 60));
+      host.hangFor.add(picker.api);
+      // Observe rejection immediately so the old timeout produces an assertion failure,
+      // not an unhandled rejection before the simulated user finishes the dialog.
+      const outcome = picker.invoke(editorApi).then(
+        (value) => ({ value }), (error) => ({ error }),
+      );
+      await new Promise((resolve) => setTimeout(resolve, 60));
 
-        const response = picker[result];
-        host.pending.get(picker.api).resolve(response);
-        const actual = await outcome;
-        assert.ifError(actual.error);
-        assert.deepEqual(actual.value, response);
-        assert.deepEqual(host.requests, [{ api: picker.api, args: [] }]);
-      });
+      const response = picker[result];
+      host.pending.get(picker.api).resolve(response);
+      const actual = await outcome;
+      assert.ifError(actual.error);
+      assert.deepEqual(actual.value, response);
+      assert.deepEqual(host.requests, [{ api: picker.api, args: [] }]);
     });
   }
 }
 
-test('a picker still rejects a native error after waiting past the ordinary RPC deadline', async () => {
-  const { editorApi, host, limits } = await loadEditorApi();
+test('a picker still rejects a native error after waiting for user selection', async () => {
+  const { editorApi, host } = await loadEditorApi();
 
-  await withShortTimeout(limits, async () => {
-    host.hangFor.add('corona.project.openProjectFile');
-    const outcome = editorApi.project.openProjectFile().then(
-      (value) => ({ value }), (error) => ({ error }),
-    );
-    await new Promise((resolve) => setTimeout(resolve, 60));
+  host.hangFor.add('corona.project.openProjectFile');
+  const outcome = editorApi.project.openProjectFile().then(
+    (value) => ({ value }), (error) => ({ error }),
+  );
+  await new Promise((resolve) => setTimeout(resolve, 60));
 
-    host.pending.get('corona.project.openProjectFile').reject(
-      Object.assign(new Error('dialog unavailable'), { code: '-2' }),
-    );
-    const actual = await outcome;
-    assert.match(actual.error.message, /dialog unavailable/);
-  });
+  host.pending.get('corona.project.openProjectFile').reject(
+    Object.assign(new Error('dialog unavailable'), { code: '-2' }),
+  );
+  const actual = await outcome;
+  assert.match(actual.error.message, /dialog unavailable/);
 });
 
-test('a native project open remains pending past the ordinary manifest deadline', async () => {
-  const { editorApi, host, limits } = await loadEditorApi();
-  await withShortTimeout(limits, async () => {
-    host.hangFor.add('corona.project.openProject');
-    const outcome = editorApi.project.openProject('C:/Projects/World', { load_policy: 'degraded' })
-      .then(value => ({ value }), error => ({ error }));
-    await new Promise(resolve => setTimeout(resolve, 60));
-    const reply = { ok: false, status: 'decision_required', diagnostics: [{ code: 'RESOURCE_NOT_FOUND' }] };
-    host.pending.get('corona.project.openProject').resolve(reply);
-    const actual = await outcome;
-    assert.ifError(actual.error);
-    assert.equal(actual.value, reply);
-    assert.deepEqual(host.requests, [{ api: 'corona.project.openProject',
-      args: ['C:/Projects/World', { load_policy: 'degraded' }] }]);
-  });
+test('a native project open remains pending until its native owner replies', async () => {
+  const { editorApi, host } = await loadEditorApi();
+  host.hangFor.add('corona.project.openProject');
+  const outcome = editorApi.project.openProject('C:/Projects/World', { load_policy: 'degraded' })
+    .then(value => ({ value }), error => ({ error }));
+  await new Promise(resolve => setTimeout(resolve, 60));
+  const reply = { ok: false, status: 'decision_required', diagnostics: [{ code: 'RESOURCE_NOT_FOUND' }] };
+  host.pending.get('corona.project.openProject').resolve(reply);
+  const actual = await outcome;
+  assert.ifError(actual.error);
+  assert.equal(actual.value, reply);
+  assert.deepEqual(host.requests, [{ api: 'corona.project.openProject',
+    args: ['C:/Projects/World', { load_policy: 'degraded' }] }]);
 });
 
-// Characterization tests for wrapper -> manifest resolution. These pin behaviour so the
-// lookup can be refactored (reverse map instead of a linear scan per call) without risk.
 test('camera render settings use one scoped V8 patch and expose no legacy Web setters', async () => {
   const { editorApi, host } = await loadEditorApi();
 
