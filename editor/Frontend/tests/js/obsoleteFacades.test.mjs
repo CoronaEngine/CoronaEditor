@@ -9,6 +9,25 @@ const retired = ['sceneService', 'fileService', 'projectService', 'projectSettin
 const sources = fs.readdirSync(sourceRoot, { recursive: true })
   .filter(file => /\.(js|vue)$/.test(file));
 
+test('unused project launch operations have no Web facade or production consumer', () => {
+  for (const method of ['browseFolder', 'getDefaultProjectPath', 'createProject',
+    'validatePortableScene', 'importPortableAsset', 'cleanupPortableSceneAssets']) {
+    assert.equal(editorApi.project[method], undefined, method);
+    for (const file of sources) {
+      assert.doesNotMatch(fs.readFileSync(path.join(sourceRoot, file), 'utf8'),
+        new RegExp(`\\b${method}\\b`), `${method}: ${file}`);
+    }
+  }
+});
+
+test('project launcher service keeps orchestration without duplicate forwarding methods', () => {
+  const source = fs.readFileSync(path.join(sourceRoot, 'services/projectLauncherService.js'), 'utf8');
+  for (const method of ['getAppVersion', 'getRecentProjects', 'getProjectLoadStatus',
+    'openProjectFile', 'createWorldProject', 'createMultiplayerProject']) {
+    assert.doesNotMatch(source, new RegExp(`^  ${method}:`, 'm'), method);
+  }
+});
+
 test('unused resource search web namespace is absent and has no production consumers', () => {
   assert.equal(editorApi.resourceSearch, undefined);
   for (const file of sources) {

@@ -286,8 +286,7 @@ const stopExistingSession = async () => {
 
 const prepareMultiplayerProject = async (role) => {
   busyText.value = '正在准备联机存档…';
-  const result = await editorApi.project.createMultiplayerProject({ role });
-  const project = result?.data ?? result;
+  const project = await editorApi.project.createMultiplayerProject({ role });
   if (!project?.path) {
     throw new Error('创建联机存档失败');
   }

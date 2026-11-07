@@ -11,27 +11,10 @@ let editorApiEventSpecs = null;
 let editorApiEventSpecsByWrapper = null;
 let editorApiEventManifestPromise = null;
 const EDITOR_API_CALLER_CEF = 1;
-// Native pickers wait for a user decision, which has no RPC execution deadline.
-const INTERACTIVE_FILE_PICKER_APIS = new Set([
-  'ProjectLauncher.open_project_file',
-  'ProjectLauncher.browse_folder',
-]);
 
 // How long a non-interactive manifest-backed request waits for a native reply before failing.
 // Exposed so an embedding host can tune it without reaching into module internals; native CEF
 // calls have no built-in deadline, so an unanswered non-interactive request would hang forever.
-async function scopedAssetPayload(payload = {}) {
-  if (payload?.archive_session) return payload;
-  const state = await editorApi.scene.readActive();
-  if (!state?.archive_session || state.read_only) throw new Error('没有可写的活动项目');
-  return { ...payload, archive_session: state.archive_session };
-}
-
-async function callProjectAssetOperation(wrapper, payload = {}, args = []) {
-  return call_manifest_editor_api(wrapper, [...args, await scopedAssetPayload(payload)]);
-}
-
-
 export const editorApiTransportLimits = {
   responseTimeoutMs: 30_000,
 };
@@ -235,9 +218,7 @@ const call_editor_api = async (apiName, args) => {
   const spec = await Bridge.validateEditorApiArgs(apiName, normalizedArgs);
   const invoke = Promise.resolve().then(() => window.corona.editor.invoke(apiName, normalizedArgs));
   let timer;
-  const response = INTERACTIVE_FILE_PICKER_APIS.has(apiName)
-    ? await invoke
-    : await Promise.race([
+  const response = await Promise.race([
         invoke,
         new Promise((_, reject) => {
           timer = setTimeout(() => {
@@ -422,27 +403,14 @@ const editorApiStatic = {
       call_manifest_editor_api('network.claimActorOwnership', [actorGuid]),
   },
   project: {
-    browseFolder: (defaultPath = '') =>
-      call_manifest_editor_api('project.browseFolder', defaultPath ? [defaultPath] : []),
-    createMultiplayerProject: (projectData) =>
-      call_manifest_editor_api('project.createMultiplayerProject', [projectData || {}]),
-    createProject: (projectData) =>
-      call_manifest_editor_api('project.createProject', [projectData || {}]),
-    createWorldProject: (worldData) =>
-      call_manifest_editor_api('project.createWorldProject', [worldData || {}]),
-    validatePortableScene: (payload) =>
-      call_manifest_editor_api('project.validatePortableScene', [payload || {}]),
-    importPortableAsset: (payload) =>
-      callProjectAssetOperation('project.importPortableAsset', payload),
-    cleanupPortableSceneAssets: (payload) =>
-      callProjectAssetOperation('project.cleanupPortableSceneAssets', payload),
-    getAppVersion: () => call_manifest_editor_api('project.getAppVersion', []),
-    getDefaultProjectPath: () => call_manifest_editor_api('project.getDefaultProjectPath', []),
-    getProjectLoadStatus: () => call_manifest_editor_api('project.getProjectLoadStatus', []),
-    getRecentProjects: () => call_manifest_editor_api('project.getRecentProjects', []),
+    createMultiplayerProject: request => window.corona.project.createMultiplayerProject(request),
+    createWorldProject: request => window.corona.project.createWorldProject(request),
+    getAppVersion: () => window.corona.project.getAppVersion(),
+    getProjectLoadStatus: () => window.corona.project.getProjectLoadStatus(),
+    getRecentProjects: () => window.corona.project.getRecentProjects(),
     openProject: (projectPath, options = {}) =>
       call_manifest_editor_api('project.openProject', [projectPath, options]),
-    openProjectFile: () => call_manifest_editor_api('project.openProjectFile', []),
+    openProjectFile: () => window.corona.project.openProjectFile(),
   },
   audio: {
     playResource: (resourceId, loop = false) => window.corona.audio.playResource(resourceId, loop),

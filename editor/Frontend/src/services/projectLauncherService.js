@@ -65,17 +65,6 @@ export async function stopWorldRuntimeBeforeOpen(api = editorApi) {
 }
 
 export const projectLauncherService = {
-  getDefaultProjectPath: () => editorApi.project.getDefaultProjectPath(),
-  browseFolder: (default_path) => editorApi.project.browseFolder(default_path),
-  validatePortableScene: (payload = {}) => editorApi.project.validatePortableScene(payload),
-  importPortableAsset: (payload = {}) => editorApi.project.importPortableAsset(payload),
-  cleanupPortableSceneAssets: (payload = {}) =>
-    editorApi.project.cleanupPortableSceneAssets(payload),
-  openProjectFile: () => editorApi.project.openProjectFile(),
-  createProject: (projectData) => editorApi.project.createProject(projectData),
-  createWorldProject: (worldData) => editorApi.project.createWorldProject(worldData),
-  createMultiplayerProject: (projectData) =>
-    editorApi.project.createMultiplayerProject(projectData),
   openProject: (projectPath, options = {}) => {
     // Selection ownership starts at submission, NOT when the native queue runs.
     const selection = ++selectionVersion;
@@ -121,7 +110,4 @@ export const projectLauncherService = {
     projectOpenQueue = operation;
     return operation;
   },
-  getAppVersion: () => editorApi.project.getAppVersion(),
-  getProjectLoadStatus: () => editorApi.project.getProjectLoadStatus(),
-  getRecentProjects: () => editorApi.project.getRecentProjects(),
 };

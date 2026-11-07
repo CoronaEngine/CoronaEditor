@@ -2040,27 +2040,18 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
                 plain_macro = f"EDITOR_API_METHOD_SCHEMA({module}, {method}, {params_name}, {return_type})"
                 wrapped_macro = f"EDITOR_API_METHOD_SCHEMA_WRAPPED({module}, {method}, {params_name},"
                 self.assertTrue(
-                    plain_macro in source or wrapped_macro in source,
+                    plain_macro in source or wrapped_macro in source
+                    or f"EDITOR_API_METHOD_SCHEMA_WRAPPED_CALLERS({module}, {method}, {params_name}," in source,
                     f"{api_name} should define an explicit C++ method schema",
                 )
 
-    def test_project_launcher_apis_use_frontend_typed_wrappers(self):
-        bridge_source = self._frontend_bridge_source()
-
-        for snippet in (
-            "getDefaultProjectPath: () => editorApi.project.getDefaultProjectPath()",
-            "browseFolder: (default_path) =>\n    editorApi.project.browseFolder",
-            "openProjectFile: () => editorApi.project.openProjectFile()",
-            "createProject: (projectData) =>\n    editorApi.project.createProject",
-            "createWorldProject: (worldData) =>\n    editorApi.project.createWorldProject",
-            "createMultiplayerProject: (projectData) =>\n    editorApi.project.createMultiplayerProject",
-            "getProjectLoadStatus: () => editorApi.project.getProjectLoadStatus()",
-            "openProject: (projectPath, options = {}) => {",
-            "const result = await editorApi.project.openProject(projectPath, { load_policy: loadPolicy })",
-            "getRecentProjects: () => editorApi.project.getRecentProjects()",
-        ):
-            with self.subTest(snippet=snippet):
-                self.assertIn(snippet, bridge_source)
+    def test_project_launcher_service_keeps_only_project_open_orchestration(self):
+        source = (self._repo_root() / "editor/Frontend/src/services/projectLauncherService.js").read_text(encoding="utf-8")
+        self.assertIn("openProject: (projectPath, options = {}) => {", source)
+        self.assertIn("const result = await editorApi.project.openProject(projectPath, { load_policy: loadPolicy })", source)
+        for method in ("getDefaultProjectPath", "browseFolder", "openProjectFile", "createProject",
+                       "createWorldProject", "createMultiplayerProject", "getProjectLoadStatus", "getRecentProjects"):
+            self.assertNotIn(f"  {method}:", source)
 
     def test_project_launcher_frontend_wrappers_are_manifest_driven(self):
         bridge_source = self._frontend_bridge_source()
@@ -2071,7 +2062,7 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
         project_section = bridge_source[start:end]
 
         self.assertIn("call_manifest_editor_api", bridge_source)
-        self.assertIn("call_manifest_editor_api('project.browseFolder'", project_section)
+        self.assertNotIn("browseFolder", project_section)
         self.assertIn("call_manifest_editor_api('project.openProject'", project_section)
         self.assertNotIn("ProjectLauncher.", project_section)
 
@@ -2817,10 +2808,10 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
         ).read_text(encoding="utf-8")
         self.assertIn("register_project_launcher_api_handlers(registry)", rpc_source)
         api_source = self._editor_api_source()
-        self.assertTrue(
-            "EDITOR_API_METHOD_SCHEMA(ProjectLauncher, browse_folder, kPathOptionalParam, EditorApiValueType::String)" in api_source
-            or "EDITOR_API_METHOD_SCHEMA_WRAPPED(ProjectLauncher, browse_folder, kPathOptionalParam, \"project.browseFolder\", \"project.browse_folder\", EditorApiValueType::String)" in api_source
-        )
+        declaration = next(line for line in api_source.splitlines() if 'ProjectLauncher, browse_folder,' in line)
+        self.assertIn('WRAPPED_CALLERS', declaration)
+        self.assertIn('all_callers() & ~caller_mask(EditorApiCaller::Cef)', declaration)
+        self.assertIn(', "", "project.browse_folder"', declaration)
         self.assertTrue(
             "EDITOR_API_METHOD_SCHEMA(ProjectLauncher, open_project_file, kNoParams, EditorApiValueType::Object)" in api_source
             or "EDITOR_API_METHOD_SCHEMA_WRAPPED(ProjectLauncher, open_project_file, kNoParams, \"project.openProjectFile\", \"project.open_project_file\", EditorApiValueType::Object)" in api_source
@@ -2829,10 +2820,10 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
             "EDITOR_API_METHOD_SCHEMA(ProjectLauncher, open_project, kOpenProjectParams, EditorApiValueType::Object)" in api_source
             or "EDITOR_API_METHOD_SCHEMA_WRAPPED(ProjectLauncher, open_project, kOpenProjectParams, \"project.openProject\", \"project.open_project\", EditorApiValueType::Object)" in api_source
         )
-        self.assertTrue(
-            "EDITOR_API_METHOD_SCHEMA(ProjectLauncher, create_project, kObjectPayloadParam, EditorApiValueType::String)" in api_source
-            or "EDITOR_API_METHOD_SCHEMA_WRAPPED(ProjectLauncher, create_project, kObjectPayloadParam, \"project.createProject\", \"project.create_project\", EditorApiValueType::String)" in api_source
-        )
+        declaration = next(line for line in api_source.splitlines() if 'ProjectLauncher, create_project,' in line)
+        self.assertIn('WRAPPED_CALLERS', declaration)
+        self.assertIn('all_callers() & ~caller_mask(EditorApiCaller::Cef)', declaration)
+        self.assertIn(', "", "project.create_project"', declaration)
 
 
 
@@ -3092,12 +3083,13 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
 
     def test_world_creation_always_writes_the_single_editable_world_type(self):
         handler_source = self._handler_source()
-        start = handler_source.index('{"create_world_project"')
-        end = handler_source.index('{"create_multiplayer_project"', start)
+        start = handler_source.index('NativeResult create_launcher_project(')
+        end = handler_source.index('ProjectLauncherReply execute_project_launcher_operation(', start)
         world_body = handler_source[start:end]
         self.assertNotIn('data.value("mode"', world_body)
         self.assertNotIn('world_type == "story"', world_body)
         self.assertIn('{"type", "creative"}', world_body)
+        self.assertIn('return create_launcher_project(arg_object(request.args, 0).value("prompt", std::string{}), "")', handler_source)
         self.assertIn(
             'update_editor_settings_section("General", {{"default_path", path_to_utf8(base_dir)}})',
             world_body,
@@ -3153,12 +3145,10 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
         ).read_text(encoding="utf-8")
 
         self.assertIn('{"get_project_load_status"', source)
-        self.assertTrue(
-            "EDITOR_API_METHOD_SCHEMA(ProjectLauncher, get_project_load_status, "
-            "kNoParams, EditorApiValueType::Object)" in api_source
-            or "EDITOR_API_METHOD_SCHEMA_WRAPPED(ProjectLauncher, get_project_load_status, kNoParams, \"project.getProjectLoadStatus\", \"project.get_project_load_status\", EditorApiValueType::Object)" in api_source
-        )
-        self.assertIn("getProjectLoadStatus: () =>", bridge_source)
+        declaration = next(line for line in api_source.splitlines() if 'ProjectLauncher, get_project_load_status,' in line)
+        self.assertIn('all_callers() & ~caller_mask(EditorApiCaller::Cef)', declaration)
+        self.assertIn(', "", "project.get_project_load_status"', declaration)
+        self.assertIn("getProjectLoadStatus: () => window.corona.project.getProjectLoadStatus()", bridge_source)
         self.assertIn("projectResourceLoadStatus", main_page)
         self.assertIn("pollProjectResourceLoadStatus", main_page)
 
@@ -3356,7 +3346,7 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
         self.assertIn("save_editor_scene(*scene, false, metadata)", source)
         self.assertIn("save_editor_scene(*scene, true)", source)
 
-    def test_portable_scene_validation_import_and_cleanup_apis_are_exposed(self):
+    def test_portable_scene_validation_import_and_cleanup_keep_non_web_contracts(self):
         repo_root = self._repo_root()
         api_source = (
             self._engine_root() / "src" / "systems" / "ui" / "editor_api" / "cef_editor_api.cpp"
@@ -3374,7 +3364,10 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
         ):
             self.assertIn(f"ProjectLauncher, {native_name}", api_source)
             self.assertIn(f'{{"{native_name}"', handler_source)
-            self.assertIn(wrapper, bridge_source)
+            declaration = next(line for line in api_source.splitlines() if f'ProjectLauncher, {native_name},' in line)
+            self.assertIn('all_callers() & ~caller_mask(EditorApiCaller::Cef)', declaration)
+            self.assertIn(f', "", "project.{native_name}"', declaration)
+            self.assertNotIn(wrapper, bridge_source)
 
     def test_duplicate_native_actor_check_happens_before_portable_asset_import(self):
         repo_root = self._repo_root()

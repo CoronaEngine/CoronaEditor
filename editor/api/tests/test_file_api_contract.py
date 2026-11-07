@@ -18,9 +18,8 @@ def test_file_manager_manifest_methods_have_the_files_adapter_wrappers():
         "open_file": ("files.openFile", "files.open_file"),
         "rename_item": ("files.renameItem", "files.rename_item"),
     }
-    for method, (js_wrapper, python_wrapper) in expected.items():
-        assert (
-            f'EDITOR_API_METHOD_SCHEMA_WRAPPED(FileManager, {method},' in source
-            and f'"{js_wrapper}"' in source
-            and f'"{python_wrapper}"' in source
-        ), method
+    for method, (_, python_wrapper) in expected.items():
+        line = next(line for line in source.splitlines() if f'(FileManager, {method},' in line)
+        assert 'WRAPPED_CALLERS(FileManager,' in line, method
+        assert f', "", "{python_wrapper}"' in line, method
+        assert 'all_callers() & ~caller_mask(EditorApiCaller::Cef)' in line, method

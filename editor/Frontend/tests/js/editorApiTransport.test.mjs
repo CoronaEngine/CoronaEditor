@@ -13,15 +13,6 @@ const CALLER_CEF = 1;
 
 const MANIFEST_METHODS = [
   {
-    api: 'ProjectLauncher.open_project_file', js_wrapper: 'project.openProjectFile',
-    params: [], return: 'object', allowed_callers: CALLER_CEF,
-  },
-  {
-    api: 'ProjectLauncher.browse_folder', js_wrapper: 'project.browseFolder',
-    params: [{ name: 'path', type: 'string', optional: true }],
-    return: 'string', allowed_callers: CALLER_CEF,
-  },
-  {
     api: 'ProjectLauncher.open_project', js_wrapper: 'project.openProject',
     params: [{ name: 'path', type: 'string' }, { name: 'options', type: 'object', optional: true }],
     return: 'object', allowed_callers: CALLER_CEF,
@@ -88,6 +79,13 @@ function createFakeCefHost() {
     pending,
     callbacks,
     corona: {
+      project: {
+        openProjectFile(...args) {
+          const api = 'corona.project.openProjectFile';
+          requests.push({ api, args });
+          return new Promise((resolve, reject) => pending.set(api, { resolve, reject }));
+        },
+      },
       scene: {
         readCameraRenderSettings(...args) {
           requests.push({ api: 'corona.scene.readCameraRenderSettings', args });
@@ -279,16 +277,10 @@ test('a late native reply after a timeout must be ignored', async () => {
 
 const PICKER_CASES = [
   {
-    api: 'ProjectLauncher.open_project_file',
+    api: 'corona.project.openProjectFile',
     invoke: (editorApi) => editorApi.project.openProjectFile(),
     selected: { name: 'Kitchen', path: 'C:/Projects/Kitchen/Kitchen.corona' },
     canceled: {},
-  },
-  {
-    api: 'ProjectLauncher.browse_folder',
-    invoke: (editorApi) => editorApi.project.browseFolder('C:/Projects'),
-    selected: 'C:/Projects/Kitchen',
-    canceled: '',
   },
 ];
 
@@ -306,11 +298,12 @@ for (const picker of PICKER_CASES) {
         );
         await new Promise((resolve) => setTimeout(resolve, 60));
 
-        const response = { status: 'success', data: picker[result] };
+        const response = picker[result];
         host.pending.get(picker.api).resolve(response);
         const actual = await outcome;
         assert.ifError(actual.error);
         assert.deepEqual(actual.value, response);
+        assert.deepEqual(host.requests, [{ api: picker.api, args: [] }]);
       });
     });
   }
@@ -320,13 +313,13 @@ test('a picker still rejects a native error after waiting past the ordinary RPC 
   const { editorApi, host, limits } = await loadEditorApi();
 
   await withShortTimeout(limits, async () => {
-    host.hangFor.add('ProjectLauncher.open_project_file');
+    host.hangFor.add('corona.project.openProjectFile');
     const outcome = editorApi.project.openProjectFile().then(
       (value) => ({ value }), (error) => ({ error }),
     );
     await new Promise((resolve) => setTimeout(resolve, 60));
 
-    host.pending.get('ProjectLauncher.open_project_file').reject(
+    host.pending.get('corona.project.openProjectFile').reject(
       Object.assign(new Error('dialog unavailable'), { code: '-2' }),
     );
     const actual = await outcome;

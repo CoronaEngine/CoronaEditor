@@ -104,11 +104,11 @@ let disposed = false;
 
 const refreshArchiveReady = async () => {
   try {
-    const response = await editorApi.project.getProjectLoadStatus();
-    const status = response?.data ?? response;
+    const status = await editorApi.project.getProjectLoadStatus();
+    if (disposed) return;
     archiveReady.value = status?.archive_service_ready === true;
   } catch {
-    archiveReady.value = false;
+    if (!disposed) archiveReady.value = false;
   }
 };
 
@@ -175,12 +175,8 @@ const handleCreate = async () => {
   creating.value = true;
   try {
     // 后端自动命名 + 存到引擎 data 目录，返回 { name, path }
-    const result = await editorApi.project.createWorldProject({
-      mode: 'creative',
-      prompt,
-    });
+    const info = await editorApi.project.createWorldProject({ prompt });
     if (disposed) return;
-    const info = result?.data ?? result;
 
     if (info && info.path) {
       const opened = await projectLauncherService.openProject(info.path, { newProject: true });

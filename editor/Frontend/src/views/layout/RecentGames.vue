@@ -95,6 +95,7 @@ import { ref, onMounted, onUnmounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { editorApi } from '@/api/editorApi.js';
 import { projectLauncherService, isProjectOpenSuperseded } from '@/services/projectLauncherService.js';
+import { createViewLifetime } from '@/utils/viewLifetime.js';
 
 const router = useRouter();
 
@@ -103,6 +104,20 @@ const recentProjects = ref([]);
 const selectedProject = ref(null);
 const archiveReady = ref(false);
 let archiveStatusTimer = null;
+const lifetime = createViewLifetime();
+let statusSequence = 0;
+
+const refreshArchiveReady = async () => {
+  if (!lifetime.current()) return;
+  const sequence = ++statusSequence;
+  const current = () => lifetime.current() && sequence === statusSequence;
+  try {
+    const status = await editorApi.project.getProjectLoadStatus();
+    if (current()) archiveReady.value = status?.archive_service_ready === true;
+  } catch {
+    if (current()) archiveReady.value = false;
+  }
+};
 
 const goBack = () => {
   router.push('/StartScreen');
@@ -111,26 +126,24 @@ const goBack = () => {
 onMounted(async () => {
   try {
     const version = await editorApi.project.getAppVersion();
-    if (version) appVersion.value = version.data;
+    if (!lifetime.current()) return;
+    if (version) appVersion.value = version;
 
     const saved = await editorApi.project.getRecentProjects();
-    if (saved) recentProjects.value = saved.data;
-
-    const refreshArchiveReady = async () => {
-      const response = await editorApi.project.getProjectLoadStatus();
-      const status = unwrapResponse(response);
-      archiveReady.value = status?.archive_service_ready === true;
-    };
+    if (!lifetime.current()) return;
+    if (saved) recentProjects.value = saved;
     await refreshArchiveReady();
+    if (!lifetime.current()) return;
     archiveStatusTimer = window.setInterval(refreshArchiveReady, 250);
   } catch (error) {
-    console.error('RecentGames 初始化失败:', error);
+    if (lifetime.current()) console.error('RecentGames 初始化失败:', error);
   }
 });
 
 const unwrapResponse = (response) => response?.data ?? response;
 
 onUnmounted(() => {
+  void lifetime.dispose();
   if (archiveStatusTimer !== null) {
     window.clearInterval(archiveStatusTimer);
   }
@@ -155,7 +168,7 @@ const openSelectedProject = () => {
 const handleOpenProject = async (path, project = null) => {
   try {
     let result = await projectLauncherService.openProject(path);
-    if (isProjectOpenSuperseded(result)) return;
+    if (!lifetime.current() || isProjectOpenSuperseded(result)) return;
     let opened = unwrapResponse(result);
     if (opened?.status === 'decision_required') {
       const details = archiveDiagnostics(opened);
@@ -164,7 +177,7 @@ const handleOpenProject = async (path, project = null) => {
       );
       if (!proceed) return;
       result = await projectLauncherService.openProject(path, { loadPolicy: 'degraded' });
-      if (isProjectOpenSuperseded(result)) return;
+      if (!lifetime.current() || isProjectOpenSuperseded(result)) return;
       opened = unwrapResponse(result);
     }
     if (opened?.status === 'invalid_archive') {
@@ -183,6 +196,7 @@ const handleOpenProject = async (path, project = null) => {
       router.push('/');
     }
   } catch (error) {
+    if (!lifetime.current()) return;
     console.error('打开项目失败:', error);
     await router.replace('/StartScreen');
     notifyWorldError(error);
@@ -192,11 +206,13 @@ const handleOpenProject = async (path, project = null) => {
 const handleImport = async () => {
   try {
     const result = await editorApi.project.openProjectFile();
-    if (result?.data?.path) {
-      const path = result.data.path;
+    if (!lifetime.current()) return;
+    if (result?.path) {
+      const path = result.path;
       await handleOpenProject(path);
     }
   } catch (error) {
+    if (!lifetime.current()) return;
     console.error('打开现有项目失败:', error);
     notifyWorldError(error);
   }

@@ -115,7 +115,6 @@ import { appService, isCurrentWindowEvent } from '@/services/appService.js';
 import { viewportControlsService } from '@/services/viewportControlsService.js';
 import { worldModeState } from '@/services/worldModeService.js';
 import { initializeWorldRenderBackend } from '@/services/worldRenderPolicy.js';
-import { projectLauncherService } from '@/services/projectLauncherService.js';
 import { useErrorHandler } from '@/composables/useErrorHandler.js';
 import { useDockStore } from '@/stores/dockStore.js';
 import { PLUGIN_MANIFEST } from '@/config/pluginManifest.js';
@@ -1759,9 +1758,7 @@ const pollProjectResourceLoadStatus = async () => {
   if (!viewCurrent()) return;
   stopProjectResourceLoadPolling();
   try {
-    const status = unwrapBridgeData(
-      await editorApi.project.getProjectLoadStatus(),
-    );
+    const status = await editorApi.project.getProjectLoadStatus();
     if (!viewCurrent()) return;
     projectResourceLoadStatus.value = status?.active ? status : null;
     if (status?.loading) {

@@ -59,11 +59,11 @@ async function mountCreationPage(t, { stopResult = idle(), wrapped = true } = {}
     worldMode.worldModeService.invalidate();
   });
   t.mock.method(console, 'error', () => {});
-  t.mock.method(editorApi.project, 'getProjectLoadStatus', async () => wrap({ archive_service_ready: true }));
+  t.mock.method(editorApi.project, 'getProjectLoadStatus', async () => ({ archive_service_ready: true }));
   t.mock.method(editorApi.projectSettings, 'getActiveProjectInfo', async () => ({ project_path: activePath, mode: 'creative' }));
   t.mock.method(editorApi.project, 'createWorldProject', async payload => {
     calls.push(['create', payload]);
-    return wrap({ name: `创造世界_${++sequence}`, path: `creative-world-${sequence}` });
+    return { name: `创造世界_${++sequence}`, path: `creative-world-${sequence}` };
   });
   t.mock.method(editorApi.scripts, 'getStatus', async () => ({ runId: 'current', snapshotCaptured: true }));
   t.mock.method(editorApi.scripts, 'stop', async (id, restore) => {
@@ -133,7 +133,7 @@ test('creation keeps the old world on real failures and the button can retry', a
       const h = await mountCreationPage(t, { stopResult });
       await h.page.handleCreate();
       assert.deepEqual(h.calls, [
-        ['create', { mode: 'creative', prompt: '' }], ['script', true], ['replace', '/StartScreen'],
+        ['create', { prompt: '' }], ['script', true], ['replace', '/StartScreen'],
       ]);
       assert.equal(h.activePath(), 'creative-world');
       assert.equal(h.alerts.length, 1);
@@ -145,7 +145,7 @@ test('creation keeps the old world on real failures and the button can retry', a
       h.calls.length = 0;
       await h.page.handleCreate();
       assert.deepEqual(h.calls, [
-        ['create', { mode: 'creative', prompt: '' }], ['script', true], ['open', 'creative-world-2'], ['route', '/'],
+        ['create', { prompt: '' }], ['script', true], ['open', 'creative-world-2'], ['route', '/'],
       ]);
       assert.equal(h.activePath(), 'creative-world-2');
       assert.equal(h.route(), '/');
@@ -164,7 +164,7 @@ test('creation waits for cleanup, disables duplicate requests, and respects serv
   const creation = h.page.handleCreate();
   await new Promise(resolve => setImmediate(resolve));
   assert.equal(h.page.creating.value, true);
-  assert.deepEqual(h.calls, [['create', { mode: 'creative', prompt: '' }], ['script', true]]);
+  assert.deepEqual(h.calls, [['create', { prompt: '' }], ['script', true]]);
   await h.page.handleCreate();
   assert.equal(h.calls.filter(([call]) => call === 'create').length, 1);
   stop.resolve(idle());
