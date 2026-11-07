@@ -6,11 +6,11 @@ import { editorApi } from '../api/editorApi.js';
 import { worldModeService, worldModeState } from './worldModeService.js';
 import { drainWorldSession, withWorldTimeout } from './worldSessionLifecycle.js';
 import lanchat from '../stores/lanchat.js';
+import { publishProjectChanged } from './projectMessages.js';
 
 let projectOpenQueue = Promise.resolve();
 let selectionVersion = 0;
 let runtimeCleanupRequired = false;
-const pendingWorldSaves = new Set();
 const superseded = () => ({ ok: false, status: 'superseded' });
 export const projectOpenResult = (result) => result?.data ?? result;
 export const isProjectOpenSuperseded = (result) => projectOpenResult(result)?.status === 'superseded';
@@ -46,7 +46,7 @@ function worldRuntimeCleanupError(kind, result) {
 }
 
 // Finish restoring the OLD scene before native open replaces it. Never run a
-// stop/restore against the new story scene, and fail closed if workers persist.
+// stop/restore against the new scene, and fail closed if workers persist.
 export async function stopWorldRuntimeBeforeOpen(api = editorApi) {
   const reply = await api.scripts.getStatus();
   const status = reply.data ?? reply;
@@ -78,20 +78,13 @@ export const projectLauncherService = {
     // Selection ownership starts at submission, NOT when the native queue runs.
     const selection = ++selectionVersion;
     const current = () => selection === selectionVersion;
-    runtimeCleanupRequired ||= worldModeState.mode === 'creative';
-    const saveOldWorld = window.__coronaNodeGraphFlushSave;
-    if (saveOldWorld) pendingWorldSaves.add(saveOldWorld);
+    runtimeCleanupRequired ||= worldModeState.status === 'ready';
     const token = worldModeService.beginOpen(projectPath, { newProject: options.newProject === true });
     const operation = projectOpenQueue.catch(() => {}).then(async () => {
       if (!current()) return superseded();
       try {
-        // Fail closed: never restore/save an old world after replacing its scene.
-        for (const save of pendingWorldSaves) {
-          await withWorldTimeout(save(), '保存旧世界');
-          pendingWorldSaves.delete(save);
-        }
         await nextTick();
-        if (typeof window.coronaBridge?.dockCommand === 'function') {
+        if (typeof window.corona?.window?.suspendCameraViews === 'function') {
           await appService.setEditorUiEnabled(false);
         }
         await drainWorldSession();
@@ -113,10 +106,7 @@ export const projectLauncherService = {
         }
         const session = await worldModeService.resolve(activeProjectPath, { force: true });
         if (!current() || !session) return superseded();
-        window.localStorage?.setItem('corona.activeProjectPath', activeProjectPath);
-        window.dispatchEvent(new CustomEvent('corona-active-project-changed', {
-          detail: { projectPath: activeProjectPath },
-        }));
+        await publishProjectChanged(activeProjectPath);
         return result;
       } catch (error) {
         if (!current()) return superseded();

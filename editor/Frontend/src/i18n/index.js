@@ -1,4 +1,5 @@
 import { createI18n } from 'vue-i18n';
+import { getWebMessages } from '../api/webMessages.js';
 import zhCN from './messages/zh-CN.js';
 import enUS from './messages/en-US.js';
 
@@ -11,6 +12,7 @@ const messages = {
   'zh-CN': zhCN,
   'en-US': enUS,
 };
+let localeSync;
 
 function normalizeLocale(value) {
   const raw = String(value || '').trim();
@@ -78,6 +80,7 @@ export function setLocale(locale, options = {}) {
       new CustomEvent(LOCALE_CHANGED_EVENT, { detail: { locale: nextLocale } })
     );
   }
+  if (options.broadcast !== false) void localeSync?.publish(nextLocale).catch(error => console.warn('[locale]', error));
   return nextLocale;
 }
 
@@ -85,19 +88,24 @@ export function translate(key, params) {
   return i18n.global.t(key, params);
 }
 
-export function setupLocaleSync() {
-  setLocale(currentLocale(), { silent: true });
+export function createLocaleSync(webMessages, { read, apply }) {
+  const lifetime = new AbortController();
+  const accept = value => { if (isSupportedLocale(value) && value !== read()) apply(value); };
+  const stopEvent = webMessages.on('ui.localeChanged', accept);
+  const stopRequest = webMessages.role === 'main' ? webMessages.handle('ui.locale', read) : () => {};
+  const ready = webMessages.role === 'main' ? Promise.resolve() : webMessages.request('main', 'ui.locale', null,
+    { waitForHandler: true, signal: lifetime.signal }).then(accept);
+  return { ready, publish: value => webMessages.emit('ui.localeChanged', value),
+    dispose() { lifetime.abort(); stopEvent(); stopRequest(); } };
+}
 
-  globalThis.addEventListener?.('storage', (event) => {
-    if (event.key !== LOCALE_STORAGE_KEY) return;
-    const nextLocale = normalizeLocale(event.newValue);
-    if (nextLocale && nextLocale !== currentLocale()) {
-      setLocale(nextLocale, { silent: true });
-      globalThis.dispatchEvent?.(
-        new CustomEvent(LOCALE_CHANGED_EVENT, { detail: { locale: nextLocale } })
-      );
-    }
-  });
+export function setupLocaleSync() {
+  if (localeSync) return;
+  setLocale(currentLocale(), { silent: true, broadcast: false });
+  localeSync = createLocaleSync(getWebMessages(), { read: currentLocale,
+    apply: value => setLocale(value, { broadcast: false }) });
+  void localeSync.ready.catch(error => { if (error.code !== 'ABORTED') console.warn('[locale]', error); });
+  globalThis.addEventListener?.('pagehide', () => { localeSync?.dispose(); localeSync = null; }, { once: true });
 }
 
 export function useLocale() {

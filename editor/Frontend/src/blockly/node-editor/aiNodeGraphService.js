@@ -1,18 +1,18 @@
-﻿const INTERNAL_AI_SCHEMA_VERSION = 1;
+import { getWebMessages } from '../../api/webMessages.js';
+
+const INTERNAL_AI_SCHEMA_VERSION = 1;
 export const PROJECT_NODE_GRAPH_TARGET_ID = 'node_graph:project:global';
 const VALID_NODE_TYPES = new Set(['start', 'custom', 'end']);
 const VALID_PORT_SIDES = new Set(['left', 'right', 'bottom']);
 
 const consumers = new Map();
-const CHANNEL_NAME = 'corona-node-graph-ai-v2';
 const INSTANCE_ID = `node_graph_ai_${Date.now()}_${Math.random().toString(36).slice(2)}`;
-let channel = null;
+let unregisterMessages = null;
 let requestSequence = 0;
-const pendingRequests = new Map();
 
 function cloneJson(value) {
   try {
-    return JSON.parse(JSON.stringify(value));
+    return globalThis.structuredClone(value);
   } catch (error) {
     throw new Error(`内部 AI 结果不是可序列化的 JSON：${error?.message || error}`);
   }
@@ -183,15 +183,11 @@ export function registerGeneratedNodeGraphConsumer(consumer, options = {}) {
     handler: config.handler,
     getSnapshot: typeof config.getSnapshot === 'function' ? config.getSnapshot : null,
   });
-  ensureChannel();
-  return () => consumers.delete(id);
-}
-
-function ensureChannel() {
-  if (channel || typeof BroadcastChannel === 'undefined') return channel;
-  channel = new BroadcastChannel(CHANNEL_NAME);
-  channel.addEventListener('message', handleChannelMessage);
-  return channel;
+  ensureMessageHandlers();
+  return () => {
+    consumers.delete(id);
+    if (!consumers.size) { unregisterMessages?.(); unregisterMessages = null; }
+  };
 }
 
 function cloneSnapshot(value) {
@@ -199,89 +195,38 @@ function cloneSnapshot(value) {
 }
 
 async function localSnapshot() {
-  const active = Array.from(consumers.values()).filter((item) => item.getSnapshot);
+  const active = Array.from(consumers.values()).filter(item => item.getSnapshot);
   if (active.length !== 1) return null;
   const snapshot = await active[0].getSnapshot();
-  if (!snapshot || typeof snapshot !== 'object') return null;
-  return cloneSnapshot(snapshot);
+  return snapshot && typeof snapshot === 'object' ? cloneSnapshot(snapshot) : null;
 }
 
-function settlePending(requestId, payload) {
-  const pending = pendingRequests.get(requestId);
-  if (!pending) return;
-  if (pending.accept && !pending.accept(payload)) return;
-  pendingRequests.delete(requestId);
-  window.clearTimeout(pending.timer);
-  pending.resolve(payload);
-}
-
-async function handleChannelMessage(event) {
-  const message = event?.data;
-  if (!message || typeof message !== 'object' || message.senderId === INSTANCE_ID) return;
-  if (message.kind === 'snapshot-response' || message.kind === 'apply-response') {
-    settlePending(String(message.requestId || ''), message);
-    return;
-  }
-
-  if (message.kind === 'snapshot-request') {
-    const snapshot = await localSnapshot();
-    if (!snapshot) return;
-    ensureChannel()?.postMessage({
-      kind: 'snapshot-response',
-      requestId: message.requestId,
-      senderId: INSTANCE_ID,
-      snapshot,
-    });
-    return;
-  }
-
-  if (message.kind === 'apply-request') {
+function ensureMessageHandlers() {
+  if (unregisterMessages) return;
+  const messages = getWebMessages();
+  const stopSnapshot = messages.handle('nodeGraph.snapshot', () => localSnapshot());
+  const stopApply = messages.handle('nodeGraph.apply', async result => {
     const active = Array.from(consumers.values());
-    if (active.length !== 1) return;
-    let result;
-    try {
-      result = await active[0].handler(message.result);
-    } catch (error) {
-      result = { success: false, errors: [String(error?.message || error)], warnings: [] };
-    }
-    ensureChannel()?.postMessage({
-      kind: 'apply-response',
-      requestId: message.requestId,
-      senderId: INSTANCE_ID,
-      result,
-    });
-  }
-}
-
-function requestAcrossWindows(kind, payload, { timeoutMs = 2500, accept = null } = {}) {
-  const currentChannel = ensureChannel();
-  if (!currentChannel) return Promise.resolve(null);
-  const requestId = `${kind}_${Date.now()}_${++requestSequence}`;
-  return new Promise((resolve) => {
-    const timer = window.setTimeout(() => {
-      pendingRequests.delete(requestId);
-      resolve(null);
-    }, Math.max(250, Number(timeoutMs) || 2500));
-    pendingRequests.set(requestId, { resolve, timer, accept });
-    currentChannel.postMessage({ kind, requestId, senderId: INSTANCE_ID, ...payload });
+    if (active.length !== 1) throw Object.assign(new Error('Node graph owner is ambiguous'), { code: 'AMBIGUOUS_HANDLER' });
+    return active[0].handler(validateGeneratedNodeGraphResult(result));
   });
+  unregisterMessages = () => { stopSnapshot(); stopApply(); };
 }
 
 /** Obtain the mounted project graph, including detached node-Dock windows. */
 export async function getGeneratedNodeGraphSnapshot({ timeoutMs = 2500 } = {}) {
   const local = await localSnapshot();
   if (local) return local;
-  const response = await requestAcrossWindows('snapshot-request', {}, {
-    timeoutMs,
-    accept: (message) => Boolean(message?.snapshot?.workspace),
-  });
-  return response?.snapshot ? cloneSnapshot(response.snapshot) : null;
+  try {
+    const snapshot = await getWebMessages().requestHandler('nodeGraph.snapshot', {}, { timeoutMs });
+    return snapshot?.workspace ? cloneSnapshot(snapshot) : null;
+  } catch { return null; }
 }
 
 /**
  * Apply an internal AI result to the mounted project graph. The mounted editor performs
  * compilation, persistence, and rollback. Detached Dock windows are reached through the
- * same-origin BroadcastChannel; no C++ interface or file import route is involved.
+ * shared Web message module; no C++ interface or file import route is involved.
  */
 export async function applyGeneratedNodeGraph(result, { timeoutMs = 12000 } = {}) {
   let validated;
@@ -302,13 +247,9 @@ export async function applyGeneratedNodeGraph(result, { timeoutMs = 12000 } = {}
     }
   }
 
-  const response = await requestAcrossWindows('apply-request', { result: validated }, {
-    timeoutMs,
-    accept: (message) => Boolean(message?.result),
-  });
-  return response?.result || {
-    success: false,
-    errors: ['\u9879\u76ee\u5e38\u9a7b\u8282\u70b9\u56fe\u5c1a\u672a\u6253\u5f00\uff0c\u65e0\u6cd5\u5e94\u7528\u5185\u90e8 AI \u7ed3\u679c'],
-    warnings: [],
-  };
+  try {
+    return await getWebMessages().requestHandler('nodeGraph.apply', validated, { timeoutMs });
+  } catch (error) {
+    return { success: false, errors: [String(error?.message || error)], warnings: [] };
+  }
 }

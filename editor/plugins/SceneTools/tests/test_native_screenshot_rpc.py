@@ -189,19 +189,19 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
         missing = sorted(native_methods - api_methods)
         self.assertEqual(missing, [])
 
-    def test_camera_lock_is_owned_by_scene_tools_aggregate(self):
+    def test_camera_lock_shares_the_native_actor_property_authority(self):
         manifest = self._editor_api_source()
         handler = self._handler_source()
         frontend = self._frontend_bridge_source()
 
         self.assertIn(
-            'set_actor_camera_lock, kSceneActorCameraLockParams, "sceneTools.setActorCameraLock"',
+            'set_actor_camera_lock, kSceneActorCameraLockParams, ""',
             manifest,
         )
         self.assertIn('{"set_actor_camera_lock",', handler)
         self.assertIn("camera_lock_enabled", handler)
-        self.assertIn("CameraFollowController::instance().set_target", handler)
-        self.assertIn("setActorCameraLock: (sceneName, actorName, cameraLock)", frontend)
+        self.assertIn("controller.set_target", handler)
+        self.assertIn("setActorProperties: (sceneName, actorName, patch)", frontend)
         self.assertNotIn("setCameraLock: (sceneName, actorName, enabled)", frontend)
 
     def test_public_editor_api_names_do_not_use_rpc_terms(self):
@@ -1055,7 +1055,6 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
             "events.onActorChanged",
             "events.onActorSelectionChanged",
             "events.onActorTransformUpdated",
-            "events.onActorPickResult",
             "events.onFocusPoseResult",
             "events.onNetworkActorDeleteSyncBroadcastRequested",
             "events.onNetworkActorOwnershipClaimed",
@@ -1569,52 +1568,20 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
         self.assertNotIn("coronaEventBus.on('lanchat-event'", app_source)
         self.assertNotIn("coronaEventBus.off('lanchat-event'", app_source)
 
-    def test_realtime_focus_and_pick_events_are_defined_and_emitted_by_cpp_callback_registry(self):
-        source = self._editor_api_source()
-        realtime_source = (
-            self._engine_root()
-            / "src"
-            / "systems"
-            / "ui"
-            / "cef"
-            / "cef_realtime_bridge.cpp"
-        ).read_text(encoding="utf-8")
-        bridge_source = self._frontend_bridge_source()
-        python_api_source = (
-            self._repo_root()
-            / "editor"
-            / "api"
-            / "editor_api.py"
-        ).read_text(encoding="utf-8")
+    def test_web_pick_uses_owned_v8_results_without_legacy_events_or_json_broker(self):
+        root = self._engine_root()
+        realtime = (root / "src/systems/ui/cef/cef_realtime_bridge.cpp").read_text(encoding="utf-8")
+        v8 = (root / "src/systems/ui/cef/cef_v8_binding.cpp").read_text(encoding="utf-8")
+        frontend = self._frontend_bridge_source()
+        for retired in ("actorPickResult", "onActorPickResult", "focusPoseResult"):
+            self.assertNotIn(retired, self._editor_api_source() + realtime + frontend)
+        self.assertNotIn('"ViewportPick"', realtime)
+        self.assertFalse((root / "src/systems/ui/cef/request_response_broker.cpp").exists())
+        self.assertIn('viewport_pick_value', v8)
+        self.assertIn('begin_viewport_pick', v8)
+        self.assertIn('window.corona.viewport.pick', frontend)
 
-        for snippet in (
-            '{"SceneTools.focusPoseResult", EditorApiValueType::Object, all_callers(), '
-            '"events.onFocusPoseResult", "events.on_focus_pose_result"}',
-            '{"SceneTools.actorPickResult", EditorApiValueType::Object, all_callers(), '
-            '"events.onActorPickResult", "events.on_actor_pick_result"}',
-            "onFocusPoseResult: (callback) => register_manifest_editor_api_callback("
-            "'events.onFocusPoseResult', callback)",
-            "onActorPickResult: (callback) => register_manifest_editor_api_callback("
-            "'events.onActorPickResult', callback)",
-            'return _register_manifest_editor_api_event_callback("events.on_focus_pose_result", callback)',
-            'return _register_manifest_editor_api_event_callback("events.on_actor_pick_result", callback)',
-        ):
-            with self.subTest(snippet=snippet):
-                self.assertIn(snippet, source + bridge_source + python_api_source)
-
-        focus_body = re.search(
-            r"void send_focus_pose_result\(const CefRefPtr<CefFrame>& frame,.*?\n\}",
-            realtime_source,
-            re.S,
-        )
-        self.assertIsNotNone(focus_body)
-        focus_source = focus_body.group(0)
-        self.assertIn('retain_viewport_result(frame, current_viewport_session(), "focusPoseResult"', focus_source)
-        self.assertIn('retain_viewport_result(frame, session, "actorPickResult"', realtime_source)
-        self.assertNotIn('emit_editor_api_event_to_frame(', realtime_source)
-
-
-    def test_realtime_focus_and_pick_frontend_consumers_use_cpp_defined_event_wrappers(self):
+    def test_focus_and_pick_frontend_consumers_use_direct_native_results(self):
         scene_bar_source = (
             self._repo_root()
             / "editor"
@@ -1634,14 +1601,16 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
             / "MainPage.vue"
         ).read_text(encoding="utf-8")
 
-        self.assertIn("editorApi.sceneTools.focusActor", scene_bar_source)
+        self.assertIn("editorApi.scene.focusActor", scene_bar_source)
+        self.assertIn("camera-pose-applied", scene_bar_source)
+        self.assertNotIn("camera-pose-request", scene_bar_source + main_page_source)
         self.assertNotIn("editorApi.events.onFocusPoseResult", scene_bar_source)
         self.assertNotIn("handleFocusPoseResult", scene_bar_source)
         self.assertNotIn("coronaEventBus.on('focus-pose-result'", scene_bar_source)
         self.assertNotIn("coronaEventBus.off('focus-pose-result'", scene_bar_source)
 
-        self.assertIn("subscribeWhileCurrent(callback => editorApi.scene.observe('actorPickResult', callback), handleActorPickResult)", main_page_source)
-        self.assertIn("editorApi.off(actorPickResultCallbackToken)", main_page_source)
+        self.assertIn("onResult: (payload, result) => handleActorPickResult(payload, result)", main_page_source)
+        self.assertNotIn("actorPickResultCallbackToken", main_page_source)
         self.assertNotIn("coronaEventBus.on('actor-pick-result'", main_page_source)
         self.assertNotIn("coronaEventBus.off('actor-pick-result'", main_page_source)
 
@@ -1814,7 +1783,7 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
             "createActor: (sceneName, objPath, actorType = 'model', actorData = null)",
             "removeActor: (sceneName, actorName)",
             "renameActor: (sceneName, actorName, name)",
-            "focusActor: (sceneName, actorName, cameraName)",
+            "focusActor: (sceneName, actorName, cameraId, scope)",
             "setRenderBackend: (mode, sceneName = null, cameraId = null)",
             "getRenderBackend: (sceneName = null, cameraId = null)",
             "setVisionRenderMode: (sceneName, cameraId = null, mode = 'path_tracing')",
@@ -1933,7 +1902,6 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
             "sceneTools.renameActor",
             "sceneTools.openActor",
             "sceneTools.selectActor",
-            "sceneTools.focusActor",
             "sceneTools.setRenderBackend",
             "sceneTools.getRenderBackend",
             "sceneTools.setVisionRenderMode",
@@ -1949,8 +1917,6 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
             "sceneTools.floorGrid",
             "sceneTools.setPhysicsParams",
             "sceneTools.getPhysicsParams",
-            "sceneTools.selectScreenshotPath",
-            "sceneTools.saveScreenshot",
             "sceneTools.setOutputMode",
             "sceneTools.getOutputMode",
             "sceneTools.setShadowCascadeDebug",
@@ -1958,7 +1924,6 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
             "sceneTools.setSsaoEnabled",
             "sceneTools.getSsaoEnabled",
             "sceneTools.isVisionAvailable",
-            "sceneTools.pickActor",
             "sceneTools.playAudio",
             "sceneTools.stopAudio",
             "sceneTools.actorPlayAudio",
@@ -2014,8 +1979,7 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
             "floorGrid: (sceneName, enabled) =>\n    editorApi.sceneTools.floorGrid",
             "setPhysicsParams: (sceneName, params) =>\n    editorApi.sceneTools.setPhysicsParams",
             "getPhysicsParams: (sceneName) => editorApi.sceneTools.getPhysicsParams(sceneName)",
-            "selectScreenshotPath: (sceneName, cameraName) =>\n    editorApi.sceneTools.selectScreenshotPath",
-            "saveScreenshot: (sceneName, path, cameraName) =>\n    editorApi.sceneTools.saveScreenshot",
+            "captureScreenshot: (sceneName, cameraId, options) =>\n    editorApi.scene.captureScreenshot",
             "setOutputMode: (sceneName, cameraName, mode) =>\n    editorApi.sceneTools.setOutputMode",
             "getOutputMode: (sceneName, cameraName) =>\n    editorApi.sceneTools.getOutputMode",
             "setShadowCascadeDebug: (sceneName, cameraName, enabled) =>\n    editorApi.sceneTools.setShadowCascadeDebug",
@@ -2023,7 +1987,6 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
             "setSsaoEnabled: (sceneName, cameraName, enabled) =>\n    editorApi.sceneTools.setSsaoEnabled",
             "getSsaoEnabled: (sceneName, cameraName) =>\n    editorApi.sceneTools.getSsaoEnabled",
             "isVisionAvailable: () => editorApi.sceneTools.isVisionAvailable()",
-            "pickActor: (sceneName, x, y, vpWidth, vpHeight) =>\n    editorApi.sceneTools.pickActor",
             "playAudio: (resourceId, loop) =>\n    editorApi.sceneTools.playAudio",
             "stopAudio: (resourceId) =>\n    editorApi.sceneTools.stopAudio",
             "actorPlayAudio: (actorName, loop = false) =>\n    editorApi.sceneTools.actorPlayAudio",
@@ -2275,7 +2238,6 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
         source = self._editor_api_source()
 
         expected = {
-            "ResourceSearch.focus_actor": ("kResourceSearchFocusActorParams", "EditorApiValueType::Object"),
             "ResourceSearch.fuzzy_search": ("kResourceSearchFuzzySearchParams", "EditorApiValueType::Object"),
             "ResourceSearch.get_stats": ("kCallerParam", "EditorApiValueType::Object"),
             "ResourceSearch.image_search": ("kResourceSearchImageSearchParams", "EditorApiValueType::Object"),
@@ -2296,7 +2258,7 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
                     f"{api_name} must expose one manifest-backed aggregate wrapper",
                 )
 
-        self.assertIn('"resourceSearch.focusActor"', source)
+        self.assertNotIn('"resourceSearch.focusActor"', source)
         self.assertIn('"resourceSearch.fuzzySearch"', source)
         self.assertIn('"resourceSearch.getStats"', source)
         self.assertIn('"resourceSearch.imageSearch"', source)
@@ -2315,7 +2277,7 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
 
         for method in (
             "prepareIndex", "fuzzySearch", "imageSearch", "listTypes",
-            "rebuildIndex", "getStats", "markIndexDirty", "focusActor",
+            "rebuildIndex", "getStats", "markIndexDirty",
         ):
             with self.subTest(method=method):
                 self.assertIn(f"call_manifest_editor_api('resourceSearch.{method}'", resource_search_section)
@@ -2548,10 +2510,7 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
         expected = {
             "AITool.submit_request": ("kObjectPayloadParam", "EditorApiValueType::Any"),
             "Scripts.get_status": ("kNoParams", "EditorApiValueType::Object"),
-            "Scripts.key_event": ("kScriptKeyEventParams", "EditorApiValueType::Any"),
-            "Scripts.key_release": ("kScriptKeyReleaseParams", "EditorApiValueType::Any"),
             "ProjectFiles.load": ("kObjectPayloadParam", "EditorApiValueType::Object"),
-            "Scripts.mouse_event": ("kScriptMouseEventParams", "EditorApiValueType::Any"),
             "ProjectFiles.save": ("kObjectPayloadParam", "EditorApiValueType::Object"),
         }
         for api_name, (params_name, return_type) in expected.items():
@@ -2577,11 +2536,7 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
             "save: request => call_manifest_editor_api('projectFiles.save', [request])",
             "load: request => call_manifest_editor_api('projectFiles.load', [request])",
             "getStatus: () => call_manifest_editor_api('scripts.getStatus', [])",
-            "sendKeyEvent: (key, modifiers, displayKey) =>",
-            "sendKeyUpEvent: (key, displayKey) =>",
-            "sendMouseEvent: (eventType, button, x, y, viewportX, viewportY, viewportWidth, viewportHeight, pickedActor = '') =>",
             "saveBlocklyTarget: (payload) => saveBlocklyTarget(payload)",
-            "sendKeyEvent: (key, modifiers, displayKey) =>\n    editorApi.scripts.sendKeyEvent",
         ):
             with self.subTest(snippet=snippet):
                 self.assertIn(snippet, bridge_source)
@@ -2598,14 +2553,14 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
             "projectFiles.save",
             "projectFiles.load",
             "scripts.getStatus",
-            "scripts.sendKeyEvent",
-            "scripts.sendKeyUpEvent",
-            "scripts.sendMouseEvent",
         )
         for wrapper in expected_wrappers:
             with self.subTest(wrapper=wrapper):
                 self.assertIn(f"call_manifest_editor_api('{wrapper}'", scratch_section)
         self.assertNotIn("ScratchTool.", scratch_section)
+        self.assertIn('window.corona.input.dispatch(sceneName, cameraId, event)', bridge_source)
+        for retired in ('scripts.sendKeyEvent', 'scripts.sendKeyUpEvent', 'scripts.sendMouseEvent'):
+            self.assertNotIn(retired, bridge_source)
 
     def test_script_facade_ai_frontend_wrappers_are_manifest_driven(self):
         bridge_source = self._frontend_bridge_source()
@@ -3090,7 +3045,7 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
         self.assertNotIn("bool /*simplify_mesh*/", parse_common_source)
         self.assertIn("if (!simplify_mesh)", parse_common_source)
 
-    def test_camera_view_click_uses_native_actor_pick_and_cleans_up_callback(self):
+    def test_camera_view_click_uses_native_pick_promise_and_disposes_controller(self):
         repo_root = self._repo_root()
         source = (
             repo_root / "editor" / "Frontend" / "src" / "views" / "tools" / "CameraView.vue"
@@ -3100,10 +3055,9 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
             "createViewportPickController",
             "indexActorsByHandle",
             "editorApi.sceneTools.listSceneTree(sceneId)",
-            "editorApi.scene.observe('actorPickResult', handleCameraViewActorPickResult)",
+            "onResult: (payload, result) => handleCameraViewActorPickResult(payload, result)",
             "cameraViewPickController.pickAt(snapshot)",
             "pickedActor",
-            "editorApi.off(actorPickResultCallbackToken)",
             "cameraViewPickController.dispose()",
         ):
             with self.subTest(snippet=snippet):
@@ -3213,14 +3167,14 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
         self.assertNotIn('data.value("mode"', create_body)
         self.assertNotIn("create_project_from_template_native", create_body)
 
-    def test_world_creation_rejects_story_before_writing_creative_archives(self):
+    def test_world_creation_always_writes_the_single_editable_world_type(self):
         handler_source = self._handler_source()
         start = handler_source.index('{"create_world_project"')
         end = handler_source.index('{"create_multiplayer_project"', start)
         world_body = handler_source[start:end]
-        branch = world_body.index('if (world_type == "story")')
-        writes = world_body.index("std::filesystem::create_directories(base_dir)")
-        self.assertIn("return native_failure(", world_body[branch:writes])
+        self.assertNotIn('data.value("mode"', world_body)
+        self.assertNotIn('world_type == "story"', world_body)
+        self.assertIn('{"type", "creative"}', world_body)
         self.assertIn(
             'update_editor_settings_section("General", {{"default_path", path_to_utf8(base_dir)}})',
             world_body,

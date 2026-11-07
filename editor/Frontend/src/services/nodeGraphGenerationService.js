@@ -7,6 +7,8 @@ import { aiService } from '@/services/aiService.js';
 import { appService } from '@/services/appService.js';
 import { coronaEventBus } from '@/utils/eventBus.js';
 import { translateUiText } from '@/i18n/domTranslator.js';
+import { subscribeProjectChanged } from './projectMessages.js';
+import { worldModeState } from './worldModeService.js';
 
 const MUTATION_PATTERN =
   /(\u751f\u6210|\u5236\u4f5c|\u65b0\u5efa|\u521b\u5efa|\u642d\u5efa|\u5b9e\u73b0|\u5f04(?:\u4e00\u4e2a|\u4e2a)?|\u505a(?:\u4e00\u4e2a|\u4e2a)?|\u7f16\u8f91|\u4fee\u6539|\u6539(?:\u6210|\u4e3a)|\u66ff\u6362(?:\u6210|\u4e3a)|\u6362(?:\u6210|\u4e3a)|\u8c03\u6574(?:\u6210|\u4e3a)|\u8bbe\u7f6e(?:\u6210|\u4e3a)|\u8bbe(?:\u6210|\u4e3a)|\u53d8(?:\u6210|\u4e3a)|\u8865\u5145|\u589e\u52a0|\u6dfb\u52a0|\u6269\u5c55|\u52a0(?:\u4e0a|\u5165|\u4e00\u4e2a|\u4e2a)?|\u5220\u9664|\u79fb\u9664|\u91cd\u505a|\u6539\u9020|generate|create|build|make|edit|modify|add|extend|delete|remove)/i;
@@ -43,8 +45,6 @@ const GENERATION_TIMEOUT_MS = 120000;
 
 let activeGeneration = null;
 
-const ACTIVE_PROJECT_PATH_KEY = 'corona.activeProjectPath';
-
 function normalizeProjectPath(value) {
   return String(value || '')
     .trim()
@@ -54,7 +54,7 @@ function normalizeProjectPath(value) {
 }
 
 function currentProjectPath() {
-  return normalizeProjectPath(window.localStorage?.getItem(ACTIVE_PROJECT_PATH_KEY) || '');
+  return normalizeProjectPath(worldModeState.activeProjectPath);
 }
 
 function wait(delay) {
@@ -302,11 +302,4 @@ function cancelGenerationForProjectChange() {
   void cancelActiveNodeGraphGeneration();
 }
 
-function cancelGenerationForProjectStorageChange(event) {
-  if (event?.key === ACTIVE_PROJECT_PATH_KEY) void cancelActiveNodeGraphGeneration();
-}
-
-if (typeof window !== 'undefined') {
-  window.addEventListener('corona-active-project-changed', cancelGenerationForProjectChange);
-  window.addEventListener('storage', cancelGenerationForProjectStorageChange);
-}
+if (typeof window !== 'undefined') subscribeProjectChanged(cancelGenerationForProjectChange);

@@ -16,8 +16,7 @@
 <script setup>
 import { onBeforeUnmount, onMounted, ref } from 'vue';
 import NodeGraphWorkspace from '@/blockly/components/NodeGraphWorkspace.vue';
-import { appService } from '@/services/appService.js';
-import { coronaEventBus } from '@/utils/eventBus.js';
+import { viewportControlsService } from '@/services/viewportControlsService.js';
 
 // An empty route binds to the current scene until MainPage publishes its identity.
 const sceneName = ref('');
@@ -28,6 +27,8 @@ function selectTarget(target) {
 }
 const workspaceRef = ref(null);
 let closeStopPromise = null;
+let unsubscribeViewportControls = null;
+const viewportRequests = new globalThis.AbortController();
 
 function applyViewportState(state = {}) {
   const nextSceneName = String(state?.sceneId || '').trim();
@@ -37,16 +38,8 @@ function applyViewportState(state = {}) {
 }
 
 function requestViewportState() {
-  const controls = window.__coronaEditorControls;
-  if (controls && typeof controls.getState === 'function') {
-    try {
-      applyViewportState(controls.getState());
-      return;
-    } catch {
-      // A detached panel does not share the main page window; use the cross-tab path below.
-    }
-  }
-  appService.crossTabBroadcast('viewport-controls-request', { action: 'getState' }).catch(() => {});
+  void viewportControlsService.request({ action: 'getState' }, { signal: viewportRequests.signal })
+    .then(applyViewportState).catch(() => {});
 }
 
 function stopNodeRunForClose() {
@@ -62,14 +55,15 @@ function handleWindowClosing() {
 onMounted(() => {
   // Read the scene initialized by MainPage. Calling MainView.on_init here would reset
   // the scene and camera every time the node panel is opened.
-  coronaEventBus.on('viewport-controls-state', applyViewportState);
+  unsubscribeViewportControls = viewportControlsService.subscribe(applyViewportState);
   window.addEventListener('pagehide', handleWindowClosing);
   window.addEventListener('beforeunload', handleWindowClosing);
   requestViewportState();
 });
 
 onBeforeUnmount(() => {
-  coronaEventBus.off('viewport-controls-state', applyViewportState);
+  unsubscribeViewportControls?.();
+  viewportRequests.abort();
   window.removeEventListener('pagehide', handleWindowClosing);
   window.removeEventListener('beforeunload', handleWindowClosing);
   stopNodeRunForClose().catch(() => {});

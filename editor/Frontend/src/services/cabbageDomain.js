@@ -15,7 +15,7 @@ const normalizePath = (value) =>
     .replace(/\/+$/, '')
     .toLowerCase();
 export function activeProjectPath() {
-  return String(window.localStorage?.getItem('corona.activeProjectPath') || '');
+  return String(worldModeState.activeProjectPath || '');
 }
 const unwrap = (response) => response?.data ?? response;
 const number = (data, ...keys) => {
@@ -162,7 +162,7 @@ export function projectIdentity(payload = {}) {
 }
 
 async function documentScope(projectPath) {
-  const scene = unwrap(await editorApi.scene.readActive());
+  const scene = await editorApi.scene.readActive();
   if (!scene?.archive_session || normalizePath(scene.project_path) !== normalizePath(projectPath))
     throw new Error('当前世界已切换');
   return { project_path: projectPath, archive_session: scene.archive_session, document: documentName };

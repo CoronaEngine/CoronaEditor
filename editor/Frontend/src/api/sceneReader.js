@@ -6,6 +6,12 @@ export function createSceneReader(query, intervalMs = 180) {
   let active = false;
   let paused = false;
   let generation = 0;
+  const selectionKey = selection => [
+    selection?.actor_guid || '', selection?.actor || '', selection?.actor_type || '',
+    selection?.source_viewport || '', selection?.source_camera_id || '', selection?.node_index ?? '',
+  ].join('|');
+  const transformKey = actor => [actor?.actor_guid || '', actor?.actor_version ?? '',
+    ...(actor?.position || []), ...(actor?.rotation || []), ...(actor?.scale || [])].join('|');
 
   function publish(kind, key, data, epoch) {
     for (const entry of listeners.values()) {
@@ -37,17 +43,14 @@ export function createSceneReader(query, intervalMs = 180) {
       const scope = { archive_session: session };
       publish('project', session, { path: state.project_path, scene: { path: state.scene, name: state.name }, ...scope }, epoch);
       publish('tree', session + ':' + state.tree_revision, { scene: state.scene, ...scope }, epoch);
-      publish('selection', session + JSON.stringify(selection), { scene: state.scene, ...selection, ...scope }, epoch);
+      publish('selection', session + selectionKey(selection), { scene: state.scene, ...selection, ...scope }, epoch);
 
       const kinds = new Set(Array.from(listeners.values(), e => e.kind));
       if (kinds.has('transform') && selection.actor_guid && epoch === generation) {
         const values = await query('readTransforms', { ...scope, actors: [selection.actor_guid] });
         for (const actor of values.actors) {
-          publish('transform', session + JSON.stringify(actor), { ...actor, ...scope }, epoch);
+          publish('transform', session + transformKey(actor), { ...actor, ...scope }, epoch);
         }
-      }
-      if (epoch === generation && ['actorPickResult', 'viewportGizmoPointerResult', 'meshMoveResult', 'focusPoseResult'].some(k => kinds.has(k))) {
-        for (const result of await query('takeViewportResults', scope)) publish(result.kind, null, result.payload, epoch);
       }
     } catch (error) {
       // A project may have switched between the lightweight read and the scoped read.

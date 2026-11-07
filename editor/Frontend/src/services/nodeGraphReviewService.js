@@ -1,27 +1,25 @@
 import { aiService } from '@/services/aiService.js';
-import { coronaEventBus } from '@/utils/eventBus.js';
+import { getWebMessages } from '../api/webMessages.js';
 
-const CHANNEL_NAME = 'corona-node-graph-review-v1';
 const REVIEW_EVENT = 'node-graph-review-result';
 const REVIEW_INTERVAL_MS = 10000;
 const STATUS_POLL_INTERVAL_MS = 2000;
 const OMITTED_SNAPSHOT_KEYS = new Set(['x', 'y', 'selected', 'viewport', 'zoom']);
-let channel = null;
-
-function getChannel() {
-  if (typeof BroadcastChannel === 'undefined') return null;
-  if (!channel) channel = new BroadcastChannel(CHANNEL_NAME);
-  return channel;
-}
-
 function clone(value) {
-  return JSON.parse(JSON.stringify(value || {}));
+  return globalThis.structuredClone(value || {});
 }
 
 function createReviewSnapshot(workspace) {
-  return JSON.parse(JSON.stringify(workspace || {}, (key, value) => (
-    OMITTED_SNAPSHOT_KEYS.has(key) ? undefined : value
-  )));
+  const snapshot = clone(workspace);
+  const strip = value => {
+    if (!value || typeof value !== 'object') return;
+    for (const key of Object.keys(value)) {
+      if (OMITTED_SNAPSHOT_KEYS.has(key)) delete value[key];
+      else strip(value[key]);
+    }
+  };
+  strip(snapshot);
+  return snapshot;
 }
 
 function hashText(text) {
@@ -63,20 +61,11 @@ function snapshotWithRevision(workspace, scope = '') {
 
 export function publishNodeGraphReview(result) {
   const payload = { ...result, publishedAt: Date.now() };
-  coronaEventBus.emit(REVIEW_EVENT, payload);
-  try { getChannel()?.postMessage(payload); } catch (_) {}
+  void getWebMessages().emit(REVIEW_EVENT, payload).catch(error => console.warn('[NodeGraphReview]', error.message));
 }
 
 export function subscribeNodeGraphReviews(listener) {
-  const local = (payload) => listener(payload);
-  const broadcast = (event) => listener(event.data);
-  coronaEventBus.on(REVIEW_EVENT, local);
-  const currentChannel = getChannel();
-  currentChannel?.addEventListener('message', broadcast);
-  return () => {
-    coronaEventBus.off(REVIEW_EVENT, local);
-    currentChannel?.removeEventListener('message', broadcast);
-  };
+  return getWebMessages().on(REVIEW_EVENT, listener);
 }
 
 export function startNodeGraphReview({

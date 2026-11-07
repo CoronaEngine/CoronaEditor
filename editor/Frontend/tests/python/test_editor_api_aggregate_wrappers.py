@@ -11,7 +11,7 @@ class EditorApiAggregateWrapperTests(unittest.TestCase):
 
     def test_manifest_contract_has_a_single_frontend_owner(self):
         self.assertIn("export class Bridge", self.api_source)
-        self.assertIn("window.cefQuery", self.api_source)
+        self.assertIn("window.corona.editor.invoke", self.api_source)
         self.assertFalse((self.source_root / "utils" / "bridge.js").exists())
         self.assertFalse((self.source_root / "compat").exists())
 
@@ -38,13 +38,11 @@ class EditorApiAggregateWrapperTests(unittest.TestCase):
         for marker in (
             "getSnapshot: (sceneName = '')",
             "setActorTransform: (sceneName, actorName, transform)",
-            "setActorPhysics: (sceneName, actorName, physics)",
-            "setActorState: (sceneName, actorName, state)",
             "saveActor: (sceneName, actorName, session)",
             "selectModelFile: (sceneName, actorName, fileType = 'model')",
-            "setActorCameraLock: (sceneName, actorName, cameraLock)",
-            "capture: (sceneName, cameraName, camera, outputPath)",
-            "setCameraPose: (sceneName, cameraName, camera)",
+            "setActorProperties: (sceneName, actorName, patch)",
+            "captureScreenshot: (sceneName, cameraId, options)",
+            "setCameraProperties: (sceneName, cameraId, patch)",
         ):
             self.assertIn(marker, self.api_source)
 

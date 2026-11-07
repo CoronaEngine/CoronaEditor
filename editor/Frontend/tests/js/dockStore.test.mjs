@@ -36,9 +36,19 @@ test('creative sessions start empty and clear requested panels when retired', t 
   assert.deepEqual(openPanels(store), []);
 });
 
-test('story mode cannot open or toggle editor panels', t => {
+test('legacy story metadata does not restrict editor panels', t => {
   const store = session(t, 'story');
   store.openPanel('SceneControls');
   store.togglePanel('SceneTools');
-  assert.deepEqual(openPanels(store), []);
+  assert.deepEqual(openPanels(store), ['SceneControls', 'SceneTools']);
+});
+
+test('a project must be ready before editor panels can open', t => {
+  const store = session(t);
+  for (const status of ['idle', 'loading', 'error']) {
+    worldModeState.status = status;
+    store.openPanel('SceneControls');
+    store.togglePanel('SceneTools');
+    assert.deepEqual(openPanels(store), []);
+  }
 });

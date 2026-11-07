@@ -42,6 +42,23 @@ class CoronaEditorLifecycleTests(unittest.TestCase):
             self.assertTrue(editor.update_runtime())
         engine.drain_input_events.assert_called_once_with()
 
+    def test_typed_queue_preserves_keyboard_display_key_and_full_mouse_context(self):
+        editor = self._load_editor()
+        editor.initialize_runtime()
+        editor.start_runtime()
+        key = SimpleNamespace(type=0, arg0='KeyJ', arg1='Shift', arg2='d')
+        up = SimpleNamespace(type=1, arg0='KeyJ', arg1='d')
+        mouse = SimpleNamespace(type=2, arg0='click', arg1='LeftButton', arg3=50, arg4=60,
+                                viewport_x=5, viewport_y=6, viewport_width=400, viewport_height=200, picked_actor='Picked')
+        engine = SimpleNamespace(drain_input_events=Mock(return_value=[key, up, mouse]))
+        file_runner = ModuleType('script_runtime.file_runner')
+        scripts = file_runner.FileScripts = SimpleNamespace(key_event=Mock(), key_release=Mock(), mouse_event=Mock())
+        with patch.object(editor, '_arm_runtime_watchdog'), patch.dict(sys.modules, {'CoronaEngine': engine, 'script_runtime.file_runner': file_runner}):
+            self.assertTrue(editor.update_runtime())
+        scripts.key_event.assert_called_once_with('KeyJ', 'Shift', 'd')
+        scripts.key_release.assert_called_once_with('KeyJ', 'd')
+        scripts.mouse_event.assert_called_once_with('click', 'LeftButton', 50, 60, 5, 6, 400, 200, 'Picked')
+
     def test_shutdown_runtime_stops_services_and_clears_dispatch_state(self):
         editor = self._load_editor()
         calls = []

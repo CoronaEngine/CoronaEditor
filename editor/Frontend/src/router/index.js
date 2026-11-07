@@ -4,17 +4,17 @@ import { createRouter, createWebHashHistory } from 'vue-router';
 
 import { createWorldModeRouteGuard, worldModeService } from '../services/worldModeService.js';
 import { appService } from '../services/appService.js';
+import { getWebDocumentIdentity } from '../api/webDocument.js';
 
 import { getPluginComponent } from '../views/panelRegistry.js';
 
 const routes = [
-  { path: '/Story', name: 'Story', component: () => import('../views/layout/StoryWorld.vue') },
   { path: '/SceneControls', name: 'SceneControls', component: getPluginComponent('SceneControls') },
   { path: '/CabbageTasks', name: 'CabbageTasks', component: getPluginComponent('CabbageTasks') },
   {
     path: '/',
     name: 'MainPage',
-    component: () => import('../views/layout/WorldEntry.vue'),
+    component: () => import('../views/layout/MainPage.vue'),
   },
   {
     path: '/StartScreen',
@@ -95,6 +95,7 @@ const router = createRouter({
 
 router.beforeEach(createWorldModeRouteGuard({
   controller: worldModeService,
+  isStandalone: () => getWebDocumentIdentity().role === 'peer',
   closePanel: () => appService.closeThisTab(''),
   notify: (message, error) => notifyWorldError(error, message),
 }));

@@ -171,7 +171,7 @@ import { setLocale } from '@/i18n/index.js';
 import { appService } from '@/services/appService.js';
 import { editorApi } from '@/api/editorApi.js';
 import { aiSettings } from '@/services/aiSessionService.js';
-import { coronaEventBus } from '@/utils/eventBus.js';
+import { viewportControlsService } from '@/services/viewportControlsService.js';
 
 const { t, locale } = useI18n();
 const confirmHome = ref(false);
@@ -181,7 +181,6 @@ const aiKeyBusy = ref(false);
 const aiKeyStatus = ref({ configured: false, masked_key: '' });
 const aiKeyMessage = ref('');
 const aiKeyMessageType = ref('');
-const EDITOR_CONTROLS_KEY = '__coronaEditorControls';
 const defaultViewportControls = {
   available: false,
   sceneId: '',
@@ -200,7 +199,8 @@ const gridApplying = ref(false);
 const renderApplying = ref(false);
 const renderError = ref(false);
 const cameraSpeedLabel = computed(() => Number(viewportControlState.value.cameraSpeed || 0).toFixed(2));
-let viewportControlPollTimer = null;
+let unsubscribeViewportControls = null;
+const viewportRequests = new globalThis.AbortController();
 let speedApplyTimer = null;
 
 function normalizeViewportControls(state = {}) {
@@ -211,6 +211,8 @@ function normalizeViewportControls(state = {}) {
   return {
     available: Boolean(state.available),
     sceneId: String(state.sceneId || ''),
+    cameraId: state.cameraId,
+    cameraHandle: state.cameraHandle,
     renderMode: String(state.renderMode || 'native'),
     renderModes: Array.isArray(state.renderModes) ? state.renderModes : [],
     viewportUiMode: String(state.viewportUiMode || defaultViewportControls.viewportUiMode),
@@ -228,25 +230,20 @@ function normalizeViewportControls(state = {}) {
   };
 }
 
-function getEditorControls() {
-  return typeof window === 'undefined' ? null : window[EDITOR_CONTROLS_KEY] || null;
-}
-
 function syncViewportControls(state = {}) {
   viewportControlState.value = normalizeViewportControls(state);
 }
 
 function requestViewportControlsState() {
-  const controls = getEditorControls();
-  if (controls && typeof controls.getState === 'function') {
-    try {
-      syncViewportControls(controls.getState());
-      return;
-    } catch (error) {
-      console.warn('[EditorSettings] failed to read viewport controls', error);
-    }
-  }
-  appService.crossTabBroadcast('viewport-controls-request', { action: 'getState' }).catch(() => {});
+  void viewportControlsService.request({ action: 'getState' }, { signal: viewportRequests.signal })
+    .then(syncViewportControls).catch(() => {});
+}
+
+async function updateViewportControls(payload) {
+  const { sceneId, cameraId, cameraHandle } = viewportControlState.value;
+  const state = await viewportControlsService.request({ ...payload, sceneId, cameraId, cameraHandle },
+    { signal: viewportRequests.signal });
+  syncViewportControls(state);
 }
 
 async function setRenderMode() {
@@ -255,15 +252,7 @@ async function setRenderMode() {
   renderError.value = false;
   try {
     const mode = viewportControlState.value.renderMode;
-    const controls = getEditorControls();
-    if (controls && typeof controls.selectRenderMode === 'function') {
-      renderError.value = await controls.selectRenderMode(mode) === false;
-      requestViewportControlsState();
-    } else {
-      await appService.crossTabBroadcast('viewport-controls-request', {
-        action: 'selectRenderMode', mode, sceneId: viewportControlState.value.sceneId,
-      });
-    }
+    await updateViewportControls({ action: 'selectRenderMode', mode });
   } catch (error) {
     renderError.value = true;
     requestViewportControlsState();
@@ -273,14 +262,8 @@ async function setRenderMode() {
 }
 
 async function setViewportUiMode(mode) {
-  const controls = getEditorControls();
-  if (controls && typeof controls.setViewportUiMode === 'function') {
-    const nextState = await controls.setViewportUiMode(mode);
-    if (nextState !== false) syncViewportControls(nextState);
-    return;
-  }
   viewportControlState.value.viewportUiMode = mode;
-  appService.crossTabBroadcast('viewport-controls-request', {
+  updateViewportControls({
     action: 'setViewportUiMode',
     mode,
   }).catch(() => requestViewportControlsState());
@@ -288,13 +271,7 @@ async function setViewportUiMode(mode) {
 
 async function applyCameraSpeed(value) {
   const speed = Math.min(2, Math.max(0.01, Number(value) || defaultViewportControls.cameraSpeed));
-  const controls = getEditorControls();
-  if (controls && typeof controls.setCameraSpeed === 'function') {
-    const nextState = await controls.setCameraSpeed(speed);
-    if (nextState !== false) syncViewportControls(nextState);
-    return;
-  }
-  appService.crossTabBroadcast('viewport-controls-request', {
+  updateViewportControls({
     action: 'setCameraSpeed',
     value: speed,
   }).catch(() => requestViewportControlsState());
@@ -314,14 +291,7 @@ async function setGridEnabled() {
   const sceneId = viewportControlState.value.sceneId;
   gridApplying.value = true;
   try {
-    const controls = getEditorControls();
-    if (controls && typeof controls.setGridEnabled === 'function') {
-      const nextState = await controls.setGridEnabled(enabled, sceneId);
-      if (nextState === false) requestViewportControlsState();
-      else syncViewportControls(nextState);
-      return;
-    }
-    await appService.crossTabBroadcast('viewport-controls-request', {
+    await updateViewportControls({
       action: 'setGridEnabled',
       enabled,
       sceneId,
@@ -410,16 +380,14 @@ function handleLocaleChange(nextLocale) {
 }
 
 onMounted(() => {
-  coronaEventBus.on('viewport-controls-state', onViewportControlsState);
+  unsubscribeViewportControls = viewportControlsService.subscribe(onViewportControlsState);
   requestViewportControlsState();
   void loadAiKeyStatus();
-  viewportControlPollTimer = window.setInterval(requestViewportControlsState, 1000);
 });
 
 onBeforeUnmount(() => {
-  coronaEventBus.off('viewport-controls-state', onViewportControlsState);
-  if (viewportControlPollTimer) window.clearInterval(viewportControlPollTimer);
-  viewportControlPollTimer = null;
+  unsubscribeViewportControls?.();
+  viewportRequests.abort();
   if (speedApplyTimer) window.clearTimeout(speedApplyTimer);
   speedApplyTimer = null;
 });

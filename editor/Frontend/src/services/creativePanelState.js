@@ -1,109 +1,93 @@
 import { onMounted, onUnmounted, ref, watch } from 'vue';
-import { appService, isCurrentWindowEvent } from './appService.js';
-import { coronaEventBus } from '../utils/eventBus.js';
+import { getWebMessages } from '../api/webMessages.js';
 
+const METHOD = 'creative.controls';
 const STATE = 'creative-controls-state';
-const REQUEST = 'creative-controls-request';
-const ACTION = 'creative-controls-action';
-const ERROR = 'creative-controls-error';
-let localOwner = null;
-const clone = value => JSON.parse(JSON.stringify(value));
+const fail = (code, message) => Object.assign(new Error(message), { code });
 
-// The main page owns the camera. Dock documents edit only the binding they saw.
-export function createCreativePanelOwner({ snapshot, actions, isCurrent, publish, reportError }) {
-  let disposed = false;
-  let pending = Promise.resolve();
-  const listeners = new Set();
-  const current = () => !disposed && isCurrent();
-  const read = () => clone(snapshot());
-  function notify() {
-    if (!current()) return;
-    const state = read();
-    for (const listener of listeners) listener(state);
-    publish(state);
-  }
-  async function applyAction(request) {
-    if (!current()) return false;
-    const state = read();
-    if (!state.available || request.sceneId !== state.sceneId || request.cameraId !== state.cameraId
-      || request.cameraHandle !== state.cameraHandle) {
-      reportError('场景或相机已切换，请等待面板刷新后重试。');
-      notify();
-      return false;
+/** Only camera business state and serialized writes live here. */
+export function createCreativePanelProvider(messages, { snapshot, actions, isCurrent }) {
+  let disposed = false, revision = 0;
+  let writes = Promise.resolve();
+  const current = () => {
+    if (disposed || !isCurrent()) throw fail('CONTEXT_CHANGED', 'Creative controls document is no longer current');
+  };
+  const read = () => {
+    current();
+    return { owner: messages.documentId, revision, state: structuredClone(snapshot()) };
+  };
+  const notify = async () => { current(); revision++; await messages.emit(STATE, read()); };
+  const apply = async request => {
+    const state = read().state;
+    if (!state.available || ['sceneId', 'cameraId', 'cameraHandle'].some(key => request[key] !== state[key])) {
+      throw fail('STALE_CAMERA', '场景或相机已切换，请等待面板刷新后重试。');
     }
-    if (!Object.hasOwn(actions, request.action) || !Array.isArray(request.args)) return false;
+    if (!Object.hasOwn(actions, request.action) || !Array.isArray(request.args)) {
+      throw fail('INVALID_ARGUMENT', 'Unknown creative control action or arguments');
+    }
     try {
-      await actions[request.action](...request.args);
-      return true;
-    } catch (error) {
-      if (current()) reportError(error?.message || String(error));
-      return false;
-    } finally { notify(); }
-  }
-  function act(request) {
-    // Serialize asynchronous writes, then recheck the binding at execution time.
-    // A camera/world switch must invalidate commands waiting behind a slow write.
-    pending = pending.then(() => applyAction(request));
-    return pending;
-  }
+      if (await actions[request.action](...request.args) === false) throw fail('CREATIVE_UPDATE_FAILED', 'Creative control update failed');
+      current();
+      return read();
+    } finally {
+      if (!disposed && isCurrent()) await notify();
+    }
+  };
+  const unregister = messages.handle(METHOD, (request = {}) => {
+    if (request.action === 'getState') return read();
+    const operation = writes.then(() => apply(request));
+    writes = operation.catch(() => {});
+    return operation;
+  });
+  return { notify, dispose() { disposed = true; unregister(); } };
+}
+
+/** Snapshot versions prevent a late initial reply from replacing newer state. */
+export function createCreativePanelClient(messages, { receive = () => {}, readyTimeoutMs = 15_000 } = {}) {
+  const lifetime = new AbortController();
+  let latest = null;
+  const accept = value => {
+    if (lifetime.signal.aborted || !value?.state) return;
+    if (latest?.owner === value.owner && value.revision < latest.revision) return;
+    latest = structuredClone(value);
+    receive(structuredClone(value.state));
+  };
+  const unsubscribe = messages.on(STATE, accept);
+  const ready = messages.request('main', METHOD, { action: 'getState' },
+    { waitForHandler: true, readyTimeoutMs, signal: lifetime.signal }).then(value => { accept(value); return latest.state; });
   return {
-    notify, act,
-    subscribe(listener) { listeners.add(listener); if (current()) listener(read()); return () => listeners.delete(listener); },
-    dispose() { disposed = true; listeners.clear(); },
+    ready,
+    async act(action, ...args) {
+      await ready;
+      const { sceneId, cameraId, cameraHandle } = latest.state;
+      const result = await messages.request('main', METHOD, { action, args, sceneId, cameraId, cameraHandle },
+        { signal: lifetime.signal });
+      accept(result);
+      return latest.state;
+    },
+    dispose() { lifetime.abort(); unsubscribe(); },
   };
 }
 
 export function provideCreativePanelState(snapshot, actions, isCurrent) {
-  const send = (event, payload) => { void appService.crossTabBroadcast(event, payload).catch(() => {}); };
-  const owner = createCreativePanelOwner({ snapshot, actions, isCurrent,
-    publish: state => send(STATE, { state }), reportError: message => send(ERROR, { message }),
-  });
-  localOwner = owner;
-  const requested = payload => { if (isCurrentWindowEvent(payload)) owner.notify(); };
-  const acted = payload => { if (isCurrentWindowEvent(payload)) void owner.act(payload); };
-  const stop = watch(snapshot, owner.notify, { deep: true });
-  onMounted(() => {
-    coronaEventBus.on(REQUEST, requested);
-    coronaEventBus.on(ACTION, acted);
-    owner.notify();
-  });
-  onUnmounted(() => {
-    stop(); owner.dispose();
-    if (localOwner === owner) localOwner = null;
-    coronaEventBus.off(REQUEST, requested);
-    coronaEventBus.off(ACTION, acted);
-  });
+  const provider = createCreativePanelProvider(getWebMessages(), { snapshot, actions, isCurrent });
+  const notify = () => { void provider.notify().catch(error => console.warn('[creative controls]', error)); };
+  const stop = watch(snapshot, notify, { deep: true });
+  onMounted(notify);
+  onUnmounted(() => { stop(); provider.dispose(); });
 }
 
 export function useCreativePanelState() {
-  const state = ref({});
-  const ready = ref(false);
-  const error = ref('');
-  let timer = null, unsubscribe = null;
-  const apply = next => { state.value = clone(next); ready.value = true; clearInterval(timer); timer = null; };
-  const receive = payload => { if (isCurrentWindowEvent(payload) && payload.state) apply(payload.state); };
-  const failed = payload => { if (isCurrentWindowEvent(payload)) error.value = payload.message; };
-  function act(action, ...args) {
-    error.value = '';
-    const { sceneId, cameraId, cameraHandle } = state.value;
-    const request = { action, args, sceneId, cameraId, cameraHandle };
-    if (localOwner) return localOwner.act(request);
-    return appService.crossTabBroadcast(ACTION, request).catch(failure => { error.value = failure.message; });
-  }
+  const state = ref({}), ready = ref(false), error = ref('');
+  let client;
   onMounted(() => {
-    coronaEventBus.on(STATE, receive);
-    coronaEventBus.on(ERROR, failed);
-    if (localOwner) unsubscribe = localOwner.subscribe(apply);
-    else {
-      const request = () => { void appService.crossTabBroadcast(REQUEST, {}).catch(() => {}); };
-      timer = setInterval(request, 1000);
-      request();
-    }
+    client = createCreativePanelClient(getWebMessages(), { receive: value => { state.value = value; ready.value = true; } });
+    client.ready.catch(failure => { if (failure.code !== 'ABORTED') error.value = failure.message; });
   });
-  onUnmounted(() => {
-    clearInterval(timer); unsubscribe?.();
-    coronaEventBus.off(STATE, receive);
-    coronaEventBus.off(ERROR, failed);
-  });
-  return { state, ready, error, act };
+  onUnmounted(() => client?.dispose());
+  return { state, ready, error, async act(action, ...args) {
+    error.value = '';
+    try { await client.act(action, ...args); return true; }
+    catch (failure) { if (failure.code !== 'ABORTED') error.value = failure.message; return false; }
+  } };
 }

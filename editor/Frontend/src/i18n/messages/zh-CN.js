@@ -57,7 +57,6 @@ export default {
     dropHere: '拖放到此处',
   },
   start: {
-    testMode: '测试模式',
     newGame: '新建游戏',
     continueGame: '继续游戏',
     joinGame: '加入游戏',

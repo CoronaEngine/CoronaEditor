@@ -421,6 +421,8 @@
 
 <script setup>
 import { ref, reactive, onMounted, onUnmounted } from 'vue';
+import { createViewLifetime } from '@/utils/viewLifetime.js';
+const viewLifetime = createViewLifetime();
 import { useRoute } from 'vue-router';
 import ModelNodeHierarchy from '@/components/ui/ModelNodeHierarchy.vue';
 import { pickedNodeIdentity } from '@/utils/modelHierarchy.js';
@@ -664,44 +666,23 @@ const getTargetCamera = () => {
 
 const focusActorFromList = async (scene) => {
   const focusSeq = ++actorFocusSeq;
-  SelectActor(scene);
-
+  const sceneId = currentSceneName.value;
+  const scope = { archive_session: archiveSession.value };
   try {
-    const cameraName = getTargetCameraName();
-    if (!cameraName) {
-      logWarn('Actor focus skipped: missing target camera', scene?.name);
+    const camera = getTargetCamera();
+    if (!camera?.camera_id) {
+      logWarn('Actor focus skipped: missing target camera identity', scene?.name);
       return;
     }
-
-    const result = await editorApi.sceneTools.focusActor(
-      currentSceneName.value,
-      scene.name,
-      cameraName
+    const result = await editorApi.scene.focusActor(
+      sceneId, scene.actor_guid || scene.name, camera.camera_id, scope,
     );
-    if (focusSeq !== actorFocusSeq) return;
-    const payload = result?.data ?? result;
-    if (result?.success === false || payload?.status === 'error') {
-      throw new Error(payload?.message || result?.error || 'Actor focus failed');
-    }
-
-    const camera = payload?.camera;
-    if (!camera || !Array.isArray(camera.position) || !Array.isArray(camera.forward)) {
-      logWarn('Actor focus returned no camera pose', payload);
-      return;
-    }
-
-    coronaEventBus.emit('camera-pose-request', {
-      position: camera.position,
-      forward: camera.forward,
-      up: camera.world_up,
-      fov: camera.fov,
-      cameraHandle: camera.handle,
-      cameraName: camera.name || cameraName,
-    });
+    if (focusSeq !== actorFocusSeq || scope.archive_session !== archiveSession.value || sceneId !== currentSceneName.value) return;
+    if (result.archive_session !== scope.archive_session || result.scene !== sceneId) return;
+    // Native already applied the pose. Web only synchronizes the matching viewport UI.
+    await appService.crossTabBroadcast('camera-pose-applied', result);
   } catch (e) {
-    if (focusSeq === actorFocusSeq) {
-      logError('Actor focus failed', e);
-    }
+    if (focusSeq === actorFocusSeq) logError('Actor focus failed', e);
   }
 };
 
@@ -789,7 +770,8 @@ const ToggleVisible = async (scene) => {
   // 音视频资源没有对应 Actor，仅在前端切换可见标记
   if (isMediaItem(scene)) return;
   try {
-    await editorApi.sceneTools.setActorState(currentSceneName.value, scene.name, {
+    await editorApi.scene.setActorProperties(currentSceneName.value, scene.name, {
+      archive_session: archiveSession.value,
       visible: newVisible,
     });
   } catch (e) {
@@ -868,26 +850,11 @@ const getTargetCameraName = () => {
 
 const TakeScreenshot = async () => {
   try {
-    const cameraName = getTargetCameraName();
-    const selectResult = await editorApi.sceneTools.selectScreenshotPath(
-      currentSceneName.value,
-      cameraName
-    );
-    const selectPayload = selectResult?.data ?? selectResult;
-
-    if (!selectPayload || selectPayload.status === 'canceled' || !selectPayload.path) {
-      return;
-    }
-
-    const result = await editorApi.sceneTools.saveScreenshot(
-      currentSceneName.value,
-      selectPayload.path,
-      cameraName
-    );
-    const payload = result?.data ?? result;
-    if (result?.success === false || payload?.status === 'error') {
-      logError('Screenshot failed', payload?.message || result?.error || 'unknown error');
-    }
+    const camera = getTargetCamera();
+    if (!camera?.camera_id) return;
+    await editorApi.scene.captureScreenshot(currentSceneName.value, camera.camera_id, {
+      archive_session: archiveSession.value,
+    });
   } catch (e) {
     logError('Failed to take screenshot', e);
   }
@@ -1187,6 +1154,7 @@ const DeleteActor = async (scene) => {
 
 
 const OnInitObjTree = async () => {
+  if (!viewLifetime.current()) return;
   const sceneName = currentSceneName.value;
   const requestSeq = ++sceneTreeRequestSeq;
   if (!sceneName) return;
@@ -1194,7 +1162,7 @@ const OnInitObjTree = async () => {
     const result = await editorApi.sceneTools.listSceneTree(sceneName);
     // Scene switches and native tree notifications can overlap.  Only the most
     // recent request for the still-active route may replace the displayed tree.
-    if (requestSeq !== sceneTreeRequestSeq || sceneName !== currentSceneName.value) return;
+    if (!viewLifetime.current() || requestSeq !== sceneTreeRequestSeq || sceneName !== currentSceneName.value) return;
 
     // Both transports return the native payload in `data`, but keeping the
     // direct-payload fallback means a valid snapshot is never discarded when a
@@ -1232,13 +1200,14 @@ const OnInitObjTree = async () => {
       scheduleSceneTreeSettleRetry(decision.retryInMs, sceneName);
     }
   } catch (e) {
-    if (requestSeq === sceneTreeRequestSeq) logError('Failed to load scene tree', e);
+    if (viewLifetime.current() && requestSeq === sceneTreeRequestSeq) logError('Failed to load scene tree', e);
   }
 };
 
 onMounted(async () => {
   coronaEventBus.on('model-node-picked', handleModelNodePick);
   const result = await editorApi.main.onInit();
+  if (!viewLifetime.current()) return;
   const queryString = window.location.hash?.split('?')[1] || window.location.search?.slice(1);
   const urlSceneName = queryString ? new URLSearchParams(queryString).get('sceneName') : null;
 
@@ -1248,13 +1217,18 @@ onMounted(async () => {
   currentSceneName.value = urlSceneName || activeScene?.path || DEFAULT_SCENE_NAME;
 
   await OnInitObjTree();
+  if (!viewLifetime.current()) return;
   await RefreshRenderBackendState();
+  if (!viewLifetime.current()) return;
   // 后端对象变化：项目打开/物体变化时重新加载场景树
-  actorChangedCallbackToken = await editorApi.scene.observe('selection', onActorChangeEvent);
+  actorChangedCallbackToken = await viewLifetime.subscribe(callback => editorApi.scene.observe('selection', callback), onActorChangeEvent, editorApi.off);
+  if (!viewLifetime.current()) return;
   sceneTreeChangedCallbackToken =
-    await editorApi.scene.observe('tree', onSceneTreeChangedEvent);
-  projectOpenedCallbackToken = await editorApi.scene.observe('project', onProjectOpenedEvent);
-  nodeSelectionCallbackToken = await editorApi.scene.observe('selection', handleModelNodePick);
+    await viewLifetime.subscribe(callback => editorApi.scene.observe('tree', callback), onSceneTreeChangedEvent, editorApi.off);
+  if (!viewLifetime.current()) return;
+  projectOpenedCallbackToken = await viewLifetime.subscribe(callback => editorApi.scene.observe('project', callback), onProjectOpenedEvent, editorApi.off);
+  if (!viewLifetime.current()) return;
+  nodeSelectionCallbackToken = await viewLifetime.subscribe(callback => editorApi.scene.observe('selection', callback), handleModelNodePick, editorApi.off);
 });
 
 // 项目打开时刷新当前场景树；actor 选择只更新详情面板，不重建树，避免点击闪烁。
@@ -1310,18 +1284,19 @@ const applyCameraList = (cameras) => {
 };
 
 const RefreshCameraListOnly = async () => {
-  if (!currentSceneName.value || cameraListRefreshInFlight) {
+  if (!viewLifetime.current() || !currentSceneName.value || cameraListRefreshInFlight) {
     return;
   }
   cameraListRefreshInFlight = true;
   try {
     const result = await editorApi.sceneTools.listSceneTree(currentSceneName.value);
+    if (!viewLifetime.current()) return;
     const data = result?.data ?? result;
     if (Array.isArray(data?.cameras)) {
       applyCameraList(data.cameras);
     }
   } catch (e) {
-    logError('Failed to refresh camera list', e);
+    if (viewLifetime.current()) logError('Failed to refresh camera list', e);
   } finally {
     cameraListRefreshInFlight = false;
   }
@@ -1337,6 +1312,7 @@ const RefreshCameraListOnHover = () => {
 };
 
 onUnmounted(() => {
+  viewLifetime.dispose();
   clearSceneTreeSettleRetry();
   coronaEventBus.off('model-node-picked', handleModelNodePick);
   if (nodeSelectionCallbackToken)

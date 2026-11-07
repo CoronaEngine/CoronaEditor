@@ -1,7 +1,9 @@
 ﻿import { reactive } from 'vue';
-import { appService, isCurrentWindowEvent } from './appService.js';
-import { coronaEventBus } from '../utils/eventBus.js';
-import { createNativeGuidanceRelay } from './nativeGuidanceRelay.js';
+import { appService } from './appService.js';
+import { editorUiAllowed } from './worldModeService.js';
+import { getWebMessages } from '../api/webMessages.js';
+import { subscribeProjectChanged } from './projectMessages.js';
+import { createGuidanceCoordinator } from './guidanceCoordinator.js';
 
 const GUIDANCE_PANELS = new Set(['MainPage', 'SceneControls', 'CabbageChatPanel', 'SceneTools', 'Object', 'EditorSettings', 'NodeGraphPanel']);
 
@@ -54,31 +56,20 @@ let exactTargetMissingTicks = 0;
 let exactTargetPrepareTicks = 0;
 let fromTargetPrepareTicks = 0;
 let lifecycleGuardsAttached = false;
+let stopProjectChanged = null;
 let nativeRelay = null;
 let nativePanelId = '';
 
 export function attachNativeGuidance(panelId) {
   nativePanelId = panelId;
-  const send = (event, payload) => { void appService.crossTabBroadcast(event, payload).catch(() => {}); };
-  const relay = createNativeGuidanceRelay({ panelId, send,
-    open: id => send('creative-panel-open', { panelId: id }),
+  const relay = createGuidanceCoordinator({ panelId, messages: getWebMessages(), isCurrent: editorUiAllowed,
+    open: id => appService.crossTabBroadcast('creative-panel-open', { panelId: id }),
     show: source => start(source, { local: true }),
   });
   nativeRelay = relay;
-  const handlers = {
-    'creative-guidance-request': payload => {
-      if (!isCurrentWindowEvent(payload)) return;
-      void relay.receiveRequest(payload);
-    },
-    'creative-guidance-ready': payload => { if (isCurrentWindowEvent(payload)) relay.receiveReady(payload); },
-    'creative-guidance-accepted': payload => { if (isCurrentWindowEvent(payload)) relay.receiveAccepted(payload); },
-  };
-  for (const [event, handler] of Object.entries(handlers)) coronaEventBus.on(event, handler);
-  relay.ready();
   return () => {
     relay.dispose();
     if (nativeRelay === relay) { nativeRelay = null; nativePanelId = ''; }
-    for (const [event, handler] of Object.entries(handlers)) coronaEventBus.off(event, handler);
     void stop();
   };
 }
@@ -810,14 +801,15 @@ function handlePageUnload() {
 function attachLifecycleGuards() {
   if (lifecycleGuardsAttached) return;
   lifecycleGuardsAttached = true;
-  window.addEventListener('corona-active-project-changed', handleProjectChanged);
+  stopProjectChanged = subscribeProjectChanged(handleProjectChanged);
   window.addEventListener('beforeunload', handlePageUnload);
 }
 
 function detachLifecycleGuards() {
   if (!lifecycleGuardsAttached) return;
   lifecycleGuardsAttached = false;
-  window.removeEventListener('corona-active-project-changed', handleProjectChanged);
+  stopProjectChanged?.();
+  stopProjectChanged = null;
   window.removeEventListener('beforeunload', handlePageUnload);
 }
 
@@ -826,8 +818,7 @@ async function start(source, { local = false } = {}) {
   if (!guidance) return false;
   if (state.active || state.preparing) await stop();
   if (!local && nativeRelay && guidance.panelId !== nativePanelId) {
-    nativeRelay.request(guidance);
-    return true;
+    return nativeRelay.request(guidance);
   }
   const token = ++lifecycleToken;
   state.preparing = true;

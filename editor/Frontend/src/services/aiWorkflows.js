@@ -107,13 +107,13 @@ async function load(payload = {}) {
   if (
     prompt &&
     (loaded.context.worldGoal.prompt !== prompt ||
-      loaded.context.worldGoal.mode !== metadata.mode ||
+      loaded.context.worldGoal.mode !== 'creative' ||
       loaded.context.worldGoal.status !== 'ready')
   ) {
     const planned = await startGoal({
       projectPath: path,
       prompt,
-      mode: metadata.mode || 'creative',
+      mode: 'creative',
     });
     return { ...loaded, goalPlan: planned };
   }
@@ -125,7 +125,7 @@ async function startGoal(payload = {}) {
     prompt = String(payload.prompt || '')
       .trim()
       .slice(0, 4000),
-    mode = payload.mode || 'story';
+    mode = 'creative';
   if (!prompt)
     return contextTransaction(path, (context) => {
       Object.assign(context.worldGoal, {

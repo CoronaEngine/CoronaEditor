@@ -14339,7 +14339,7 @@
     },
     "worldGoal": {
       "prompt": "",
-      "mode": "story",
+      "mode": "creative",
       "source": "default",
       "status": "ready",
       "generatedAt": 0,

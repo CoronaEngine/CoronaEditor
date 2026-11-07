@@ -8,11 +8,12 @@ import { onMounted, onUnmounted } from 'vue';
 import { useCabbageAssistantStore } from '@/stores/cabbageAssistantStore.js';
 import { appService } from '@/services/appService.js';
 import { reviewScopeId } from '@/services/nodeGraphReviewService.js';
+import { worldModeState } from '@/services/worldModeService.js';
 import { subscribeCabbageAssistantContext, subscribeCabbagePreWarnings } from '@/services/cabbageAssistantContextService.js';
 import CabbageReviewAssistant from '@/components/ui/CabbageReviewAssistant.vue';
 const assistant = useCabbageAssistantStore();
 let unsubscribe = null, unsubscribeWarnings = null;
-const projectScopeId = () => reviewScopeId(String(window.localStorage?.getItem('corona.activeProjectPath') || ''));
+const projectScopeId = () => reviewScopeId(String(worldModeState.activeProjectPath || ''));
 const openChat = () => {
   void appService.crossTabBroadcast('creative-panel-open', { panelId: 'CabbageChatPanel' }).catch(() => {});
 };

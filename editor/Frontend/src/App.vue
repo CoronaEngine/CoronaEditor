@@ -6,12 +6,15 @@ import NativeDockLayout from '@/components/dock/NativeDockLayout.vue';
 import CabbageGuidanceOverlay from '@/components/ui/CabbageGuidanceOverlay.vue';
 import { editorApi } from '@/api/editorApi.js';
 import { appService } from '@/services/appService.js';
-import { EDITOR_UI_POLICY_KEY } from '@/services/editorWindowSession.js';
+import { getWebMessages } from '@/api/webMessages.js';
+import { getWebDocumentIdentity } from '@/api/webDocument.js';
+import { WINDOW_SESSION_POLICY_EVENT } from '@/services/windowSessionState.js';
 import { LAUNCHER_ROUTES, normalizeProjectPath, editorUiAllowed, worldModeService, worldModeState } from '@/services/worldModeService.js';
 import lanchat from '@/stores/lanchat.js';
 import { cancelPendingProjectOpen } from '@/services/projectLauncherService.js';
 import { notifyWorldError } from '@/services/worldSessionLifecycle.js';
 import { coronaEventBus } from '@/utils/eventBus.js';
+import { subscribeProjectChanged } from '@/services/projectMessages.js';
 
 const route = useRoute();
 const router = useRouter();
@@ -26,7 +29,8 @@ const worldReady = computed(() => worldModeState.status === 'ready'
   && preparedRevision.value === worldModeState.revision);
 const mayRenderRoute = computed(() => isLauncherRoute.value || (worldReady.value
   && (route.path === '/' || editorUiAllowed())));
-const isStandalonePanel = computed(() => route.query?.standalone === '1');
+const documentIdentity = getWebDocumentIdentity();
+const isStandalonePanel = computed(() => documentIdentity.role === 'peer');
 function returnToLauncher() {
   if (isEditorRoute.value && !isStandalonePanel.value) void router.replace('/StartScreen');
 }
@@ -53,25 +57,16 @@ watch(() => [worldModeState.status, worldModeState.revision, route.path, route.m
   if (worldModeState.status === 'ready') lastReadyProjectKey = projectKey;
   preparedRevision.value = -1;
   try {
-    if (!isStandalonePanel.value && typeof window.coronaBridge?.dockCommand === 'function') {
+    if (!isStandalonePanel.value && typeof window.corona?.window?.suspendCameraViews === 'function') {
       const enabled = editorUiAllowed() && !isLauncherRoute.value;
       if (!enabled && !refreshingCurrentProject) dockStore.clearSession();
       await appService.setEditorUiEnabled(enabled);
-    } else if (isStandalonePanel.value && typeof window.coronaBridge?.dockCommand === 'function') {
+    } else if (isStandalonePanel.value && typeof window.corona?.window?.suspendCameraViews === 'function') {
       const policy = await appService.readEditorUiPolicy();
       if (!policy?.enabled) { await appService.closeThisTab(''); return; }
     }
     if (preparation !== preparationRevision || revision !== worldModeState.revision || appUnmounted) return;
     if (worldModeState.status !== 'ready') return;
-    if (worldModeState.mode === 'story') {
-      if (isStandalonePanel.value) {
-        await appService.closeThisTab('');
-        return;
-      }
-      dockStore.clearSession();
-      await lanchat.finishWorldSession();
-      if (!isLauncherRoute.value && route.path !== '/') await router.replace('/');
-    }
     if (preparation === preparationRevision && revision === worldModeState.revision && !appUnmounted) preparedRevision.value = revision;
   } catch (error) {
     if (preparation !== preparationRevision || revision !== worldModeState.revision || appUnmounted) return;
@@ -88,7 +83,7 @@ async function refreshWorldMode(projectPath = '', force = false) {
     && normalizeProjectPath(projectPath) === normalizeProjectPath(worldModeState.projectPath)) return;
   const request = ++refreshRevision;
   try {
-    await worldModeService.resolve(projectPath, { force: true });
+    await worldModeService.resolve(projectPath, { force });
   } catch (error) {
     if (request !== refreshRevision || appUnmounted) return;
     if (isStandalonePanel.value) {
@@ -96,22 +91,14 @@ async function refreshWorldMode(projectPath = '', force = false) {
       return;
     }
     await router.replace('/StartScreen');
-    notifyWorldError(error, '读取世界模式失败');
+    notifyWorldError(error, '读取项目失败');
   }
 }
-function onWindowPolicyChanged(event) {
-  if (event.key === EDITOR_UI_POLICY_KEY && isStandalonePanel.value) windowPolicyRevision.value++;
-}
-function onActiveProjectChanged(event) {
-  void refreshWorldMode(event.detail?.projectPath || '');
-}
-function onProjectStorageChanged(event) {
-  if (event.key === 'corona.activeProjectPath') void refreshWorldMode(event.newValue || '');
-}
-
 let gcTimer = null;
+let stopNativeCloseRequested;
+let stopProjectChanged;
+let stopWindowPolicyChanged;
 let lanChatEventCallbackToken = null;
-const SCRATCH_KEY_FORWARDED = '__coronaScratchKeyForwarded';
 
 function isEscapeKey(event) {
   const modifierKeys = new Set([
@@ -135,29 +122,6 @@ function isEditableTarget(target) {
   );
 }
 
-function forwardScratchKey(event, released = false) {
-  // Inside the native editor SDL already feeds the engine input queue.
-  // Forwarding the same DOM event would duplicate every gameplay input.
-  if (window.coronaBridge) return;
-  if (event[SCRATCH_KEY_FORWARDED]) return;
-  if (!released && isEditableTarget(event.target)) return;
-
-  const code = event.code || event.key || '';
-  const displayKey = event.key || event.code || '';
-  if (!code) return;
-
-  event[SCRATCH_KEY_FORWARDED] = true;
-  if (released) {
-    editorApi.scripts.sendKeyUpEvent(code, displayKey).catch(() => {});
-    return;
-  }
-  const modifiers = [
-    event.ctrlKey || event.metaKey ? 'Ctrl' : '',
-    event.shiftKey ? 'Shift' : '',
-    event.altKey ? 'Alt' : '',
-  ].filter(Boolean).join(',');
-  editorApi.scripts.sendKeyEvent(code, modifiers, displayKey).catch(() => {});
-}
 
 function isGameplayKey(event) {
   if (event.ctrlKey || event.metaKey || event.altKey) return false;
@@ -195,7 +159,6 @@ function onGlobalKeyDown(event) {
   }
   if (isLauncherRoute.value || !editorUiAllowed() || !worldReady.value) return;
   consumeNativeGameplayDomEvent(event);
-  forwardScratchKey(event, false);
   if (event.defaultPrevented) return;
   if (!isEscapeKey(event)) return;
   if (isStandalonePanel.value && route.path === '/SetUp') {
@@ -216,7 +179,6 @@ function onGlobalKeyDown(event) {
 function onGlobalKeyUp(event) {
   if (isLauncherRoute.value || !editorUiAllowed() || !worldReady.value) return;
   consumeNativeGameplayDomEvent(event);
-  forwardScratchKey(event, true);
 }
 
 function onLanChatEvent(payload) {
@@ -239,12 +201,13 @@ async function registerLanChatEvent() {
 }
 
 onMounted(() => {
-  coronaEventBus.on('native-panel-close', closeNativePanel);
+  if (window.corona) stopNativeCloseRequested = appService.onWindowCloseRequested(closeNativePanel);
   coronaEventBus.on('creative-return-to-launcher', returnToLauncher);
   appUnmounted = false;
-  window.addEventListener('corona-active-project-changed', onActiveProjectChanged);
-  window.addEventListener('storage', onProjectStorageChanged);
-  window.addEventListener('storage', onWindowPolicyChanged);
+  stopProjectChanged = subscribeProjectChanged(({ projectPath }) => void refreshWorldMode(projectPath));
+  stopWindowPolicyChanged = getWebMessages().on(WINDOW_SESSION_POLICY_EVENT, () => {
+    if (isStandalonePanel.value) windowPolicyRevision.value++;
+  });
   void editorApi.scene.observe('project', (payload) => {
     const reopened = Boolean(observedProjectSession) && observedProjectSession !== payload.archive_session;
     observedProjectSession = payload.archive_session;
@@ -270,13 +233,14 @@ onMounted(() => {
 });
 
 onUnmounted(() => {
-  coronaEventBus.off('native-panel-close', closeNativePanel);
+  stopNativeCloseRequested?.();
   coronaEventBus.off('creative-return-to-launcher', returnToLauncher);
   appUnmounted = true;
   ++refreshRevision;
-  window.removeEventListener('corona-active-project-changed', onActiveProjectChanged);
-  window.removeEventListener('storage', onProjectStorageChanged);
-  window.removeEventListener('storage', onWindowPolicyChanged);
+  stopProjectChanged?.();
+  stopProjectChanged = null;
+  stopWindowPolicyChanged?.();
+  stopWindowPolicyChanged = null;
   if (projectOpenedToken) void editorApi.off(projectOpenedToken).catch(() => {});
   if (lanChatEventCallbackToken) {
     const callbackToken = lanChatEventCallbackToken;

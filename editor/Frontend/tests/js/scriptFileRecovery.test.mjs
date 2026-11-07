@@ -8,7 +8,7 @@ const timeout = () => Object.assign(new Error('lost acknowledgement'), { code: 5
 
 test('a retry after reopening the same project keeps the session captured at the click', async t => {
   let session = 'first-A';
-  t.mock.method(editorApi.scene, 'readActive', async () => ({ data: { project_path: '/A', archive_session: session } }));
+  t.mock.method(editorApi.scene, 'readActive', async () => ({ project_path: '/A', archive_session: session }));
   const start = { requestId: 'delayed', ...await readScriptProject() };
   let attempts = 0;
   await assert.rejects(startScriptFile(start, {

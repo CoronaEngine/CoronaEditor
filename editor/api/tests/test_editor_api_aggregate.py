@@ -30,14 +30,17 @@ class EditorAggregateApiTest(unittest.TestCase):
             scene_tools = type(CoronaEditorApi.scene_tools)()
             self.assertFalse(callable(getattr(scene_tools, "get_frame_timing", None)))
 
-    def test_retired_log_event_has_no_python_subscription(self):
+    def test_retired_result_events_have_no_python_subscription(self):
         with patch("api.editor_api._CPP_EDITOR_API_METHODS", {}), patch(
             "api.editor_api._CPP_EDITOR_API_EVENTS", {
-                "SceneTools.meshMoveResult": {"python_wrapper": "events.on_mesh_move_result"},
+                "SceneTools.actorChanged": {"python_wrapper": "events.on_actor_changed"},
             },
         ):
-            self.assertFalse(hasattr(CoronaEditorApi.events, "on_log_batch"))
-            self.assertTrue(callable(CoronaEditorApi.events.on_mesh_move_result))
+            events = type(CoronaEditorApi.events)()
+            self.assertFalse(hasattr(events, "on_log_batch"))
+            self.assertFalse(hasattr(events, "on_mesh_move_result"))
+            self.assertFalse(hasattr(events, "on_actor_pick_result"))
+            self.assertTrue(callable(events.on_actor_changed))
 
     def test_script_runtime_manifest_lookup_uses_script_channel(self):
         import api.editor_api as editor_api_module
@@ -345,6 +348,9 @@ class EditorAggregateApiTest(unittest.TestCase):
             ],
         )
 
+    def test_orphan_focus_pose_event_wrapper_is_removed(self):
+        self.assertIsNone(getattr(type(CoronaEditorApi.events), 'on_focus_pose_result', None))
+
     def test_scene_tools_vision_denoise_preserves_false_and_pending_response(self):
         accepted = {"status": "success", "enabled": False, "pending": True}
         with patch("api.editor_api._invoke_manifest_cpp_api", return_value=accepted) as invoke:
@@ -372,7 +378,9 @@ class EditorAggregateApiTest(unittest.TestCase):
             ("scene_tools.get_vision_accumulation", [None, None]),
         ])
 
-    def test_scene_tools_camera_debug_uses_aggregate_contracts(self):
+    def test_scene_tools_camera_rendering_uses_current_aggregate_contracts(self):
+        for retired in ('set_shadow_cascade_debug', 'get_shadow_cascade_debug', 'set_ssao_enabled', 'get_ssao_enabled'):
+            self.assertIsNone(getattr(type(CoronaEditorApi.scene_tools), retired, None))
         with patch(
             "api.editor_api._invoke_manifest_cpp_api",
             side_effect=[
@@ -380,10 +388,6 @@ class EditorAggregateApiTest(unittest.TestCase):
                 {"status": "success", "mode": "vision"},
                 {"status": "success", "mode": "path_tracing"},
                 {"status": "success", "mode": "path_tracing"},
-                {"status": "success", "enabled": True},
-                {"status": "success", "enabled": True},
-                {"status": "success", "enabled": False},
-                {"status": "success", "enabled": False},
                 {"status": "success", "mode": "final_color"},
                 {"status": "success", "mode": "final_color"},
             ],
@@ -401,18 +405,6 @@ class EditorAggregateApiTest(unittest.TestCase):
                 CoronaEditorApi.scene_tools.get_vision_render_mode(
                     "level.scene", "MainCamera"
                 ),
-                CoronaEditorApi.scene_tools.set_shadow_cascade_debug(
-                    "level.scene", "MainCamera", True
-                ),
-                CoronaEditorApi.scene_tools.get_shadow_cascade_debug(
-                    "level.scene", "MainCamera"
-                ),
-                CoronaEditorApi.scene_tools.set_ssao_enabled(
-                    "level.scene", "MainCamera", False
-                ),
-                CoronaEditorApi.scene_tools.get_ssao_enabled(
-                    "level.scene", "MainCamera"
-                ),
                 CoronaEditorApi.scene_tools.set_output_mode(
                     "level.scene", "MainCamera", "final_color"
                 ),
@@ -422,8 +414,8 @@ class EditorAggregateApiTest(unittest.TestCase):
             ]
 
         self.assertEqual(results[0]["mode"], "vision")
-        self.assertTrue(results[4]["enabled"])
-        self.assertFalse(results[7]["enabled"])
+        self.assertEqual(results[2]["mode"], "path_tracing")
+        self.assertEqual(results[5]["mode"], "final_color")
         self.assertEqual(
             [call.args for call in invoke.call_args_list],
             [
@@ -434,13 +426,6 @@ class EditorAggregateApiTest(unittest.TestCase):
                     ["level.scene", "MainCamera", "path_tracing"],
                 ),
                 ("scene_tools.get_vision_render_mode", ["level.scene", "MainCamera"]),
-                (
-                    "scene_tools.set_shadow_cascade_debug",
-                    ["level.scene", "MainCamera", True],
-                ),
-                ("scene_tools.get_shadow_cascade_debug", ["level.scene", "MainCamera"]),
-                ("scene_tools.set_ssao_enabled", ["level.scene", "MainCamera", False]),
-                ("scene_tools.get_ssao_enabled", ["level.scene", "MainCamera"]),
                 (
                     "scene_tools.set_output_mode",
                     ["level.scene", "MainCamera", "final_color"],

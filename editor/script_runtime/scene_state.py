@@ -85,38 +85,6 @@ def _snapshot_actor_key(data):
     return "name:" + _target_token((data or {}).get("name") or (data or {}).get("route") or "")
 
 
-def _native_restore_operation(scene_route, actor_name, operation, values):
-    action = f"Restore actor {actor_name} operation {operation}"
-    from api.editor_api import get_script_runtime_editor_api
-
-    scene_tools = get_script_runtime_editor_api().scene_tools
-    if operation == "SetVisible":
-        result = scene_tools.set_actor_state(scene_route, actor_name, {"visible": bool(values[0])})
-    else:
-        match operation:
-            case "SetMass":
-                field = {"mass": float(values[0])}
-            case "SetRestitution":
-                field = {"restitution": float(values[0])}
-            case "SetDamping":
-                field = {"damping": float(values[0])}
-            case "SetPhysicsEnabled":
-                field = {"physics_enabled": bool(values[0])}
-            case "SetCollision":
-                field = {"collision_type": str(values[0])}
-            case "SetLinearLock":
-                field = {"linear_lock": list(map(bool, values[:3]))}
-            case "SetAngularLock":
-                field = {"angular_lock": list(map(bool, values[:3]))}
-            case _:
-                raise RuntimeError(f"unsupported native actor operation: {operation}")
-        result = scene_tools.set_actor_physics(scene_route, actor_name, field)
-    return _native_payload_or_raise(
-        result,
-        action,
-    )
-
-
 def _set_native_runtime_camera(scene_route, position, forward, world_up, fov, camera_name=""):
     """Update the main editor viewport camera in memory without writing the scene file."""
     try:
@@ -164,14 +132,18 @@ def _restore_native_actor_state(scene_route, actor_data, session):
         raise RuntimeError("Scene snapshot actor is missing a name")
     geometry = actor_data.get("geometry") if isinstance(actor_data.get("geometry"), dict) else {}
     mechanics = actor_data.get("mechanics") if isinstance(actor_data.get("mechanics"), dict) else {}
-    scene_api = get_script_runtime_editor_api().scene
+    api = get_script_runtime_editor_api()
+    scene_api = api.scene
     setter = getattr(scene_api, "set_actor_transform", None) if scene_api is not None else None
     if not callable(setter):
         raise RuntimeError("native set_editor_actor_transform is unavailable")
 
     # Pause physics before restoring transforms so simulation cannot race restoration.
     if mechanics:
-        _native_restore_operation(scene_route, actor_name, "SetPhysicsEnabled", [False])
+        _native_payload_or_raise(
+            api.scene_tools.set_actor_physics(scene_route, actor_name, {"body_type": "static"}),
+            f"Pause actor {actor_name} physics",
+        )
 
     transform = {
         key: list(geometry[key])
@@ -184,47 +156,18 @@ def _restore_native_actor_state(scene_route, actor_data, session):
             f"Restore actor {actor_name} transform",
         )
 
-    _native_restore_operation(
-        scene_route, actor_name, "SetVisible", [bool(actor_data.get("visible", True))]
+    _native_payload_or_raise(
+        api.scene_tools.set_actor_state(scene_route, actor_name, {"visible": bool(actor_data.get("visible", True))}),
+        f"Restore actor {actor_name} visibility",
     )
-    _native_restore_operation(
-        scene_route,
-        actor_name,
-        "SetCollision",
-        [_normalize_native_collision_type(
-            actor_data.get("collision", mechanics.get("collision_type", "box"))
-        )],
-    )
-    if "mass" in mechanics:
-        _native_restore_operation(scene_route, actor_name, "SetMass", [mechanics.get("mass")])
-    if "restitution" in mechanics:
-        _native_restore_operation(
-            scene_route, actor_name, "SetRestitution", [mechanics.get("restitution")]
-        )
-    if "damping" in mechanics:
-        _native_restore_operation(scene_route, actor_name, "SetDamping", [mechanics.get("damping")])
-    linear = mechanics.get("linear_lock")
-    if isinstance(linear, (list, tuple)) and len(linear) >= 3:
-        _native_restore_operation(
-            scene_route,
-            actor_name,
-            "SetLinearLock",
-            [bool(linear[0]), bool(linear[1]), bool(linear[2])],
-        )
-    angular = mechanics.get("angular_lock")
-    if isinstance(angular, (list, tuple)) and len(angular) >= 3:
-        _native_restore_operation(
-            scene_route,
-            actor_name,
-            "SetAngularLock",
-            [bool(angular[0]), bool(angular[1]), bool(angular[2])],
-        )
-    if "physics_enabled" in mechanics:
-        _native_restore_operation(
-            scene_route,
-            actor_name,
-            "SetPhysicsEnabled",
-            [bool(mechanics.get("physics_enabled"))],
+    if mechanics:
+        _native_payload_or_raise(
+            api.scene_tools.set_actor_physics(scene_route, actor_name, {
+                key: mechanics[key] for key in
+                ("body_type", "mass", "restitution", "damping", "linear_lock", "angular_lock")
+                if key in mechanics
+            }),
+            f"Restore actor {actor_name} mechanics",
         )
 
 

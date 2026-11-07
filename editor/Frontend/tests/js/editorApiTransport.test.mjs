@@ -38,12 +38,6 @@ const MANIFEST_METHODS = [
     return: 'object', allowed_callers: CALLER_CEF,
   },
   {
-    api: 'SceneTools.select_screenshot_path', js_wrapper: 'sceneTools.selectScreenshotPath',
-    params: [{ name: 'scene_name', type: 'string', optional: true },
-      { name: 'camera_name', type: 'string', optional: true }],
-    return: 'object', allowed_callers: CALLER_CEF,
-  },
-  {
     api: 'SceneTools.get_restir_settings', js_wrapper: 'sceneTools.getRestirSettings',
     params: [{ name: 'scene_name', type: 'string' }, { name: 'camera_id', type: 'string' }],
     return: 'object', allowed_callers: CALLER_CEF,
@@ -112,45 +106,50 @@ function createFakeCefHost() {
   const hangFor = new Set();
   const requests = [];
   const pending = new Map();
+  const callbacks = new Map();
 
   return {
     requests,
     failFor,
     hangFor,
     pending,
-    cefQuery({ request, onSuccess, onFailure }) {
-      let payload = null;
-      try {
-        payload = JSON.parse(request);
-      } catch (error) {
-        onFailure(-1, `unparseable request: ${error.message}`);
-        return;
-      }
-
-      requests.push(payload);
-
-      // Emulates a native handler that accepts the request and never answers it.
-      if (hangFor.has(payload.api)) {
-        pending.set(payload.api, { onSuccess, onFailure });
-        return;
-      }
-      if (failFor.has(payload.api)) {
-        onFailure(-2, `${payload.api} refused by native`);
-        return;
-      }
-      if (payload.api === 'EditorApi.list_methods') {
-        onSuccess(JSON.stringify({ status: 'success', data: { methods: MANIFEST_METHODS } }));
-        return;
-      }
-      if (payload.api === 'EditorApi.list_events') {
-        onSuccess(JSON.stringify({ status: 'success', data: { events: MANIFEST_EVENTS } }));
-        return;
-      }
-      if (payload.api === 'EditorApi.register_callback') {
-        onSuccess(JSON.stringify({ status: 'success', data: { callback_token: 42 } }));
-        return;
-      }
-      onSuccess(JSON.stringify({ status: 'success', data: {} }));
+    callbacks,
+    corona: {
+      editor: {
+        invoke(api, args) {
+          const payload = { api, args };
+          requests.push(payload);
+          if (hangFor.has(api)) {
+            return new Promise((resolve, reject) => pending.set(api, { resolve, reject }));
+          }
+          if (failFor.has(api)) {
+            return Promise.reject(Object.assign(new Error(`${api} refused by native`), { code: '-2' }));
+          }
+          if (api === 'EditorApi.list_methods') {
+            return Promise.resolve({ status: 'success', data: { methods: MANIFEST_METHODS } });
+          }
+          if (api === 'EditorApi.list_events') {
+            return Promise.resolve({ status: 'success', data: { events: MANIFEST_EVENTS } });
+          }
+          return Promise.resolve({ status: 'success', data: {} });
+        },
+        on(event, callback) {
+          callbacks.set(42, { event, callback });
+          requests.push({ api: 'EditorApi.on', args: [event] });
+          return Promise.resolve(42);
+        },
+        off(token) {
+          requests.push({ api: 'EditorApi.off', args: [token] });
+          callbacks.delete(token);
+          if (failFor.has('EditorApi.off')) {
+            return Promise.reject(Object.assign(new Error('EditorApi.off refused by native'), { code: '-2' }));
+          }
+          return Promise.resolve(true);
+        },
+      },
+    },
+    emit(token, payload, event) {
+      callbacks.get(token)?.callback(payload, event);
     },
   };
 }
@@ -173,6 +172,14 @@ test('retired log subscription is absent before and after loading native events'
   await editorApi.off(extensionToken);
 });
 
+test('orphan mesh movement subscription is absent before and after loading native events', async () => {
+  const { editorApi } = await loadEditorApi();
+  assert.equal(editorApi.events.onMeshMoveResult, undefined);
+  const token = await editorApi.events.onActorChanged(() => {});
+  assert.equal(editorApi.events.onMeshMoveResult, undefined);
+  await editorApi.off(token);
+});
+
 test('model node wrappers preserve actor and numeric node identity in native requests', async () => {
   const { editorApi, host } = await loadEditorApi();
   await editorApi.sceneTools.getModelNodes('scene.ini', 'Temple', -1, 0, 50);
@@ -182,6 +189,16 @@ test('model node wrappers preserve actor and numeric node identity in native req
     ['scene.ini', 'Temple', -1, 0, 50]);
   assert.deepEqual(host.requests.find((item) => item.api === 'SceneTools.set_model_node_state').args,
     ['scene.ini', 'Temple', 12, patch]);
+});
+
+test('editor API calls pass structured values through the typed V8 binding', async () => {
+  const { editorApi, host } = await loadEditorApi();
+  const options = { restore_session: true };
+  await editorApi.project.openProject('C:/Projects/Kitchen/Kitchen.corona', options);
+
+  const call = host.requests.find((request) => request.api === 'ProjectLauncher.open_project');
+  assert.deepEqual(call.args, ['C:/Projects/Kitchen/Kitchen.corona', options]);
+  assert.equal(host.cefQuery, undefined);
 });
 
 // Runs `body` with a short transport wait so timeout behaviour is exercised without
@@ -204,23 +221,15 @@ test('a callback whose unregister failed must not stay reachable', async () => {
   assert.equal(token, 42, 'the registration must return the native callback token');
 
   // Sanity: while registered, the event reaches the handler.
-  globalThis.window.__coronaEditorApiDispatch({
-    token,
-    event: 'events.onActorChanged',
-    payload: { n: 1 },
-  });
+  host.emit(token, { n: 1 }, 'events.onActorChanged');
   assert.deepEqual(seen, [{ n: 1 }]);
 
   // Native refuses the unregister. The local registration must still be dropped, otherwise
   // the handler (and everything it closes over) leaks for the lifetime of the page.
-  host.failFor.add('EditorApi.unregister_callback');
+  host.failFor.add('EditorApi.off');
   await assert.rejects(() => editorApi.off(token));
 
-  globalThis.window.__coronaEditorApiDispatch({
-    token,
-    event: 'events.onActorChanged',
-    payload: { n: 2 },
-  });
+  host.emit(token, { n: 2 }, 'events.onActorChanged');
   assert.deepEqual(seen, [{ n: 1 }], 'a handler whose unregister failed must not stay reachable');
 });
 
@@ -262,9 +271,7 @@ test('a late native reply after a timeout must be ignored', async () => {
     // The native handler finally answers. This must neither throw nor try to settle twice.
     const late = host.pending.get('EditorApi.list_methods');
     assert.ok(late, 'the fake host must have captured the hung request');
-    assert.doesNotThrow(() =>
-      late.onSuccess(JSON.stringify({ status: 'success', data: { methods: MANIFEST_METHODS } }))
-    );
+    assert.doesNotThrow(() => late.resolve({ status: 'success', data: { methods: MANIFEST_METHODS } }));
   });
 });
 
@@ -294,12 +301,6 @@ const PICKER_CASES = [
       file_path: 'Assets/Chair.glb', actor_type: 'model' },
     canceled: { status: 'canceled', message: '用户取消了文件选择' },
   },
-  {
-    api: 'SceneTools.select_screenshot_path',
-    invoke: (editorApi) => editorApi.sceneTools.selectScreenshotPath('scene.ini', 'camera-a'),
-    selected: { status: 'success', path: 'C:/Pictures/Kitchen.png', camera_name: 'camera-a' },
-    canceled: { status: 'canceled', path: '' },
-  },
 ];
 
 for (const picker of PICKER_CASES) {
@@ -317,7 +318,7 @@ for (const picker of PICKER_CASES) {
         await new Promise((resolve) => setTimeout(resolve, 60));
 
         const response = { status: 'success', data: picker[result] };
-        host.pending.get(picker.api).onSuccess(JSON.stringify(response));
+        host.pending.get(picker.api).resolve(response);
         const actual = await outcome;
         assert.ifError(actual.error);
         assert.deepEqual(actual.value, response);
@@ -336,9 +337,11 @@ test('a picker still rejects a native error after waiting past the ordinary RPC 
     );
     await new Promise((resolve) => setTimeout(resolve, 60));
 
-    host.pending.get('ProjectLauncher.open_project_file').onFailure(-2, 'dialog unavailable');
+    host.pending.get('ProjectLauncher.open_project_file').reject(
+      Object.assign(new Error('dialog unavailable'), { code: '-2' }),
+    );
     const actual = await outcome;
-    assert.match(actual.error.message, /Editor API Error \(-2\): dialog unavailable/);
+    assert.match(actual.error.message, /dialog unavailable/);
   });
 });
 
@@ -351,8 +354,8 @@ test('loading a selected project still times out and ignores its late native rep
       () => editorApi.project.openProject('C:/Projects/Kitchen/Kitchen.corona'),
       (error) => error.code === 'EDITOR_API_TIMEOUT',
     );
-    assert.doesNotThrow(() => host.pending.get('ProjectLauncher.open_project').onSuccess(
-      JSON.stringify({ status: 'success', data: {} }),
+    assert.doesNotThrow(() => host.pending.get('ProjectLauncher.open_project').resolve(
+      { status: 'success', data: {} },
     ));
   });
 });

@@ -19,7 +19,6 @@ EXPECTED_SERVICES = (
     "projectSettingsService.js",
     "nodeGraphGenerationService.js",
     "nodeGraphReviewService.js",
-    "nodeGraphRuntimeService.js",
     "cabbageAssistantContextService.js",
     "cabbageGuidanceService.js",
     "cabbageTutorialSessionService.js",

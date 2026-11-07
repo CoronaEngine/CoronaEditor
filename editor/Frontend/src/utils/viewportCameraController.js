@@ -1,3 +1,15 @@
+/** An applied native pose is a UI snapshot, never another camera write command. */
+export function readAppliedCameraPose(result, { archiveSession, sceneId, cameraId }) {
+  const camera = result?.camera;
+  if (!archiveSession || result?.archive_session !== archiveSession || result.scene !== sceneId ||
+    !camera?.camera_id || camera.camera_id !== cameraId) return null;
+  const vector = value => Array.isArray(value) && value.length === 3 &&
+    value.every(item => typeof item === 'number' && Number.isFinite(item));
+  if (!vector(camera.position) || !vector(camera.forward) || !vector(camera.world_up) ||
+    typeof camera.fov !== 'number' || !Number.isFinite(camera.fov)) return null;
+  return { position: [...camera.position], forward: [...camera.forward], up: [...camera.world_up], fov: camera.fov };
+}
+
 /** Shared free-camera input. Hosts own scene binding, persistence and bridge calls. */
 const MOVEMENT = Object.freeze({
   w: 'forward', s: 'backward', a: 'left', d: 'right', q: 'up', e: 'down',

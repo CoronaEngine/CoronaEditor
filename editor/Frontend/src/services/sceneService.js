@@ -6,15 +6,10 @@ export const sceneService = {
   removeActor: (sceneName, actorName) => editorApi.sceneTools.removeActor(sceneName, actorName),
   renameActor: (sceneName, actorName, name) =>
     editorApi.sceneTools.renameActor(sceneName, actorName, name),
-  sunDirection: (sceneName, enable, direction) =>
-    editorApi.sceneTools.sunDirection(sceneName, enable, direction),
-  floorGrid: (sceneName, enabled) => editorApi.sceneTools.floorGrid(sceneName, enabled),
-  setPhysicsParams: (sceneName, params) => editorApi.sceneTools.setPhysicsParams(sceneName, params),
-  getPhysicsParams: (sceneName) => editorApi.sceneTools.getPhysicsParams(sceneName),
-  selectScreenshotPath: (sceneName, cameraName) =>
-    editorApi.sceneTools.selectScreenshotPath(sceneName, cameraName),
-  saveScreenshot: (sceneName, path, cameraName) =>
-    editorApi.sceneTools.saveScreenshot(sceneName, path, cameraName),
+  getEnvironment: (sceneName, scope) => editorApi.scene.getEnvironment(sceneName, scope),
+  setEnvironment: (sceneName, patch) => editorApi.scene.setEnvironment(sceneName, patch),
+  captureScreenshot: (sceneName, cameraId, options) =>
+    editorApi.scene.captureScreenshot(sceneName, cameraId, options),
   setOutputMode: (sceneName, cameraName, mode) =>
     editorApi.sceneTools.setOutputMode(sceneName, cameraName, mode),
   getOutputMode: (sceneName, cameraName) =>
@@ -36,22 +31,16 @@ export const sceneService = {
   renameCameraView: (sceneName, cameraId, name) =>
     editorApi.sceneTools.renameCameraView(sceneName, cameraId, name),
   listCameraViews: (sceneName) => editorApi.sceneTools.listCameraViews(sceneName),
-  updateCameraView: (sceneName, cameraId, state) =>
-    editorApi.sceneTools.updateCameraView(sceneName, cameraId, state),
   deleteCamera: (sceneName, cameraId) => editorApi.sceneTools.deleteCamera(sceneName, cameraId),
   reloadScene: (sceneName, projectPath = '') =>
     editorApi.sceneTools.reloadScene(sceneName, projectPath),
   rebindActorResource: (sceneName, actorGuid, path) =>
     editorApi.sceneTools.rebindActorResource(sceneName, actorGuid, path),
   openSceneActor: (sceneName, actorName) => editorApi.sceneTools.openActor(sceneName, actorName),
-  setActorState: (sceneName, actorName, state) =>
-    editorApi.sceneTools.setActorState(sceneName, actorName, state),
+  setActorProperties: (sceneName, actorName, patch) =>
+    editorApi.scene.setActorProperties(sceneName, actorName, patch),
   selectModelFileDialog: (sceneName, actorName, fileType = 'model') =>
     editorApi.sceneTools.selectModelFile(sceneName, actorName, fileType),
-  setActorCameraLock: (sceneName, actorName, cameraLock) =>
-    editorApi.sceneTools.setActorCameraLock(sceneName, actorName, cameraLock),
-  pickActor: (sceneName, x, y, vpWidth, vpHeight) =>
-    editorApi.sceneTools.pickActor(sceneName, x, y, vpWidth, vpHeight),
   playAudio: (resourceId, loop) => editorApi.sceneTools.playAudio(resourceId, loop),
   stopAudio: (resourceId) => editorApi.sceneTools.stopAudio(resourceId),
   actorPlayAudio: (actorName, loop = false) => editorApi.sceneTools.actorPlayAudio(actorName, loop),

@@ -23,16 +23,11 @@ FRONTEND_ROOT = Path(__file__).resolve().parents[2]
 SRC_ROOT = FRONTEND_ROOT / "src"
 
 # Sanctioned owners of the fast-path bridge.
-SANCTIONED = {
-    "api/editorApi.js",  # the transport owner wraps coronaBridge.dockCommand
-    "utils/viewportUiMode.js",  # an explicitly registered low-latency input adapter
-}
+SANCTIONED = set()
 
 # Known deviations in the view/presentation layer, pending convergence into the adapters
 # above. Recorded so the ratchet starts from the measured status quo rather than from zero.
 KNOWN_DEVIATIONS = {
-    "App.vue",
-    "services/projectLauncherService.js",
     "views/layout/MainPage.vue",
     "views/tools/CameraView.vue",
 }

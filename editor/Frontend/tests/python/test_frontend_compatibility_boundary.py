@@ -60,4 +60,4 @@ def test_camera_lock_controls_have_a_canonical_vue_owner():
 
     assert "actor.cameraLock.enabled" in object_source
     assert "actor.cameraLock.position" in object_source
-    assert "editorApi.sceneTools.setActorCameraLock" in object_source
+    assert "editorApi.scene.setActorProperties" in object_source

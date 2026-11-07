@@ -10,9 +10,6 @@
 
     <!-- 导航按钮（GSAP 控制居中/左移） -->
     <div ref="navContainer" class="nav-container">
-      <button type="button" class="nav-btn" @click="router.push('/Story')">
-        {{ t('start.testMode') }}
-      </button>
       <button
         v-for="item in navItems"
         :key="item.id"

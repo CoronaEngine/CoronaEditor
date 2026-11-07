@@ -1,9 +1,10 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import test from 'node:test';
-import { ref, reactive, computed } from 'vue';
+import { ref, reactive } from 'vue';
 import { babelParse, parse } from 'vue/compiler-sfc';
 import { cameraMovementKey, createViewportCameraController } from '../../src/utils/viewportCameraController.js';
+import { createScriptInputSender } from '../../src/utils/scriptInput.js';
 import { normalizeVisionRenderMode, visionAccumulationFromCamera, visionDenoiseFromCamera, visionStablePlanesFromCamera, visionDenoiserFromCamera } from '../../src/utils/visionRenderModes.js';
 
 const source = fs.readFileSync(new URL('../../src/views/layout/MainPage.vue', import.meta.url), 'utf8');
@@ -15,7 +16,7 @@ const names = new Set([
   'cameraState', 'cameraBindingState', 'cameraSpeed', 'mouseSensitivity', 'viewportPickSurfaceRef',
   'cameraMovementGestures', 'movementAxisGroups', 'mouseRotateStartForward', 'mouseRotateMoved',
   'cameraControls', 'isRealtimeCameraInputActive', 'scheduleCameraUpdate',
-  'vectorDistance', 'scratchMouseButton', 'sendScratchPointerEvent', 'handleWheel',
+  'vectorDistance', 'sendScriptInput', 'sendScratchPointerEvent', 'handleWheel',
   'handleKeyDown', 'handleKeyUp', 'isEditorInputLocked', 'resetRealtimeCameraInput',
   'setEditorCameraInputLock',
   'viewportCursorShape', 'handleMainViewportBlur', 'handleMainViewportVisibility',
@@ -31,8 +32,8 @@ const hostSource = declarations.filter(node => node.type === 'VariableDeclaratio
   && node.declarations.some(declaration => names.has(declaration.id.name)))
   .map(node => descriptor.scriptSetup.content.slice(node.start, node.end)).join('\n');
 const makeHost = new Function('deps', `
-  const { ref, reactive, cameraMovementKey, createViewportCameraController, window, document,
-    editorApi, cabbageContextService, viewCurrent, viewportGizmoController,
+  const { ref, reactive, cameraMovementKey, createViewportCameraController, createScriptInputSender, window, document,
+    editorApi, cabbageContextService, viewCurrent, viewportGizmoController, viewportUiPointerController,
     refreshSceneCameraBinding, syncSceneCameraBinding, broadcastViewportControlsState,
     getEditorControlsState, normalizeVisionRenderMode, visionAccumulationFromCamera, visionDenoiseFromCamera, visionStablePlanesFromCamera, visionDenoiserFromCamera } = deps;
   const DEFAULT_SCENE_NAME = 'scene.ini';
@@ -47,14 +48,14 @@ const makeHost = new Function('deps', `
   return { ${[...names].join(', ')} };
 `);
 const viewportTarget = {};
-const input = (props = {}) => ({ target: viewportTarget, preventDefault() {}, stopPropagation() {}, ...props });
+const input = (props = {}) => ({ clientX: 50, clientY: 60, target: viewportTarget, preventDefault() {}, stopPropagation() {}, ...props });
 const snapshot = (handle = 12, position = [0, 0, 0]) => ({ status: 'success', scene: 'scene.ini', active_camera_name: 'main', cameras: [
-  { handle, name: 'main', position, forward: [0, 0, 1], world_up: [0, 1, 0], fov: 60 },
+  { handle, name: 'main', camera_id: 'main-id', archive_session: 'host-archive', position, forward: [0, 0, 1], world_up: [0, 1, 0], fov: 60 },
 ] });
 function mountCreative(t, { native = true } = {}) {
   let current = true, time = 0, id = 0;
   const frames = new Map(), calls = [], records = [], scratch = [];
-  const window = native ? { coronaBridge: { cameraMove: (...args) => calls.push(args) } } : {};
+  const window = native ? { coronaBridge: {} } : {};
   const document = { hidden: false, getElementById: () => null };
   const clock = {
     requestFrame: callback => { frames.set(++id, callback); return id; },
@@ -62,13 +63,15 @@ function mountCreative(t, { native = true } = {}) {
   };
   let refreshes = 0;
   const page = makeHost({
-    ref, reactive, cameraMovementKey, normalizeVisionRenderMode, visionAccumulationFromCamera, visionDenoiseFromCamera, visionStablePlanesFromCamera, visionDenoiserFromCamera,
+    ref, reactive, cameraMovementKey, createScriptInputSender, normalizeVisionRenderMode, visionAccumulationFromCamera, visionDenoiseFromCamera, visionStablePlanesFromCamera, visionDenoiserFromCamera,
     createViewportCameraController: options => createViewportCameraController({ ...options, ...clock }),
     window, document, viewCurrent: () => current,
-    editorApi: { scripts: Object.fromEntries(['sendKeyEvent', 'sendKeyUpEvent', 'sendMouseEvent']
-      .map(name => [name, async (...args) => scratch.push([name, ...args])])) },
+    editorApi: { scene: { setCameraProperties: async (scene, camera, patch) => {
+      if (native) calls.push([scene, camera, patch]);
+    } }, input: { dispatch: async (...args) => { scratch.push(args); return { status: 'queued' }; } } },
     cabbageContextService: { recordEvent: async record => records.push(record) },
     viewportGizmoController: { isDragging: () => false, cancel() {} },
+    viewportUiPointerController: { hide() {} },
     refreshSceneCameraBinding: () => { refreshes++; }, syncSceneCameraBinding() {},
     broadcastViewportControlsState() {}, getEditorControlsState: () => ({}),
   });
@@ -92,11 +95,13 @@ test('creative binds native snapshots with a string scene route and optional env
     assert.equal(p.cameraBindingState.value.cameraHandle, 25);
     assert.equal(p.cameraBindingState.value.sceneId, native.scene);
     assert.deepEqual(p.cameraState.value.position, [1, 2, 3]);
-    assert.deepEqual(h.calls.at(-1).slice(0, 2), [25, [1, 2, 3]]);
+    assert.deepEqual(h.calls.at(-1), [native.scene, 'main-id', {
+      archive_session: 'host-archive', position: [1, 2, 3], forward: [0, 0, 1], world_up: [0, 1, 0], fov: 60,
+    }]);
   }
 });
 
-test('creative host keeps panel controls, input refresh, analytics and script forwarding', t => {
+test('creative host keeps controls and analytics while forwarding only scoped mouse input', t => {
   const h = mountCreative(t, { native: false }), p = h.page;
   p.setCameraSpeedFromPanel(0.5); p.handleCameraMove('forward');
   assert.equal(p.cameraState.value.position[2], 0.5);
@@ -109,14 +114,14 @@ test('creative host keeps panel controls, input refresh, analytics and script fo
   assert.equal(h.refreshes(), 1);
   assert.ok(h.records.some(item => item.details.interaction === 'wheel'));
   assert.ok(h.records.some(item => item.details.axisGroup === 'left_right'));
-  assert.deepEqual(h.scratch.map(call => call[0]), ['sendMouseEvent', 'sendMouseEvent', 'sendKeyEvent', 'sendKeyUpEvent']);
+  assert.deepEqual(h.scratch.map(call => call[2].event), ['wheel', 'wheel']);
   p.setEditorCameraInputLock('node_graph', true);
   const before = structuredClone(JSON.parse(JSON.stringify(p.cameraState.value)));
   p.handleKeyDown(input({ code: 'KeyW', key: 'w' }));
   p.handleWheel(input({ deltaY: -1 })); p.handleCameraMove('forward'); h.step(100);
   assert.deepEqual(JSON.parse(JSON.stringify(p.cameraState.value)), before);
-  assert.equal(h.scratch.at(-2)[0], 'sendKeyEvent');
-  assert.equal(h.scratch.at(-1)[0], 'sendMouseEvent');
+  assert.equal(h.scratch.length, 3);
+  assert.equal(h.scratch.at(-1)[2].event, 'wheel');
   p.setCameraSpeedFromPanel(1); assert.equal(p.cameraSpeed.value, 1);
 });
 
@@ -126,7 +131,7 @@ test('creative host rebinding, focus loss and invalidation cancel old movement',
   const late = [...h.frames.values()][0];
   p.applySceneSnapshot('next.ini', snapshot(25, [5, 0, 0]), { preservePose: true });
   late(50); h.step(50);
-  assert.deepEqual(h.calls.map(call => call.slice(0, 2)), [[25, [5, 0, 0]]]);
+  assert.deepEqual(h.calls.map(call => [call[0], call[1], call[2].position]), [['next.ini', 'main-id', [5, 0, 0]]]);
   assert.equal(p.cameraControls.isInputActive(), false);
   for (const stop of [() => p.handleMainViewportBlur(), () => {
     h.document.hidden = true; p.handleMainViewportVisibility();
@@ -169,4 +174,16 @@ test('creative right-drag analytics and native key authority remain intact', t =
   p.handleKeyDown(input({ code: 'KeyW', key: 'w' })); h.step(50);
   p.handleKeyUp(input({ code: 'KeyW', key: 'w' }));
   assert.equal(h.scratch.length, 0);
+});
+
+test('creative camera rebinding uses archive identity even when native handles are reused', t => {
+  const h = mountCreative(t), p = h.page; h.step(0);
+  p.handleKeyDown(input({ code: 'KeyW', key: 'w' }));
+  const next = snapshot(12, [5, 0, 0]);
+  next.cameras[0].archive_session = 'new-archive';
+  p.applySceneSnapshot('scene.ini', next, { preservePose: true });
+  assert.equal(p.cameraControls.isInputActive(), false);
+  h.step(50);
+  assert.equal(h.calls.at(-1)[2].archive_session, 'new-archive');
+  assert.deepEqual(h.calls.at(-1)[2].position, [5, 0, 0]);
 });

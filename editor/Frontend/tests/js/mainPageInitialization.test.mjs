@@ -9,11 +9,15 @@ import * as projectLauncher from '../../src/services/projectLauncherService.js';
 import * as visionRenderModes from '../../src/utils/visionRenderModes.js';
 import * as viewportCamera from '../../src/utils/viewportCameraController.js';
 import * as viewportPick from '../../src/utils/viewportPick.js';
+import * as scriptInput from '../../src/utils/scriptInput.js';
 import * as viewportGizmo from '../../src/utils/viewportGizmo.js';
 import * as viewportUiMode from '../../src/utils/viewportUiMode.js';
 import * as serviceInitialization from '../../src/utils/serviceInitialization.js';
+import * as viewLifetime from '../../src/utils/viewLifetime.js';
 import * as pluginManifest from '../../src/config/pluginManifest.js';
 import * as worldRenderPolicy from '../../src/services/worldRenderPolicy.js';
+import { createWebMessages } from '../../src/api/webMessages.js';
+import { createViewportControlsService } from '../../src/services/viewportControlsService.js';
 
 // Execute the complete production setup and mounted hook. Only host/service
 // boundaries are injected; scene selection, backend policy and binding stay real.
@@ -34,8 +38,10 @@ for (const node of [...imports].reverse()) {
 const makeComponent = new Function('modules', 'window', 'document', 'requestAnimationFrame',
   'cancelAnimationFrame', 'ResizeObserver', `${setupSource}; return MainPage;`);
 
-function mountMainPage(t, visionMode = 'path_tracing') {
-  const calls = [], errors = [], mounted = [], unmounted = [], observed = [];
+function mountMainPage(t, visionMode = 'path_tracing', { nativeCursor = false } = {}) {
+  const messages = createWebMessages({ scope: crypto.randomUUID(), role: 'main', documentId: 'main' });
+  t.after(() => messages.dispose());
+  const calls = [], errors = [], mounted = [], unmounted = [], observed = [], creativeActions = {};
   const dock = {
     panels: Vue.reactive({ SceneControls: { open: false }, SceneTools: { open: false } }),
     closePanel(id) { if (this.panels[id]) this.panels[id].open = false; },
@@ -58,17 +64,10 @@ function mountMainPage(t, visionMode = 'path_tracing') {
     addEventListener: windowEvents.on.bind(windowEvents), removeEventListener: windowEvents.off.bind(windowEvents),
     setInterval: () => ++sequence, clearInterval: noop,
     setTimeout: () => ++sequence, clearTimeout: noop,
-    coronaBridge: {
-      cameraMove: () => true,
-      setCameraViewport: (...args) => { calls.push(['viewport', ...args]); return true; },
-      setViewportUiMode: () => true,
-      setViewportUiCalibration: (...args) => { calls.push(['calibration', ...args]); return true; },
-      setViewportGizmoTarget: () => true,
-      setViewportSystemCursorHidden: () => true,
-    },
   };
   const document = { hidden: false, addEventListener: noop, removeEventListener: noop };
   const api = {
+    viewport: { configure: async (...args) => { calls.push(['viewport', ...args]); return {}; } },
     main: { onInit: async () => ({ data: { scene: { path: 'scene_v3.xml' } } }) },
     sceneTools: {
       setRenderBackend: async (mode, scene, camera) => {
@@ -79,11 +78,21 @@ function mountMainPage(t, visionMode = 'path_tracing') {
       isVisionAvailable: async () => ({ data: { available: true } }),
       listCameraViews: async () => ({ data: { cameras: [] } }),
     },
-    scene: { observe: async () => -1, getSnapshot: async scene => {
+    scene: { observe: async () => -1,
+      setCameraProperties: async (...args) => { calls.push(['cameraWrite', ...args]); return {}; },
+      readActive: async () => ({ archive_session: 'main-archive', scene: 'scene_v3.xml' }),
+      getEnvironment: async (...args) => {
+        calls.push(['environmentRead', ...args]);
+        return { archive_session: 'main-archive', scene: 'scene_v3.xml', physics: {
+          gravity: [1, -8, 2], floor_y: 4, floor_restitution: 0.3, fixed_dt: 0.02,
+        } };
+      },
+      setEnvironment: async (...args) => { calls.push(['environmentWrite', ...args]); return {}; },
+      getSnapshot: async scene => {
       calls.push(['snapshot', scene]);
       assert.equal(scene, 'scene_v3.xml');
       return { data: { scene, active_camera_name: 'KitchenCamera', actors: [], cameras: [{
-        name: 'KitchenCamera', camera_id: 'camera-1', handle: 42,
+        name: 'KitchenCamera', camera_id: 'camera-1', archive_session: 'main-archive', handle: 42,
         position: [0, 1, -5], forward: [0, 0, 1], world_up: [0, 1, 0], fov: 45,
         render_backend: 'native', vision_render_mode: visionMode,
         vision_accumulation: false, vision_denoise: true, vision_denoiser: 'reblur',
@@ -92,11 +101,12 @@ function mountMainPage(t, visionMode = 'path_tracing') {
     } },
     project: { getProjectLoadStatus: async () => ({ active: true, loading: false }) },
     scripts: { getStatus: async () => ({ status: 'stopped', threadAlive: false }) },
+    input: { dispatch: asyncNoop },
     scratch: {
       getGamePreviewStatus: async () => ({ status: 'stopped', workerActive: false }),
     },
-    events: Object.fromEntries(['onProjectOpened', 'onActorSelectionChanged', 'onActorTransformUpdated',
-      'onActorPickResult', 'onViewportGizmoPointerResult'].map(name => [name, async () => ++sequence])),
+    events: Object.fromEntries(['onProjectOpened', 'onActorSelectionChanged', 'onActorTransformUpdated']
+      .map(name => [name, async () => ++sequence])),
     off: asyncNoop,
   };
   const modules = Object.fromEntries(imports.map(node => [node.source.value, {}]));
@@ -108,9 +118,12 @@ function mountMainPage(t, visionMode = 'path_tracing') {
     '@/services/projectLauncherService.js': projectLauncher,
     '@/utils/visionRenderModes.js': visionRenderModes,
     '@/utils/viewportPick.js': viewportPick,
+    '@/utils/scriptInput.js': scriptInput,
     '@/utils/viewportGizmo.js': viewportGizmo,
-    '@/utils/viewportUiMode.js': { ...viewportUiMode, createViewportUiCalibrationStore: () => calibration },
+    '@/utils/viewportUiMode.js': { ...viewportUiMode, createViewportUiCalibrationStore: () => calibration,
+      isNativeViewportCursorEnabled: () => nativeCursor },
     '@/utils/serviceInitialization.js': serviceInitialization,
+    '@/utils/viewLifetime.js': viewLifetime,
     '@/config/pluginManifest.js': pluginManifest,
     '@/utils/viewportCameraController.js': { ...viewportCamera,
       createViewportCameraController: options => viewportCamera.createViewportCameraController({
@@ -118,9 +131,12 @@ function mountMainPage(t, visionMode = 'path_tracing') {
       }),
     },
     '@/api/editorApi.js': { editorApi: api },
-    '@/services/worldModeService.js': { worldModeState: { mode: 'creative', revision: 1 } },
+    '@/api/webMessages.js': { getWebMessages: () => messages },
+    '@/services/worldModeService.js': { worldModeState: { status: 'ready', mode: 'creative', revision: 1 } },
     '@/services/worldRenderPolicy.js': worldRenderPolicy,
+    '@/services/projectMessages.js': { subscribeProjectChanged: () => noop },
     '@/services/appService.js': { appService: { crossTabBroadcast: asyncNoop } },
+    '@/services/viewportControlsService.js': { viewportControlsService: createViewportControlsService(messages) },
     '@/composables/useErrorHandler.js': { useErrorHandler: () => ({
       error: (...args) => errors.push(args), warn: (...args) => errors.push(args),
     }) },
@@ -131,14 +147,17 @@ function mountMainPage(t, visionMode = 'path_tracing') {
     '@/utils/eventBus.js': { coronaEventBus: bus },
     '@/services/nodeGraphReviewService.js': { reviewScopeId: value => value, subscribeNodeGraphReviews: () => noop },
     '@/services/cabbageAssistantContextService.js': {
-      cabbageContextService: { loadCurrentWorld: asyncNoop, requestProfileScoreUpdate: asyncNoop, flush: asyncNoop },
+      cabbageContextService: { loadCurrentWorld: asyncNoop, requestProfileScoreUpdate: asyncNoop, flush: asyncNoop, recordEvent: asyncNoop },
       cancelPendingTransformEvents: noop, publishCabbageAssistantContext: noop,
       readCabbageAssistantContext: noop, subscribeCabbageAssistantContext: () => noop,
       subscribeCabbagePreWarnings: () => noop,
     },
     '@/services/nodeGraphGenerationService.js': { cancelActiveNodeGraphGeneration: asyncNoop },
     '@/services/cabbageTutorialSessionService.js': { closeTutorialSessionChannel: noop },
-    '@/services/creativePanelState.js': { provideCreativePanelState: noop },
+    '@/services/creativePanelState.js': { provideCreativePanelState: (snapshot, actions) => {
+      Object.assign(creativeActions, actions);
+      assert.doesNotThrow(() => structuredClone(snapshot()), 'Web snapshots must not contain Vue proxies');
+    } },
   });
   class ResizeObserver {
     observe(element) { observed.push(element); }
@@ -152,7 +171,7 @@ function mountMainPage(t, visionMode = 'path_tracing') {
   };
   page.viewportPickSurfaceRef.value = surface;
   t.after(() => { for (const hook of unmounted) hook(); });
-  return { page, calls, errors, observed, surface, dock, bus, windowEvents, calibration,
+  return { page, calls, errors, observed, surface, dock, bus, windowEvents, messages, calibration, api, creativeActions,
     async mount() { for (const hook of mounted) await hook(); },
     flushFrames() {
       const pending = [...frames.values()];
@@ -168,6 +187,75 @@ test('world entry retains the initialized scene controls and scene manager', asy
   assert.equal(h.dock.panels.SceneControls.open, false);
   assert.equal(h.dock.panels.SceneTools.open, false);
   assert.deepEqual(h.errors, []);
+});
+
+test('applied focus synchronizes only the matching native camera without resubmitting a pose', async t => {
+  const h = mountMainPage(t);
+  await h.mount();
+  h.flushFrames();
+  assert.equal(typeof h.page.onCameraPoseApplied, 'function');
+  const binding = { ...h.page.cameraBindingState.value };
+  const pose = { archive_session: 'main-archive', scene: binding.sceneId, camera: {
+    camera_id: binding.cameraId, position: [4, 5, -8], forward: [0, 0, 1], world_up: [0, 1, 0], fov: 55,
+  } };
+  const submissions = h.calls.filter(call => call[0] === 'cameraWrite').length;
+  // An actual pending movement frame must also be canceled by an applied pose.
+  h.page.scheduleCameraUpdate();
+  assert.equal(h.page.onCameraPoseApplied(pose), true);
+  h.flushFrames();
+  assert.equal(h.calls.filter(call => call[0] === 'cameraWrite').length, submissions);
+  assert.deepEqual(h.page.cameraState.value.position, [4, 5, -8]);
+  assert.deepEqual(h.page.cameraBindingState.value, binding);
+  for (const changed of [{ archive_session: 'old' }, { scene: 'other.ini' },
+    { camera: { ...pose.camera, camera_id: 'other-camera' } }]) {
+    assert.equal(h.page.onCameraPoseApplied({ ...pose, ...changed }), false);
+    assert.deepEqual(h.page.cameraState.value.position, [4, 5, -8]);
+  }
+  assert.equal(h.bus.listenerCount('camera-pose-request'), 0);
+  assert.equal(h.bus.listenerCount('camera-pose-applied'), 1);
+});
+
+test('main controls use the same scoped environment patch for light, grid and physics', async t => {
+  const h = mountMainPage(t);
+  await h.mount();
+  assert.deepEqual(await h.page.setSceneGridEnabledFromPanel(false), h.page.getEditorControlsState());
+  assert.equal(h.page.sceneGridEnabled.value, false);
+  assert.equal(await h.page.updateSceneLight(), true);
+  assert.equal(await h.page.handleApplyPhysics(), true);
+  const writes = h.calls.filter(call => call[0] === 'environmentWrite');
+  assert.equal(writes.length, 3);
+  assert.deepEqual(writes[0], ['environmentWrite', 'scene_v3.xml', { archive_session: 'main-archive', grid: { enabled: false } }]);
+  assert.deepEqual(writes[1][2], { archive_session: 'main-archive', sun: { enabled: true, direction: [1, 1, 1] } });
+  assert.equal(writes[2][2].archive_session, 'main-archive');
+  assert.ok(Array.isArray(writes[2][2].physics.gravity));
+  assert.equal(await h.page.loadPhysicsParams(), true);
+  assert.equal(h.page.physicsParams.value.gravityY, -8);
+  assert.equal(h.page.physicsParams.value.floorY, 4);
+  assert.deepEqual(h.calls.filter(call => call[0] === 'environmentRead'), [
+    ['environmentRead', 'scene_v3.xml', { archive_session: 'main-archive' }],
+  ]);
+});
+
+test('a delayed environment result cannot update controls after the observed archive changes', async t => {
+  const h = mountMainPage(t);
+  await h.mount();
+  let release;
+  h.api.scene.getEnvironment = () => new Promise(resolve => { release = resolve; });
+  const old = h.page.loadPhysicsParams();
+  assert.equal(typeof release, 'function');
+  h.page.environmentArchiveSession.value = 'replacement';
+  release({ archive_session: 'main-archive', physics: { gravity: [99, 99, 99] } });
+  assert.equal(await old, false);
+  assert.notEqual(h.page.physicsParams.value.gravityY, 99);
+});
+
+test('light actions return native failures to the shared Web request owner', async t => {
+  const h = mountMainPage(t);
+  await h.mount();
+  h.api.scene.setEnvironment = async () => { throw Object.assign(new Error('old archive'), { code: 'PROJECT_CONTEXT_CHANGED' }); };
+  assert.equal(await h.creativeActions.setSceneLightEnabled(false), false);
+  assert.equal(await h.creativeActions.setSceneLightDirection('x', 2), false);
+  assert.equal(await h.creativeActions.setSceneLightDirection('unknown', 2), false);
 });
 
 test('right dragging a DOM panel does not rotate the viewport camera', async t => {
@@ -203,8 +291,9 @@ test(`external scene entry defaults to Vision and preserves saved ${visionMode}`
   assert.equal(h.page.mainVisionRenderMode.value, visionMode);
   assert.deepEqual(h.observed, [h.surface]);
   h.flushFrames();
-  assert.ok(h.calls.some(call => call[0] === 'viewport' && call[1] === 42
-    && call[4] === 1536 && call[5] === 825), 'the mounted page must send camera viewport bounds');
+  assert.ok(h.calls.some(call => call[0] === 'viewport' && call[1] === 'scene_v3.xml' && call[2] === 'camera-1'
+    && call[3].archive_session === 'main-archive' && call[3].bounds?.width === 1536
+    && call[3].bounds?.height === 825), 'the mounted page must send scoped camera viewport bounds');
   assert.deepEqual(h.errors, []);
 });
 }
@@ -231,13 +320,60 @@ test('calibration edits from a native panel update only an active stereo main vi
   const h = mountMainPage(t);
   await h.mount();
   const values = h.calibration.set({}, { pe: 24, angle: 0.5, offset: 1, parallaxScale: 2 });
-  const changes = () => h.calls.filter(([kind]) => kind === 'calibration');
-  const event = { key: h.calibration.keyFor({}) };
-  h.windowEvents.emit('storage', event);
+  const changes = () => h.calls.filter(([kind, , , patch]) => kind === 'viewport' && patch.calibration);
+  await h.messages.emit('viewportUi.calibrationChanged', values);
   assert.equal(changes().length, 0);
   h.page.viewportUiMode.value = 'stereo3d';
-  h.windowEvents.emit('storage', { key: 'unrelated' });
+  await h.messages.emit('viewportUi.otherChanged', {});
   assert.equal(changes().length, 0);
-  h.windowEvents.emit('storage', event);
-  assert.deepEqual(changes(), [['calibration', 42, values.pe, values.angle, values.offset, values.parallaxScale]]);
+  await h.messages.emit('viewportUi.calibrationChanged', values);
+  await Vue.nextTick();
+  assert.deepEqual(changes(), [['viewport', 'scene_v3.xml', 'camera-1', { archive_session: 'main-archive', calibration: values }]]);
+});
+
+test('viewport bounds deduplicate per archive and retry explicitly after native rejection', async t => {
+  const h = mountMainPage(t);
+  await h.mount();
+  h.flushFrames();
+  await Vue.nextTick();
+  const writes = () => h.calls.filter(call => call[0] === 'viewport' && call[3].bounds);
+  const initial = writes().length;
+  assert.equal(await h.page.syncCameraViewportRect(), true);
+  assert.equal(writes().length, initial);
+  h.page.cameraBindingState.value.archiveSession = 'replacement';
+  h.page.cameraBindingState.value.cameraId = '18446744073709551615';
+  assert.equal(await h.page.syncCameraViewportRect(), true);
+  assert.equal(writes().length, initial + 1);
+  assert.equal(writes().at(-1)[2], '18446744073709551615');
+  assert.equal(writes().at(-1)[3].archive_session, 'replacement');
+  const configure = h.api.viewport.configure;
+  let attempts = 0;
+  h.api.viewport.configure = async (...args) => {
+    attempts++;
+    if (attempts === 1) throw Object.assign(new Error('rejected'), { code: 'PROJECT_CONTEXT_CHANGED' });
+    return configure(...args);
+  };
+  h.page.cameraBindingState.value.archiveSession = 'next';
+  const warn = console.warn;
+  t.after(() => { console.warn = warn; });
+  console.warn = () => {};
+  assert.equal(await h.page.syncCameraViewportRect(), false);
+  assert.equal(attempts, 1, 'a rejection must not automatically replay the operation');
+  assert.equal(await h.page.syncCameraViewportRect(), true);
+  assert.equal(attempts, 2);
+});
+
+test('main viewport blur and pointer cancellation retire the native cursor through the same scoped patch', async t => {
+  const h = mountMainPage(t, 'path_tracing', { nativeCursor: true });
+  await h.mount(); h.flushFrames();
+  h.page.viewportUiMode.value = 'stereo3d';
+  const pointerWrites = () => h.calls.filter(call => call[0] === 'viewport' && call[3].pointer);
+  for (const handler of ['handleMainViewportBlur', 'handleViewportPointerCancel']) {
+    h.page.handleViewportPointerDown({ type: 'pointerdown', clientX: 20, clientY: 30, pointerId: 7, button: 0 });
+    assert.notEqual(pointerWrites().at(-1)?.[3].pointer.cursor, 'hidden');
+    h.page[handler]({ pointerId: 7 });
+    assert.deepEqual(pointerWrites().at(-1), ['viewport', 'scene_v3.xml', 'camera-1', {
+      archive_session: 'main-archive', pointer: { cursor: 'hidden' },
+    }], handler);
+  }
 });

@@ -3,7 +3,7 @@ import { setImmediate } from 'node:timers';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createWorldModeController, createWorldModeRouteGuard, normalizeWorldMode, normalizeProjectPath, unwrapProjectInfo, worldModeService } from '../../src/services/worldModeService.js';
-import { editorApi, Bridge } from '../../src/api/editorApi.js';
+import { editorApi } from '../../src/api/editorApi.js';
 import { appService } from '../../src/services/appService.js';
 import { projectLauncherService, resolveOpenedProjectScene, stopWorldRuntimeBeforeOpen } from '../../src/services/projectLauncherService.js';
 
@@ -20,8 +20,8 @@ test('does not restore old scene lists or active indexes', () => {
   assert.equal(resolveOpenedProjectScene({}), '');
 });
 
-test('only an explicit story marker selects story; legacy and multiplayer stay creative', () => {
-  assert.equal(normalizeWorldMode('story'), 'story');
+test('legacy story metadata uses the single editable world mode', () => {
+  assert.equal(normalizeWorldMode('story'), 'creative');
   for (const mode of [undefined, null, '', 'creative', '3d', 'multiplayer', 'Story']) assert.equal(normalizeWorldMode(mode), 'creative');
   assert.equal(normalizeProjectPath('D:\\Worlds\\Demo\\'), 'd:/worlds/demo');
   assert.equal(unwrapProjectInfo({ data: info('demo', 'story') }).mode, 'story');
@@ -40,14 +40,30 @@ test('mode resolution is fail closed and does not mount an editor while pending'
   assert.ok(states.every((state) => state.mode === null));
 });
 
+test('active project scope remains on the committed world while a new selection is pending or fails', async () => {
+  let activePath = 'old-world';
+  const controller = createWorldModeController({ readProjectInfo: async () => info(activePath, 'creative') });
+  await controller.resolve('old-world');
+  const token = controller.beginOpen('new-world');
+  assert.equal(controller.state.projectPath, 'new-world');
+  assert.equal(controller.state.activeProjectPath, 'old-world');
+  controller.fail(new Error('open failed'));
+  controller.finishOpen(token);
+  assert.equal(controller.state.activeProjectPath, 'old-world');
+
+  activePath = 'new-world';
+  await controller.resolve('new-world', { force: true });
+  assert.equal(controller.state.activeProjectPath, 'new-world');
+});
+
 test('deduplicates reads and rejects mismatched authoritative project paths', async () => {
   let calls = 0;
   const request = deferred();
   const controller = createWorldModeController({ readProjectInfo: () => { calls++; return request.promise; } });
   const first = controller.resolve('D:/story'), second = controller.resolve('d:\\story\\');
   request.resolve(info('D:/story', 'story'));
-  assert.equal((await first).mode, 'story');
-  assert.equal((await second).mode, 'story');
+  assert.equal((await first).mode, 'creative');
+  assert.equal((await second).mode, 'creative');
   assert.equal(calls, 1);
   await assert.rejects(controller.resolve('D:/different'), /改变/);
   assert.equal(controller.state.mode, null);
@@ -63,9 +79,36 @@ test('stale success and failure cannot overwrite the most recent world', async (
     await current;
     if (fail) requests[0].reject(new Error('old failure')); else requests[0].resolve(info('old', 'creative'));
     assert.equal(await old, null);
-    assert.equal(controller.state.mode, 'story');
+    assert.equal(controller.state.mode, 'creative');
     assert.equal(controller.state.projectPath, 'current');
   }
+});
+
+test('a scoped observer validates the project of a shared unscoped metadata read', async () => {
+  const request = deferred();
+  let reads = 0;
+  const controller = createWorldModeController({ readProjectInfo: () => { reads++; return request.promise; } });
+  const routeRead = controller.resolve();
+  const observedRead = controller.resolve('expected');
+  const results = Promise.allSettled([routeRead, observedRead]);
+  request.resolve(info('different', 'creative'));
+  assert.ok((await results).every(result => result.status === 'rejected' && /改变/.test(result.reason.message)));
+  assert.equal(controller.state.status, 'error');
+  assert.equal(reads, 1);
+});
+
+test('forced archive reopen supersedes even a pending read of the same project', async () => {
+  const requests = [deferred(), deferred()];
+  let reads = 0;
+  const controller = createWorldModeController({ readProjectInfo: () => requests[reads++].promise });
+  const old = controller.resolve('world');
+  const reopened = controller.resolve('world', { force: true });
+  assert.equal(reads, 2);
+  requests[1].resolve(info('world', 'story'));
+  assert.equal((await reopened).mode, 'creative');
+  requests[0].resolve(info('world', 'creative'));
+  assert.equal(await old, null);
+  assert.equal(controller.state.mode, 'creative');
 });
 
 test('open ownership token survives mode resolution but not a newer open', async () => {
@@ -79,7 +122,7 @@ test('open ownership token survives mode resolution but not a newer open', async
   assert.equal(controller.opening, false);
 });
 
-test('route guard permits launcher and world but closes story standalone editor routes', async () => {
+test('legacy story projects permit every editor route including standalone panels', async () => {
   let mode = 'story', closed = 0, reads = 0;
   const controller = createWorldModeController({ readProjectInfo: async () => { reads++; return info('world', mode); } });
   const guard = createWorldModeRouteGuard({ controller, closePanel: async () => { closed++; }, notify: assert.fail });
@@ -87,10 +130,10 @@ test('route guard permits launcher and world but closes story standalone editor 
   assert.equal(reads, 0);
   assert.equal(await guard({ path: '/' }), true);
   for (const path of ['/SetUp', '/NodeGraph', '/CameraView', '/CabbageChat']) {
-    assert.equal(await guard({ path }), '/');
-    assert.equal(await guard({ path, query: { standalone: '1' } }), false);
+    assert.equal(await guard({ path }), true);
+    assert.equal(await guard({ path, query: { standalone: '1' } }), true);
   }
-  assert.equal(closed, 4);
+  assert.equal(closed, 0);
   mode = 'creative'; controller.invalidate();
   assert.equal(await guard({ path: '/NodeGraph', query: { standalone: '1' } }), true);
   const token = controller.beginOpen('next');
@@ -107,17 +150,19 @@ test('failed mode reads return to launcher and never fall back to creative', asy
   assert.equal(controller.state.mode, null);
 });
 
-test('late native panel completion is closed even after creative -> story -> creative', async (t) => {
+test('late native panel completion is closed after switching between editable projects', async (t) => {
+  t.mock.method(editorApi.scene, 'readActive', async () => ({ archive_session: '' }));
+  const closed = [];
   const previousWindow = globalThis.window;
-  globalThis.window = { localStorage: memoryStorage() };
+  globalThis.window = { localStorage: memoryStorage(), corona: { window: {
+    closeTab: async tabId => { closed.push(tabId); return true; },
+    suspendCameraViews: async () => ({ closed: 0 }),
+  } } };
   t.after(() => { globalThis.window = previousWindow; });
   t.mock.method(editorApi.projectSettings, 'getActiveProjectInfo', async () => info('creative', 'creative'));
   await worldModeService.resolve('creative', { force: true });
   const request = deferred(), commands = [];
-  t.mock.method(Bridge, 'callDockCommand', async (command) => {
-    commands.push(command);
-    return command.cmd === 'createPanelTab' ? request.promise : {};
-  });
+  window.corona.window.createPanel = () => request.promise;
   await appService.setEditorUiEnabled(true);
   commands.length = 0;
   const nativePanel = { panelId: 'Object', routePath: '/Object', width: 400, height: 600, dockingPos: 'right', nativeDocked: true };
@@ -126,15 +171,15 @@ test('late native panel completion is closed even after creative -> story -> cre
   await worldModeService.resolve('creative', { force: true });
   request.resolve({ tab_id: 7 });
   await assert.rejects(pending, /世界已切换/);
-  assert.equal(commands[1].cmd, 'closePanelTab');
-  assert.equal(commands[1].tabId, 7);
+  assert.deepEqual(closed, [7]);
+  assert.ok(commands.every(command => command.cmd !== 'closePanelTab'));
   worldModeService.invalidate();
   await assert.rejects(appService.openNativePanel(nativePanel), /不允许/);
 });
 
 
 
-test('project opening is serialized and stores only verified authoritative worlds', async (t) => {
+test('project opening is serialized and commits only verified authoritative worlds', async (t) => {
   const first = deferred(), paths = [], saved = [];
   let activePath = 'first';
   t.mock.method(editorApi.project, 'openProject', async (path) => {
@@ -159,7 +204,7 @@ test('project opening is serialized and stores only verified authoritative world
   assert.deepEqual(paths, ['first', 'second']);
   assert.equal(worldModeService.state.projectPath, 'second');
   assert.equal(worldModeService.opening, false);
-  assert.deepEqual(saved.filter(([key]) => key === 'corona.activeProjectPath').map(([,path]) => path), ['second']);
+  assert.deepEqual(saved, []);
 });
 
 
@@ -194,7 +239,7 @@ test('world cleanup still rejects real script restoration and stop failures', as
 });
 
 
-test('creative to story opens only after safe cleanup and can retry genuine failures', async (t) => {
+test('legacy projects open only after safe cleanup and can retry genuine failures', async (t) => {
   const calls = [];
   const idle = { status: 'stopped', restored: false, snapshotCaptured: false, restoreStatus: 'idle' };
   let stopResult = idle;
@@ -238,7 +283,7 @@ test('creative to story opens only after safe cleanup and can retry genuine fail
     }
     assert.equal((await projectLauncherService.openProject('story')).data.ok, true);
     assert.deepEqual(calls, ['script:true', 'open:story']);
-    assert.equal(worldModeService.state.mode, 'story');
+    assert.equal(worldModeService.state.mode, 'creative');
     assert.equal(worldModeService.state.projectPath, 'story');
     assert.equal(worldModeService.opening, false);
   }

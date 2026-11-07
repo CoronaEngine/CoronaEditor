@@ -275,6 +275,8 @@
 
 <script setup>
 import { computed, onMounted, onUnmounted, reactive, ref } from 'vue';
+import { createViewLifetime } from '@/utils/viewLifetime.js';
+const viewLifetime = createViewLifetime();
 import { pickedNodeIdentity } from '@/utils/modelHierarchy.js';
 import { coronaEventBus } from '@/utils/eventBus.js';
 import IkBoneSelect from '@/components/ui/IkBoneSelect.vue';
@@ -550,7 +552,7 @@ function flushTransformUpdates() {
       return editorApi.scene.setActorTransform(
         update.sceneName,
         update.actorName,
-        { [key]: update.vector, archive_session: update.session, persist: false },
+        { [key]: update.vector, archive_session: update.session },
       );
     }),
   ).catch((error) => {
@@ -609,12 +611,11 @@ async function setRenderSpace(enabled) {
   const previous = actor.followCamera;
   actor.followCamera = enabled;
   try {
-    await editorApi.sceneTools.setActorState(
+    await editorApi.scene.setActorProperties(
       selectedSceneName.value,
       selectedActorName.value,
-      { follow_camera: Boolean(enabled) },
+      { archive_session: archiveSession.value, follow_camera: Boolean(enabled) },
     );
-    if (enabled) actor.mechanics.bodyType = 'kinematic';
   } catch (error) {
     actor.followCamera = previous;
     logError('更新对象渲染空间失败', error);
@@ -672,10 +673,10 @@ async function setBodyType(type) {
   const next = normalizeBodyType(type);
   actor.mechanics.bodyType = next;
   try {
-    await editorApi.sceneTools.setActorPhysics(
+    await editorApi.scene.setActorProperties(
       selectedSceneName.value,
       selectedActorName.value,
-      { body_type: next },
+      { archive_session: archiveSession.value, mechanics: { body_type: next } },
     );
     void cabbageContextService.recordEvent({
       type: 'physics_changed',
@@ -708,10 +709,10 @@ async function updateMechanic(operation, value) {
     return;
   }
   try {
-    await editorApi.sceneTools.setActorPhysics(
+    await editorApi.scene.setActorProperties(
       selectedSceneName.value,
       selectedActorName.value,
-      { [field]: value },
+      { archive_session: archiveSession.value, mechanics: { [field]: value } },
     );
     void cabbageContextService.recordEvent({
       type: 'physics_changed',
@@ -738,10 +739,10 @@ async function updateLocks(operation, values) {
     return;
   }
   try {
-    await editorApi.sceneTools.setActorPhysics(
+    await editorApi.scene.setActorProperties(
       selectedSceneName.value,
       selectedActorName.value,
-      { [field]: values.map((value) => Boolean(value)) },
+      { archive_session: archiveSession.value, mechanics: { [field]: values.map((value) => Boolean(value)) } },
     );
     void cabbageContextService.recordEvent({
       type: 'physics_changed',
@@ -760,10 +761,10 @@ async function updateLocks(operation, values) {
 
 async function updateCameraLock() {
   try {
-    await editorApi.sceneTools.setActorCameraLock(
+    await editorApi.scene.setActorProperties(
       selectedSceneName.value,
       selectedActorName.value,
-      { enabled: actor.cameraLock.enabled },
+      { archive_session: archiveSession.value, camera_lock: { enabled: actor.cameraLock.enabled } },
     );
   } catch (error) {
     logError('更新摄像机跟随失败', error);
@@ -777,16 +778,19 @@ async function updateCameraLockOffset() {
     return Number.isFinite(number) ? number : fallback;
   };
   try {
-    await editorApi.sceneTools.setActorCameraLock(
+    await editorApi.scene.setActorProperties(
       selectedSceneName.value,
       selectedActorName.value,
       {
-        enabled: true,
-        position_offset: [
-          toFinite(value.x, 0),
-          toFinite(value.y, 0),
-          toFinite(value.z, 2),
-        ],
+        archive_session: archiveSession.value,
+        camera_lock: {
+          enabled: true,
+          position_offset: [
+            toFinite(value.x, 0),
+            toFinite(value.y, 0),
+            toFinite(value.z, 2),
+          ],
+        },
       },
     );
   } catch (error) {
@@ -891,12 +895,15 @@ function handleGuidancePrepare(event) {
 onMounted(async () => {
   coronaEventBus.on('model-node-selection', handleModelNodeSelection);
   // Each window reads the current native selection on its first sample.
-  selectionToken = await editorApi.scene.observe('selection', handleSelection);
-  transformToken = await editorApi.scene.observe('transform', handleTransform);
+  selectionToken = await viewLifetime.subscribe(callback => editorApi.scene.observe('selection', callback), handleSelection, editorApi.off);
+  if (!viewLifetime.current()) return;
+  transformToken = await viewLifetime.subscribe(callback => editorApi.scene.observe('transform', callback), handleTransform, editorApi.off);
+  if (!viewLifetime.current()) return;
   window.addEventListener('cabbage-guidance-prepare', handleGuidancePrepare);
 });
 
 onUnmounted(() => {
+  viewLifetime.dispose();
   coronaEventBus.off('model-node-selection', handleModelNodeSelection);
   loadSequence += 1;
   ikController.clear();

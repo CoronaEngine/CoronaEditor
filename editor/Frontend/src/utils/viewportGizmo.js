@@ -18,11 +18,11 @@ const modifierMask = (event) =>
 
 export const isViewportGizmoSelectionOwner = ({
   viewportScope = 'main',
-  cameraHandle = 0,
+  cameraId = '',
   selection = {},
 } = {}) => {
   const sourceViewport = String(
-    selection.source_viewport || selection.sourceViewport || 'main',
+    selection.source_viewport || 'main',
   ).trim();
   if (sourceViewport === 'main') {
     return viewportScope === 'main';
@@ -30,12 +30,8 @@ export const isViewportGizmoSelectionOwner = ({
   if (sourceViewport !== 'cameraView' || viewportScope !== 'cameraView') {
     return false;
   }
-  const sourceCameraHandle = Number(
-    selection.source_camera_handle || selection.sourceCameraHandle || 0,
-  );
-  const localCameraHandle = Number(cameraHandle || 0);
-  return sourceCameraHandle > 0 && localCameraHandle > 0 &&
-    sourceCameraHandle === localCameraHandle;
+  const sourceCameraId = String(selection.source_camera_id || '').trim();
+  return Boolean(sourceCameraId) && sourceCameraId === String(cameraId || '').trim();
 };
 
 export const resolveViewportGizmoTarget = ({
@@ -52,24 +48,20 @@ export const resolveViewportGizmoTarget = ({
   }
 
   const pickedActor = pickResult?.actor;
-  const pickedHandle = Number(pickedActor?.handle || 0);
-  if (
-    Number.isFinite(pickedHandle)
-    && pickedHandle > 0
-    && String(pickedActor?.name || '') === actorName
-  ) {
+  const pickedGuid = String(pickedActor?.actor_guid || pickedActor?.guid || '').trim();
+  if (pickedGuid && String(pickedActor?.name || '') === actorName) {
     return {
-      handle: pickedHandle,
+      actor_guid: pickedGuid,
       name: actorName,
       type: String(pickedActor?.type || actorType || 'actor'),
     };
   }
 
-  for (const [handleValue, actor] of actorIndex || []) {
-    const handle = Number(handleValue || 0);
-    if (Number.isFinite(handle) && handle > 0 && actor?.name === actorName) {
+  for (const [, actor] of actorIndex || []) {
+    const guid = String(actor?.actor_guid || actor?.guid || '').trim();
+    if (guid && actor?.name === actorName) {
       return {
-        handle,
+        actor_guid: guid,
         name: actorName,
         type: String(actor.type || actorType || 'actor'),
       };
@@ -79,12 +71,13 @@ export const resolveViewportGizmoTarget = ({
 };
 
 export const createViewportGizmoController = ({
-  getBridge,
+  getApi,
   getCameraBinding,
   getHitRect,
   getRenderRect,
   onDragEnd,
   onDragCancel,
+  onResult,
   makeRequestId,
   scheduleFrame,
 } = {}) => {
@@ -109,33 +102,23 @@ export const createViewportGizmoController = ({
 
   const controller = {
     setTarget(actor = {}) {
-      const bridge = getBridge?.();
+      const api = getApi?.();
       const current = binding();
-      const cameraHandle = Number(current.cameraHandle || 0);
-      const actorHandle = Number(actor.handle || 0);
-      if (!bridge?.setViewportGizmoTarget || cameraHandle <= 0 || actorHandle <= 0) {
-        return false;
-      }
-      bridge.setViewportGizmoTarget(
-        cameraHandle,
-        String(current.sceneId || ''),
-        String(actor.name || ''),
-        actorHandle,
-      );
+      const actorGuid = String(actor.actor_guid || '').trim();
+      if (!api?.gizmo?.setTarget || !current.sceneId || !current.cameraId || !current.archiveSession || !actorGuid) return false;
+      Promise.resolve(api.gizmo.setTarget(String(current.sceneId), String(current.cameraId), {
+        archive_session: String(current.archiveSession), actor_guid: actorGuid,
+      })).catch(error => console.warn('[Viewport] Gizmo target failed', error));
       return true;
     },
 
     clearTarget() {
-      const bridge = getBridge?.();
+      const api = getApi?.();
       const current = binding();
-      const cameraHandle = Number(current.cameraHandle || 0);
-      if (!bridge?.setViewportGizmoTarget || cameraHandle <= 0) return false;
-      bridge.setViewportGizmoTarget(
-        cameraHandle,
-        String(current.sceneId || ''),
-        '',
-        0,
-      );
+      if (!api?.gizmo?.setTarget || !current.sceneId || !current.cameraId || !current.archiveSession) return false;
+      Promise.resolve(api.gizmo.setTarget(String(current.sceneId), String(current.cameraId), {
+        archive_session: String(current.archiveSession), actor_guid: null,
+      })).catch(error => console.warn('[Viewport] Gizmo target clear failed', error));
       dragging = false;
       activeAxis = 'none';
       queuedMove = null;
@@ -176,12 +159,11 @@ export const createViewportGizmoController = ({
       if (nativeEventType === 'gizmo-pointermove-immediate') {
         nativeEventType = 'pointermove';
       }
-      const bridge = getBridge?.();
+      const api = getApi?.();
       const current = binding();
-      const cameraHandle = Number(current.cameraHandle || 0);
       const renderRect = normalizeRect(getRenderRect?.() || getHitRect?.());
       const hitRect = normalizeRect(getHitRect?.() || renderRect);
-      if (!bridge?.viewportGizmoPointer || cameraHandle <= 0 || !renderRect) return false;
+      if (!api?.gizmo?.pointer || !current.sceneId || !current.cameraId || !current.archiveSession || !renderRect) return false;
 
       const clientX = Number(event.clientX ?? lastPointer.clientX);
       const clientY = Number(event.clientY ?? lastPointer.clientY);
@@ -204,18 +186,15 @@ export const createViewportGizmoController = ({
       };
       const requestId = nextRequestId();
       pending.add(requestId);
-      bridge.viewportGizmoPointer(
-        cameraHandle,
-        requestId,
-        nativeEventType,
-        clientX - renderRect.left,
-        clientY - renderRect.top,
-        renderRect.width,
-        renderRect.height,
-        lastPointer.button,
-        lastPointer.buttons,
-        modifierMask(event),
-      );
+      Promise.resolve(api.gizmo.pointer(String(current.sceneId), String(current.cameraId), {
+        archive_session: String(current.archiveSession), request_id: requestId, event: nativeEventType,
+        x: clientX - renderRect.left, y: clientY - renderRect.top,
+        width: renderRect.width, height: renderRect.height,
+        button: lastPointer.button, buttons: lastPointer.buttons, modifiers: modifierMask(event),
+      })).then(result => controller.handleResult({ ...result, requestId })).catch(error => {
+        pending.delete(requestId);
+        console.warn('[Viewport] Gizmo pointer failed', error);
+      });
       return requestId;
     },
 
@@ -247,7 +226,7 @@ export const createViewportGizmoController = ({
       } else if (!payload.dragging) {
         pending.delete(requestId);
       }
-      return {
+      const result = {
         status: payload.cancelled
           ? 'cancelled'
           : payload.ended
@@ -259,6 +238,8 @@ export const createViewportGizmoController = ({
                 : 'miss',
         ...payload,
       };
+      onResult?.(result);
+      return result;
     },
 
     isDragging: () => dragging,

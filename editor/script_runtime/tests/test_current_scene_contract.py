@@ -164,7 +164,8 @@ def test_native_actor_proxy_uses_script_runtime_scene_tools_for_actor_operations
     ]
 
 
-def test_native_restore_operation_uses_script_runtime_aggregates(monkeypatch):
+@pytest.mark.parametrize('body_type', ['dynamic', 'kinematic', 'static', 'phantom'])
+def test_native_restore_uses_one_mechanics_patch_and_preserves_body_type(monkeypatch, body_type):
     import api.editor_api
     from script_runtime import scene_state
 
@@ -176,24 +177,30 @@ def test_native_restore_operation_uses_script_runtime_aggregates(monkeypatch):
             return {"status": "success"}
 
         def set_actor_physics(self, *args):
+            assert 'collision_type' not in args[2] and 'physics_enabled' not in args[2]
             calls.append(("physics", args))
             return {"status": "success"}
+
+    class SceneApi:
+        def set_actor_transform(self, *args):
+            calls.append(('transform', args))
+            return {'status': 'success'}
 
     monkeypatch.setattr(
         api.editor_api,
         "get_script_runtime_editor_api",
-        lambda: type("Api", (), {"scene_tools": SceneToolsApi()})(),
+        lambda: type("Api", (), {"scene_tools": SceneToolsApi(), 'scene': SceneApi()})(),
     )
-
-    assert scene_state._native_restore_operation(
-        "scene.ini", "Hero", "SetVisible", [False]
-    )
-    assert scene_state._native_restore_operation(
-        "scene.ini", "Hero", "SetMass", [3.0]
-    )
+    mechanics = {'body_type': body_type, 'mass': 3.0, 'restitution': 0.2, 'damping': 0.5,
+                 'linear_lock': [True, False, True], 'angular_lock': [False, True, False]}
+    scene_state._restore_native_actor_state('scene.ini', {
+        'name': 'Hero', 'visible': False, 'geometry': {'position': [1, 2, 3]}, 'mechanics': mechanics,
+    }, 'archive')
     assert calls == [
+        ('physics', ('scene.ini', 'Hero', {'body_type': 'static'})),
+        ('transform', ('scene.ini', 'Hero', {'position': [1, 2, 3], 'persist': False, 'archive_session': 'archive'})),
         ("state", ("scene.ini", "Hero", {"visible": False})),
-        ("physics", ("scene.ini", "Hero", {"mass": 3.0})),
+        ('physics', ('scene.ini', 'Hero', mechanics)),
     ]
 
 

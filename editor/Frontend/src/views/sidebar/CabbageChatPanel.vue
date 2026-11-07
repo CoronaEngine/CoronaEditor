@@ -102,7 +102,9 @@ import { coronaEventBus } from '@/utils/eventBus.js';
 import { useCabbageAssistantStore } from '@/stores/cabbageAssistantStore.js';
 import { aiService } from '@/services/aiService.js';
 import { reviewScopeId } from '@/services/nodeGraphReviewService.js';
+import { worldModeState } from '@/services/worldModeService.js';
 import { guidanceService } from '@/services/cabbageGuidanceService.js';
+import { subscribeProjectChanged } from '@/services/projectMessages.js';
 import { translateUiText } from '@/i18n/domTranslator.js';
 import {
   cancelActiveNodeGraphGeneration,
@@ -480,10 +482,7 @@ function resetChatForProjectChange() {
   if (requestKind === 'generation') cancelActiveNodeGraphGeneration().catch(() => {});
   else if (taskId) aiService.cancelNodeGraphReviewChat(taskId).catch(() => {});
 }
-
-function resetChatForProjectStorageChange(event) {
-  if (event?.key === 'corona.activeProjectPath') resetChatForProjectChange();
-}
+let stopProjectChanged = null;
 
 function focusComposer() {
   nextTick(() => {
@@ -505,10 +504,9 @@ watch(streamingContent, scrollToBottom);
 
 onMounted(() => {
   coronaEventBus.on('creative-panel-open', focusDockComposer);
-  window.addEventListener('corona-active-project-changed', resetChatForProjectChange);
-  window.addEventListener('storage', resetChatForProjectStorageChange);
+  stopProjectChanged = subscribeProjectChanged(resetChatForProjectChange);
   const currentProjectScopeId = () =>
-    reviewScopeId(String(window.localStorage?.getItem('corona.activeProjectPath') || ''));
+    reviewScopeId(String(worldModeState.activeProjectPath || ''));
   unsubscribeAssistantContext = subscribeCabbageAssistantContext(
     (snapshot) => assistant.hydrateContext(snapshot),
     { projectScopeId: currentProjectScopeId, emitCurrent: true }
@@ -517,8 +515,8 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   coronaEventBus.off('creative-panel-open', focusDockComposer);
-  window.removeEventListener('corona-active-project-changed', resetChatForProjectChange);
-  window.removeEventListener('storage', resetChatForProjectStorageChange);
+  stopProjectChanged?.();
+  stopProjectChanged = null;
   unsubscribeAssistantContext?.();
   unsubscribeAssistantContext = null;
   clearPollTimer();

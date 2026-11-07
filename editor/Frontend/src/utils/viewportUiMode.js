@@ -79,13 +79,13 @@ export const createViewportUiModeStore = ({ storage = safeStorage() } = {}) => {
     return normalized;
   };
 
-  const applyToBridge = ({ bridge, cameraHandle, mode }) => {
-    if (!cameraHandle || typeof bridge?.setViewportUiMode !== 'function') return false;
-    bridge.setViewportUiMode(Number(cameraHandle), normalizeViewportUiMode(mode));
+  const applyToNative = async ({ api, sceneId, cameraId, archiveSession, mode }) => {
+    if (!sceneId || !cameraId || !archiveSession) return false;
+    await api.configure(sceneId, cameraId, { archive_session: archiveSession, mode: normalizeViewportUiMode(mode) });
     return true;
   };
 
-  return { keyFor, get, set, applyToBridge };
+  return { keyFor, get, set, applyToNative };
 };
 
 // 光场 3D UI 标定：UI 面板与传输层统一使用 Vision 光场语义 (pe/angle/offset)。
@@ -149,14 +149,13 @@ export const createViewportUiCalibrationStore = ({ storage = safeStorage() } = {
     return normalized;
   };
 
-  const applyToBridge = ({ bridge, cameraHandle, calibration }) => {
-    if (!cameraHandle || typeof bridge?.setViewportUiCalibration !== 'function') return false;
-    const c = normalizeLightFieldCalibration(calibration);
-    bridge.setViewportUiCalibration(Number(cameraHandle), c.pe, c.angle, c.offset, c.parallaxScale);
+  const applyToNative = async ({ api, sceneId, cameraId, archiveSession, calibration }) => {
+    if (!sceneId || !cameraId || !archiveSession) return false;
+    await api.configure(sceneId, cameraId, { archive_session: archiveSession, calibration: normalizeLightFieldCalibration(calibration) });
     return true;
   };
 
-  return { keyFor, get, set, applyToBridge };
+  return { keyFor, get, set, applyToNative };
 };
 
 export const VIEWPORT_UI_CURSOR_SHAPES = Object.freeze([
@@ -196,13 +195,6 @@ const normalizeRect = (rect) => {
   };
 };
 
-const pointerModifiers = (event) => (
-  (event?.ctrlKey ? 1 : 0) |
-  (event?.shiftKey ? 2 : 0) |
-  (event?.altKey ? 4 : 0) |
-  (event?.metaKey ? 8 : 0)
-);
-
 const pointInRect = (event, rect) => (
   event.clientX >= rect.left &&
   event.clientY >= rect.top &&
@@ -211,159 +203,107 @@ const pointInRect = (event, rect) => (
 );
 
 export const createViewportUiPointerController = ({
-  getBridge,
-  getCameraHandle,
+  api,
+  getBinding,
   getHitRect,
   getRenderRect,
   getEnabled = () => true,
   getNativeCursorEnabled = () => isNativeViewportCursorEnabled(),
   defaultCursor = 'arrow',
+  onError = error => console.warn('[Viewport] Native pointer update failed', error),
 } = {}) => {
-  let lastCameraHandle = 0;
-  let lastX = 0;
-  let lastY = 0;
+  let lastBinding = null;
   let pendingMove = null;
   let pendingMoveFrame = 0;
   let pointerVisible = false;
-  let systemCursorHidden = false;
-  let systemCursorCustom = false;
+  let disposed = false;
+  let inFlight = 0;
 
-  const cameraHandleForSend = () => {
-    const handle = Number(getCameraHandle?.() ?? 0);
-    return Number.isFinite(handle) && handle > 0 ? handle : 0;
+  const completed = () => {
+    inFlight--;
+    if (!inFlight && pendingMove && !pendingMoveFrame && !disposed) {
+      pendingMoveFrame = globalThis.requestAnimationFrame(flushPendingMove);
+    }
   };
 
-  const bridgeForSend = () => getBridge?.() ?? globalThis.coronaBridge ?? null;
-
-  const isNativeCursorEnabled = () => getNativeCursorEnabled?.() === true;
-
-  const isEnabled = () => getEnabled?.() !== false && isNativeCursorEnabled();
-
-  const setSystemCursorState = (hidden, custom) => {
-    if (systemCursorHidden === hidden && systemCursorCustom === custom) return false;
-    const bridge = bridgeForSend();
-    if (typeof bridge?.setViewportSystemCursorHidden !== 'function') return false;
-    if (bridge.setViewportSystemCursorHidden(hidden, custom) === false) return false;
-    systemCursorHidden = hidden;
-    systemCursorCustom = custom;
-    return true;
+  const currentBinding = () => {
+    const value = getBinding?.();
+    return value && ['sceneId', 'cameraId', 'archiveSession'].every(key => typeof value[key] === 'string' && value[key])
+      ? { sceneId: value.sceneId, cameraId: value.cameraId, archiveSession: value.archiveSession } : null;
   };
+  const sameBinding = (left, right) => left && right &&
+    ['sceneId', 'cameraId', 'archiveSession'].every(key => left[key] === right[key]);
 
-  const isHidePayload = ({ type, cursor }) => {
-    const eventType = String(type ?? '').toLowerCase();
-    return cursor === 'hidden' || eventType === 'pointerleave' ||
-      eventType === 'pointercancel' || eventType === 'leave' ||
-      eventType === 'cancel' || eventType === 'blur';
-  };
-
-  const emitPointer = ({ cameraHandle, type, x, y, buttons, modifiers, cursor }) => {
-    const bridge = bridgeForSend();
-    if (typeof bridge?.viewportUiPointer !== 'function') return false;
-    bridge.viewportUiPointer(cameraHandle, type, x, y, buttons, modifiers, cursor);
-    pointerVisible = !isHidePayload({ type, cursor });
-    setSystemCursorState(pointerVisible, pointerVisible);
-    return true;
+  const emitPointer = ({ binding, pointer }) => {
+    try {
+      const operation = api.configure(binding.sceneId, binding.cameraId, { archive_session: binding.archiveSession, pointer });
+      lastBinding = binding;
+      pointerVisible = pointer.cursor !== 'hidden';
+      inFlight++;
+      Promise.resolve(operation).then(completed, error => { onError(error); completed(); });
+      return true;
+    } catch (error) {
+      onError(error);
+      return false;
+    }
   };
 
   const flushPendingMove = () => {
     pendingMoveFrame = 0;
+    if (inFlight) return false;
     const payload = pendingMove;
     pendingMove = null;
     if (!payload) return false;
+    // A queued frame cannot write into a replacement world or camera.
+    if (disposed || getEnabled?.() === false || getNativeCursorEnabled?.() !== true || !sameBinding(payload.binding, currentBinding())) {
+      hide();
+      return false;
+    }
     return emitPointer(payload);
   };
 
   const hide = () => {
     pendingMove = null;
-    if (pendingMoveFrame && typeof globalThis.cancelAnimationFrame === 'function') {
-      globalThis.cancelAnimationFrame(pendingMoveFrame);
-    }
+    if (pendingMoveFrame) globalThis.cancelAnimationFrame?.(pendingMoveFrame);
     pendingMoveFrame = 0;
-    const cameraHandle = cameraHandleForSend() || lastCameraHandle;
-    if (!cameraHandle || !pointerVisible) {
-      setSystemCursorState(false, false);
-      return false;
-    }
-    return emitPointer({
-      cameraHandle,
-      type: 'pointerleave',
-      x: lastX,
-      y: lastY,
-      buttons: 0,
-      modifiers: 0,
-      cursor: 'hidden',
-    });
+    if (!pointerVisible || !lastBinding) return false;
+    return emitPointer({ binding: lastBinding, pointer: { cursor: 'hidden' } });
   };
 
   const send = (event, type = event?.type ?? 'pointermove', cursor = defaultCursor) => {
-    const clientX = Number(event?.clientX);
-    const clientY = Number(event?.clientY);
+    if (disposed) return false;
+    if (['pointerleave', 'pointercancel', 'leave', 'cancel', 'blur'].includes(type) || cursor === 'hidden') return hide();
+    const binding = currentBinding();
+    if (!binding || getEnabled?.() === false || getNativeCursorEnabled?.() !== true) {
+      hide();
+      return false;
+    }
+    if ((lastBinding && !sameBinding(lastBinding, binding)) || (pendingMove && !sameBinding(pendingMove.binding, binding))) hide();
+    const clientX = Number(event?.clientX), clientY = Number(event?.clientY);
     if (!Number.isFinite(clientX) || !Number.isFinite(clientY)) return false;
-
     const hitRect = normalizeRect(getHitRect?.() ?? getRenderRect?.());
-    if (hitRect && !pointInRect({ clientX, clientY }, hitRect)) {
-      hide();
-      return false;
-    }
-
     const renderRect = normalizeRect(getRenderRect?.() ?? hitRect);
-    if (!renderRect || renderRect.renderWidth <= 0 || renderRect.renderHeight <= 0) {
+    if ((hitRect && !pointInRect({ clientX, clientY }, hitRect)) || !renderRect || renderRect.renderWidth <= 0 || renderRect.renderHeight <= 0) {
       hide();
       return false;
     }
-
-    const opticsPointerEnabled = isEnabled();
-    if (!opticsPointerEnabled) {
-      if (pointerVisible) {
-        hide();
-      } else {
-        setSystemCursorState(false, false);
-      }
-      return false;
-    }
-    setSystemCursorState(true, true);
-
-    const bridge = bridgeForSend();
-    if (typeof bridge?.viewportUiPointer !== 'function') return false;
-    const cameraHandle = cameraHandleForSend();
-    if (!cameraHandle) {
-      hide();
-      return false;
-    }
-
     const x = (clientX - renderRect.left) * (renderRect.renderWidth / renderRect.width);
     const y = (clientY - renderRect.top) * (renderRect.renderHeight / renderRect.height);
     if (!Number.isFinite(x) || !Number.isFinite(y)) return false;
-
-    lastCameraHandle = cameraHandle;
-    lastX = Math.max(0, Math.min(renderRect.renderWidth - 1, x));
-    lastY = Math.max(0, Math.min(renderRect.renderHeight - 1, y));
-    const payload = {
-      cameraHandle,
-      type,
-      x: lastX,
-      y: lastY,
-      buttons: Number(event?.buttons ?? 0) || 0,
-      modifiers: pointerModifiers(event),
+    const payload = { binding, pointer: {
+      x: Math.max(0, Math.min(renderRect.renderWidth - 1, x)),
+      y: Math.max(0, Math.min(renderRect.renderHeight - 1, y)),
       cursor: normalizeViewportUiCursorShape(cursor),
-    };
-
+    } };
     if (type === 'pointermove' && typeof globalThis.requestAnimationFrame === 'function') {
       pendingMove = payload;
-      if (!pendingMoveFrame) {
-        pendingMoveFrame = globalThis.requestAnimationFrame(flushPendingMove);
-      }
+      if (!pendingMoveFrame) pendingMoveFrame = globalThis.requestAnimationFrame(flushPendingMove);
       return true;
     }
-
     return emitPointer(payload);
   };
 
-  return {
-    send,
-    hide,
-    dispose: hide,
-  };
+  return { send, hide, dispose: () => { hide(); disposed = true; } };
 };
 
 export const createViewportUiCursorController = ({ getTarget } = {}) => {

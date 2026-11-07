@@ -73,33 +73,43 @@ test('main viewport pointerdown does not force a focus transition during drag st
   );
 });
 
-test('sets and clears the native gizmo target', () => {
+test('sets and clears a GUID target through the scoped V8 API', () => {
   const calls = [];
-  const bridge = {
-    setViewportGizmoTarget: (...args) => calls.push(args),
-  };
+  const api = { gizmo: {
+    setTarget: (...args) => calls.push(args),
+    pointer: (...args) => calls.push(args),
+  } };
   const controller = createViewportGizmoController({
-    getBridge: () => bridge,
-    getCameraBinding: () => ({ cameraHandle: 11, sceneId: 'Scene/default.scene' }),
+    getApi: () => api,
+    getCameraBinding: () => ({ sceneId: 'Scene/default.scene', cameraId: 'camera/main', archiveSession: 'session-1' }),
   });
-
-  controller.setTarget({ handle: 22, name: 'Cube' });
+  controller.setTarget({ actor_guid: 'actor-guid-1', name: 'Cube' });
   controller.clearTarget();
-
   assert.deepEqual(calls, [
-    [11, 'Scene/default.scene', 'Cube', 22],
-    [11, 'Scene/default.scene', '', 0],
+    ['Scene/default.scene', 'camera/main', { archive_session: 'session-1', actor_guid: 'actor-guid-1' }],
+    ['Scene/default.scene', 'camera/main', { archive_session: 'session-1', actor_guid: null }],
   ]);
 });
 
-test('forwards viewport-local pointer coordinates and tracks consumed drag', () => {
+test('viewport gizmo uses scoped typed V8 operations without numeric native handles or result polling', () => {
+  const source = readFileSync(join(frontendRoot, 'src/utils/viewportGizmo.js'), 'utf8');
+  assert.match(source, /api\.gizmo\.setTarget/);
+  assert.match(source, /api\.gizmo\.pointer/);
+  assert.doesNotMatch(source, /cameraHandle|actorHandle|setViewportGizmoTarget|viewportGizmoPointer/);
+  assert.doesNotMatch(source, /Number\(.*handle/);
+
+  const sceneReader = readFileSync(join(frontendRoot, 'src/api/sceneReader.js'), 'utf8');
+  const api = readFileSync(join(frontendRoot, 'src/api/editorApi.js'), 'utf8');
+  assert.doesNotMatch(sceneReader, /viewportGizmoPointerResult|takeViewportResults/);
+  assert.doesNotMatch(api, /onViewportGizmoPointerResult|takeViewportResults/);
+});
+
+test('forwards viewport-local pointer coordinates and tracks the direct Promise result', async () => {
   const calls = [];
-  const bridge = {
-    viewportGizmoPointer: (...args) => calls.push(args),
-  };
+  const api = { gizmo: { setTarget() {}, pointer: (...args) => { calls.push(args); return Promise.resolve({ consumed: true, dragging: true, axis: 'x' }); } } };
   const controller = createViewportGizmoController({
-    getBridge: () => bridge,
-    getCameraBinding: () => ({ cameraHandle: 11, sceneId: 'Scene/default.scene' }),
+    getApi: () => api,
+    getCameraBinding: () => ({ sceneId: 'Scene/default.scene', cameraId: 'camera/main', archiveSession: 'session-1' }),
     getHitRect: () => ({ left: 10, top: 20, width: 200, height: 100 }),
     getRenderRect: () => ({ left: 0, top: 0, width: 220, height: 140 }),
     makeRequestId: () => 'gizmo-1',
@@ -110,41 +120,35 @@ test('forwards viewport-local pointer coordinates and tracks consumed drag', () 
     'pointerdown'
   );
   assert.equal(requestId, 'gizmo-1');
-  assert.deepEqual(calls[0].slice(0, 7), [11, 'gizmo-1', 'pointerdown', 60, 70, 220, 140]);
-
-  const result = controller.handleResult({
-    requestId: 'gizmo-1',
-    consumed: true,
-    dragging: true,
-    axis: 'x',
-  });
-  assert.equal(result.consumed, true);
+  assert.deepEqual(calls[0].slice(0, 3), ['Scene/default.scene', 'camera/main', {
+    archive_session: 'session-1', request_id: 'gizmo-1', event: 'pointerdown',
+    x: 60, y: 70, width: 220, height: 140, button: 0, buttons: 1, modifiers: 0,
+  }]);
+  await new Promise(resolve => setImmediate(resolve));
   assert.equal(controller.isDragging(), true);
 });
 
-test('drag end is reported once for persistence', () => {
+test('drag end is reported once for persistence', async () => {
   const ended = [];
   const controller = createViewportGizmoController({
-    getBridge: () => ({ viewportGizmoPointer() {} }),
-    getCameraBinding: () => ({ cameraHandle: 11, sceneId: 'Scene/default.scene' }),
+    getApi: () => ({ gizmo: { setTarget() {}, pointer: () => Promise.resolve({ consumed: true, dragging: true, ended: true }) } }),
+    getCameraBinding: () => ({ sceneId: 'Scene/default.scene', cameraId: 'camera/main', archiveSession: 'session-1' }),
     getHitRect: () => ({ left: 0, top: 0, width: 100, height: 100 }),
     getRenderRect: () => ({ left: 0, top: 0, width: 100, height: 100 }),
     onDragEnd: (payload) => ended.push(payload),
     makeRequestId: () => 'gizmo-end',
   });
   controller.pointer({ clientX: 10, clientY: 10, button: 0, buttons: 1 }, 'pointerdown');
-  controller.handleResult({ requestId: 'gizmo-end', consumed: true, dragging: true });
-  controller.handleResult({ requestId: 'gizmo-end', consumed: true, ended: true });
-  controller.handleResult({ requestId: 'gizmo-end', consumed: true, ended: true });
+  await new Promise(resolve => setImmediate(resolve));
   assert.equal(ended.length, 1);
 });
 
-test('pointercancel forwards cancellation and clears the active drag once', () => {
+test('pointercancel result clears the active drag once', async () => {
   const calls = [];
   const cancelled = [];
   const controller = createViewportGizmoController({
-    getBridge: () => ({ viewportGizmoPointer: (...args) => calls.push(args) }),
-    getCameraBinding: () => ({ cameraHandle: 11, sceneId: 'Scene/default.scene' }),
+    getApi: () => ({ gizmo: { setTarget() {}, pointer: (...args) => { calls.push(args); const cancel = args[2].event === 'pointercancel'; return Promise.resolve(cancel ? { consumed: true, dragging: false, cancelled: true, axis: 'x' } : { consumed: true, dragging: true, axis: 'x' }); } } }),
+    getCameraBinding: () => ({ sceneId: 'Scene/default.scene', cameraId: 'camera/main', archiveSession: 'session-1' }),
     getHitRect: () => ({ left: 0, top: 0, width: 100, height: 100 }),
     getRenderRect: () => ({ left: 0, top: 0, width: 100, height: 100 }),
     onDragCancel: (payload) => cancelled.push(payload),
@@ -158,29 +162,25 @@ test('pointercancel forwards cancellation and clears the active drag once', () =
     { clientX: 10, clientY: 10, button: 0, buttons: 1 },
     'pointerdown'
   );
-  controller.handleResult({ requestId: downRequest, consumed: true, dragging: true, axis: 'x' });
+  await new Promise(resolve => setImmediate(resolve));
 
   const cancelRequest = controller.cancel('pointercancel');
-  assert.equal(calls.at(-1)[2], 'pointercancel');
-  assert.equal(controller.isDragging(), true);
-
-  const cancelPayload = { requestId: cancelRequest, cancelled: true, dragging: false, axis: 'x' };
-  const result = controller.handleResult(cancelPayload);
-  assert.equal(result.status, 'cancelled');
+  assert.equal(calls.at(-1)[2].event, 'pointercancel');
+  assert.equal(cancelRequest, 'gizmo-cancel-2');
+  await new Promise(resolve => setImmediate(resolve));
   assert.equal(controller.isDragging(), false);
-  assert.deepEqual(cancelled, [cancelPayload]);
 
   assert.equal(controller.cancel('pointercancel'), false);
   assert.equal(cancelled.length, 1);
 });
 
-test('coalesces active drag moves to one animation frame', () => {
+test('coalesces active drag moves to one animation frame', async () => {
   const calls = [];
   const frames = [];
   let request = 0;
   const controller = createViewportGizmoController({
-    getBridge: () => ({ viewportGizmoPointer: (...args) => calls.push(args) }),
-    getCameraBinding: () => ({ cameraHandle: 11, sceneId: 'Scene/default.scene' }),
+    getApi: () => ({ gizmo: { setTarget() {}, pointer: (...args) => { calls.push(args); return Promise.resolve({ consumed: true, dragging: true, axis: 'x' }); } } }),
+    getCameraBinding: () => ({ sceneId: 'Scene/default.scene', cameraId: 'camera/main', archiveSession: 'session-1' }),
     getHitRect: () => ({ left: 0, top: 0, width: 100, height: 100 }),
     getRenderRect: () => ({ left: 0, top: 0, width: 100, height: 100 }),
     makeRequestId: () => `request-${++request}`,
@@ -190,7 +190,7 @@ test('coalesces active drag moves to one animation frame', () => {
     { clientX: 10, clientY: 10, button: 0, buttons: 1 },
     'pointerdown'
   );
-  controller.handleResult({ requestId: down, consumed: true, dragging: true, axis: 'x' });
+  await new Promise(resolve => setImmediate(resolve));
   controller.pointer({ clientX: 20, clientY: 10, buttons: 1 }, 'pointermove');
   controller.pointer({ clientX: 30, clientY: 10, buttons: 1 }, 'pointermove');
 
@@ -198,10 +198,10 @@ test('coalesces active drag moves to one animation frame', () => {
   assert.equal(frames.length, 1);
   frames[0]();
   assert.equal(calls.length, 2);
-  assert.equal(calls[1][3], 30);
+  assert.equal(calls[1][2].y, 10);
 });
 
-test('resolves the main viewport gizmo target from a successful pick', () => {
+test('resolves the main viewport gizmo target from a successful pick GUID', () => {
   assert.equal(
     typeof viewportGizmoModule.resolveViewportGizmoTarget,
     'function',
@@ -210,24 +210,24 @@ test('resolves the main viewport gizmo target from a successful pick', () => {
   const target = viewportGizmoModule.resolveViewportGizmoTarget({
     sceneId: 'scene.ini',
     selection: { scene: 'scene.ini', actor: 'Ball', actor_type: 'model' },
-    pickResult: { actor: { handle: 1176640039248, name: 'Ball', type: 'model' } },
+    pickResult: { actor: { guid: 'actor-guid-1', name: 'Ball', type: 'model' } },
     actorIndex: new Map(),
   });
   assert.deepEqual(target, {
-    handle: 1176640039248,
+    actor_guid: 'actor-guid-1',
     name: 'Ball',
     type: 'model',
   });
 });
 
-test('resolves a scene-tree selection through the actor index', () => {
+test('resolves a scene-tree selection through the GUID index', () => {
   assert.equal(typeof viewportGizmoModule.resolveViewportGizmoTarget, 'function');
   const target = viewportGizmoModule.resolveViewportGizmoTarget({
     sceneId: 'scene.ini',
     selection: { scene: 'scene.ini', actor: 'Ball', actor_type: 'model' },
-    actorIndex: new Map([[1176640039248, { name: 'Ball', type: 'model' }]]),
+    actorIndex: new Map([['actor-guid-1', { actor_guid: 'actor-guid-1', name: 'Ball', type: 'model' }]]),
   });
-  assert.equal(target?.handle, 1176640039248);
+  assert.equal(target?.actor_guid, 'actor-guid-1');
 });
 
 test('routes a gizmo selection only to its source viewport', () => {
@@ -239,12 +239,12 @@ test('routes a gizmo selection only to its source viewport', () => {
 
   const fromCameraView = {
     source_viewport: 'cameraView',
-    source_camera_handle: 22,
+    source_camera_id: 'camera/22',
   };
   assert.equal(
     viewportGizmoModule.isViewportGizmoSelectionOwner({
       viewportScope: 'main',
-      cameraHandle: 11,
+      cameraId: 'camera/11',
       selection: fromCameraView,
     }),
     false
@@ -252,7 +252,7 @@ test('routes a gizmo selection only to its source viewport', () => {
   assert.equal(
     viewportGizmoModule.isViewportGizmoSelectionOwner({
       viewportScope: 'cameraView',
-      cameraHandle: 22,
+      cameraId: 'camera/22',
       selection: fromCameraView,
     }),
     true
@@ -260,7 +260,7 @@ test('routes a gizmo selection only to its source viewport', () => {
   assert.equal(
     viewportGizmoModule.isViewportGizmoSelectionOwner({
       viewportScope: 'cameraView',
-      cameraHandle: 33,
+      cameraId: 'camera/33',
       selection: fromCameraView,
     }),
     false
@@ -269,7 +269,7 @@ test('routes a gizmo selection only to its source viewport', () => {
   assert.equal(
     viewportGizmoModule.isViewportGizmoSelectionOwner({
       viewportScope: 'main',
-      cameraHandle: 11,
+      cameraId: 'camera/11',
       selection: {},
     }),
     true
@@ -277,7 +277,7 @@ test('routes a gizmo selection only to its source viewport', () => {
   assert.equal(
     viewportGizmoModule.isViewportGizmoSelectionOwner({
       viewportScope: 'cameraView',
-      cameraHandle: 22,
+      cameraId: 'camera/22',
       selection: {},
     }),
     false

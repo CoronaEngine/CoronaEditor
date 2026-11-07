@@ -1,40 +1,35 @@
 /** Web-owned window sessions. Native Dock remains a mode-agnostic transport. */
-export const EDITOR_UI_POLICY_KEY = 'corona.editorUi.policy.v1';
-const WINDOW_PREFIX = 'corona.editorUi.window.v1:';
+import { isSecondaryWebDocument } from '../api/webDocument.js';
 const uniqueId = () => `${Date.now()}_${Math.random().toString(36).slice(2)}`;
 const unwrap = value => value?.data ?? value;
 
-export function createEditorWindowSession({ storage, send, getWorld, getQuery, owner = uniqueId(),
+export function createEditorWindowSession({ state, send, publish, getWorld, getQuery, owner = uniqueId(),
+  activities = { begin: () => null, end: () => {}, drain: async () => {} },
+  beforeRetire = () => {},
   wait = ms => new Promise(resolve => setTimeout(resolve, ms)), timeoutMs = 30_000 }) {
   let queue = Promise.resolve();
   let retirement = null;
   let retirementRevision = null;
   let needsRetirement = true;
   let preparationSequence = 0;
-  const read = key => JSON.parse(storage.getItem(key) || 'null');
-  const write = (key, value) => storage.setItem(key, JSON.stringify(value));
   // Surface identity must survive route changes; a secondary page never becomes
   // the policy owner simply by navigating to a URL without standalone=1.
   const surfaceQuery = new URLSearchParams(getQuery());
   const query = () => surfaceQuery;
-  const standalone = () => query().get('standalone') === '1';
+  const standalone = () => isSecondaryWebDocument(surfaceQuery);
   const sessionOwner = () => standalone() ? query().get('uiOwner') : owner;
-  const records = () => {
-    const result = [];
-    for (let i = 0; i < storage.length; i++) {
-      const key = storage.key(i);
-      if (key?.startsWith(WINDOW_PREFIX + sessionOwner() + ':')) result.push({ key, ...read(key) });
-    }
-    return result;
-  };
-  const forget = record => {
-    storage.removeItem(record.key);
+  const read = () => state.read();
+  const write = value => state.write(value);
+  const hydrate = () => state.hydrate?.() || Promise.resolve(read());
+  const records = () => read().records.filter(record => record.owner === sessionOwner());
+  const forget = async record => {
+    await state.removeRecord(record);
     record.status = 'disposed';
   };
-  const save = record => write(record.key, record);
-  const worldAllowed = () => getWorld().status === 'ready' && getWorld().mode === 'creative';
+  const save = record => state.saveRecord(record);
+  const worldAllowed = () => getWorld().status === 'ready';
   function policy() {
-    const current = read(EDITOR_UI_POLICY_KEY);
+    const current = read();
     const record = standalone() ? ownRecord() : null;
     const valid = current?.enabled && (standalone()
       ? current.generation === query().get('uiSession') && current.owner === query().get('uiOwner')
@@ -69,18 +64,18 @@ export function createEditorWindowSession({ storage, send, getWorld, getQuery, o
       await send({ cmd: 'suspendCameraViews', sceneId: record.sceneId });
     } else if (Number.isInteger(record.tabId)) {
       if (notify) {
-        record.status = 'closing'; save(record);
+        record.status = 'closing'; await save(record);
         await drain(item => item.source === record.id);
+        await activities.drain(item => item.source === record.id);
       }
       await send({ cmd: 'closePanelTab', tabId: record.tabId, panelId: '' });
-      if (notify) await send({ cmd: 'broadcast', event: 'panel-closed', payload: {
-        panelId: record.panelId, tabId: record.tabId, uiGeneration: record.generation,
-      } });
     }
-    forget(record);
+    await forget(record);
   }
   async function retire() {
+    await beforeRetire();
     await drain();
+    await activities.drain();
     await fence();
     for (const record of records()) await dispose(record);
     await fence();
@@ -90,11 +85,14 @@ export function createEditorWindowSession({ storage, send, getWorld, getQuery, o
     if (standalone()) return Promise.reject(new Error('只有主窗口可以更改世界界面策略'));
     const preparation = ++preparationSequence;
     const revision = getWorld().revision;
-    const previous = read(EDITOR_UI_POLICY_KEY);
+    const previous = read();
     if (previous?.owner !== owner || previous?.revision !== revision) needsRetirement = true;
     if (!enabled || needsRetirement) {
       if (previous?.owner !== owner || previous.enabled || previous.revision !== revision) {
-        write(EDITOR_UI_POLICY_KEY, { owner, revision, generation: uniqueId(), enabled: false });
+        // Revoke UI operations immediately, but keep the old message generation
+        // alive until its archive-scoped saves and native retirement complete.
+        write({ ...previous, owner, revision,
+          generation: previous?.owner === owner ? previous.generation : uniqueId(), enabled: false });
       }
       needsRetirement = true;
       if (!enabled && retirement && retirementRevision === revision) return retirement;
@@ -104,7 +102,7 @@ export function createEditorWindowSession({ storage, send, getWorld, getQuery, o
       if (needsRetirement) await retire();
       if (enabled && preparation === preparationSequence && revision === getWorld().revision && worldAllowed()) {
         const current = policy();
-        if (!current.enabled) write(EDITOR_UI_POLICY_KEY, {
+        if (!current.enabled) write({ ...current,
           owner, revision, generation: uniqueId(), enabled: true,
         });
       }
@@ -120,27 +118,32 @@ export function createEditorWindowSession({ storage, send, getWorld, getQuery, o
     return operation;
   }
   async function open(command) {
+    if (!state.main) await hydrate();
     const current = requirePolicy();
     const id = uniqueId();
-    const record = { key: `${WINDOW_PREFIX}${current.owner}:${id}`, id,
+    const record = { owner: current.owner, id,
       generation: current.generation, source: query().get('uiWindow'), panelId: command.panelId || '', sceneId: command.sceneId,
       kind: command.cmd === 'createCameraView' ? 'camera'
         : command.cmd.startsWith('create') ? 'panel' : 'operation', status: 'pending' };
-    save(record);
+    const activityId = record.kind === 'operation'
+      ? activities.begin({ source: record.source || owner, kind: 'operation' })
+      : null;
+    if (record.kind !== 'operation') {
+      const saved = save(record);
+      if (!state.main) await saved;
+    }
     const request = { ...command };
     if (record.kind !== 'operation') request.routePath = taggedRoute(command.routePath, current.generation, id, current.owner);
     const finish = async result => {
       record.tabId = unwrap(result)?.tab_id;
       record.status = 'settling';
-      save(record);
-      if (record.kind !== 'panel') await fence(); // queued=true is not completion
+      if (record.kind !== 'operation') await save(record);
       if (record.kind === 'operation') {
-        forget(record);
         if (!policy().enabled || policy().generation !== current.generation) throw new Error('世界已切换，已丢弃旧窗口请求');
         return;
       }
-      if (record.kind === 'panel' && !Number.isInteger(record.tabId)) {
-        record.status = 'uncertain'; save(record);
+      if (record.kind !== 'operation' && !Number.isInteger(record.tabId)) {
+        record.status = 'uncertain'; await save(record);
         throw new Error('窗口创建结果缺少 tab_id，已取消切换世界');
       }
       if (!policy().enabled || policy().generation !== current.generation || !worldAllowed()) {
@@ -148,34 +151,27 @@ export function createEditorWindowSession({ storage, send, getWorld, getQuery, o
         throw new Error('世界已切换，已丢弃旧窗口请求');
       }
       record.status = 'ready';
-      save(record);
+      await save(record);
     };
     try {
       if (requirePolicy().generation !== current.generation) throw new Error('世界已切换，已丢弃旧窗口请求');
-      const result = await send(request, { onLateResult: async (error, result) => {
-        if (error) { forget(record); return; }
-        record.tabId = unwrap(result)?.tab_id;
-        if (record.kind === 'panel' && !Number.isInteger(record.tabId)) return;
-        record.status = 'settling'; save(record);
-        try { await dispose(record); } // A timed-out request is never resurrected.
-        catch (failure) { record.status = 'ready'; save(record); throw failure; }
-      } });
+      const result = await send(request);
       await finish(result);
       return result;
     } catch (error) {
-      // Unknown native completion must keep the world switch blocked. The late
-      // callback cleans it up; retries cannot silently bypass this outstanding work.
-      if (error.code === 'DOCK_TIMEOUT' && record.status === 'pending') { record.status = 'uncertain'; save(record); }
-      else if (record.status === 'pending') forget(record);
-      else if (record.status === 'settling') { record.status = 'ready'; save(record); }
+      if (record.kind === 'operation') throw error;
+      if (record.status === 'pending') await forget(record);
+      else if (record.status === 'settling') { record.status = 'ready'; await save(record); }
       throw error;
+    } finally {
+      if (activityId) activities.end(activityId);
     }
   }
   function ownRecord() {
-    const current = read(EDITOR_UI_POLICY_KEY);
+    const current = read();
     const id = query().get('uiWindow');
     const sourceOwner = query().get('uiOwner') || current?.owner;
-    return id && sourceOwner ? read(`${WINDOW_PREFIX}${sourceOwner}:${id}`) : null;
+    return id && sourceOwner ? records().find(item => item.id === id && item.owner === sourceOwner) : null;
   }
   async function closeThis(panelId) {
     if (!standalone()) throw new Error('主世界窗口不能作为面板关闭');
@@ -188,20 +184,16 @@ export function createEditorWindowSession({ storage, send, getWorld, getQuery, o
     if (query().get('camera') && !record) return;
     if (record) {
       await drain(item => item.id === record.id);
+      record.status = 'closing'; await save(record);
+      await activities.drain(item => item.source === record.id);
       record = ownRecord();
       if (!record) return; // The main surface already retired it.
-      record.status = 'closing'; save(record);
       await drain(item => item.source === record.id);
-      const current = read(EDITOR_UI_POLICY_KEY);
+      const current = read();
       if (!current?.enabled || current.generation !== record.generation) return;
     }
-    // Broadcast before closing: the CEF context can disappear immediately after
-    // closeThisTab, taking any later notification with it.
-    if (record) await send({ cmd: 'broadcast', event: 'panel-closed', payload: {
-      panelId, tabId: record.tabId, uiGeneration: record.generation,
-    } });
     await send({ cmd: 'closeThisTab', panelId: '' });
-    if (record) forget(record);
+    if (record) await forget(record);
   }
   async function closeTab(tabId, panelId) {
     const record = records().find(item => item.tabId === tabId);
@@ -211,13 +203,13 @@ export function createEditorWindowSession({ storage, send, getWorld, getQuery, o
   async function broadcast(event, payload) {
     const current = requirePolicy();
     const record = ownRecord();
-    return send({ cmd: 'broadcast', event, payload: {
+    return publish(event, {
       ...payload, uiGeneration: current.generation, ...(record?.tabId !== undefined ? { tabId: record.tabId } : {}),
-    } });
+    });
   }
   function accepts(payload) {
     const current = policy();
     return worldAllowed() && current.enabled && payload?.uiGeneration === current.generation;
   }
-  return { prepare, policy, open, closeThis, closeTab, broadcast, accepts };
+  return { prepare, policy, hydrate, open, closeThis, closeTab, broadcast, accepts };
 }

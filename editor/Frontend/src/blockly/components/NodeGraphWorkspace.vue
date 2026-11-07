@@ -320,6 +320,7 @@ import BlocklyToolboxPalette from '@/blockly/components/BlocklyToolboxPalette.vu
 import { useErrorHandler } from '@/composables/useErrorHandler.js';
 import { editorApi } from '@/api/editorApi.js';
 import { appService } from '@/services/appService.js';
+import { getNodeGraphSaves } from '@/services/nodeGraphSaves.js';
 import { coronaEventBus } from '@/utils/eventBus.js';
 import { nodeGraphToCode, validateNodeGraph } from '@/blockly/generators/index.js';
 import { generatedNodeGraphRevision, registerGeneratedNodeGraphConsumer } from '@/blockly/node-editor/aiNodeGraphService.js';
@@ -327,6 +328,8 @@ import { actorContextNameKey, actorContextRevision, actorRecordsFromSceneTree, n
 import { nextSaveAction } from '@/blockly/utils/saveRetryPolicy.js';
 import { graphRevision as reviewGraphRevision, reviewScopeId, startNodeGraphReview } from '@/services/nodeGraphReviewService.js';
 import { useCabbageAssistantStore } from '@/stores/cabbageAssistantStore.js';
+import { subscribeProjectChanged } from '@/services/projectMessages.js';
+import { worldModeState } from '@/services/worldModeService.js';
 import {
   cabbageContextService,
   publishCabbageAssistantContext,
@@ -335,11 +338,6 @@ import {
   readCabbageAssistantContext,
   subscribeCabbageAssistantContext,
 } from '@/services/cabbageAssistantContextService.js';
-import {
-  publishProjectNodeGraphRuntimeState,
-  registerProjectNodeGraphRuntimeHandler,
-  registerProjectNodeGraphSaveHandler,
-} from '@/services/nodeGraphRuntimeService.js';
 
 const props = defineProps({
   actorName: { type: String, default: '' },
@@ -518,8 +516,6 @@ let isLoading = false,
   actorOptionsRefreshSequence = 0,
   graphLoadSequence = 0,
   unsubscribeCabbageContext = null,
-  unregisterProjectNodeGraphSaveHandler = null,
-  unregisterProjectNodeGraphRuntimeHandler = null,
   tutorialObservationTimer = null,
   lastTutorialObservationSignature = '',
   loadedProjectPath = '',
@@ -620,7 +616,7 @@ function resetNodeRunLifecycle() {
   nodeRunLifecycle.terminalReported = false;
 }
 function readActiveProjectPath() {
-  return String(window.localStorage?.getItem('corona.activeProjectPath') || '').trim();
+  return String(worldModeState.activeProjectPath || '').trim();
 }
 function normalizeProjectPath(value) {
   return String(value || '')
@@ -2470,7 +2466,6 @@ async function loadGraphForCurrentTarget() {
     if (response?.status === 'error') throw new Error(response.message || '节点图加载失败');
     loadedArchiveSession = scope.archive_session;
     loadedProjectPath = activeProjectPath.value = scope.project_path;
-    window.localStorage?.setItem('corona.activeProjectPath', scope.project_path);
     if (response?.status === 'loaded') {
       targetEnabledByKey.set(storageKeyForTarget(target), response.target?.enabled !== false);
       shouldMigrateLocal = applyGraph(normalizeGraph(response.workspace || {}));
@@ -2934,23 +2929,6 @@ async function handleToggleRun() {
   }
 }
 
-function currentProjectNodeGraphRuntimeState() {
-  return {
-    ready: Boolean(componentMounted && unregisterProjectNodeGraphRuntimeHandler),
-    running: codeRunning.value,
-    busy: runBusy.value,
-    status: runStatus.value,
-    detail: runDetail.value,
-  };
-}
-function syncProjectNodeGraphRuntimeState() {
-  if (!isProjectTarget.value || !unregisterProjectNodeGraphRuntimeHandler) return;
-  publishProjectNodeGraphRuntimeState(currentProjectNodeGraphRuntimeState());
-}
-watch(
-  [codeRunning, runBusy, runStatus, runDetail],
-  syncProjectNodeGraphRuntimeState
-);
 watch(
   () => [activeNodeTutorialTaskKey.value, canonicalJson(tutorialNodeBindings.value)],
   () => {
@@ -3098,7 +3076,7 @@ function updateCanvasSize() {
   clampViewport();
 }
 async function onActiveProjectChanged(event) {
-  const nextProjectPath = String(event?.detail?.projectPath || readActiveProjectPath()).trim();
+  const nextProjectPath = String(event?.projectPath || event?.path || readActiveProjectPath()).trim();
   if (!nextProjectPath) return;
   if (normalizeProjectPath(nextProjectPath) === normalizeProjectPath(activeProjectPath.value)) {
     return;
@@ -3123,10 +3101,7 @@ async function onActiveProjectChanged(event) {
   await loadGraphForCurrentTarget();
   await refreshSceneActorOptions();
 }
-function onProjectStorageChanged(event) {
-  if (event?.key !== 'corona.activeProjectPath') return;
-  onActiveProjectChanged({ detail: { projectPath: event.newValue || '' } });
-}
+let stopProjectChanged = null;
 
 
 watch(
@@ -3178,31 +3153,13 @@ function flushSessionGraph(session) {
   return saveNow();
 }
 
-function registerNodeGraphFlusher() {
-  const flushers = window.__coronaNodeGraphFlushers instanceof Set
-    ? window.__coronaNodeGraphFlushers
-    : new Set();
-  window.__coronaNodeGraphFlushers = flushers;
-  flushers.add(flushSessionGraph);
-  window.__coronaNodeGraphFlushSave = async session => {
-    const results = await Promise.all(
-      Array.from(window.__coronaNodeGraphFlushers || []).map((flush) => Promise.resolve().then(() => flush(session)))
-    );
-    if (results.some((result) => result === false)) {
-      throw new Error('\u8282\u70b9\u56fe\u4fdd\u5b58\u5931\u8d25\uff0c\u5df2\u53d6\u6d88\u5168\u5c40\u8fd0\u884c');
-    }
-    return true;
-  };
-}
-function unregisterNodeGraphFlusher() {
-  window.__coronaNodeGraphFlushers?.delete?.(flushSessionGraph);
-  if (!window.__coronaNodeGraphFlushers?.size) {
-    delete window.__coronaNodeGraphFlushSave;
-    delete window.__coronaNodeGraphFlushers;
-  }
-}
+let graphSaveRegistration = null;
 onMounted(async () => {
   componentMounted = true;
+  graphSaveRegistration = getNodeGraphSaves().register({
+    getSession: () => initialLoadComplete ? loadedArchiveSession : '',
+    flush: flushSessionGraph,
+  });
   activeProjectPath.value = readActiveProjectPath() || activeProjectPath.value;
 
   // The node graph runs in its own CEF page and therefore owns a separate Pinia
@@ -3223,8 +3180,7 @@ onMounted(async () => {
     { projectScopeId: currentCabbageScopeId, emitCurrent: true },
   );
 
-  window.addEventListener('corona-active-project-changed', onActiveProjectChanged);
-  window.addEventListener('storage', onProjectStorageChanged);
+  stopProjectChanged = subscribeProjectChanged(onActiveProjectChanged);
   window.addEventListener('cabbage-guidance-prepare', handleGuidancePrepare);
 
   // Establish the visible layout before waiting for bridge subscriptions and data loads,
@@ -3293,23 +3249,11 @@ onMounted(async () => {
     requestNodeGraphReview(500);
   }
   window.addEventListener('keydown', handleFullscreenKey);
-  registerNodeGraphFlusher();
-  if (isProjectTarget.value) {
-    unregisterProjectNodeGraphSaveHandler = registerProjectNodeGraphSaveHandler(flushSessionGraph);
-    unregisterProjectNodeGraphRuntimeHandler = registerProjectNodeGraphRuntimeHandler({
-      toggle: session => {
-        if (!session || session !== loadedArchiveSession) throw new Error('项目会话已切换');
-        return handleToggleRun();
-      },
-      getState: currentProjectNodeGraphRuntimeState,
-    });
-    syncProjectNodeGraphRuntimeState();
-  }
 });
 onBeforeUnmount(() => {
   componentMounted = false;
-  window.removeEventListener('corona-active-project-changed', onActiveProjectChanged);
-  window.removeEventListener('storage', onProjectStorageChanged);
+  stopProjectChanged?.();
+  stopProjectChanged = null;
   window.removeEventListener('cabbage-guidance-prepare', handleGuidancePrepare);
   unsubscribeCabbageContext?.();
   unsubscribeCabbageContext = null;
@@ -3331,10 +3275,6 @@ onBeforeUnmount(() => {
   }
   stopNodeGraphReview?.();
   stopNodeGraphReview = null;
-  unregisterProjectNodeGraphRuntimeHandler?.();
-  unregisterProjectNodeGraphRuntimeHandler = null;
-  unregisterProjectNodeGraphSaveHandler?.();
-  unregisterProjectNodeGraphSaveHandler = null;
   unregisterAiNodeGraphConsumer?.();
   unregisterAiNodeGraphConsumer = null;
   window.removeEventListener('keydown', handleFullscreenKey);
@@ -3342,7 +3282,6 @@ onBeforeUnmount(() => {
     appService.redockPanel().catch(() => {});
     isFullscreen.value = false;
   }
-  unregisterNodeGraphFlusher();
   if (saveTimer) clearTimeout(saveTimer);
   saveTimer = null;
   if (preWarningTimer) window.clearTimeout(preWarningTimer);
@@ -3350,7 +3289,8 @@ onBeforeUnmount(() => {
   if (tutorialObservationTimer) window.clearTimeout(tutorialObservationTimer);
   tutorialObservationTimer = null;
   lastTutorialObservationSignature = '';
-  if (initialLoadComplete && graphDirty) saveNow(null, { force: true });
+  graphSaveRegistration?.retire().catch(error => logError('卸载节点图保存失败，保留待保存状态', error));
+  graphSaveRegistration = null;
   resizeObserver?.disconnect?.();
   if (resizeFrame) window.cancelAnimationFrame(resizeFrame);
   resizeFrame = 0;

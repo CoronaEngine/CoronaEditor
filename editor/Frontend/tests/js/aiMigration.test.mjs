@@ -26,6 +26,8 @@ globalThis.window = {
 };
 const { normalizeContext, applyEvent, appendMessage, updateTask, contextTransaction } =
   await import('../../src/services/cabbageDomain.js');
+const { worldModeService } = await import('../../src/services/worldModeService.js');
+worldModeService.commitActiveProject('E:/World/FixtureWorld');
 const { validateGeneratedGraph, validateSemantics, generationRequirements, filterReview } =
   await import('../../src/services/aiGraphDomain.js');
 const { buildCabbageChatRequest } = await import('../../src/services/cabbageChatRequest.js');
@@ -128,7 +130,7 @@ test('CAS conflicts replay pure changes on latest state without losing another w
   let content = null,
     version = '0',
     first = true;
-  editorApi.scene.readActive = async () => ({ data: { archive_session: 'fixture', project_path: 'E:/World/FixtureWorld' } });
+  editorApi.scene.readActive = async () => ({ archive_session: 'fixture', project_path: 'E:/World/FixtureWorld' });
   editorApi.projectSettings.readProjectDocument = async () => ({
     data: { success: true, content: structuredClone(content), version },
   });
@@ -353,7 +355,7 @@ test('contract selection stays bounded for known capabilities and falls back for
 function documentFixture(initial) {
   let content = initial,
     version = 0;
-  editorApi.scene.readActive = async () => ({ data: { archive_session: 'fixture', project_path: 'E:/World/FixtureWorld' } });
+  editorApi.scene.readActive = async () => ({ archive_session: 'fixture', project_path: 'E:/World/FixtureWorld' });
   editorApi.projectSettings.readProjectDocument = async () => ({
     data: { success: true, content: structuredClone(content), version: String(version) },
   });
@@ -374,6 +376,14 @@ async function finished(job) {
   }
   assert.fail('Web workflow did not complete');
 }
+
+test('world goals normalize legacy modes to the single editable world type', async () => {
+  const saved = documentFixture(normalizeContext(null, 'E:/World/FixtureWorld'));
+  for (const mode of [undefined, 'story', 'creative']) {
+    await aiWorkflows.startGoal({ prompt: '', mode });
+    assert.equal(saved().worldGoal.mode, 'creative');
+  }
+});
 test('another panel resumes an active task in the same launch without another model call', async () => {
   const context = normalizeContext(null, 'E:/World/FixtureWorld');
   context.worldGoal = {

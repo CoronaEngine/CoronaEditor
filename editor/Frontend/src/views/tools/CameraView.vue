@@ -179,15 +179,19 @@ import RelaxSettings from '@/components/ui/RelaxSettings.vue';
 import { nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import { editorApi } from '@/api/editorApi.js';
+import { getWebMessages } from '@/api/webMessages.js';
 import { appService } from '@/services/appService.js';
+import { createViewLifetime } from '@/utils/viewLifetime.js';
 import { buildDragRegions, dragRegionsSignature } from '@/utils/cameraDragRegions.js';
 import { pickedNodeIdentity } from '@/utils/modelHierarchy.js';
 import { coronaEventBus } from '@/utils/eventBus.js';
+import { readAppliedCameraPose } from '@/utils/viewportCameraController.js';
 import {
   normalizeVisionRenderMode, visionAccumulationFromCamera, visionDenoiseFromCamera, visionStablePlanesFromCamera, visionRenderModes,
   visionDenoisers, visionDenoiserFromCamera,
 } from '@/utils/visionRenderModes.js';
 import { createViewportPickController, indexActorsByHandle } from '@/utils/viewportPick.js';
+import { createScriptInputSender } from '@/utils/scriptInput.js';
 import {
   createViewportGizmoController,
   isViewportGizmoSelectionOwner,
@@ -200,6 +204,7 @@ import {
 } from '@/utils/viewportUiMode.js';
 
 const route = useRoute();
+const viewLifetime = createViewLifetime();
 const sceneId = String(route.query.scene || '');
 const cameraId = String(route.query.camera || '');
 
@@ -237,9 +242,7 @@ let scriptInputTimer = 0;
 let scratchMouseMoveFrame = 0;
 let pendingScratchMouseMove = null;
 let actorPickIndex = new Map();
-let actorPickResultCallbackToken = null;
 let actorSelectionCallbackToken = null;
-let gizmoPointerResultCallbackToken = null;
 let pendingScratchClick = null;
 let gizmoDownRequestId = '';
 let gizmoDownPointerId = null;
@@ -260,6 +263,7 @@ const outputModes = [
 ];
 const viewportUiModeStore = createViewportUiModeStore();
 const viewportUiCalibrationStore = createViewportUiCalibrationStore();
+const webMessages = getWebMessages();
 const viewportUiCalibrationDescriptor = {};
 const nativeViewportCursorEnabled = isNativeViewportCursorEnabled();
 const viewportUiModeItems = [
@@ -316,7 +320,7 @@ const renameCamera = async () => {
   if (!camera.value || !cameraName.value.trim() || cameraName.value === camera.value.name) return;
   try {
     const result = unwrap(await editorApi.sceneTools.renameCameraView(sceneId, cameraId, cameraName.value.trim()));
-    camera.value = result.camera;
+    Object.assign(camera.value, result.camera);
     cameraName.value = result.camera.name;
   } catch (error) {
     errorText.value = error.message;
@@ -525,8 +529,8 @@ const getCameraRenderRect = () => {
 };
 
 const viewportUiPointerController = createViewportUiPointerController({
-  getBridge: () => window.coronaBridge,
-  getCameraHandle: () => camera.value?.handle,
+  api: editorApi.viewport,
+  getBinding: () => ({ sceneId, cameraId, archiveSession: camera.value?.archive_session }),
   getEnabled: () => viewportUiMode.value === 'stereo3d',
   getNativeCursorEnabled: () => nativeViewportCursorEnabled,
   getHitRect: getCameraViewHitRect,
@@ -535,30 +539,36 @@ const viewportUiPointerController = createViewportUiPointerController({
 
 const cameraViewSelectionContext = () => ({
   sourceViewport: 'cameraView',
-  sourceCameraHandle: Number(camera.value?.handle || 0),
+  sourceCameraId: cameraId,
 });
 
 const cameraViewPickController = createViewportPickController({
-  getBridge: () => window.coronaBridge,
+  api: editorApi,
   getCameraBinding: () => ({
     sceneId,
-    cameraHandle: camera.value?.handle,
+    cameraId,
+    archiveSession: camera.value?.archive_session,
   }),
   getHitRect: getCameraViewHitRect,
   getRenderRect: getCameraRenderRect,
-  getActorIndex: () => actorPickIndex,
+  onResult: (payload, result) => handleCameraViewActorPickResult(payload, result),
   emitActorChange: (type, scene, actorName, nodeContext) =>
     editorApi.sceneTools.selectActor(scene, type, actorName, { ...cameraViewSelectionContext(), ...nodeContext }),
 });
 
 const viewportGizmoController = createViewportGizmoController({
-  getBridge: () => window.coronaBridge,
+  getApi: () => editorApi,
   getCameraBinding: () => ({
     sceneId,
-    cameraHandle: camera.value?.handle,
+    cameraId,
+    archiveSession: camera.value?.archive_session,
   }),
   getHitRect: getCameraViewHitRect,
   getRenderRect: getCameraRenderRect,
+  onResult: result => {
+    if (result.requestId === gizmoDownRequestId && result.consumed) gizmoDownConsumed = true;
+    if (result.status === 'ended' || result.status === 'cancelled') { gizmoDownRequestId = ''; gizmoDownPointerId = null; }
+  },
 });
 
 const refreshCameraViewActorPickIndex = async () => {
@@ -570,8 +580,8 @@ const refreshCameraViewActorPickIndex = async () => {
 };
 
 const findActorPickEntryByName = (actorName) => {
-  for (const [handle, actorEntry] of actorPickIndex.entries()) {
-    if (actorEntry?.name === actorName) return { handle, ...actorEntry };
+  for (const [, actorEntry] of actorPickIndex.entries()) {
+    if (actorEntry?.name === actorName) return actorEntry;
   }
   return null;
 };
@@ -583,7 +593,7 @@ const syncViewportGizmoSelection = async (payload = {}) => {
   if (coronaEventBus.modelNodeSelection) { viewportGizmoController.clearTarget(); return; }
   const ownsGizmo = isViewportGizmoSelectionOwner({
     viewportScope: 'cameraView',
-    cameraHandle: camera.value?.handle,
+    cameraId,
     selection: payload,
   });
   if (!ownsGizmo) {
@@ -602,19 +612,19 @@ const syncViewportGizmoSelection = async (payload = {}) => {
     await refreshCameraViewActorPickIndex().catch(() => false);
     entry = findActorPickEntryByName(actorName);
   }
-  if (entry?.handle && !coronaEventBus.modelNodeSelection) {
-    viewportGizmoController.setTarget({ handle: entry.handle, name: actorName });
+  if (entry?.actor_guid && !coronaEventBus.modelNodeSelection) {
+    viewportGizmoController.setTarget({ actor_guid: entry.actor_guid, name: actorName });
   } else {
     viewportGizmoController.clearTarget();
   }
 };
 
 const applyViewportUiCalibration = () => {
-  viewportUiCalibrationStore.applyToBridge({
-    bridge: window.coronaBridge,
-    cameraHandle: camera.value?.handle,
+  viewportUiCalibrationStore.applyToNative({
+    api: editorApi.viewport,
+    sceneId, cameraId, archiveSession: camera.value?.archive_session,
     calibration: viewportUiCalibrationStore.get(viewportUiCalibrationDescriptor),
-  });
+  }).catch(error => console.warn('[Viewport] Native configuration failed', error));
 };
 
 const syncViewportUiCalibration = () => {
@@ -625,11 +635,11 @@ const syncViewportUiCalibration = () => {
 
 const syncViewportUiMode = () => {
   viewportUiMode.value = viewportUiModeStore.get(viewportUiDescriptor());
-  viewportUiModeStore.applyToBridge({
-    bridge: window.coronaBridge,
-    cameraHandle: camera.value?.handle,
+  viewportUiModeStore.applyToNative({
+    api: editorApi.viewport,
+    sceneId, cameraId, archiveSession: camera.value?.archive_session,
     mode: viewportUiMode.value,
-  });
+  }).catch(error => console.warn('[Viewport] Native configuration failed', error));
   if (viewportUiMode.value !== 'stereo3d') {
     viewportUiPointerController.hide();
   }
@@ -638,28 +648,25 @@ const syncViewportUiMode = () => {
 
 const selectViewportUiMode = (mode) => {
   viewportUiMode.value = viewportUiModeStore.set(viewportUiDescriptor(), mode);
-  viewportUiModeStore.applyToBridge({
-    bridge: window.coronaBridge,
-    cameraHandle: camera.value?.handle,
+  viewportUiModeStore.applyToNative({
+    api: editorApi.viewport,
+    sceneId, cameraId, archiveSession: camera.value?.archive_session,
     mode: viewportUiMode.value,
-  });
+  }).catch(error => console.warn('[Viewport] Native configuration failed', error));
   if (viewportUiMode.value !== 'stereo3d') {
     viewportUiPointerController.hide();
   }
   syncViewportUiCalibration();
 };
 
-const handleViewportUiCalibrationStorage = (event) => {
-  if (event.key === viewportUiCalibrationStore.keyFor(viewportUiCalibrationDescriptor)) {
-    syncViewportUiCalibration();
-  }
-};
+let stopViewportUiCalibrationMessages = null;
 
 const saveSettings = async () => {
   try {
     const width = Math.max(Number(renderWidth.value) || 960, 64);
     const height = Math.max(Number(renderHeight.value) || 540, 64);
-    const result = unwrap(await editorApi.sceneTools.updateCameraView(sceneId, cameraId, {
+    const result = unwrap(await editorApi.scene.setCameraProperties(sceneId, cameraId, {
+      archive_session: camera.value?.archive_session,
       view_open: true,
       move_speed: Math.max(Number(moveSpeed.value) || 1, 0.01),
       width,
@@ -667,7 +674,7 @@ const saveSettings = async () => {
       view_width: width,
       view_height: height,
     }));
-    camera.value = result.camera;
+    Object.assign(camera.value, result.camera);
     renderWidth.value = result.camera.width || width;
     renderHeight.value = result.camera.height || height;
     await appService.resizeThisCameraView(
@@ -697,7 +704,8 @@ const syncWindowSize = async (force = false) => {
   renderWidth.value = width;
   renderHeight.value = height;
   try {
-    const result = unwrap(await editorApi.sceneTools.updateCameraView(sceneId, cameraId, {
+    const result = unwrap(await editorApi.scene.setCameraProperties(sceneId, cameraId, {
+      archive_session: camera.value?.archive_session,
       view_open: true,
       width,
       height,
@@ -705,7 +713,7 @@ const syncWindowSize = async (force = false) => {
       view_height: height,
       move_speed: Math.max(Number(moveSpeed.value) || 1, 0.01),
     }));
-    camera.value = result.camera;
+    Object.assign(camera.value, result.camera);
   } catch (error) {
     errorText.value = error.message;
   }
@@ -718,9 +726,7 @@ const scheduleWindowSizeSync = () => {
 
 const takeScreenshot = async () => {
   try {
-    const selected = unwrap(await editorApi.sceneTools.selectScreenshotPath(sceneId, cameraId));
-    if (selected?.status === 'canceled' || !selected?.path) return;
-    await editorApi.sceneTools.saveScreenshot(sceneId, selected.path, cameraId);
+    await editorApi.scene.captureScreenshot(sceneId, cameraId, { archive_session: camera.value?.archive_session });
   } catch (error) {
     errorText.value = error.message;
   }
@@ -785,21 +791,31 @@ const cross = (a, b) => [
   a[0] * b[1] - a[1] * b[0],
 ];
 
+const onCameraPoseApplied = (result = {}) => {
+  const pose = readAppliedCameraPose(result, { archiveSession: camera.value?.archive_session, sceneId, cameraId });
+  if (!pose) return false;
+  if (posePublishTimer) window.clearTimeout(posePublishTimer);
+  posePublishTimer = 0;
+  keys.clear();
+  looking = false;
+  Object.assign(camera.value, { position: pose.position, forward: pose.forward, world_up: pose.up, fov: pose.fov });
+  return true;
+};
+
 const flushPose = () => {
   posePublishTimer = 0;
   // Keep Scratch input active, but never publish an editor-controlled camera
   // pose while a node graph/game preview owns keyboard and mouse input.
   if (isEditorInputLocked()) return;
   const item = camera.value;
-  const bridge = window.coronaBridge;
-  if (!item || !bridge || typeof bridge.cameraMove !== 'function') return;
-  bridge.cameraMove(
-    item.handle,
-    Array.from(item.position),
-    Array.from(item.forward),
-    Array.from(item.world_up),
-    item.fov,
-  );
+  if (!item?.archive_session) return;
+  editorApi.scene.setCameraProperties(sceneId, cameraId, {
+    archive_session: item.archive_session,
+    position: Array.from(item.position), forward: Array.from(item.forward),
+    world_up: Array.from(item.world_up), fov: item.fov,
+  }).catch(error => {
+    if (camera.value?.archive_session === item.archive_session) errorText.value = error.message;
+  });
   lastPosePublishTime = performance.now();
 };
 
@@ -901,12 +917,6 @@ const movementCode = (event) => {
   }[key] || '';
 };
 
-const keyModifiers = (event) => [
-  event.ctrlKey ? 'Ctrl' : '',
-  event.altKey ? 'Alt' : '',
-  event.shiftKey ? 'Shift' : '',
-  event.metaKey ? 'Meta' : '',
-].filter(Boolean).join(',');
 const isTextInputEvent = (event) => {
   const target = event.target;
   return Boolean(target?.closest?.('input, textarea, select, [contenteditable="true"]'));
@@ -925,18 +935,7 @@ const onKeyDown = (event) => {
     return;
   }
   if (isTextInputEvent(event)) return;
-  // The native editor already delivers SDL keyboard events to CEF. Sending the
-  // same movement key through the manifest API re-enters the Scratch runtime on
-  // its slow path; with a loaded large scene that duplicate Q event can block the
-  // UI while the native input path is still active.
-  if (!window.coronaBridge && !event.__coronaScratchKeyForwarded) {
-    event.__coronaScratchKeyForwarded = true;
-    editorApi.scripts.sendKeyEvent(
-      event.code || event.key || '',
-      keyModifiers(event),
-      event.key || event.code || '',
-    ).catch(() => {});
-  }
+  // Native SDL owns Scratch keyboard delivery.
   if (isEditorInputLocked()) {
     keys.clear();
     event.preventDefault();
@@ -963,61 +962,21 @@ const onKeyUp = (event) => {
     if (posePublishTimer) window.clearTimeout(posePublishTimer);
     flushPose();
   }
-  if (!window.coronaBridge && !event.__coronaScratchKeyForwarded) {
-    event.__coronaScratchKeyForwarded = true;
-    editorApi.scripts.sendKeyUpEvent(
-      event.code || event.key || '',
-      event.key || event.code || '',
-    ).catch(() => {});
-  }
 };
-const scratchMouseButton = (button) => ({
-  0: 'LeftButton',
-  1: 'MiddleButton',
-  2: 'RightButton',
-}[button] || '');
-const sendScratchMouse = (
-  eventType,
-  button,
-  x,
-  y,
-  viewportX,
-  viewportY,
-  viewportWidth,
-  viewportHeight,
-  pickedActor = '',
-) => {
-  editorApi.scripts.sendMouseEvent(
-    eventType,
-    button,
-    x,
-    y,
-    viewportX,
-    viewportY,
-    viewportWidth,
-    viewportHeight,
-    pickedActor,
-  ).catch(() => {});
+const sendScriptInput = createScriptInputSender({ api: editorApi,
+  getBinding: () => ({ sceneId, cameraId, archiveSession: camera.value?.archive_session }),
+  getRenderRect: getCameraRenderRect });
+const sendScratchMouse = (type, event, pickedActor = '') => {
+  sendScriptInput(type, event, pickedActor).catch(error => console.warn('Script input failed', error));
 };
 const finishPendingScratchClick = (pickedActor = '') => {
   const pending = pendingScratchClick;
   if (!pending) return;
   pendingScratchClick = null;
-  sendScratchMouse(
-    'click',
-    pending.button,
-    pending.x,
-    pending.y,
-    pending.viewportX,
-    pending.viewportY,
-    pending.viewportWidth,
-    pending.viewportHeight,
-    pickedActor,
-  );
+  pending.send(pickedActor).catch(error => console.warn('Script input failed', error));
 };
 
 const handleScratchClick = (event) => {
-  const rect = getCameraRenderRect();
   const snapshot = {
     clientX: Number(event?.clientX || 0),
     clientY: Number(event?.clientY || 0),
@@ -1026,13 +985,7 @@ const handleScratchClick = (event) => {
   // Replace an unfinished pick with the newest click. Older GPU completions
   // remain harmless because the controller matches the latest requestId.
   pendingScratchClick = {
-    button: scratchMouseButton(snapshot.button),
-    x: snapshot.clientX,
-    y: snapshot.clientY,
-    viewportX: snapshot.clientX - Number(rect.left || 0),
-    viewportY: snapshot.clientY - Number(rect.top || 0),
-    viewportWidth: Number(rect.width || 0),
-    viewportHeight: Number(rect.height || 0),
+    send: sendScriptInput.capture('click', snapshot),
     requestId: '',
   };
 
@@ -1063,17 +1016,11 @@ const handleViewportClick = (event) => {
 const finishCameraViewClickFromPick = (payload, result) => {
   if (!pendingScratchClick || payload?.requestId !== pendingScratchClick.requestId) return;
   if (result?.status === 'stale') return;
-  const pickedActor =
-    result?.actor?.name ||
-    payload?.actorName ||
-    payload?.name ||
-    payload?.actor?.name ||
-    '';
+  const pickedActor = result?.actor?.name || '';
   finishPendingScratchClick(pickedActor);
 };
 
-const handleCameraViewActorPickResult = (payload) => {
-  const result = cameraViewPickController.handlePickResult(payload);
+const handleCameraViewActorPickResult = (payload, result) => {
   if (result.status === 'selected') coronaEventBus.emit('model-node-picked', { ...payload, actor_name: payload?.actor_name || result.actor?.name });
   if (result.status === 'miss') coronaEventBus.emit('model-node-picked', payload);
   if (result.status === 'miss') {
@@ -1087,70 +1034,16 @@ const handleCameraViewActorPickResult = (payload) => {
   finishCameraViewClickFromPick(payload, result);
 };
 
-const handleViewportGizmoPointerResult = (payload = {}) => {
-  const result = viewportGizmoController.handleResult(payload);
-  if (payload.requestId === gizmoDownRequestId && payload.consumed) {
-    gizmoDownConsumed = true;
-  }
-  if (result.status === 'ended' || result.status === 'cancelled') {
-    gizmoDownRequestId = '';
-    gizmoDownPointerId = null;
-  }
-};
-
 const forwardScratchMouse = (eventType, event) => {
-  const button = scratchMouseButton(event.button);
-  const x = Number(event.clientX || 0);
-  const y = Number(event.clientY || 0);
-  // Native CameraView renders behind the 34px toolbar across the whole
-  // browser surface. The input layer only starts below that toolbar, so using
-  // its bounds shifts projected picking upward. Keep event capture on the
-  // input layer, but express Scratch coordinates in the full render surface.
-  const rect = getCameraRenderRect();
-  const viewportX = x - Number(rect.left || 0);
-  const viewportY = y - Number(rect.top || 0);
-  const viewportWidth = Number(rect.width || 0);
-  const viewportHeight = Number(rect.height || 0);
-  const scratchEvent = {
-    button,
-    x,
-    y,
-    viewportX,
-    viewportY,
-    viewportWidth,
-    viewportHeight,
-  };
-  if (eventType !== 'move') {
-    sendScratchMouse(
-      eventType,
-      scratchEvent.button,
-      scratchEvent.x,
-      scratchEvent.y,
-      scratchEvent.viewportX,
-      scratchEvent.viewportY,
-      scratchEvent.viewportWidth,
-      scratchEvent.viewportHeight,
-    );
-    return;
-  }
-  pendingScratchMouseMove = scratchEvent;
+  const snapshot = { clientX: event.clientX, clientY: event.clientY, button: event.button };
+  if (eventType !== 'move') { sendScratchMouse(eventType, snapshot); return; }
+  pendingScratchMouseMove = sendScriptInput.capture('move', snapshot);
   if (scratchMouseMoveFrame) return;
   scratchMouseMoveFrame = window.requestAnimationFrame(() => {
     scratchMouseMoveFrame = 0;
     const pending = pendingScratchMouseMove;
     pendingScratchMouseMove = null;
-    if (pending) {
-      sendScratchMouse(
-        'move',
-        pending.button,
-        pending.x,
-        pending.y,
-        pending.viewportX,
-        pending.viewportY,
-        pending.viewportWidth,
-        pending.viewportHeight,
-      );
-    }
+    if (pending) pending().catch(error => console.warn('Script input failed', error));
   });
 };
 const beginLook = (event) => {
@@ -1200,6 +1093,7 @@ const handleViewportPointerDown = (event) => {
 };
 
 const handleViewportPointerCancel = (event) => {
+  viewportUiPointerController.hide();
   if (event.pointerId !== gizmoDownPointerId) return;
   try {
     inputLayerRef.value?.releasePointerCapture?.(event.pointerId);
@@ -1216,7 +1110,10 @@ const handleViewportPointerLeave = () => {
 const cancelViewportGizmoDrag = (reason = 'cancel') => {
   viewportGizmoController.cancel(reason);
 };
-const handleCameraViewBlur = () => cancelViewportGizmoDrag('blur');
+const handleCameraViewBlur = () => {
+  viewportUiPointerController.hide();
+  cancelViewportGizmoDrag('blur');
+};
 
 const updateLook = (event) => {
   forwardScratchMouse('move', event);
@@ -1290,31 +1187,38 @@ onMounted(async () => {
   document.documentElement.style.background = 'transparent';
   document.body.style.background = 'transparent';
   await syncDragRegions({ force: true });
+  if (!viewLifetime.current()) return;
   try {
     await loadCamera();
+    if (!viewLifetime.current()) return;
     await refreshCameraViewActorPickIndex().catch(() => false);
-    actorPickResultCallbackToken = await editorApi.scene.observe('actorPickResult', handleCameraViewActorPickResult);
-    actorSelectionCallbackToken = await editorApi.scene.observe('selection', syncViewportGizmoSelection);
-    gizmoPointerResultCallbackToken =
-      await editorApi.scene.observe('viewportGizmoPointerResult', handleViewportGizmoPointerResult);
+    if (!viewLifetime.current()) return;
+    actorSelectionCallbackToken = await viewLifetime.subscribe(
+      callback => editorApi.scene.observe('selection', callback), syncViewportGizmoSelection, editorApi.off);
+    if (!viewLifetime.current()) return;
     syncViewportUiMode();
     await syncWindowSize(true);
   } catch (error) {
-    errorText.value = error.message;
+    if (viewLifetime.current()) errorText.value = error.message;
   }
+  if (!viewLifetime.current()) return;
   window.addEventListener('resize', scheduleWindowSizeSync);
   window.addEventListener('resize', scheduleDragRegionSync);
   window.addEventListener('keydown', onKeyDown);
   window.addEventListener('keyup', onKeyUp);
-  window.addEventListener('storage', handleViewportUiCalibrationStorage);
+  stopViewportUiCalibrationMessages = webMessages.on('viewportUi.calibrationChanged', syncViewportUiCalibration);
   window.addEventListener('blur', handleCameraViewBlur);
   coronaEventBus.on('model-node-selection', handleModelNodeGizmoSelection);
+  coronaEventBus.on('camera-pose-applied', onCameraPoseApplied);
   animationFrame = requestAnimationFrame(movementFrame);
   await pollScriptInputLock();
+  if (!viewLifetime.current()) return;
   scriptInputTimer = window.setInterval(pollScriptInputLock, 250);
 });
 
 onBeforeUnmount(() => {
+  viewLifetime.dispose();
+  sendScriptInput.dispose();
   cancelAnimationFrame(animationFrame);
   if (posePublishTimer) window.clearTimeout(posePublishTimer);
   posePublishTimer = 0;
@@ -1328,17 +1232,9 @@ onBeforeUnmount(() => {
   viewportGizmoController.cancel('cancel');
   viewportGizmoController.clearTarget();
   cameraViewPickController.dispose();
-  if (actorPickResultCallbackToken) {
-    editorApi.off(actorPickResultCallbackToken).catch(() => {});
-    actorPickResultCallbackToken = null;
-  }
   if (actorSelectionCallbackToken) {
     editorApi.off(actorSelectionCallbackToken).catch(() => {});
     actorSelectionCallbackToken = null;
-  }
-  if (gizmoPointerResultCallbackToken) {
-    editorApi.off(gizmoPointerResultCallbackToken).catch(() => {});
-    gizmoPointerResultCallbackToken = null;
   }
   window.clearTimeout(resizeTimer);
   window.clearInterval(scriptInputTimer);
@@ -1346,9 +1242,11 @@ onBeforeUnmount(() => {
   window.removeEventListener('resize', scheduleDragRegionSync);
   window.removeEventListener('keydown', onKeyDown);
   window.removeEventListener('keyup', onKeyUp);
-  window.removeEventListener('storage', handleViewportUiCalibrationStorage);
+  stopViewportUiCalibrationMessages?.();
+  stopViewportUiCalibrationMessages = null;
   window.removeEventListener('blur', handleCameraViewBlur);
   coronaEventBus.off('model-node-selection', handleModelNodeGizmoSelection);
+  coronaEventBus.off('camera-pose-applied', onCameraPoseApplied);
   viewportUiPointerController.dispose();
 });
 </script>

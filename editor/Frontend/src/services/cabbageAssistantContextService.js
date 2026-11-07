@@ -1,3 +1,5 @@
+import { getWebMessages } from '../api/webMessages.js';
+import { getWebDocumentIdentity } from '../api/webDocument.js';
 import { worldModeState, editorUiAllowed } from './worldModeService.js';
 import { trackWorldSessionWork } from './worldSessionLifecycle.js';
 import { aiService } from '@/services/aiService.js';
@@ -5,8 +7,6 @@ import { editorApi } from '../api/editorApi.js';
 import { AI_SETTINGS_CHANGED } from './aiSessionService.js';
 import { createServiceResponseError } from '@/utils/serviceInitialization.js';
 
-const CHANNEL_NAME = 'corona-cabbage-assistant-context-v2';
-const TRANSIENT_CHANNEL_NAME = 'corona-cabbage-assistant-transient-v1';
 const STORAGE_KEY = 'corona.cabbageAssistantContext.v2';
 const CONTEXT_MESSAGE_TYPE = 'cabbage-assistant-context';
 const PRE_WARNING_MESSAGE_TYPE = 'cabbage-pre-warning';
@@ -15,40 +15,29 @@ const PROFILE_POLL_MS = 1200;
 const GOAL_PLAN_POLL_MS = 1000;
 const GOAL_PLAN_TIMEOUT_MS = 60000;
 
-let channel = null;
-let transientChannel = null;
+let sceneSavedMessages = null;
 let latestSnapshot = null;
 let writeChain = Promise.resolve();
 let activeScoreUpdateTaskId = '';
 const activeGoalPlanPolls = new Map();
 const pendingTransforms = new Map();
 const pendingActorEvents = [];
-const localSubscribers = new Set();
-const localPreWarningSubscribers = new Set();
 
-function getChannel() {
-  if (typeof BroadcastChannel === 'undefined') return null;
-  if (!channel) {
-    channel = new BroadcastChannel(CHANNEL_NAME);
-    channel.addEventListener('message', ({ data }) => {
-      if (data?.type === 'scene-saved') flushActorEvents(data.projectPath);
-    });
+function getMessages() {
+  const messages = getWebMessages();
+  if (sceneSavedMessages !== messages) {
+    sceneSavedMessages = messages;
+    messages.on('cabbage.scene-saved', projectPath => flushActorEvents(projectPath));
   }
-  return channel;
-}
-
-function getTransientChannel() {
-  if (typeof BroadcastChannel === 'undefined') return null;
-  if (!transientChannel) transientChannel = new BroadcastChannel(TRANSIENT_CHANNEL_NAME);
-  return transientChannel;
+  return messages;
 }
 
 function clone(value, fallback) {
-  try { return JSON.parse(JSON.stringify(value)); } catch (_) { return fallback; }
+  try { return globalThis.structuredClone(value); } catch (_) { return fallback; }
 }
 
 function currentProjectPath() {
-  return String(window.localStorage?.getItem('corona.activeProjectPath') || '')
+  return String(worldModeState.activeProjectPath || '')
     .trim().replace(/\\/g, '/').replace(/\/+$/, '');
 }
 
@@ -131,15 +120,7 @@ function publishSnapshot(snapshot) {
   if (!normalized) return null;
   latestSnapshot = normalized;
   try { window.localStorage?.setItem(STORAGE_KEY, JSON.stringify(normalized)); } catch (_) {}
-  // BroadcastChannel and the storage event do not notify the document that performed
-  // the write. Notify in-page subscribers explicitly so completed tutorial tasks are
-  // removed and their replacements appear without reopening the world or Dock.
-  for (const subscriber of Array.from(localSubscribers)) {
-    try { subscriber(normalized); } catch (error) {
-      console.warn('[CabbageContext] local subscriber failed', error?.message || error);
-    }
-  }
-  try { getChannel()?.postMessage({ type: CONTEXT_MESSAGE_TYPE, payload: normalized }); } catch (_) {}
+  void getMessages().emit(CONTEXT_MESSAGE_TYPE, normalized).catch(error => console.warn('[CabbageContext]', error.message));
   return normalized;
 }
 
@@ -301,13 +282,13 @@ export function initializeWorldTasks(options = {}) {
   return trackWorldSessionWork(initializeWorldTasksNow(options));
 }
 
-async function initializeWorldTasksNow({ prompt = '', mode = 'story', waitForCompletion = true } = {}) {
+async function initializeWorldTasksNow({ prompt = '', waitForCompletion = true } = {}) {
   const expectedScopeId = currentScopeId();
   const revision = worldModeState.revision;
   const response = await aiService.startCabbageGoalPlan({
     worldId: currentWorldId(),
     prompt: String(prompt || '').trim(),
-    mode: String(mode || 'story'),
+    mode: 'creative',
   });
   if (revision !== worldModeState.revision || !editorUiAllowed()) return null;
   if (response?.success !== true) throw goalPlanError(response);
@@ -335,15 +316,14 @@ function flushActorEvents(projectPath) {
 function notifySceneSaved(filepath) {
   if (!filepath) return;
   const projectPath = filepath.replaceAll('\\', '/').replace(/\/[^/]+$/, '');
-  flushActorEvents(projectPath);
-  getChannel()?.postMessage({ type: 'scene-saved', projectPath });
+  void getMessages().emit('cabbage.scene-saved', projectPath).catch(error => console.warn('[CabbageContext]', error.message));
 }
 
 export function recordEvent(event = {}, { onSceneSave = false } = {}) {
   const normalized = { ...clone(event, {}),projectPath:currentProjectPath(),projectRevision:worldModeState.revision, timestamp: Number(event.timestamp) || Date.now() };
   if (onSceneSave) {
     // Actor edits and trial runs must not modify the project's assistant document.
-    getChannel();
+    getMessages();
     pendingActorEvents.push(normalized);
     if (pendingActorEvents.length > 200) pendingActorEvents.shift();
     return Promise.resolve({ success: true, status: 'queued' });
@@ -442,26 +422,12 @@ export function subscribeCabbageAssistantContext(listener, { projectScopeId = ''
     latestSnapshot = snapshot;
     listener(clone(snapshot, snapshot));
   };
-  const onBroadcast = (event) => {
-    if (event?.data?.type === CONTEXT_MESSAGE_TYPE) accept(event.data.payload);
-  };
-  const onStorage = (event) => {
-    if (event?.key !== STORAGE_KEY || !event.newValue) return;
-    try { accept(JSON.parse(event.newValue)); } catch (_) {}
-  };
-  const currentChannel = getChannel();
-  localSubscribers.add(accept);
-  currentChannel?.addEventListener('message', onBroadcast);
-  window.addEventListener('storage', onStorage);
+  const unsubscribe = getMessages().on(CONTEXT_MESSAGE_TYPE, accept);
   if (emitCurrent) {
     const current = readCabbageAssistantContext(getExpectedScope());
     if (current) accept(current);
   }
-  return () => {
-    localSubscribers.delete(accept);
-    currentChannel?.removeEventListener('message', onBroadcast);
-    window.removeEventListener('storage', onStorage);
-  };
+  return unsubscribe;
 }
 
 // Repeated-issue warnings are intentionally transient. They travel between the
@@ -470,14 +436,7 @@ export function subscribeCabbageAssistantContext(listener, { projectScopeId = ''
 export function publishCabbagePreWarning(warning = {}) {
   const envelope = normalizePreWarningEnvelope(warning);
   if (!envelope) return null;
-  for (const subscriber of Array.from(localPreWarningSubscribers)) {
-    try { subscriber(envelope); } catch (error) {
-      console.warn('[CabbageContext] local pre-warning subscriber failed', error?.message || error);
-    }
-  }
-  try {
-    getTransientChannel()?.postMessage({ type: PRE_WARNING_MESSAGE_TYPE, payload: envelope });
-  } catch (_) {}
+  void getMessages().emit(PRE_WARNING_MESSAGE_TYPE, envelope).catch(error => console.warn('[CabbageContext]', error.message));
   return clone(envelope.warning, envelope.warning);
 }
 
@@ -493,16 +452,7 @@ export function subscribeCabbagePreWarnings(listener, { projectScopeId = '', wor
     if (expectedWorld && envelope.worldId && envelope.worldId !== expectedWorld) return;
     listener(clone(envelope.warning, envelope.warning), clone(envelope, envelope));
   };
-  const onBroadcast = (event) => {
-    if (event?.data?.type === PRE_WARNING_MESSAGE_TYPE) accept(event.data.payload);
-  };
-  const currentChannel = getTransientChannel();
-  localPreWarningSubscribers.add(accept);
-  currentChannel?.addEventListener('message', onBroadcast);
-  return () => {
-    localPreWarningSubscribers.delete(accept);
-    currentChannel?.removeEventListener('message', onBroadcast);
-  };
+  return getMessages().on(PRE_WARNING_MESSAGE_TYPE, accept);
 }
 
 export function cancelPendingTransformEvents() {
@@ -538,8 +488,7 @@ export const cabbageContextService = {
 // Configuring a session key after entering a world retries an earlier unconfigured plan.
 window.addEventListener(AI_SETTINGS_CHANGED,()=>{
   if(!editorUiAllowed())return;
-  const query=new URLSearchParams((window.location?.hash||'').split('?')[1]||'');
-  if(query.get('standalone')==='1')return;
+  if(getWebDocumentIdentity().role !== 'main')return;
   const revision=worldModeState.revision;
   void editorApi.projectSettings.getActiveProjectInfo().then(response=>{
     if(revision!==worldModeState.revision||!editorUiAllowed())return;

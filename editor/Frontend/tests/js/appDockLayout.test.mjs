@@ -37,11 +37,11 @@ function component(path, modules, window) {
   return result;
 }
 
-async function renderApp({ path = '/', standalone = false } = {}) {
+async function renderApp({ path = '/', standalone = false, mode = 'creative' } = {}) {
   const worldModeState = Vue.shallowReactive({
-    status: 'ready', mode: 'creative', projectPath: 'D:/worlds/kitchen', revision: 1,
+    status: 'ready', mode, projectPath: 'D:/worlds/kitchen', revision: 1,
   });
-  const editorUiAllowed = () => worldModeState.status === 'ready' && worldModeState.mode === 'creative';
+  const editorUiAllowed = () => worldModeState.status === 'ready';
   const storeSource = source('stores/dockStore.js').replace(/^import .*;\r?\n/gm, '')
     .replace('export const useDockStore', 'const useDockStore');
   const useDockStore = new Function('defineStore', 'PLUGIN_MANIFEST', 'editorUiAllowed',
@@ -51,10 +51,11 @@ async function renderApp({ path = '/', standalone = false } = {}) {
   for (const id of ['SceneControls', 'SceneTools', 'EditorSettings', 'NodeGraphPanel']) store.openPanel(id);
   const opened = [];
 
-  const window = { coronaBridge: { dockCommand() {} } };
+  const window = { corona: { window: { suspendCameraViews() {} } } };
   const noop = () => {};
   const asyncNoop = async () => {};
   const appService = {
+    onWindowClosed: () => noop,
     openNativePanel: async options => ({ tab_id: opened.push(options) }),
     setEditorUiEnabled: asyncNoop,
     readEditorUiPolicy: async () => ({ enabled: true }),
@@ -68,7 +69,9 @@ async function renderApp({ path = '/', standalone = false } = {}) {
     '@/stores/dockStore.js': { useDockStore: () => useDockStore(pinia) },
     '@/config/pluginManifest.js': manifests,
     '@/services/appService.js': { appService },
-    '@/services/editorWindowSession.js': { EDITOR_UI_POLICY_KEY: 'policy' },
+    '@/api/webMessages.js': { getWebMessages: () => ({ on: () => noop }) },
+    '@/api/webDocument.js': { getWebDocumentIdentity: () => ({ role: standalone ? 'peer' : 'main' }) },
+    '@/services/windowSessionState.js': { WINDOW_SESSION_POLICY_EVENT: 'windowSession.policyChanged' },
     '@/services/worldModeService.js': {
       LAUNCHER_ROUTES: new Set(['/StartScreen', '/NewGame', '/JoinGame', '/RecentGames']),
       normalizeProjectPath: value => value,
@@ -78,6 +81,7 @@ async function renderApp({ path = '/', standalone = false } = {}) {
     '@/api/editorApi.js': { editorApi: {} },
     '@/stores/lanchat.js': { default: { finishWorldSession: asyncNoop } },
     '@/services/projectLauncherService.js': { cancelPendingProjectOpen: noop },
+    '@/services/projectMessages.js': { subscribeProjectChanged: () => noop },
     '@/services/worldSessionLifecycle.js': { notifyWorldError: assert.fail },
     '@/utils/eventBus.js': { coronaEventBus: { on: noop, off: noop } },
     '@/services/nativePanelHosts.js': { createNativePanelHosts },
@@ -117,6 +121,13 @@ test('a standalone panel renders its route without hosting more windows', async 
   assert.match(h.html, /class="standalone-route-shell"/);
   assert.doesNotMatch(h.html, /data-dock-zone=|standalone-resize-handle/);
   assert.deepEqual(h.opened, []);
+});
+
+test('legacy story projects mount the normal native editor and retain requested panels', async t => {
+  const h = await renderApp({ mode: 'story' });
+  t.after(h.dispose);
+  assert.equal(h.opened.length, 4);
+  assert.equal(h.store.panels.SceneTools.open, true);
 });
 
 test('refreshing metadata for the current project preserves open and user-closed panels', async t => {

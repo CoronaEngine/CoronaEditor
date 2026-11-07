@@ -62,3 +62,40 @@ test('a reply issued before pause cannot publish into a resumed project', async 
   await until(() => seen.length > 0);
   assert.deepEqual(seen, ['second']);
 });
+
+test('scene reader deduplicates typed snapshots without JSON serialization', async t => {
+  globalThis.document = { hidden: false };
+  t.after(() => { delete globalThis.document; });
+  const source = await import('../../src/api/sceneReader.js?typed-key-check');
+  const readerSource = source.createSceneReader.toString();
+  assert.equal(readerSource.includes('JSON.stringify'), false);
+});
+
+test('the production reader samples transforms through the direct scene V8 binding', async t => {
+  const previousWindow = globalThis.window, previousDocument = globalThis.document;
+  let directReads = 0, manifestReads = 0;
+  globalThis.document = { hidden: false };
+  globalThis.window = { corona: {
+    scene: {
+      readActive: async () => ({ archive_session: 'A', selection: { actor_guid: 'actor' } }),
+      readTransforms: async scope => {
+        directReads++;
+        assert.deepEqual(scope, { archive_session: 'A', actors: ['actor'] });
+        return { actors: [{ actor_guid: 'actor', position: [1, 2, 3] }] };
+      },
+    },
+    editor: { invoke: async () => { manifestReads++; throw new Error('unexpected manifest path'); } },
+  } };
+  t.mock.method(console, 'warn', () => {});
+  const { sceneReader } = await import('../../src/api/editorApi.js');
+  const received = [];
+  const token = sceneReader.observe('transform', value => received.push(value));
+  t.after(() => {
+    sceneReader.off(token);
+    globalThis.window = previousWindow;
+    globalThis.document = previousDocument;
+  });
+  await until(() => received.length);
+  assert.equal(directReads, 1);
+  assert.equal(manifestReads, 0);
+});

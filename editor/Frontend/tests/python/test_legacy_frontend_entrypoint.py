@@ -43,7 +43,7 @@ class LegacyFrontendEntrypointTests(unittest.TestCase):
 
         self.assertIn("actor.cameraLock.enabled", object_panel)
         self.assertIn("actor.cameraLock.position", object_panel)
-        self.assertIn("editorApi.sceneTools.setActorCameraLock", object_panel)
+        self.assertIn("editorApi.scene.setActorProperties", object_panel)
 
     def test_obsolete_camera_follow_panel_is_not_kept_as_a_second_ui_owner(self):
         obsolete_panel = (
@@ -54,7 +54,7 @@ class LegacyFrontendEntrypointTests(unittest.TestCase):
         )
 
         self.assertFalse(obsolete_panel.exists())
-        self.assertIn("editorApi.sceneTools.setActorCameraLock", object_panel.read_text(encoding="utf-8"))
+        self.assertIn("editorApi.scene.setActorProperties", object_panel.read_text(encoding="utf-8"))
 
     def test_unreferenced_rich_text_component_is_not_kept_in_ui_directory(self):
         obsolete_component = (

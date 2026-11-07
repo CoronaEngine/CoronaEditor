@@ -1,54 +1,52 @@
 import { isCurrentWindowEvent } from '../services/appService.js';
-/**
- * 事件总线 —— 同一 JS 上下文内的发布-订阅
- *
- * 消息流：
- *   C++ → ExecuteJavaScript
- *     → window.__coronaEmit(event, ...args)        ← 仅主 Tab 收到
- *   pop-out Tab 收到 C++ cross-tab broadcast:
- *     → window.__coronaEmit(event, ...args, {_fromCross:1})
- *     → 内部 emit → pop-out Tab 内的面板组件收到
- */
-export const coronaEventBus = {
-  _handlers: {},
+import { getWebMessages } from '../api/webMessages.js';
 
-  on(event, handler) {
-    if (!this._handlers[event]) {
-      this._handlers[event] = [];
+/** UI event adapter; cross-document routing belongs to webMessages. */
+export function createEventBus(messages, accepts = () => true) {
+  const listeners = new Map();
+  const subscriptions = new Map();
+  const emit = (event, ...args) => {
+    for (const handler of [...(listeners.get(event) || [])]) {
+      try { handler(...args); }
+      catch (error) { console.error(`[coronaEventBus] ${event}`, error); }
     }
-    this._handlers[event].push(handler);
-  },
-
-  off(event, handler) {
-    if (!this._handlers[event]) return;
-    if (!handler) {
-      delete this._handlers[event];
-    } else {
-      this._handlers[event] = this._handlers[event].filter((h) => h !== handler);
-    }
-  },
-
-  emit(event, ...args) {
-    if (!this._handlers[event]) return;
-    for (const h of this._handlers[event]) {
-      try {
-        h(...args);
-      } catch (e) {
-        console.error(`[coronaEventBus] handler error for "${event}":`, e);
+  };
+  return {
+    on(event, handler) {
+      if (!listeners.has(event)) listeners.set(event, new Set());
+      listeners.get(event).add(handler);
+      if (!subscriptions.has(event)) {
+        subscriptions.set(event, messages.on(event, payload => {
+          if (accepts(payload)) emit(event, payload);
+        }));
       }
-    }
-  },
-};
+    },
+    off(event, handler) {
+      if (handler) listeners.get(event)?.delete(handler);
+      else listeners.delete(event);
+      if (!listeners.get(event)?.size) {
+        listeners.delete(event);
+        subscriptions.get(event)?.();
+        subscriptions.delete(event);
+      }
+    },
+    // Native events and local object references stay in their document.
+    // Explicit cross-document publishing goes through appService/webMessages.
+    emit,
+  };
+}
 
-/**
- * 统一入口：C++ ExecuteJavaScript 调用
- */
-window.__coronaEmit = (event, ...rest) => {
-  // 检查最后一个参数是否为选项对象 {_fromCross: 1}
-  const last = rest.length > 0 ? rest[rest.length - 1] : undefined;
-  const isCross = last && typeof last === 'object' && last._fromCross;
-  const args = isCross ? rest.slice(0, -1) : rest;
+const buses = new WeakMap();
+function currentBus() {
+  if (!buses.has(window)) {
+    buses.set(window, createEventBus(getWebMessages(window), payload =>
+      payload?.uiGeneration === undefined || isCurrentWindowEvent(payload)));
+  }
+  return buses.get(window);
+}
 
-  if (args[0]?.uiGeneration !== undefined && !isCurrentWindowEvent(args[0])) return;
-  coronaEventBus.emit(event, ...args);
+export const coronaEventBus = {
+  on: (...args) => currentBus().on(...args),
+  off: (...args) => currentBus().off(...args),
+  emit: (...args) => currentBus().emit(...args),
 };

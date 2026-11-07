@@ -1,7 +1,7 @@
 import { createSceneReader } from './sceneReader.js';
 /**
- * Bridge Utility for QWebChannel
- * 封装了与 C++ Editor API 的通信，支持 Promise 调用
+ * Public editor contracts over native V8 bindings.
+ * Manifest-backed methods share the typed editor.invoke entry point.
  */
 
 let editorApiMethodSpecs = null;
@@ -13,16 +13,12 @@ let editorApiEventManifestPromise = null;
 const EDITOR_API_CALLER_CEF = 1;
 // Default caller for the manifest-backed resource-search namespace.
 const CURRENT_CALLER = 'SceneBar';
-const dockChannels = new WeakMap();
-let dockRequestSequence = 0;
-const DOCK_RESPONSE_TIMEOUT_MS = 30_000;
 // Native pickers wait for a user decision, which has no RPC execution deadline.
 const INTERACTIVE_FILE_PICKER_APIS = new Set([
   'ProjectLauncher.open_project_file',
   'ProjectLauncher.browse_folder',
   'SceneTools.select_model_file',
   'MainView.import_resource_file',
-  'SceneTools.select_screenshot_path',
 ]);
 
 // How long a non-interactive manifest-backed request waits for a native reply before failing.
@@ -30,7 +26,7 @@ const INTERACTIVE_FILE_PICKER_APIS = new Set([
 // calls have no built-in deadline, so an unanswered non-interactive request would hang forever.
 async function scopedAssetPayload(payload = {}) {
   if (payload?.archive_session) return payload;
-  const state = (await editorApi.scene.readActive()).data;
+  const state = await editorApi.scene.readActive();
   if (!state?.archive_session || state.read_only) throw new Error('没有可写的活动项目');
   return { ...payload, archive_session: state.archive_session };
 }
@@ -47,23 +43,6 @@ async function callProjectFileMutation(wrapper, args, scope) {
 export const editorApiTransportLimits = {
   responseTimeoutMs: 30_000,
 };
-
-// One callback per browser surface. Replies never replace another request's handler.
-function getDockChannel(surface) {
-  let channel = dockChannels.get(surface);
-  if (!channel) {
-    const pending = new Map();
-    const dispatch = (id, error, result) => {
-      const request = pending.get(id);
-      if (!request) return; // Unknown, duplicate, or untracked timed-out native response.
-      request.finish(error, result);
-    };
-    channel = { pending, dispatch };
-    dockChannels.set(surface, channel);
-    surface.__dockCallback = dispatch;
-  }
-  return channel;
-}
 
 export class Bridge {
   // Wrapper-path lookup used to be a linear scan over every manifest entry on each call.
@@ -257,115 +236,30 @@ export class Bridge {
       throw new Error(`Editor API event payload schema mismatch for ${eventName}: payload must be ${payloadType}`);
     }
   }
-
-  static async callDockCommand(params, { onLateResult } = {}) {
-    const requestId = `dock_${Date.now()}_${++dockRequestSequence}`;
-    const command = params.cmd || 'unknown';
-    return new Promise((resolve, reject) => {
-      if (!window.coronaBridge || typeof window.coronaBridge.dockCommand !== 'function') {
-        reject(new Error('coronaBridge.dockCommand is unavailable'));
-        return;
-      }
-      const { pending } = getDockChannel(window);
-      let timedOut = false;
-      const finish = (error, result) => {
-        if (!pending.delete(requestId)) return;
-        clearTimeout(timer);
-        if (timedOut) {
-          Promise.resolve().then(() => onLateResult?.(error, result))
-            .catch(error => console.error('[Dock] late cleanup failed:', error));
-          return;
-        }
-        if (error) {
-          const failure = new Error(`Dock ${command} (${requestId}): ${error.message || String(error)}`);
-          if (error.code) failure.code = error.code;
-          reject(failure);
-        } else resolve(result);
-      };
-      const timer = setTimeout(() => {
-        const error = new Error('response timed out after 30 seconds; native execution may have completed');
-        error.code = 'DOCK_TIMEOUT';
-        if (onLateResult) {
-          timedOut = true;
-          reject(Object.assign(new Error(`Dock ${command} (${requestId}): ${error.message}`), { code: error.code }));
-        } else finish(error);
-      }, DOCK_RESPONSE_TIMEOUT_MS);
-      pending.set(requestId, { finish });
-      try {
-        window.coronaBridge.dockCommand(JSON.stringify({ ...params, requestId }));
-      } catch (error) {
-        finish(error);
-      }
-    });
-  }
 }
 
 const call_editor_api = async (apiName, args) => {
   const normalizedArgs = args || [];
   const spec = await Bridge.validateEditorApiArgs(apiName, normalizedArgs);
-  const request = {
-    api: apiName,
-    args: normalizedArgs,
-  };
-
-  return new Promise((resolve, reject) => {
-    let settled = false;
-    const timer = INTERACTIVE_FILE_PICKER_APIS.has(apiName) ? null : setTimeout(() => {
-      if (settled) return;
-      settled = true;
-      const error = new Error(
-        `Editor API request timed out after ${editorApiTransportLimits.responseTimeoutMs} ms: ` +
-          `${apiName} (native execution may still be in progress)`,
-      );
-      error.code = 'EDITOR_API_TIMEOUT';
-      reject(error);
-    }, editorApiTransportLimits.responseTimeoutMs);
-
-    // A late native reply must neither throw nor settle an already-timed-out request.
-    const succeed = (value) => {
-      if (settled) return;
-      settled = true;
-      clearTimeout(timer);
-      resolve(value);
-    };
-    const fail = (error) => {
-      if (settled) return;
-      settled = true;
-      clearTimeout(timer);
-      reject(error);
-    };
-
-    try {
-      window.cefQuery({
-        request: JSON.stringify(request),
-        persistent: false,
-        onSuccess: (response) => {
-          try {
-            const jsonResponse = typeof response === 'string' ? JSON.parse(response) : response;
-            if (
-              jsonResponse &&
-              (jsonResponse.success === false ||
-                jsonResponse.status === 'error' ||
-                jsonResponse.type === 'error' ||
-                jsonResponse.error)
-            ) {
-              fail(new Error(jsonResponse.error || jsonResponse.message || 'Editor API error'));
-            } else {
-              Bridge.validateEditorApiReturn(apiName, jsonResponse?.data, spec);
-              succeed(jsonResponse);
-            }
-          } catch (e) {
-            fail(e);
-          }
-        },
-        onFailure: (error_code, error_message) => {
-          fail(Object.assign(new Error(`Editor API Error (${error_code}): ${error_message}`), { code: error_code }));
-        },
-      });
-    } catch (error) {
-      fail(error);
-    }
-  });
+  const invoke = Promise.resolve().then(() => window.corona.editor.invoke(apiName, normalizedArgs));
+  let timer;
+  const response = INTERACTIVE_FILE_PICKER_APIS.has(apiName)
+    ? await invoke
+    : await Promise.race([
+        invoke,
+        new Promise((_, reject) => {
+          timer = setTimeout(() => {
+            const error = new Error(
+              `Editor API request timed out after ${editorApiTransportLimits.responseTimeoutMs} ms: ` +
+                `${apiName} (native execution may still be in progress)`,
+            );
+            error.code = 'EDITOR_API_TIMEOUT';
+            reject(error);
+          }, editorApiTransportLimits.responseTimeoutMs);
+        }),
+      ]).finally(() => clearTimeout(timer));
+  Bridge.validateEditorApiReturn(apiName, response?.data, spec);
+  return response;
 };
 const call_typed_editor_api = async (apiName, wrapperPath, args) => {
   const spec = await Bridge.ensureEditorApiMethod(apiName);
@@ -373,32 +267,15 @@ const call_typed_editor_api = async (apiName, wrapperPath, args) => {
   return call_editor_api(apiName, args);
 };
 
-const editorApiCallbacks = new Map();
-
-if (typeof window !== 'undefined') {
-  window.__coronaEditorApiDispatch = (event) => {
-    const envelope = typeof event === 'string' ? JSON.parse(event) : event;
-    const token = envelope?.token ?? envelope?.callback_token;
-    const entry = editorApiCallbacks.get(token);
-    const callback = entry?.callback;
-    if (typeof callback === 'function') {
-      Bridge.validateEditorApiEventPayload(envelope?.event, envelope?.payload, entry.eventSpec);
-      callback(envelope?.payload, envelope?.event);
-    }
-  };
-}
-
 const register_editor_api_callback = async (eventName, callback) => {
   const eventSpec = await Bridge.ensureEditorApiEvent(eventName);
-  const response = await call_editor_api('EditorApi.register_callback', [
-    eventName,
-    { transport: 'cef-js' },
-  ]);
-  const callbackToken = response?.data?.callback_token ?? response?.callback_token;
+  const callbackToken = await window.corona.editor.on(eventName, (payload, emittedEvent) => {
+    Bridge.validateEditorApiEventPayload(eventName, payload, eventSpec);
+    callback(payload, emittedEvent || eventName);
+  });
   if (!callbackToken) {
     throw new Error(`Editor API event registration failed: ${eventName}`);
   }
-  editorApiCallbacks.set(callbackToken, { callback, eventName, eventSpec });
   return callbackToken;
 };
 
@@ -410,16 +287,7 @@ const register_typed_editor_api_callback = async (eventName, wrapperName, callba
   return register_editor_api_callback(eventName, callback);
 };
 
-const unregister_callback = async (callbackToken) => {
-  // The local registration must be dropped even when native refuses or never answers the
-  // unregister call; otherwise the handler stays reachable (and leaks its closure) for the
-  // lifetime of the page. Hence try/finally rather than .then().
-  try {
-    return await call_editor_api('EditorApi.unregister_callback', [callbackToken]);
-  } finally {
-    editorApiCallbacks.delete(callbackToken);
-  }
-};
+const unregister_callback = (callbackToken) => window.corona.editor.off(callbackToken);
 
 const find_editor_api_method_by_js_wrapper = async (wrapperPath) => {
   await Bridge.ensureEditorApiManifest();
@@ -497,8 +365,8 @@ const create_dynamic_editor_api_namespace = (wrapperPath, target = {}) => {
 };
 
 export const sceneReader = createSceneReader(async (method, payload) => {
-  const result = await call_manifest_editor_api('scene.' + method, payload ? [payload] : []);
-  return result.data ?? result;
+  return method === 'readActive' ? editorApi.scene.readActive()
+    : editorApi.scene.readTransforms(payload.archive_session, payload.actors);
 });
 if (typeof document !== 'undefined') document.addEventListener?.('visibilitychange', () => sceneReader.visibilityChanged());
 if (typeof window !== 'undefined') {
@@ -513,19 +381,13 @@ const editorApiStatic = {
   editor: {
     listMethods: () => call_editor_api('EditorApi.list_methods', []),
     listEvents: () => call_editor_api('EditorApi.list_events', []),
-    registerCallback: (eventName, callbackSpec = {}) =>
-      call_editor_api('EditorApi.register_callback', [eventName, callbackSpec || {}]),
+    registerCallback: (eventName, callback) => register_editor_api_callback(eventName, callback),
     unregisterCallback: (callbackToken) => unregister_callback(callbackToken),
   },
   events: {
     onActorChanged: (callback) => register_manifest_editor_api_callback('events.onActorChanged', callback),
     onActorSelectionChanged: (callback) => register_manifest_editor_api_callback('events.onActorSelectionChanged', callback),
     onActorTransformUpdated: (callback) => register_manifest_editor_api_callback('events.onActorTransformUpdated', callback),
-    // 原生三角面移动的每帧结果：少了这条登记，玩家控制器的 pendingMove 永远等不到回调。
-    onMeshMoveResult: (callback) => register_manifest_editor_api_callback('events.onMeshMoveResult', callback),
-    onActorPickResult: (callback) => register_manifest_editor_api_callback('events.onActorPickResult', callback),
-    onViewportGizmoPointerResult: (callback) => register_manifest_editor_api_callback('events.onViewportGizmoPointerResult', callback),
-    onFocusPoseResult: (callback) => register_manifest_editor_api_callback('events.onFocusPoseResult', callback),
     onNetworkActorDeleteSyncBroadcastRequested: (callback) => register_manifest_editor_api_callback('events.onNetworkActorDeleteSyncBroadcastRequested', callback),
     onNetworkActorOwnershipClaimed: (callback) => register_manifest_editor_api_callback('events.onNetworkActorOwnershipClaimed', callback),
     onNetworkActorStateSyncBroadcastRequested: (callback) => register_manifest_editor_api_callback('events.onNetworkActorStateSyncBroadcastRequested', callback),
@@ -660,28 +522,38 @@ const editorApiStatic = {
     observe: async (kind, callback) => sceneReader.observe(kind, callback),
     listActorTree: (sceneName) => call_manifest_editor_api('scene.listActorTree', [sceneName]),
     getSnapshot: (sceneName = '') => call_manifest_editor_api('scene.getSnapshot', [sceneName]),
-    readActive: () => call_manifest_editor_api('scene.readActive', []),
+    readActive: () => window.corona.scene.readActive(),
     readActor: (session, actor) => call_manifest_editor_api('scene.readActor', [{ archive_session: session, actor }]),
-    readTransforms: (session, actors) => call_manifest_editor_api('scene.readTransforms', [{ archive_session: session, actors }]),
+    readTransforms: (session, actors) => window.corona.scene.readTransforms({ archive_session: session, actors }),
     readArchive: session => call_manifest_editor_api('scene.readArchive', [{ archive_session: session }]),
-    takeViewportResults: session => call_manifest_editor_api('scene.takeViewportResults', [{ archive_session: session }]),
     getActor: async (sceneName, actorName, session) => {
       if (!session) {
-        const response = await editorApi.scene.readActive();
-        const state = response.data ?? response;
+        const state = await editorApi.scene.readActive();
         if (state.scene !== sceneName || !state.archive_session) throw new Error('PROJECT_CONTEXT_CHANGED');
         session = state.archive_session;
       }
       return editorApi.scene.readActor(session, actorName);
     },
     setActorTransform: (sceneName, actorName, transform) =>
-      call_manifest_editor_api('scene.setActorTransform', [sceneName, actorName, transform]),
+      window.corona.scene.setActorTransform(sceneName, actorName, transform),
+    setActorProperties: (sceneName, actorName, patch) =>
+      window.corona.scene.setActorProperties(sceneName, actorName, patch),
+    focusActor: (sceneName, actorName, cameraId, scope) => window.corona.scene.focusActor(sceneName, actorName, cameraId, scope),
+    setCameraProperties: (sceneName, cameraId, patch) => window.corona.scene.setCameraProperties(sceneName, cameraId, patch),
+    captureScreenshot: (sceneName, cameraId, options) => window.corona.scene.captureScreenshot(sceneName, cameraId, options),
+    getEnvironment: (sceneName, scope) => window.corona.scene.getEnvironment(sceneName, scope),
+    setEnvironment: (sceneName, patch) => window.corona.scene.setEnvironment(sceneName, patch),
   },
   viewport: {
-    capture: (sceneName, cameraName, camera, outputPath) =>
-      call_manifest_editor_api('viewport.capture', [sceneName, cameraName, camera, outputPath]),
-    setCameraPose: (sceneName, cameraName, camera) =>
-      call_manifest_editor_api('viewport.setCameraPose', [sceneName, cameraName, camera]),
+    pick: (sceneName, cameraId, options) => window.corona.viewport.pick(sceneName, cameraId, options),
+    configure: (sceneName, cameraId, patch) => window.corona.viewport.configure(sceneName, cameraId, patch),
+  },
+  gizmo: {
+    setTarget: (sceneId, cameraId, options) => window.corona.gizmo.setTarget(sceneId, cameraId, options),
+    pointer: (sceneId, cameraId, options) => window.corona.gizmo.pointer(sceneId, cameraId, options),
+  },
+  input: {
+    dispatch: (sceneName, cameraId, event) => window.corona.input.dispatch(sceneName, cameraId, event),
   },
   scripts: {
     getStatus: () => call_manifest_editor_api('scripts.getStatus', []),
@@ -689,16 +561,6 @@ const editorApiStatic = {
     getRun: (requestId) => call_manifest_editor_api('scripts.getRun', [{ requestId }]),
     stop: (runId, restoreState = true, requestId) =>
       call_manifest_editor_api('scripts.stop', [{ runId, requestId, restore_state: restoreState }]),
-    sendKeyEvent: (key, modifiers, displayKey) =>
-      call_manifest_editor_api('scripts.sendKeyEvent', [key, modifiers || '', displayKey || key]),
-    sendKeyUpEvent: (key, displayKey) =>
-      call_manifest_editor_api('scripts.sendKeyUpEvent', [key, displayKey || key]),
-    sendMouseEvent: (eventType, button, x, y, viewportX, viewportY, viewportWidth, viewportHeight, pickedActor = '') =>
-      call_manifest_editor_api('scripts.sendMouseEvent', [
-        eventType, button || '', x || 0, y || 0,
-        viewportX ?? x ?? 0, viewportY ?? y ?? 0,
-        viewportWidth ?? 0, viewportHeight ?? 0, pickedActor || '',
-      ]),
   },
   projectFiles: {
     save: request => call_manifest_editor_api('projectFiles.save', [request]),
@@ -706,9 +568,6 @@ const editorApiStatic = {
   },
   sceneTools: {
     listSceneTree: (sceneName, query) => call_manifest_editor_api('sceneTools.listSceneTree', query ? [sceneName, query] : [sceneName]),
-    getEnvironment: (sceneName) => call_manifest_editor_api('sceneTools.getEnvironment', [sceneName]),
-    setEnvironment: (sceneName, state) =>
-      call_manifest_editor_api('sceneTools.setEnvironment', [sceneName, state || {}]),
     reloadScene: (sceneName, projectPath = '') =>
       call_manifest_editor_api('sceneTools.reloadScene', projectPath ? [sceneName, projectPath] : [sceneName]),
     rebindActorResource: (sceneName, actorGuid, path, scope) =>
@@ -722,26 +581,14 @@ const editorApiStatic = {
     openActor: (sceneName, actorName) =>
       call_manifest_editor_api('sceneTools.openActor', [sceneName, actorName]),
     selectActor: (sceneName, actorType, actorName, context = null) =>
-      call_manifest_editor_api(
-        'sceneTools.selectActor',
-        context ? [sceneName, actorType, actorName, context] : [sceneName, actorType, actorName],
-      ),
-    focusActor: (sceneName, actorName, cameraName) =>
-      call_manifest_editor_api('sceneTools.focusActor', [sceneName, actorName, cameraName]),
-    setActorState: (sceneName, actorName, state) =>
-      state?.animation_sources
-        ? callProjectAssetOperation('sceneTools.setActorState', state, [sceneName, actorName])
-        : call_manifest_editor_api('sceneTools.setActorState', [sceneName, actorName, state || {}]),
+      context ? window.corona.scene.selectActor(sceneName, actorType, actorName, context)
+        : window.corona.scene.selectActor(sceneName, actorType, actorName),
     setActorAnimation: (sceneName, actorName, animation, blendSeconds = 0.2) =>
       call_manifest_editor_api('sceneTools.setActorAnimation', [sceneName, actorName, animation, blendSeconds]),
     saveActor: (sceneName, actorName, session) =>
       call_manifest_editor_api('sceneTools.saveActor', [sceneName, actorName, { archive_session: session }]),
     selectModelFile: (sceneName, actorName, fileType = 'model') =>
       call_manifest_editor_api('sceneTools.selectModelFile', [sceneName, actorName, fileType]),
-    setActorPhysics: (sceneName, actorName, physics) =>
-      call_manifest_editor_api('sceneTools.setActorPhysics', [sceneName, actorName, physics]),
-    setActorCameraLock: (sceneName, actorName, cameraLock) =>
-      call_manifest_editor_api('sceneTools.setActorCameraLock', [sceneName, actorName, cameraLock]),
     setRenderBackend: (mode, sceneName = null, cameraId = null) =>
       call_manifest_editor_api('sceneTools.setRenderBackend', [mode, sceneName, cameraId]),
     getRenderBackend: (sceneName = null, cameraId = null) =>
@@ -772,34 +619,13 @@ const editorApiStatic = {
       call_manifest_editor_api('sceneTools.renameCameraView', [sceneName, cameraId, name]),
     listCameraViews: (sceneName) =>
       call_manifest_editor_api('sceneTools.listCameraViews', [sceneName]),
-    updateCameraView: (sceneName, cameraId, state) =>
-      call_manifest_editor_api('sceneTools.updateCameraView', [sceneName, cameraId, state]),
     deleteCamera: (sceneName, cameraId) =>
       call_manifest_editor_api('sceneTools.deleteCamera', [sceneName, cameraId]),
-    sunDirection: (sceneName, enable, direction) =>
-      call_manifest_editor_api('sceneTools.sunDirection', [sceneName, enable, direction]),
-    floorGrid: (sceneName, enabled) =>
-      call_manifest_editor_api('sceneTools.floorGrid', [sceneName, enabled]),
-    setPhysicsParams: (sceneName, params) =>
-      call_manifest_editor_api('sceneTools.setPhysicsParams', [
-        sceneName,
-        params.gravity,
-        params.floor_y,
-        params.floor_restitution,
-        params.fixed_dt,
-      ]),
-    getPhysicsParams: (sceneName) => call_manifest_editor_api('sceneTools.getPhysicsParams', [sceneName]),
-    selectScreenshotPath: (sceneName, cameraName) =>
-      call_manifest_editor_api('sceneTools.selectScreenshotPath', [sceneName, cameraName]),
-    saveScreenshot: (sceneName, path, cameraName) =>
-      call_manifest_editor_api('sceneTools.saveScreenshot', [sceneName, path, cameraName]),
     setOutputMode: (sceneName, cameraName, mode) =>
       call_manifest_editor_api('sceneTools.setOutputMode', [sceneName, cameraName, mode]),
     getOutputMode: (sceneName, cameraName) =>
       call_manifest_editor_api('sceneTools.getOutputMode', [sceneName, cameraName]),
     isVisionAvailable: () => call_manifest_editor_api('sceneTools.isVisionAvailable', []),
-    pickActor: (sceneName, x, y, vpWidth, vpHeight) =>
-      call_manifest_editor_api('sceneTools.pickActor', [sceneName, x, y, vpWidth, vpHeight]),
     playAudio: (resourceId, loop) =>
       call_manifest_editor_api('sceneTools.playAudio', [resourceId, loop]),
     stopAudio: (resourceId) =>
@@ -846,15 +672,13 @@ const editorApiStatic = {
       call_manifest_editor_api('resourceSearch.getStats', [caller]),
     markIndexDirty: (reason = 'frontend', caller = CURRENT_CALLER) =>
       call_manifest_editor_api('resourceSearch.markIndexDirty', [reason, caller]),
-    focusActor: (sceneName, actorName, caller = CURRENT_CALLER) =>
-      call_manifest_editor_api('resourceSearch.focusActor', [sceneName, actorName, caller]),
   },
 };
 
 export const editorApi = create_dynamic_editor_api_namespace('', editorApiStatic);
 
 // 快捷访问
-// 局域网聊天室：所有跨机传输在 C++ NetworkSystem 完成，前端只通过 cefQuery 调用。
+// LAN transport belongs to C++ NetworkSystem; Web calls native V8 contracts.
 // LANChat 主事件由 C++ Editor API registry 定义为 LANChat.event。
 
 // End of manifest-backed editor API definitions.

@@ -61,6 +61,7 @@
 <script setup>
 import { reactive, toRaw } from 'vue';
 import NumberInputWithSlider from '@/components/ui/NumberInputWithSlider.vue';
+import { getWebMessages } from '@/api/webMessages.js';
 import {
   createViewportUiCalibrationStore,
   normalizeLightFieldCalibration,
@@ -70,6 +71,7 @@ import {
 // dock 面板与 MainPage 用同一固定 key 持久化（标定按显示而非按相机），保证两端一致。
 const DESCRIPTOR = {};
 const store = createViewportUiCalibrationStore();
+const messages = getWebMessages();
 const form = reactive(normalizeLightFieldCalibration(store.get(DESCRIPTOR)));
 
 const fmt2 = (v) => Number(v).toFixed(2);
@@ -79,6 +81,7 @@ const fmt4 = (v) => Number(v).toFixed(4);
 const apply = () => {
   const calibration = { ...toRaw(form) };
   store.set(DESCRIPTOR, calibration);
+  void messages.emit('viewportUi.calibrationChanged', calibration);
 };
 
 const resetDefault = () => {

@@ -71,6 +71,7 @@ def test_blockly_node_graph_adapter_is_not_a_transport_owner():
     )
 
     assert "validateGeneratedNodeGraphResult" in source
-    assert "BroadcastChannel" in source
+    assert "getWebMessages" in source
+    assert "new BroadcastChannel" not in source
     assert "window.cefQuery" not in source
     assert "editorApi" not in source

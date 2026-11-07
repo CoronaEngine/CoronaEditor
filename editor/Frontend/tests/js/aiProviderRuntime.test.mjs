@@ -1,4 +1,5 @@
 import test from 'node:test';
+import { createWebMessages } from '../../src/api/webMessages.js';
 import assert from 'node:assert/strict';
 import { createModelRuntime, readModelResponse } from '../../src/services/aiProviderRuntime.js';
 import { createAiSession } from '../../src/services/aiSessionService.js';
@@ -362,11 +363,25 @@ test('a panel rejects data that cannot cross the channel without leaving retry t
       addEventListener() {},
       removeEventListener() {},
       close() {},
-      postMessage() {
-        throw new DOMException('Cannot clone', 'DataCloneError');
+      postMessage(message) {
+        if (message.kind === 'request') throw new DOMException('Cannot clone', 'DataCloneError');
       },
     }),
   });
   await assert.rejects(client.invoke('model.start', { messages, extra() {} }), /请求无法传递/);
   client.dispose();
+});
+
+test('AI owner uses the shared Web endpoint and disposing AI leaves other modules alive', async t => {
+  const scope = crypto.randomUUID();
+  const main = createWebMessages({ scope, role: 'main', documentId: 'main' });
+  const dock = createWebMessages({ scope, documentId: 'settings' });
+  const session = createAiSession({ scope, owner: true, messages: main });
+  t.after(() => { session.dispose(); main.dispose(); dock.dispose(); });
+  const result = await dock.request('main', 'ai.session', { operation: 'settings.get' });
+  assert.equal(result.success, true);
+  assert.equal(result.configured, false);
+  session.dispose();
+  main.handle('other.module', () => 'alive');
+  assert.equal(await dock.request('main', 'other.module', null), 'alive');
 });

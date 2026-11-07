@@ -253,8 +253,7 @@ class CoronaEditor:
         if cls._shutdown_requested or not cls._runtime_started:
             return False
         cls.checkpoint()
-        # ── Input 事件队列消费：CEF InputInject → 队列 → Python─ ─
-        # 每帧批量消费积攒的键盘/鼠标注入事件，消除逐事件 cefQuery 开销
+        # Consume SDL and scoped V8 input from the one native owned queue.
         cls._set_native_runtime_phase("input_dispatch")
         input_start = _time.perf_counter()
         try:
@@ -268,7 +267,8 @@ class CoronaEditor:
                     elif e.type == 1:    # keyUp
                         FileScripts.key_release(e.arg0, e.arg1 or e.arg0)
                     elif e.type == 2:    # mouseEvent
-                        FileScripts.mouse_event(e.arg0, e.arg1, e.arg3, e.arg4)
+                        FileScripts.mouse_event(e.arg0, e.arg1, e.arg3, e.arg4,
+                                                e.viewport_x, e.viewport_y, e.viewport_width, e.viewport_height, e.picked_actor)
         except RuntimeError:
             return False
         except Exception:

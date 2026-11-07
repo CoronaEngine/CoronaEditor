@@ -1,9 +1,10 @@
 export const indexActorsByHandle = (actors = []) => {
   const index = new Map();
   for (const actor of actors) {
-    const handle = Number(actor?.handle || 0);
-    if (!Number.isFinite(handle) || handle <= 0) continue;
-    index.set(handle, {
+    const guid = String(actor?.actor_guid || actor?.guid || '').trim();
+    if (!guid) continue;
+    index.set(guid, {
+      actor_guid: guid,
       name: actor.name,
       type: actor.type || actor.actor_type || 'actor',
     });
@@ -12,178 +13,72 @@ export const indexActorsByHandle = (actors = []) => {
 };
 
 export const createViewportPickController = ({
-  getBridge,
+  api,
   getCameraBinding,
   getHitRect,
   getRenderRect,
-  getViewportRect,
-  getViewportSize,
-  getActorIndex,
   onPickStart,
+  onResult,
   emitActorChange,
   makeRequestId,
 } = {}) => {
   let latestRequestId = '';
-  const pendingRequests = new Map();
   let sequence = 0;
-
-  const nextRequestId =
-    makeRequestId || (() => `pick-${Date.now()}-${++sequence}`);
-
-  const normalizeRect = (rect) => {
-    if (!rect) return null;
-    const left = Number(rect.left || 0);
-    const top = Number(rect.top || 0);
-    const width = Number(rect.width || 0);
-    const height = Number(rect.height || 0);
-    if (
-      !Number.isFinite(left) ||
-      !Number.isFinite(top) ||
-      !Number.isFinite(width) ||
-      !Number.isFinite(height) ||
-      width <= 0 ||
-      height <= 0
-    ) {
-      return null;
-    }
-    return { left, top, width, height };
+  let disposed = false;
+  const nextRequestId = makeRequestId || (() => `pick-${Date.now()}-${++sequence}`);
+  const currentScope = () => {
+    const binding = getCameraBinding?.() || {};
+    return { scene: binding.sceneId, camera: binding.cameraId, archive: binding.archiveSession };
   };
-
-  const containsClientPoint = (rect, clientX, clientY) =>
-    rect &&
-    clientX >= rect.left &&
-    clientY >= rect.top &&
-    clientX < rect.left + rect.width &&
-    clientY < rect.top + rect.height;
-
-  const callFastPick = (bridge, cameraHandle, sceneId, requestId, x, y, width, height) => {
-    bridge.pickActor(cameraHandle, sceneId, requestId, x, y, width, height);
+  const sameScope = (a, b) => a.scene === b.scene && a.camera === b.camera && a.archive === b.archive;
+  const rect = value => {
+    if (!value) return null;
+    const { left, top, width, height } = value;
+    return [left, top, width, height].every(Number.isFinite) && width > 0 && height > 0
+      ? { left, top, width, height } : null;
   };
+  const contains = (r, x, y) => r && x >= r.left && y >= r.top && x < r.left + r.width && y < r.top + r.height;
 
   return {
-    dispose() {
-      latestRequestId = '';
-      pendingRequests.clear();
-    },
-
-    pickAt(event, overrides = {}) {
-      const bridge = overrides.bridge || getBridge?.();
-      if (!bridge || typeof bridge.pickActor !== 'function') {
-        return false;
-      }
-
-      const binding = overrides.cameraBinding || getCameraBinding?.() || {};
-      const cameraHandle = Number(binding.cameraHandle || 0);
-      const sceneId = binding.sceneId || '';
-      if (!Number.isFinite(cameraHandle) || cameraHandle <= 0 || !sceneId) {
-        return false;
-      }
-
-      const clientX = Number(event?.clientX);
-      const clientY = Number(event?.clientY);
-      if (!Number.isFinite(clientX) || !Number.isFinite(clientY)) {
-        return false;
-      }
-
-      const hitRect = normalizeRect(
-        overrides.hitRect || overrides.viewportRect || getHitRect?.() || getViewportRect?.()
-      );
-      if (!containsClientPoint(hitRect, clientX, clientY)) {
-        return false;
-      }
-
-      const renderRect = normalizeRect(
-        overrides.renderRect || getRenderRect?.() || overrides.viewport || getViewportSize?.() || hitRect
-      );
-      if (!renderRect) {
-        return false;
-      }
-
-      const x = clientX - renderRect.left;
-      const y = clientY - renderRect.top;
-      const width = renderRect.width;
-      const height = renderRect.height;
-      if (
-        !Number.isFinite(x) ||
-        !Number.isFinite(y) ||
-        x < 0 ||
-        y < 0 ||
-        x >= width ||
-        y >= height
-      ) {
-        return false;
-      }
-
+    dispose() { disposed = true; latestRequestId = ''; },
+    pickAt(event) {
+      if (disposed || typeof api?.viewport?.pick !== 'function') return false;
+      const scope = currentScope();
+      if (![scope.scene, scope.camera, scope.archive].every(value => typeof value === 'string' && value)) return false;
+      const clientX = event?.clientX, clientY = event?.clientY;
+      if (!Number.isFinite(clientX) || !Number.isFinite(clientY)) return false;
+      const hit = rect(getHitRect?.());
+      const render = rect(getRenderRect?.());
+      if (!contains(hit, clientX, clientY) || !contains(render, clientX, clientY)) return false;
       const requestId = nextRequestId();
       latestRequestId = requestId;
-      pendingRequests.set(requestId, { cameraHandle, sceneId });
-       try {
-        callFastPick(bridge, cameraHandle, sceneId, requestId, x, y, width, height);
-      } catch (_) {
-        pendingRequests.delete(requestId);
-        return false;
-      }
-      onPickStart?.(requestId);
-
-       return requestId;
-    },
-
-    handlePickResult(payload) {
-      const binding = getCameraBinding?.() || {};
-      const activeCameraHandle = Number(binding.cameraHandle || 0);
-      const activeSceneId = binding.sceneId || '';
-      const payloadCameraHandle = Number(payload?.cameraHandle || 0);
-      const requestId = payload?.requestId || '';
-      const request = pendingRequests.get(requestId);
-      if (!payload || !request ||
-          (payloadCameraHandle > 0 && payloadCameraHandle !== request.cameraHandle) ||
-          (payload?.sceneId && payload.sceneId !== request.sceneId)) {
-        return { status: 'stale', payload };
-      }
-
-      const isLatest = requestId === latestRequestId;
-      pendingRequests.delete(requestId);
-      if (!isLatest ||
-          (payloadCameraHandle > 0 && payloadCameraHandle !== activeCameraHandle) ||
-          (payload?.sceneId && activeSceneId && payload.sceneId !== activeSceneId)) {
-        return { status: 'stale', payload };
-      }
-
-      if (payload.status === 'miss') {
-        return { status: 'miss', payload };
-      }
-
-      if (payload.status === 'error') {
-        return { status: 'error', payload };
-      }
-
-      if (payload.status !== 'success') {
-        return { status: 'error', payload };
-      }
-
-      const actorHandle = Number(payload.actorHandle || 0);
-      const actor = getActorIndex?.().get(actorHandle);
-      const payloadActorName = payload.actor_name || payload.actorName || payload.name || payload.actor?.name;
-      const payloadActorType = payload.actorType || payload.type || payload.actor?.actor_type || payload.actor?.type;
-      const resolvedActor = actor?.name
-        ? actor
-        : payloadActorName
-          ? { name: payloadActorName, type: payloadActorType || 'actor' }
-          : null;
-      if (!resolvedActor?.name) {
-        return { status: 'unknown', payload };
-      }
-
-      emitActorChange?.(resolvedActor.type || 'actor', payload.sceneId, resolvedActor.name, { node_index: Number.isInteger(payload.node_index) && payload.node_index >= 0 ? payload.node_index : null });
-      return {
-        status: 'selected',
-        payload,
-        actor: {
-          handle: actorHandle,
-          name: resolvedActor.name,
-          type: resolvedActor.type || 'actor',
-        },
+      const current = () => !disposed && requestId === latestRequestId && sameScope(scope, currentScope());
+      const deliver = payload => {
+        if (!current()) return;
+        const result = { status: payload.status, payload };
+        if (payload.status === 'success') {
+          result.actor = { handle: payload.actor_handle, guid: payload.actor_guid, name: payload.actor_name, type: payload.actor_type };
+          if (!result.actor.name || !result.actor.guid || !result.actor.handle) result.status = 'error';
+          else {
+            result.status = 'selected';
+            Promise.resolve(emitActorChange?.(result.actor.type, scope.scene, result.actor.name, { node_index: payload.node_index }))
+              .catch(error => console.warn('[viewport pick] Selection failed', error));
+          }
+        }
+        onResult?.(payload, result);
       };
+      let promise;
+      try {
+        promise = api.viewport.pick(scope.scene, scope.camera, { archive_session: scope.archive,
+          x: clientX - render.left, y: clientY - render.top, width: render.width, height: render.height });
+      } catch (_) { return false; }
+      onPickStart?.(requestId);
+      Promise.resolve(promise).then(payload => {
+        if (!payload || payload.scene !== scope.scene || payload.camera_id !== scope.camera || payload.archive_session !== scope.archive) return;
+        deliver({ ...payload, requestId });
+      }, error => deliver({ status: 'error', code: error?.code, message: error?.message, scene: scope.scene, requestId }))
+        .catch(error => console.warn('[viewport pick] Result consumer failed', error));
+      return requestId;
     },
   };
 };

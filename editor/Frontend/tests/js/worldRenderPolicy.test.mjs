@@ -16,7 +16,7 @@ const declarations = babelParse(source, { sourceType: 'module' }).program.body
 
 function creative({ newProject = false, cameraId = 'camera-2', reply } = {}) {
   const calls = [];
-  const state = { mode: 'creative', newProject };
+  const state = { status: 'ready', mode: 'creative', newProject };
   const api = { sceneTools: { setRenderBackend: async (...args) => {
     calls.push(args);
     return reply ? reply() : { data: { mode: args[0] } };

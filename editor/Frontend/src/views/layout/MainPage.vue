@@ -110,7 +110,10 @@ import {
   Bridge,
   editorApi,
 } from '@/api/editorApi.js';
+import { getWebMessages } from '@/api/webMessages.js';
+import { createViewLifetime } from '@/utils/viewLifetime.js';
 import { appService, isCurrentWindowEvent } from '@/services/appService.js';
+import { viewportControlsService } from '@/services/viewportControlsService.js';
 import { worldModeState } from '@/services/worldModeService.js';
 import { initializeWorldRenderBackend } from '@/services/worldRenderPolicy.js';
 import { projectLauncherService, resolveOpenedProjectScene } from '@/services/projectLauncherService.js';
@@ -120,7 +123,8 @@ import { PLUGIN_MANIFEST } from '@/config/pluginManifest.js';
 import { pickedNodeIdentity } from '@/utils/modelHierarchy.js';
 import { coronaEventBus } from '@/utils/eventBus.js';
 import { createViewportPickController, indexActorsByHandle } from '@/utils/viewportPick.js';
-import { cameraMovementKey, createViewportCameraController } from '@/utils/viewportCameraController.js';
+import { createScriptInputSender } from '@/utils/scriptInput.js';
+import { cameraMovementKey, createViewportCameraController, readAppliedCameraPose } from '@/utils/viewportCameraController.js';
 import {
   createViewportGizmoController,
   isViewportGizmoSelectionOwner,
@@ -148,19 +152,16 @@ import { cancelActiveNodeGraphGeneration } from '@/services/nodeGraphGenerationS
 import { setActorContext } from '@/blockly/composables/useActorContext.js';
 import { closeTutorialSessionChannel } from '@/services/cabbageTutorialSessionService.js';
 import { provideCreativePanelState } from '@/services/creativePanelState.js';
+import { subscribeProjectChanged } from '@/services/projectMessages.js';
 
 const { error: logError, warn: logWarn } = useErrorHandler('MainPage');
 
 // Every asynchronous continuation belongs to the world instance that mounted it.
 const worldRevision = worldModeState.revision;
-let viewDisposed = false;
-const viewCurrent = () => !viewDisposed && worldModeState.revision === worldRevision;
-async function subscribeWhileCurrent(register, handler) {
-  const token = await register((...args) => { if (viewCurrent()) handler(...args); });
-  if (viewCurrent()) return token;
-  await editorApi.off(token).catch(() => {});
-  return null;
-}
+const viewLifetime = createViewLifetime(() => worldModeState.revision === worldRevision);
+const viewCurrent = viewLifetime.current;
+const subscribeWhileCurrent = (register, handler) => viewLifetime.subscribe(register, handler,
+  token => editorApi.off(token).catch(() => {}));
 
 const { t: translate } = useI18n();
 const dockStore = useDockStore();
@@ -200,8 +201,10 @@ const handleNodeGraphPanelOpenRequest = () => handleCreativePanelOpen({ panelId:
 const importProgress = ref(null);
 const projectResourceLoadStatus = ref(null);
 let projectResourceLoadPollTimer = null;
+let stopProjectChanged = null;
 
 const currentSceneId = ref(DEFAULT_SCENE_NAME);
+const environmentArchiveSession = ref('');
 
 const cameraState = ref({
   position: [0.0, 5.0, 10.0],
@@ -215,11 +218,10 @@ const cameraBindingState = ref({
   cameraId: null,
   cameraName: null,
   cameraHandle: null,
+  archiveSession: '',
 });
 let actorPickIndex = new Map();
-let actorPickResultCallbackToken = null;
 let actorSelectionCallbackToken = null;
-let gizmoPointerResultCallbackToken = null;
 let actorTransformCallbackToken = null;
 let projectOpenedCallbackToken = null;
 const actorTransformBaselines = new Map();
@@ -241,13 +243,16 @@ const viewportUiModeItems = [
 // 光场 3D UI 标定：标定面板通过共享存储同步修改，这里用活动相机句柄下发；
 // 切到 stereo3d 自动打开标定 dock 面板并推送当前值，切回 flat2d 关闭。
 const viewportUiCalibrationStore = createViewportUiCalibrationStore();
+const webMessages = getWebMessages();
 const VIEWPORT_UI_CALIBRATION_PANEL = 'LightFieldCalibration';
 const applyViewportUiCalibration = () => {
-  viewportUiCalibrationStore.applyToBridge({
-    bridge: window.coronaBridge,
-    cameraHandle: cameraBindingState.value.cameraHandle,
+  viewportUiCalibrationStore.applyToNative({
+    api: editorApi.viewport,
+    sceneId: cameraBindingState.value.sceneId,
+    cameraId: cameraBindingState.value.cameraId,
+    archiveSession: cameraBindingState.value.archiveSession,
     calibration: viewportUiCalibrationStore.get({}),
-  });
+  }).catch(error => console.warn('[Viewport] Native configuration failed', error));
 };
 const syncViewportUiCalibrationPanel = (mode) => {
   if (mode === 'stereo3d') {
@@ -391,7 +396,6 @@ const emitActorChangeFast = (type, sceneId, actorName, nodeContext = {}) => {
   editorApi.sceneTools.selectActor(sceneId, type, actorName, {
     ...nodeContext,
     sourceViewport: 'main',
-    sourceCameraHandle: Number(cameraBindingState.value.cameraHandle || 0),
   }).catch((error) => {
     logError('Failed to publish actor selection', error);
   });
@@ -413,7 +417,7 @@ const handleActorSelectionForObjectDock = async (payload = {}, maybeSceneId = ''
   void seedActorTransformBaseline(resolvedSceneId, actorName);
   const ownsGizmo = isViewportGizmoSelectionOwner({
     viewportScope: 'main',
-    cameraHandle: cameraBindingState.value.cameraHandle,
+    cameraId: cameraBindingState.value.cameraId,
     selection: payload,
   });
   if (ownsGizmo) {
@@ -432,19 +436,23 @@ const handleActorSelectionForObjectDock = async (payload = {}, maybeSceneId = ''
 };
 
 const viewportPickController = createViewportPickController({
-  getBridge: () => window.coronaBridge,
+  api: editorApi,
   getCameraBinding: () => cameraBindingState.value,
   getHitRect: getViewportHitRect,
   getRenderRect: getViewportRenderRect,
-  getActorIndex: () => actorPickIndex,
+  onResult: (payload, result) => handleActorPickResult(payload, result),
   emitActorChange: (type, sceneId, actorName, nodeContext) => emitActorChangeFast(type, sceneId, actorName, nodeContext),
 });
 
 const viewportGizmoController = createViewportGizmoController({
-  getBridge: () => window.coronaBridge,
+  getApi: () => editorApi,
   getCameraBinding: () => cameraBindingState.value,
   getHitRect: getViewportHitRect,
   getRenderRect: getViewportRenderRect,
+  onResult: result => {
+    if (result.requestId === gizmoDownRequestId && result.consumed) gizmoDownConsumed = true;
+    if (result.status === 'ended' || result.status === 'cancelled') { gizmoDownRequestId = ''; gizmoDownPointerId = null; }
+  },
 });
 
 const handleModelNodeGizmoSelection = (identity) => { if (identity) viewportGizmoController.clearTarget(); };
@@ -476,8 +484,8 @@ const syncMainViewportGizmoSelection = async (selection = {}, pickResult = null)
 };
 
 const viewportUiPointerController = createViewportUiPointerController({
-  getBridge: () => window.coronaBridge,
-  getCameraHandle: () => cameraBindingState.value.cameraHandle,
+  api: editorApi.viewport,
+  getBinding: () => cameraBindingState.value,
   getEnabled: () => viewportUiMode.value === 'stereo3d',
   getNativeCursorEnabled: () => nativeViewportCursorEnabled,
   getHitRect: getViewportHitRect,
@@ -488,12 +496,11 @@ let cameraViewportSyncRafId = null;
 let cameraViewportResizeObserver = null;
 let lastCameraViewportSignature = '';
 
-const syncCameraViewportRect = () => {
+const syncCameraViewportRect = async () => {
   if (!viewCurrent()) return false;
-  const bridge = window.coronaBridge;
-  const cameraHandle = Number(cameraBindingState.value.cameraHandle || 0);
+  const { sceneId, cameraId, archiveSession } = cameraBindingState.value;
   const rect = getViewportHitRect();
-  if (!bridge || typeof bridge.setCameraViewport !== 'function' || !cameraHandle || !rect) {
+  if (!sceneId || !cameraId || !archiveSession || !rect) {
     return false;
   }
 
@@ -507,24 +514,23 @@ const syncCameraViewportRect = () => {
     Math.max(Number(rect.height || 0), 0),
     scale,
   );
-  const signature = `${cameraHandle}:${x}:${y}:${width}:${height}:${renderSize.width}:${renderSize.height}`;
+  const signature = `${archiveSession}:${sceneId}:${cameraId}:${x}:${y}:${width}:${height}:${renderSize.width}:${renderSize.height}`;
   if (signature === lastCameraViewportSignature) {
     return true;
   }
 
-  if (bridge.setCameraViewport(
-    cameraHandle,
-    x,
-    y,
-    width,
-    height,
-    renderSize.width,
-    renderSize.height,
-  )) {
-    lastCameraViewportSignature = signature;
+  lastCameraViewportSignature = signature;
+  try {
+    await editorApi.viewport.configure(sceneId, cameraId, {
+      archive_session: archiveSession,
+      bounds: { x, y, width, height, renderWidth: renderSize.width, renderHeight: renderSize.height },
+    });
     return true;
+  } catch (error) {
+    if (lastCameraViewportSignature === signature) lastCameraViewportSignature = '';
+    console.warn('[Viewport] Native bounds update failed', error);
+    return false;
   }
-  return false;
 };
 
 const scheduleCameraViewportSync = () => {
@@ -544,11 +550,13 @@ const handleViewportLayoutChange = () => {
 const syncViewportUiMode = () => {
   const mode = viewportUiModeStore.get(currentViewportUiDescriptor());
   viewportUiMode.value = mode;
-  viewportUiModeStore.applyToBridge({
-    bridge: window.coronaBridge,
-    cameraHandle: cameraBindingState.value.cameraHandle,
+  viewportUiModeStore.applyToNative({
+    api: editorApi.viewport,
+    sceneId: cameraBindingState.value.sceneId,
+    cameraId: cameraBindingState.value.cameraId,
+    archiveSession: cameraBindingState.value.archiveSession,
     mode,
-  });
+  }).catch(error => console.warn('[Viewport] Native configuration failed', error));
   if (mode !== 'stereo3d') {
     viewportUiPointerController.hide();
   }
@@ -557,11 +565,13 @@ const syncViewportUiMode = () => {
 
 const selectViewportUiMode = (mode) => {
   viewportUiMode.value = viewportUiModeStore.set(currentViewportUiDescriptor(), mode);
-  viewportUiModeStore.applyToBridge({
-    bridge: window.coronaBridge,
-    cameraHandle: cameraBindingState.value.cameraHandle,
+  viewportUiModeStore.applyToNative({
+    api: editorApi.viewport,
+    sceneId: cameraBindingState.value.sceneId,
+    cameraId: cameraBindingState.value.cameraId,
+    archiveSession: cameraBindingState.value.archiveSession,
     mode: viewportUiMode.value,
-  });
+  }).catch(error => console.warn('[Viewport] Native configuration failed', error));
   if (viewportUiMode.value !== 'stereo3d') {
     viewportUiPointerController.hide();
   }
@@ -607,7 +617,7 @@ const currentMainCamera = ref(null);
 window.__coronaEditorInputLocks = window.__coronaEditorInputLocks instanceof Set
   ? window.__coronaEditorInputLocks
   : new Set();
-const EDITOR_CONTROLS_KEY = '__coronaEditorControls';
+let unregisterViewportControls = null;
 
 // 物理参数状态
 const physicsParams = ref({
@@ -647,8 +657,6 @@ let unsubscribeCabbagePreWarnings = null;
 let cabbageCandidateTimer = null;
 let cabbageWorldLoadGeneration = 0;
 const cabbageWorldInitializationRetry = createServiceInitializationRetry();
-const ACTIVE_PROJECT_PATH_KEY = 'corona.activeProjectPath';
-
 function normalizeActiveProjectPath(value) {
   return String(value || '')
     .trim()
@@ -658,7 +666,7 @@ function normalizeActiveProjectPath(value) {
 }
 
 function readActiveProjectPath() {
-  return String(window.localStorage?.getItem(ACTIVE_PROJECT_PATH_KEY) || '').trim();
+  return String(worldModeState.activeProjectPath || '').trim();
 }
 
 let activeProjectPathSnapshot = normalizeActiveProjectPath(readActiveProjectPath());
@@ -711,7 +719,7 @@ async function loadCabbageWorldContext({ reset = true } = {}) {
       && String(goal.prompt || '').trim()) {
       void initializeWorldTasks({
         prompt: String(goal.prompt || '').trim(),
-        mode: String(goal.mode || 'story'),
+        mode: 'creative',
         waitForCompletion: false,
       }).catch((error) => {
         console.warn(
@@ -770,21 +778,13 @@ function applyActualProjectChange(projectPath, { refreshCamera = true } = {}) {
 }
 
 function onActiveProjectChanged(event) {
-  const detail = event?.detail;
-  const projectPath = typeof detail === 'string'
-    ? detail
-    : detail?.projectPath || detail?.path || readActiveProjectPath();
+  const projectPath = typeof event === 'string'
+    ? event
+    : event?.projectPath || event?.path || readActiveProjectPath();
   applyActualProjectChange(projectPath);
 }
 
-function onEditorStorageChanged(event) {
-  if (event?.key === viewportUiCalibrationStore.keyFor({}) && viewportUiMode.value === 'stereo3d') {
-    applyViewportUiCalibration();
-    return;
-  }
-  if (event?.key !== ACTIVE_PROJECT_PATH_KEY) return;
-  applyActualProjectChange(event?.newValue);
-}
+let stopViewportUiCalibrationMessages = null;
 
 async function handleNodeGraphReview(result) {
   if (result?.projectScopeId && result.projectScopeId !== currentProjectReviewScopeId()) return;
@@ -826,7 +826,7 @@ const initializeCreativeRenderMode = async () => {
   const sceneId = currentMainSceneId();
   const cameraId = currentMainCameraId();
   const cameraHandle = cameraBindingState.value.cameraHandle;
-  const current = () => viewCurrent() && worldModeState.mode === 'creative'
+  const current = () => viewCurrent() && worldModeState.status === 'ready'
     && currentMainSceneId() === sceneId && currentMainCameraId() === cameraId
     && cameraBindingState.value.cameraHandle === cameraHandle;
   creativeRenderDefaultsBusy.value = true;
@@ -1095,6 +1095,7 @@ const applySceneSnapshot = (sceneId, payload, { preservePose = false } = {}) => 
       cameraId: null,
       cameraName: null,
       cameraHandle: null,
+      archiveSession: '',
     };
     return;
   }
@@ -1118,10 +1119,13 @@ const applySceneSnapshot = (sceneId, payload, { preservePose = false } = {}) => 
 
   const nextHandle = activeCamera?.handle ?? activeCamera?.camera_handle ?? null;
   const bindingChanged = cameraBindingState.value.sceneId !== normalizedSceneId
-    || cameraBindingState.value.cameraHandle !== nextHandle;
+    || cameraBindingState.value.cameraHandle !== nextHandle
+    || cameraBindingState.value.cameraId !== (activeCamera?.camera_id ?? activeCamera?.id ?? null)
+    || cameraBindingState.value.archiveSession !== (activeCamera?.archive_session || snapshot.archive_session || '');
   if (bindingChanged) resetRealtimeCameraInput();
   cameraBindingState.value = {
     sceneId: normalizedSceneId,
+    archiveSession: activeCamera?.archive_session || snapshot.archive_session || '',
     cameraId: activeCamera?.camera_id ?? activeCamera?.id ?? null,
     cameraName: activeCameraName,
     cameraHandle: activeCamera?.handle ?? activeCamera?.camera_handle ?? null,
@@ -1244,13 +1248,14 @@ const updateSceneLight = async (axis = '') => {
     || currentSceneId.value
     || DEFAULT_SCENE_NAME;
   const direction = sceneLightSettings.direction;
+  const scope = { archive_session: environmentArchiveSession.value };
   sceneLightBusy.value = true;
   try {
-    await editorApi.sceneTools.sunDirection(sceneId, sceneLightSettings.enabled, [
-      Number(direction.x) || 0,
-      Number(direction.y) || 0,
-      Number(direction.z) || 0,
-    ]);
+    await editorApi.scene.setEnvironment(sceneId, { ...scope, sun: {
+      enabled: sceneLightSettings.enabled,
+      direction: [Number(direction.x) || 0, Number(direction.y) || 0, Number(direction.z) || 0],
+    } });
+    if (!viewCurrent() || scope.archive_session !== environmentArchiveSession.value) return false;
     void cabbageContextService.recordEvent({
       type: 'lighting_changed',
       category: 'lighting',
@@ -1310,22 +1315,10 @@ const restoreCameraViews = async (sceneId) => {
   }
 };
 
-const scratchMouseButton = (button) => ({ 0: 'LeftButton', 1: 'MiddleButton', 2: 'RightButton' }[button] || '');
+const sendScriptInput = createScriptInputSender({ api: editorApi,
+  getBinding: () => cameraBindingState.value, getRenderRect: getViewportRenderRect });
 const sendScratchPointerEvent = (type, event, pickedActor = '') => {
-  const renderRect = getViewportRenderRect();
-  const localX = Number(event.clientX || 0) - Number(renderRect.left || 0);
-  const localY = Number(event.clientY || 0) - Number(renderRect.top || 0);
-  editorApi.scripts.sendMouseEvent(
-    type,
-    scratchMouseButton(event.button),
-    event.clientX || 0,
-    event.clientY || 0,
-    localX,
-    localY,
-    renderRect.width || 0,
-    renderRect.height || 0,
-    pickedActor || ''
-  ).catch(() => {});
+  sendScriptInput(type, event, pickedActor).catch(error => logError('Script input failed', error));
 };
 const vectorDistance = (left = [], right = []) => Math.sqrt(
   left.reduce((sum, value, index) => sum + ((Number(value) || 0) - (Number(right[index]) || 0)) ** 2, 0)
@@ -1371,21 +1364,6 @@ const handleKeyDown = (event) => {
     viewportGizmoController.cancel('escape');
     return;
   }
-  const modifiers = [
-    event.ctrlKey ? 'Ctrl' : '',
-    event.altKey ? 'Alt' : '',
-    event.shiftKey ? 'Shift' : '',
-    event.metaKey ? 'Meta' : '',
-  ].filter(Boolean).join(',');
-  // Native SDL is authoritative in the editor; this is browser-dev fallback.
-  if (!window.coronaBridge && !event.__coronaScratchKeyForwarded) {
-    event.__coronaScratchKeyForwarded = true;
-    editorApi.scripts.sendKeyEvent(
-      event.code || event.key || '',
-      modifiers,
-      event.key || event.code || ''
-    ).catch(() => {});
-  }
   if (isEditorInputLocked()) {
     resetRealtimeCameraInput();
     return;
@@ -1411,13 +1389,6 @@ const handleKeyUp = (event) => {
   cameraControls.keyUp(event);
   const tag = event.target?.tagName;
   if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
-  if (!window.coronaBridge && !event.__coronaScratchKeyForwarded) {
-    event.__coronaScratchKeyForwarded = true;
-    editorApi.scripts.sendKeyUpEvent(
-      event.code || event.key || '',
-      event.key || event.code || ''
-    ).catch(() => {});
-  }
   if (isEditorInputLocked()) {
     resetRealtimeCameraInput();
     return;
@@ -1535,6 +1506,7 @@ const handleViewportPointerDown = (event) => {
 };
 
 const handleViewportPointerCancel = (event) => {
+  viewportUiPointerController.hide();
   resetRealtimeCameraInput();
   if (event.pointerId !== gizmoDownPointerId) return;
   try {
@@ -1549,18 +1521,8 @@ const handleViewportPointerLeave = () => {
   viewportUiPointerController.hide();
 };
 
-const handleViewportGizmoPointerResult = (payload = {}) => {
-  const result = viewportGizmoController.handleResult(payload);
-  if (payload.requestId === gizmoDownRequestId && payload.consumed) {
-    gizmoDownConsumed = true;
-  }
-  if (result.status === 'ended' || result.status === 'cancelled') {
-    gizmoDownRequestId = '';
-    gizmoDownPointerId = null;
-  }
-};
-
 const handleMainViewportBlur = () => {
+  viewportUiPointerController.hide();
   resetRealtimeCameraInput();
   viewportGizmoController.cancel('blur');
 };
@@ -1574,7 +1536,7 @@ const finishPendingScratchClick = (pickedActor = '') => {
   const pending = pendingScratchClick;
   if (!pending) return;
   pendingScratchClick = null;
-  sendScratchPointerEvent('click', pending.event, pickedActor);
+  pending.send(pickedActor).catch(error => logError('Script input failed', error));
 };
 
 const handleViewportScratchClick = (event) => {
@@ -1595,7 +1557,7 @@ const handleViewportScratchClick = (event) => {
   // entry. This keeps a later blank click from being swallowed by a slow pick.
   pendingScratchClick = {
     requestId,
-    event: eventSnapshot,
+    send: sendScriptInput.capture('click', eventSnapshot),
   };
 };
 
@@ -1618,12 +1580,7 @@ const handleViewportClick = (event) => {
 const finishScratchClickFromPick = (payload, result) => {
   if (!pendingScratchClick || payload?.requestId !== pendingScratchClick.requestId) return;
   if (result?.status === 'stale') return;
-  const pickedActor =
-    result?.actor?.name ||
-    payload?.actorName ||
-    payload?.name ||
-    payload?.actor?.name ||
-    '';
+  const pickedActor = result?.actor?.name || '';
   finishPendingScratchClick(pickedActor);
 };
 
@@ -1674,30 +1631,11 @@ const applyActorPickResult = (result, payload = result?.payload) => {
   if (result.status === 'selected') coronaEventBus.emit('model-node-picked', { ...payload, actor_name: payload?.actor_name || result.actor?.name });
   if (result.status === 'miss') coronaEventBus.emit('model-node-picked', payload);
 
-  if (result.status !== 'selected') {
-    const fallbackActorHandle = Number(payload?.actorHandle || 0);
-    if (
-      result.status === 'unknown' &&
-      payload?.status === 'success' &&
-      Number.isFinite(fallbackActorHandle) &&
-      fallbackActorHandle > 0
-    ) {
-      emitActorChangeFast(
-        payload?.actorType || 'actor',
-        payload?.sceneId || cameraBindingState.value.sceneId || DEFAULT_SCENE_NAME,
-        payload?.actorName || `Actor ${fallbackActorHandle}`
-      );
-      return;
-    }
-    return;
-  }
-
   // 选中结果已由 viewportPickController 内部 emitActorChange 驱动属性面板，
   // 此处无需额外处理。
 };
 
-const handleActorPickResult = (payload) => {
-  const result = viewportPickController.handlePickResult(payload);
+const handleActorPickResult = (payload, result) => {
   applyActorPickResult(result, payload);
   // Gizmo synchronization is owned exclusively by actorSelectionChanged.
   // A miss still publishes the empty scene selection so that the same
@@ -1705,7 +1643,7 @@ const handleActorPickResult = (payload) => {
   if (result.status === 'miss') {
     emitActorChangeFast(
       'scene',
-      payload?.sceneId || cameraBindingState.value.sceneId || DEFAULT_SCENE_NAME,
+      payload?.scene || cameraBindingState.value.sceneId || DEFAULT_SCENE_NAME,
       '',
     );
   }
@@ -1717,42 +1655,33 @@ const sendCameraUpdateFast = () => {
   // During Blockly/node-graph execution the editor must not publish camera
   // poses. Keyboard/mouse events are still sent to Scratch by their handlers.
   if (isEditorInputLocked()) return true;
-  const handle = cameraBindingState.value.cameraHandle;
-  if (!handle) return false;
-  const bridge = window.coronaBridge;
-  if (!bridge || typeof bridge.cameraMove !== 'function') {
-    if (!window._coronaBridgeWarned) {
-      window._coronaBridgeWarned = true;
-      console.warn(
-        '[Camera] coronaBridge 缺失或 cameraMove 不可用，' +
-        'CEF 子进程可能未运行。快速通道摄像头更新已禁用。'
-      );
-    }
-    return false;
-  }
+  const { sceneId, cameraId, archiveSession } = cameraBindingState.value;
+  if (!sceneId || !cameraId || !archiveSession) return false;
   try {
-    bridge.cameraMove(
-      handle,
-      [...cameraState.value.position],
-      [...cameraState.value.forward],
-      [...cameraState.value.up],
-      cameraState.value.fov
-    );
+    editorApi.scene.setCameraProperties(sceneId, cameraId, {
+      archive_session: archiveSession,
+      position: [...cameraState.value.position],
+      forward: [...cameraState.value.forward],
+      world_up: [...cameraState.value.up],
+      fov: cameraState.value.fov,
+    }).catch(error => {
+      if (viewCurrent() && archiveSession === cameraBindingState.value.archiveSession)
+        console.warn('[Camera] Native camera update failed', error);
+    });
     return true;
-  } catch (e) {
+  } catch {
     return false;
   }
 };
-
-/** 发送当前 cameraState 到引擎——已移除，全部走快速通道 */
 
 const handleCameraMove = (direction) => cameraControls.move(direction);
 
 const handleApplyPhysics = async () => {
   const sceneId = currentSceneId.value || DEFAULT_SCENE_NAME;
+  const scope = { archive_session: environmentArchiveSession.value };
 
   try {
-    const result = await editorApi.sceneTools.setPhysicsParams(sceneId, {
+    await editorApi.scene.setEnvironment(sceneId, { ...scope, physics: {
       gravity: [
         physicsParams.value.gravityX,
         physicsParams.value.gravityY,
@@ -1761,13 +1690,8 @@ const handleApplyPhysics = async () => {
       floor_y: physicsParams.value.floorY,
       floor_restitution: physicsParams.value.floorRestitution,
       fixed_dt: physicsParams.value.fixedDt,
-    });
-    const data = unwrapBridgeData(result);
-    if (data?.status === 'error' || data?.success === false) {
-      logError('Apply physics params failed', data?.message || data?.error);
-      return false;
-    }
-    return true;
+    } });
+    return viewCurrent() && scope.archive_session === environmentArchiveSession.value;
   } catch (e) {
     logError('Apply physics params failed', e);
     return false;
@@ -1776,10 +1700,12 @@ const handleApplyPhysics = async () => {
 
 const loadPhysicsParams = async () => {
   const sceneId = currentSceneId.value || DEFAULT_SCENE_NAME;
+  const scope = { archive_session: environmentArchiveSession.value };
   try {
-    const result = await editorApi.sceneTools.getPhysicsParams(sceneId);
-    const data = result?.data ?? result;
-    if (data && data.status !== 'error') {
+    const environment = await editorApi.scene.getEnvironment(sceneId, scope);
+    if (!viewCurrent() || scope.archive_session !== environmentArchiveSession.value) return false;
+    const data = environment.physics;
+    if (data) {
       const g = data.gravity || [0, -9.8, 0];
       physicsParams.value.gravityX = g[0];
       physicsParams.value.gravityY = g[1];
@@ -1867,8 +1793,10 @@ const setSceneGridEnabledFromPanel = async (enabled, requestedSceneId = '') => {
   }
 
   const nextEnabled = Boolean(enabled);
+  const scope = { archive_session: environmentArchiveSession.value };
   try {
-    await editorApi.sceneTools.floorGrid(sceneId, nextEnabled);
+    await editorApi.scene.setEnvironment(sceneId, { ...scope, grid: { enabled: nextEnabled } });
+    if (!viewCurrent() || scope.archive_session !== environmentArchiveSession.value) return false;
     sceneGridEnabled.value = nextEnabled;
     broadcastViewportControlsState();
     return getEditorControlsState();
@@ -1899,6 +1827,7 @@ const currentMainRenderMode = () =>
 const getEditorControlsState = () => ({
   available: true,
   sceneId: currentSceneId.value || DEFAULT_SCENE_NAME,
+  cameraId: cameraBindingState.value.cameraId,
   visionAvailable: visionAvailable.value,
   renderMode: currentMainRenderMode(),
   renderLabel: mainRenderModeLabel.value,
@@ -1919,65 +1848,31 @@ const getEditorControlsState = () => ({
 
 const broadcastViewportControlsState = () => {
   if (!viewCurrent()) return;
-  appService
-    .crossTabBroadcast('viewport-controls-state', getEditorControlsState())
+  viewportControlsService
+    .publish(getEditorControlsState())
     .catch(() => {});
 };
 
-const handleViewportControlsRequest = async (payload = {}) => {
-  if (!payload || typeof payload !== 'object') {
-    broadcastViewportControlsState();
-    return;
-  }
-
-  if (payload.action === 'setViewportUiMode') {
-    setViewportUiModeFromPanel(payload.mode);
-    return;
-  }
-
-  if (payload.action === 'selectRenderMode') {
-    if (payload.sceneId === getEditorControlsState().sceneId &&
-        mainRenderModeOptions.some((mode) => mode.value === payload.mode &&
-          (mode.backend !== 'vision' || visionAvailable.value))) {
-      await selectMainRenderMode(payload.mode);
-    }
-    broadcastViewportControlsState();
-    return;
-  }
-
-  if (payload.action === 'setCameraSpeed') {
-    setCameraSpeedFromPanel(payload.value);
-    return;
-  }
-
-  if (payload.action === 'setGridEnabled') {
-    await setSceneGridEnabledFromPanel(payload.enabled, payload.sceneId);
-    return;
-  }
-
-  broadcastViewportControlsState();
-};
-
 const registerEditorControls = () => {
-  window[EDITOR_CONTROLS_KEY] = {
-    getState: getEditorControlsState,
-    refreshPhysics: async () => {
-      const loaded = await loadPhysicsParams();
-      if (loaded === false) return false;
-      return getEditorControlsState();
+  unregisterViewportControls = viewportControlsService.provide({
+    snapshot: getEditorControlsState,
+    isCurrent: viewCurrent,
+    actions: {
+      selectRenderMode: payload => {
+        if (!mainRenderModeOptions.some(mode => mode.value === payload.mode &&
+            (mode.backend !== 'vision' || visionAvailable.value))) return false;
+        return selectMainRenderMode(payload.mode);
+      },
+      setViewportUiMode: payload => setViewportUiModeFromPanel(payload.mode),
+      setCameraSpeed: payload => setCameraSpeedFromPanel(payload.value),
+      setGridEnabled: payload => setSceneGridEnabledFromPanel(payload.enabled, payload.sceneId),
     },
-    applyPhysics: applyPhysicsFromSettings,
-    selectRenderMode: selectMainRenderMode,
-    setViewportUiMode: setViewportUiModeFromPanel,
-    setCameraSpeed: setCameraSpeedFromPanel,
-    setGridEnabled: setSceneGridEnabledFromPanel,
-  };
+  });
 };
 
 const unregisterEditorControls = () => {
-  if (window[EDITOR_CONTROLS_KEY]?.getState === getEditorControlsState) {
-    delete window[EDITOR_CONTROLS_KEY];
-  }
+  unregisterViewportControls?.();
+  unregisterViewportControls = null;
 };
 
 const onSceneImportProgress = payload => {
@@ -1987,38 +1882,13 @@ watch(() => dockStore.panels.SceneTools?.open, open => {
   if (!open) importProgress.value = null;
 });
 
-const applyCameraPose = (pose = {}) => {
-  const toVector3 = (value) => {
-    if (!isVector3(value)) return null;
-    const next = value.map((item) => Number(item));
-    return next.every((item) => Number.isFinite(item)) ? next : null;
-  };
-
-  const position = toVector3(pose.position);
-  const forward = toVector3(pose.forward);
-  const up = toVector3(pose.up);
-  if (!position || !forward || !up) {
-    return false;
-  }
-
+const onCameraPoseApplied = (result = {}) => {
+  if (!viewCurrent()) return false;
+  const pose = readAppliedCameraPose(result, { archiveSession: environmentArchiveSession.value,
+    sceneId: currentMainSceneId(), cameraId: currentMainCameraId() });
+  if (!pose) return false;
   resetRealtimeCameraInput();
-  cameraState.value = {
-    position,
-    forward,
-    up,
-    fov: Number.isFinite(Number(pose.fov)) ? Number(pose.fov) : cameraState.value.fov,
-  };
-
-  if (Number.isFinite(Number(pose.cameraHandle))) {
-    cameraBindingState.value = {
-      ...cameraBindingState.value,
-      cameraHandle: Number(pose.cameraHandle),
-      cameraId: pose.cameraId ?? cameraBindingState.value.cameraId,
-      cameraName: pose.cameraName ?? cameraBindingState.value.cameraName,
-    };
-  }
-
-  scheduleCameraUpdate();
+  cameraState.value = pose;
   return true;
 };
 
@@ -2026,6 +1896,7 @@ const applyCameraPose = (pose = {}) => {
 let projectOpenedRefreshRevision = 0;
 const onProjectOpenedEvent = async (payload = {}) => {
   const refreshRevision = ++projectOpenedRefreshRevision;
+  environmentArchiveSession.value = payload.archive_session || '';
   const openedSceneRoute = resolveOpenedProjectScene(payload);
   applyActualProjectChange(payload?.path, { refreshCamera: false });
 
@@ -2052,6 +1923,9 @@ onMounted(async () => {
   clearKnownEditorCameraInputLocks();
   const result = await editorApi.main.onInit();
   if (!viewCurrent()) return;
+  const active = await editorApi.scene.readActive();
+  if (!viewCurrent()) return;
+  environmentArchiveSession.value = active.archive_session;
   const initData = result?.data ?? result;
   const openedSceneId = resolveOpenedProjectScene(initData) || DEFAULT_SCENE_NAME;
   currentSceneId.value = openedSceneId;
@@ -2107,8 +1981,7 @@ onMounted(async () => {
   // 跨窗口事件监听：panel / loading / viewport 等 UI 本地通道
   coronaEventBus.on('creative-panel-open', handleCreativePanelOpen);
   coronaEventBus.on('scene-import-progress', onSceneImportProgress);
-  coronaEventBus.on('camera-pose-request', applyCameraPose);
-  coronaEventBus.on('viewport-controls-request', handleViewportControlsRequest);
+  coronaEventBus.on('camera-pose-applied', onCameraPoseApplied);
   coronaEventBus.on('node-graph-panel-open-request', handleNodeGraphPanelOpenRequest);
   if (!viewCurrent()) return;
   projectOpenedCallbackToken = await subscribeWhileCurrent(callback => editorApi.scene.observe('project', callback), onProjectOpenedEvent);
@@ -2118,10 +1991,6 @@ onMounted(async () => {
   if (!viewCurrent()) return;
   actorTransformCallbackToken = await subscribeWhileCurrent(callback => editorApi.scene.observe('transform', callback), handleActorTransformForCabbage);
   if (!viewCurrent()) return;
-  actorPickResultCallbackToken = await subscribeWhileCurrent(callback => editorApi.scene.observe('actorPickResult', callback), handleActorPickResult);
-  if (!viewCurrent()) return;
-  gizmoPointerResultCallbackToken =
-    await subscribeWhileCurrent(callback => editorApi.scene.observe('viewportGizmoPointerResult', callback), handleViewportGizmoPointerResult);
     if (!viewCurrent()) return;
   coronaEventBus.on('model-node-selection', handleModelNodeGizmoSelection);
 
@@ -2143,12 +2012,15 @@ onMounted(async () => {
   if (!viewCurrent()) return;
   cabbageCandidateTimer = window.setInterval(() => promoteDueCabbageTasks(), 1000);
   window.addEventListener('cabbage-run-failed', onCabbageRunFailed);
-  window.addEventListener('corona-active-project-changed', onActiveProjectChanged);
-  window.addEventListener('storage', onEditorStorageChanged);
+  stopProjectChanged = subscribeProjectChanged(onActiveProjectChanged);
+  stopViewportUiCalibrationMessages = webMessages.on('viewportUi.calibrationChanged', () => {
+    if (viewportUiMode.value === 'stereo3d') applyViewportUiCalibration();
+  });
 });
 
 onUnmounted(() => {
-  viewDisposed = true;
+  sendScriptInput.dispose();
+  viewLifetime.dispose();
   ++cabbageWorldLoadGeneration;
   ++cameraInputLockReconcileToken;
   cameraControls.dispose();
@@ -2168,36 +2040,25 @@ onUnmounted(() => {
   cabbageCandidateTimer = null;
   window.removeEventListener('cabbage-run-failed', onCabbageRunFailed);
   void cabbageContextService.flush();
-  window.removeEventListener('corona-active-project-changed', onActiveProjectChanged);
-  window.removeEventListener('storage', onEditorStorageChanged);
+  stopProjectChanged?.();
+  stopProjectChanged = null;
+  stopViewportUiCalibrationMessages?.();
+  stopViewportUiCalibrationMessages = null;
   closeTutorialSessionChannel();
   coronaEventBus.off('model-node-selection', handleModelNodeGizmoSelection);
   coronaEventBus.off('creative-panel-open', handleCreativePanelOpen);
   coronaEventBus.off('scene-import-progress', onSceneImportProgress);
-  coronaEventBus.off('camera-pose-request', applyCameraPose);
-  coronaEventBus.off('viewport-controls-request', handleViewportControlsRequest);
+  coronaEventBus.off('camera-pose-applied', onCameraPoseApplied);
   coronaEventBus.off('node-graph-panel-open-request', handleNodeGraphPanelOpenRequest);
   if (gizmoClickTimer) window.clearTimeout(gizmoClickTimer);
   gizmoClickTimer = 0;
   viewportGizmoController.cancel('cancel');
   viewportGizmoController.clearTarget();
-  if (actorPickResultCallbackToken) {
-    editorApi.off(actorPickResultCallbackToken).catch((error) => {
-      logError('Failed to unregister actor pick result callback', error);
-    });
-    actorPickResultCallbackToken = null;
-  }
   if (actorSelectionCallbackToken) {
     editorApi.off(actorSelectionCallbackToken).catch((error) => {
       logError('Failed to unregister actor selection callback', error);
     });
     actorSelectionCallbackToken = null;
-  }
-  if (gizmoPointerResultCallbackToken) {
-    editorApi.off(gizmoPointerResultCallbackToken).catch((error) => {
-      logError('Failed to unregister viewport gizmo callback', error);
-    });
-    gizmoPointerResultCallbackToken = null;
   }
   if (actorTransformCallbackToken) {
     editorApi.off(actorTransformCallbackToken).catch((error) => {
@@ -2248,7 +2109,8 @@ provideCreativePanelState(() => ({
   mainVisionDenoiserError: mainVisionDenoiserError.value, mainVisionStablePlanesError: mainVisionStablePlanesError.value,
   creativeRenderDefaultsBusy: creativeRenderDefaultsBusy.value, creativeRenderDefaultsError: creativeRenderDefaultsError.value,
   cameraSpeed: cameraSpeed.value, sceneGridEnabled: sceneGridEnabled.value, viewportUiMode: viewportUiMode.value,
-  sceneLightSettings, sceneLightBusy: sceneLightBusy.value,
+  sceneLightSettings: { enabled: sceneLightSettings.enabled, direction: { ...sceneLightSettings.direction } },
+  sceneLightBusy: sceneLightBusy.value,
   physics: getPhysicsSnapshot(),
 }), {
   refreshPhysics: loadPhysicsParams, applyPhysics: applyPhysicsFromSettings,
@@ -2256,12 +2118,12 @@ provideCreativePanelState(() => ({
   toggleMainVisionDenoise, toggleMainVisionStablePlanes, setCameraSpeedFromPanel,
   setSceneLightEnabled: async enabled => {
     sceneLightSettings.enabled = Boolean(enabled);
-    await updateSceneLight();
+    return updateSceneLight();
   },
   setSceneLightDirection: async (axis, value) => {
-    if (!['x', 'y', 'z'].includes(axis) || !Number.isFinite(value)) return;
+    if (!['x', 'y', 'z'].includes(axis) || !Number.isFinite(value)) return false;
     sceneLightSettings.direction[axis] = value;
-    await updateSceneLight(axis);
+    return updateSceneLight(axis);
   },
 }, viewCurrent);
 
