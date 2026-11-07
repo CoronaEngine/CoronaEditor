@@ -10,6 +10,7 @@ import { compile } from '@vue/compiler-ssr';
 import { renderToString } from '@vue/server-renderer';
 import * as manifests from '../../src/config/pluginManifest.js';
 import { createNativePanelHosts } from '../../src/services/nativePanelHosts.js';
+import { createViewLifetime } from '../../src/utils/viewLifetime.js';
 
 const require = createRequire(import.meta.url);
 const source = path => fs.readFileSync(new URL(`../../src/${path}`, import.meta.url), 'utf8');
@@ -85,6 +86,7 @@ async function renderApp({ path = '/', standalone = false, mode = 'creative' } =
     '@/services/worldSessionLifecycle.js': { notifyWorldError: assert.fail },
     '@/utils/eventBus.js': { coronaEventBus: { on: noop, off: noop } },
     '@/services/nativePanelHosts.js': { createNativePanelHosts },
+    '@/utils/viewLifetime.js': { createViewLifetime },
   };
   modules['@/components/dock/NativeDockLayout.vue'] = {
     default: component('components/dock/NativeDockLayout.vue', modules, window),

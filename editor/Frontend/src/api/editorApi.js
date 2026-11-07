@@ -315,55 +315,6 @@ const call_manifest_editor_api = async (wrapperPath, args) => {
   return call_typed_editor_api(methodSpec.api, wrapperPath, args || []);
 };
 
-const create_dynamic_editor_api_function = (wrapperPath) => async (...args) => {
-  const methodSpec = await find_editor_api_method_by_js_wrapper(wrapperPath);
-  if (methodSpec?.api) {
-    return call_typed_editor_api(methodSpec.api, wrapperPath, args);
-  }
-  const eventSpec = await find_editor_api_event_by_js_wrapper(wrapperPath);
-  if (eventSpec?.event) {
-    return register_typed_editor_api_callback(eventSpec.event, wrapperPath, args[0]);
-  }
-  throw new Error(`Editor API wrapper path is not defined by C++ manifest: ${wrapperPath}`);
-};
-
-const create_dynamic_editor_api_namespace = (wrapperPath, target = {}) => {
-  // Static namespaces also contain methods supplied only by the native manifest.
-  // Keep their explicit wrappers (and defaults), while resolving missing members
-  // through the same manifest validation as fully dynamic namespaces.
-  for (const [property, value] of Object.entries(target)) {
-    if (value !== null && typeof value === 'object') {
-      const childPath = wrapperPath ? `${wrapperPath}.${property}` : property;
-      target[property] = create_dynamic_editor_api_namespace(childPath, value);
-    }
-  }
-  return new Proxy(target, {
-    get(current, property) {
-      if (typeof property !== 'string') {
-        return current[property];
-      }
-      if (property === 'then') {
-        return undefined;
-      }
-      if (property in current) {
-        return current[property];
-      }
-      const childPath = wrapperPath ? `${wrapperPath}.${property}` : property;
-      // Only expose additional event subscriptions declared by the native manifest.
-      if (wrapperPath === 'events' && !editorApiEventSpecsByWrapper?.has(childPath)) return undefined;
-      const dynamicMember = create_dynamic_editor_api_namespace(
-        childPath,
-        create_dynamic_editor_api_function(childPath),
-      );
-      current[property] = dynamicMember;
-      return dynamicMember;
-    },
-    apply(current, thisArg, args) {
-      return current.apply(thisArg, args);
-    },
-  });
-};
-
 export const sceneReader = createSceneReader(async (method, payload) => {
   return method === 'readActive' ? editorApi.scene.readActive()
     : editorApi.scene.readTransforms(payload.archive_session, payload.actors);
@@ -378,16 +329,7 @@ const editorApiStatic = {
   listMethods: () => call_editor_api('EditorApi.list_methods', []),
   listEvents: () => call_editor_api('EditorApi.list_events', []),
   off: async (callbackToken) => callbackToken < 0 ? sceneReader.off(callbackToken) : unregister_callback(callbackToken),
-  editor: {
-    listMethods: () => call_editor_api('EditorApi.list_methods', []),
-    listEvents: () => call_editor_api('EditorApi.list_events', []),
-    registerCallback: (eventName, callback) => register_editor_api_callback(eventName, callback),
-    unregisterCallback: (callbackToken) => unregister_callback(callbackToken),
-  },
   events: {
-    onActorChanged: (callback) => register_manifest_editor_api_callback('events.onActorChanged', callback),
-    onActorSelectionChanged: (callback) => register_manifest_editor_api_callback('events.onActorSelectionChanged', callback),
-    onActorTransformUpdated: (callback) => register_manifest_editor_api_callback('events.onActorTransformUpdated', callback),
     onNetworkActorDeleteSyncBroadcastRequested: (callback) => register_manifest_editor_api_callback('events.onNetworkActorDeleteSyncBroadcastRequested', callback),
     onNetworkActorOwnershipClaimed: (callback) => register_manifest_editor_api_callback('events.onNetworkActorOwnershipClaimed', callback),
     onNetworkActorStateSyncBroadcastRequested: (callback) => register_manifest_editor_api_callback('events.onNetworkActorStateSyncBroadcastRequested', callback),
@@ -396,8 +338,6 @@ const editorApiStatic = {
     onNetworkAssetImportCompleted: (callback) => register_manifest_editor_api_callback('events.onNetworkAssetImportCompleted', callback),
     onNetworkFileSyncStatusChanged: (callback) => register_manifest_editor_api_callback('events.onNetworkFileSyncStatusChanged', callback),
     onNetworkSyncPauseRequested: (callback) => register_manifest_editor_api_callback('events.onNetworkSyncPauseRequested', callback),
-    onSceneTreeChanged: (callback) => register_manifest_editor_api_callback('events.onSceneTreeChanged', callback),
-    onProjectOpened: (callback) => register_manifest_editor_api_callback('events.onProjectOpened', callback),
     onLanChatEvent: (callback) => register_manifest_editor_api_callback('events.onLanChatEvent', callback),
   },
   app: {
@@ -519,21 +459,15 @@ const editorApiStatic = {
     openProjectFile: () => call_manifest_editor_api('project.openProjectFile', []),
   },
   scene: {
+    createCamera: (sceneName, options) => window.corona.scene.createCamera(sceneName, options),
     observe: async (kind, callback) => sceneReader.observe(kind, callback),
+    readTree: (sceneName, scope) => window.corona.scene.readTree(sceneName, scope),
     listActorTree: (sceneName) => call_manifest_editor_api('scene.listActorTree', [sceneName]),
-    getSnapshot: (sceneName = '') => call_manifest_editor_api('scene.getSnapshot', [sceneName]),
+    readCameras: (sceneName, scope) => window.corona.scene.readCameras(sceneName, scope),
     readActive: () => window.corona.scene.readActive(),
-    readActor: (session, actor) => call_manifest_editor_api('scene.readActor', [{ archive_session: session, actor }]),
+    readActorIndex: (sceneName, scope) => window.corona.scene.readActorIndex(sceneName, scope),
+    readActorProperties: (sceneName, actor, scope) => window.corona.scene.readActorProperties(sceneName, actor, scope),
     readTransforms: (session, actors) => window.corona.scene.readTransforms({ archive_session: session, actors }),
-    readArchive: session => call_manifest_editor_api('scene.readArchive', [{ archive_session: session }]),
-    getActor: async (sceneName, actorName, session) => {
-      if (!session) {
-        const state = await editorApi.scene.readActive();
-        if (state.scene !== sceneName || !state.archive_session) throw new Error('PROJECT_CONTEXT_CHANGED');
-        session = state.archive_session;
-      }
-      return editorApi.scene.readActor(session, actorName);
-    },
     setActorTransform: (sceneName, actorName, transform) =>
       window.corona.scene.setActorTransform(sceneName, actorName, transform),
     setActorProperties: (sceneName, actorName, patch) =>
@@ -567,7 +501,19 @@ const editorApiStatic = {
     load: request => call_manifest_editor_api('projectFiles.load', [request]),
   },
   sceneTools: {
-    listSceneTree: (sceneName, query) => call_manifest_editor_api('sceneTools.listSceneTree', query ? [sceneName, query] : [sceneName]),
+    setVisionDenoiser: (...args) => call_manifest_editor_api('sceneTools.setVisionDenoiser', args),
+    setReblurSettings: (...args) => call_manifest_editor_api('sceneTools.setReblurSettings', args),
+    setPtSettings: (...args) => call_manifest_editor_api('sceneTools.setPtSettings', args),
+    setRestirSettings: (...args) => call_manifest_editor_api('sceneTools.setRestirSettings', args),
+    setRelaxSettings: (...args) => call_manifest_editor_api('sceneTools.setRelaxSettings', args),
+    getPtSettings: (...args) => call_manifest_editor_api('sceneTools.getPtSettings', args),
+    getRestirSettings: (...args) => call_manifest_editor_api('sceneTools.getRestirSettings', args),
+    getReblurSettings: (...args) => call_manifest_editor_api('sceneTools.getReblurSettings', args),
+    getRelaxSettings: (...args) => call_manifest_editor_api('sceneTools.getRelaxSettings', args),
+    pauseActorAnimation: (...args) => call_manifest_editor_api('sceneTools.pauseActorAnimation', args),
+    resumeActorAnimation: (...args) => call_manifest_editor_api('sceneTools.resumeActorAnimation', args),
+    getModelNodes: (...args) => call_manifest_editor_api('sceneTools.getModelNodes', args),
+    setModelNodeState: (...args) => call_manifest_editor_api('sceneTools.setModelNodeState', args),
     reloadScene: (sceneName, projectPath = '') =>
       call_manifest_editor_api('sceneTools.reloadScene', projectPath ? [sceneName, projectPath] : [sceneName]),
     rebindActorResource: (sceneName, actorGuid, path, scope) =>
@@ -609,16 +555,8 @@ const editorApiStatic = {
       call_manifest_editor_api('sceneTools.setVisionStablePlanes', [sceneName, cameraId, !!enabled]),
     getVisionStablePlanes: (sceneName, cameraId = null) =>
       call_manifest_editor_api('sceneTools.getVisionStablePlanes', [sceneName, cameraId]),
-    createCameraView: (sceneName, name = null) =>
-      call_manifest_editor_api('sceneTools.createCameraView', [sceneName, name]),
-    openCameraView: (sceneName, cameraId) =>
-      call_manifest_editor_api('sceneTools.openCameraView', [sceneName, cameraId]),
-    closeCameraView: (sceneName, cameraId) =>
-      call_manifest_editor_api('sceneTools.closeCameraView', [sceneName, cameraId]),
     renameCameraView: (sceneName, cameraId, name) =>
       call_manifest_editor_api('sceneTools.renameCameraView', [sceneName, cameraId, name]),
-    listCameraViews: (sceneName) =>
-      call_manifest_editor_api('sceneTools.listCameraViews', [sceneName]),
     deleteCamera: (sceneName, cameraId) =>
       call_manifest_editor_api('sceneTools.deleteCamera', [sceneName, cameraId]),
     setOutputMode: (sceneName, cameraName, mode) =>
@@ -675,7 +613,7 @@ const editorApiStatic = {
   },
 };
 
-export const editorApi = create_dynamic_editor_api_namespace('', editorApiStatic);
+export const editorApi = editorApiStatic;
 
 // 快捷访问
 // LAN transport belongs to C++ NetworkSystem; Web calls native V8 contracts.

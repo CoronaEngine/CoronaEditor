@@ -783,10 +783,6 @@ const RUNTIME_DOM_TEXT_TRANSLATIONS = {
 
   景: 'Scene',
   点: 'Node',
-  '[Camera] coronaBridge 缺失或 cameraMove 不可用，':
-    '[Camera] coronaBridge Is Missing or cameraMove Is Unavailable,',
-  'CEF 子进程可能未运行。快速通道摄像头更新已禁用。':
-    'The CEF Subprocess May Not Be Running. Fast-path Camera Updates Have Been Disabled.',
   'ProjectLauncher 初始化失败:': 'ProjectLauncher Initialization Failed:',
   '创建失败: ': 'Creation Failed: ',
   '创建失败: {error}': 'Creation Failed: {error}',
@@ -808,7 +804,6 @@ const RUNTIME_DOM_TEXT_TRANSLATIONS = {
     'Automatically opened the connection condition and displayed its {count} visible blocks.',
   '\u5df2\u81ea\u52a8\u5b9a\u4f4d\u5230\u672c\u6b21\u4fee\u6539\u7684\u8282\u70b9\u8fde\u7ebf\u3002':
     'Automatically located the node connection modified in this update.',
-  'coronaBridge.actorTransform 不可用': 'coronaBridge.actorTransform Is Unavailable',
 };
 const CUSTOM_BLOCK_TEXT_TRANSLATIONS = {
   ...CUSTOM_BLOCK_TRANSLATIONS,

@@ -322,6 +322,7 @@ import { editorApi } from '@/api/editorApi.js';
 import { appService } from '@/services/appService.js';
 import { getNodeGraphSaves } from '@/services/nodeGraphSaves.js';
 import { coronaEventBus } from '@/utils/eventBus.js';
+import { createViewLifetime } from '@/utils/viewLifetime.js';
 import { nodeGraphToCode, validateNodeGraph } from '@/blockly/generators/index.js';
 import { generatedNodeGraphRevision, registerGeneratedNodeGraphConsumer } from '@/blockly/node-editor/aiNodeGraphService.js';
 import { actorContextNameKey, actorContextRevision, actorRecordsFromSceneTree, normalizeActorContextName } from '@/blockly/utils/actorContext.js';
@@ -336,6 +337,7 @@ import {
   publishCabbagePreWarning,
   publishCabbageProjectContext,
   readCabbageAssistantContext,
+  requestCabbageAssistantContext,
   subscribeCabbageAssistantContext,
 } from '@/services/cabbageAssistantContextService.js';
 
@@ -510,8 +512,6 @@ let isLoading = false,
   panelCloseStopPromise = null,
   unregisterAiNodeGraphConsumer = null,
   stopNodeGraphReview = null,
-  actorChangedCallbackToken = null,
-  sceneTreeChangedCallbackToken = null,
   actorOptionsRefreshTimer = null,
   actorOptionsRefreshSequence = 0,
   graphLoadSequence = 0,
@@ -525,6 +525,7 @@ let isLoading = false,
   graphDirty = false,
   saveInFlight = null,
   saveQueued = false;
+const viewLifetime = createViewLifetime(() => componentMounted);
 const targetEnabledByKey = new Map();
 const nodeRunLifecycle = { active: false, terminalReported: false };
 const sceneActorContext = reactive({
@@ -2325,16 +2326,26 @@ function currentTarget(projectPathOverride = '') {
 async function selectRunTarget(event) {
   const actorName = event.target.value;
   event.target.value = props.actorName;
+  const archive = loadedArchiveSession, loadSequence = graphLoadSequence;
+  const current = () => viewLifetime.current() && !panelClosing && archive && archive === loadedArchiveSession && loadSequence === graphLoadSequence;
   if (!initialLoadComplete || !(await saveNow())) return;
+  if (!current()) return;
   try {
-    const scene = bridgeResult(await editorApi.scene.getSnapshot(props.sceneName || ''));
-    const route = scene.scene || scene.id;
+    let sceneName = props.sceneName;
+    if (!sceneName) {
+      const active = await editorApi.scene.readActive();
+      if (!current() || active.archive_session !== archive) return;
+      sceneName = active.scene;
+    }
+    const scene = await editorApi.scene.readActorIndex(sceneName, { archive_session: archive });
+    if (!current() || scene.archive_session !== archive) return;
+    const route = scene.scene;
     if (actorName && (!route || !scene.actors?.some(actor => actor.name === actorName))) {
       throw new Error('运行目标已不在当前场景');
     }
     emit('select-target', { actorName, sceneName: route || '' });
   } catch (error) {
-    runStatus.value = error.message;
+    if (current()) runStatus.value = error.message;
   }
 }
 async function saveNow(targetOverride = null, { force = false } = {}) {
@@ -3168,8 +3179,9 @@ onMounted(async () => {
   const currentCabbageScopeId = () => reviewScopeId(
     normalizeProjectPath(activeProjectPath.value || readActiveProjectPath()),
   );
-  const cachedCabbageContext = readCabbageAssistantContext(currentCabbageScopeId());
-  if (cachedCabbageContext) cabbageAssistant.hydrateContext(cachedCabbageContext);
+  void requestCabbageAssistantContext(currentCabbageScopeId()).then((cachedCabbageContext) => {
+    if (componentMounted && cachedCabbageContext) cabbageAssistant.hydrateContext(cachedCabbageContext);
+  });
   unsubscribeCabbageContext = subscribeCabbageAssistantContext(
     (snapshot) => {
       if (componentMounted) {
@@ -3194,24 +3206,16 @@ onMounted(async () => {
   // Event subscription is useful for later object updates, but it must not block the
   // first graph paint. Some native bridge shutdown/startup transitions can make an
   // event registration noticeably slower than loading the saved graph itself.
-  Promise.allSettled([
-    editorApi.scene.observe('selection', onNodeGraphActorChanged),
-    editorApi.scene.observe('tree', onNodeGraphSceneTreeChanged),
-  ]).then((subscriptionResults) => {
-    const [actorSubscription, sceneTreeSubscription] = subscriptionResults;
-    if (actorSubscription.status === 'fulfilled') {
-      if (componentMounted) actorChangedCallbackToken = actorSubscription.value;
-      else editorApi.off(actorSubscription.value).catch(() => {});
-    } else {
-      logError('Failed to subscribe to actor changes', actorSubscription.reason);
-    }
-    if (sceneTreeSubscription.status === 'fulfilled') {
-      if (componentMounted) sceneTreeChangedCallbackToken = sceneTreeSubscription.value;
-      else editorApi.off(sceneTreeSubscription.value).catch(() => {});
-    } else {
-      logError('Failed to subscribe to scene tree changes', sceneTreeSubscription.reason);
-    }
-  });
+  viewLifetime.subscribe(
+    callback => editorApi.scene.observe('selection', callback),
+    onNodeGraphActorChanged,
+    token => editorApi.off(token),
+  ).catch(error => logError('Failed to subscribe to actor changes', error));
+  viewLifetime.subscribe(
+    callback => editorApi.scene.observe('tree', callback),
+    onNodeGraphSceneTreeChanged,
+    token => editorApi.off(token),
+  ).catch(error => logError('Failed to subscribe to scene tree changes', error));
 
   // Actor choices are needed by object-reference dropdowns, so finish the first scan
   // before hydrating Blockly. Unlike the event subscriptions above, this request is on
@@ -3251,6 +3255,7 @@ onMounted(async () => {
   window.addEventListener('keydown', handleFullscreenKey);
 });
 onBeforeUnmount(() => {
+  viewLifetime.dispose();
   componentMounted = false;
   stopProjectChanged?.();
   stopProjectChanged = null;
@@ -3261,18 +3266,6 @@ onBeforeUnmount(() => {
   graphLoadSequence += 1;
   if (actorOptionsRefreshTimer) window.clearTimeout(actorOptionsRefreshTimer);
   actorOptionsRefreshTimer = null;
-  if (actorChangedCallbackToken) {
-    editorApi.off(actorChangedCallbackToken).catch((error) => {
-      logError('Failed to unsubscribe from actor changes', error);
-    });
-    actorChangedCallbackToken = null;
-  }
-  if (sceneTreeChangedCallbackToken) {
-    editorApi.off(sceneTreeChangedCallbackToken).catch((error) => {
-      logError('Failed to unsubscribe from scene tree changes', error);
-    });
-    sceneTreeChangedCallbackToken = null;
-  }
   stopNodeGraphReview?.();
   stopNodeGraphReview = null;
   unregisterAiNodeGraphConsumer?.();

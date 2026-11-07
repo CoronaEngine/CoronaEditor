@@ -106,11 +106,10 @@ import {
   normalizeVisionRenderMode, visionAccumulationFromCamera, visionDenoiseFromCamera, visionStablePlanesFromCamera, visionRenderModes,
   visionDenoisers, visionDenoiserFromCamera,
 } from '@/utils/visionRenderModes.js';
-import {
-  Bridge,
-  editorApi,
-} from '@/api/editorApi.js';
+import { editorApi } from '@/api/editorApi.js';
 import { getWebMessages } from '@/api/webMessages.js';
+import { getWebDocumentIdentity } from '@/api/webDocument.js';
+import { createViewportCalibrationService } from '@/services/viewportCalibrationService.js';
 import { createViewLifetime } from '@/utils/viewLifetime.js';
 import { appService, isCurrentWindowEvent } from '@/services/appService.js';
 import { viewportControlsService } from '@/services/viewportControlsService.js';
@@ -161,7 +160,7 @@ const worldRevision = worldModeState.revision;
 const viewLifetime = createViewLifetime(() => worldModeState.revision === worldRevision);
 const viewCurrent = viewLifetime.current;
 const subscribeWhileCurrent = (register, handler) => viewLifetime.subscribe(register, handler,
-  token => editorApi.off(token).catch(() => {}));
+  token => editorApi.off(token));
 
 const { t: translate } = useI18n();
 const dockStore = useDockStore();
@@ -221,9 +220,6 @@ const cameraBindingState = ref({
   archiveSession: '',
 });
 let actorPickIndex = new Map();
-let actorSelectionCallbackToken = null;
-let actorTransformCallbackToken = null;
-let projectOpenedCallbackToken = null;
 const actorTransformBaselines = new Map();
 const ACTOR_TRANSFORM_EPSILON = 1e-5;
 let gizmoDownRequestId = '';
@@ -240,10 +236,13 @@ const viewportUiModeItems = [
   { mode: 'stereo3d', label: '3D UI', title: '光场屏立体 UI' },
 ];
 
-// 光场 3D UI 标定：标定面板通过共享存储同步修改，这里用活动相机句柄下发；
+// 光场 3D UI 标定：主文档持有活动值，标定面板通过公共 Web 消息修改；
 // 切到 stereo3d 自动打开标定 dock 面板并推送当前值，切回 flat2d 关闭。
 const viewportUiCalibrationStore = createViewportUiCalibrationStore();
 const webMessages = getWebMessages();
+const viewportCalibration = createViewportCalibrationService(webMessages, {
+  owner: getWebDocumentIdentity().owner, main: true, store: viewportUiCalibrationStore,
+});
 const VIEWPORT_UI_CALIBRATION_PANEL = 'LightFieldCalibration';
 const applyViewportUiCalibration = () => {
   viewportUiCalibrationStore.applyToNative({
@@ -251,7 +250,7 @@ const applyViewportUiCalibration = () => {
     sceneId: cameraBindingState.value.sceneId,
     cameraId: cameraBindingState.value.cameraId,
     archiveSession: cameraBindingState.value.archiveSession,
-    calibration: viewportUiCalibrationStore.get({}),
+    calibration: viewportCalibration.read(),
   }).catch(error => console.warn('[Viewport] Native configuration failed', error));
 };
 const syncViewportUiCalibrationPanel = (mode) => {
@@ -348,11 +347,12 @@ const transformVectorChanged = (previous, next) => ['x', 'y', 'z'].some((axis) =
 const seedActorTransformBaseline = async (sceneId, actorName) => {
   const scene = String(sceneId || '').trim();
   const actor = String(actorName || '').trim();
-  if (!scene || !actor) return;
+  const archive = cameraBindingState.value.archiveSession;
+  if (!scene || !actor || !archive || cameraBindingState.value.sceneId !== scene || !viewCurrent()) return;
   try {
-    const result = await editorApi.scene.getActor(scene, actor);
-    const data = result?.data ?? result ?? {};
-    if (!data || data.status === 'error') return;
+    const data = await editorApi.scene.readActorProperties(scene, actor, { archive_session: archive });
+    if (!viewCurrent() || cameraBindingState.value.archiveSession !== archive
+        || cameraBindingState.value.sceneId !== scene || data?.archive_session !== archive || data?.scene !== scene) return;
     actorTransformBaselines.set(
       actorTransformKey(scene, actor),
       normalizeActorTransform(data.geometry || {}),
@@ -1115,9 +1115,10 @@ const applySceneSnapshot = (sceneId, payload, { preservePose = false } = {}) => 
   const activeCameraName =
     snapshot.active_camera_name ?? snapshot.activeCameraName ?? cameras[0]?.name ?? null;
   const activeCamera =
-    cameras.find((cam) => cam?.name === activeCameraName) ?? cameras[0] ?? snapshot.camera ?? null;
+    cameras.find((cam) => cam?.camera_id === snapshot.active_camera_id)
+    ?? cameras.find((cam) => cam?.name === activeCameraName) ?? cameras[0] ?? snapshot.camera ?? null;
 
-  const nextHandle = activeCamera?.handle ?? activeCamera?.camera_handle ?? null;
+  const nextHandle = activeCamera?.opaque_handle ?? activeCamera?.handle ?? activeCamera?.camera_handle ?? null;
   const bindingChanged = cameraBindingState.value.sceneId !== normalizedSceneId
     || cameraBindingState.value.cameraHandle !== nextHandle
     || cameraBindingState.value.cameraId !== (activeCamera?.camera_id ?? activeCamera?.id ?? null)
@@ -1127,8 +1128,8 @@ const applySceneSnapshot = (sceneId, payload, { preservePose = false } = {}) => 
     sceneId: normalizedSceneId,
     archiveSession: activeCamera?.archive_session || snapshot.archive_session || '',
     cameraId: activeCamera?.camera_id ?? activeCamera?.id ?? null,
-    cameraName: activeCameraName,
-    cameraHandle: activeCamera?.handle ?? activeCamera?.camera_handle ?? null,
+    cameraName: activeCamera?.name ?? activeCameraName,
+    cameraHandle: nextHandle,
   };
   currentMainCamera.value = activeCamera;
   if (bindingChanged) {
@@ -1223,19 +1224,27 @@ const applySceneSnapshot = (sceneId, payload, { preservePose = false } = {}) => 
 };
 
 const syncSceneCameraBinding = async (sceneId, { preservePose = false } = {}) => {
-  if (!viewCurrent() || !sceneId) {
+  const archive = environmentArchiveSession.value;
+  if (!viewCurrent() || !sceneId || !archive) {
     return false;
   }
 
   const requestRevision = ++sceneCameraBindingRequestRevision;
+  const current = () => viewCurrent() && requestRevision === sceneCameraBindingRequestRevision
+    && archive === environmentArchiveSession.value;
   try {
-    const result = await editorApi.scene.getSnapshot(sceneId);
-    if (!viewCurrent() || requestRevision !== sceneCameraBindingRequestRevision) return false;
-    applySceneSnapshot(sceneId, result, { preservePose });
+    const scope = { archive_session: archive };
+    const [cameras, environment, index] = await Promise.all([
+      editorApi.scene.readCameras(sceneId, scope), editorApi.scene.getEnvironment(sceneId, scope),
+      editorApi.scene.readActorIndex(sceneId, scope),
+    ]);
+    if (!current() || [cameras, environment, index].some(value => value.archive_session !== archive || value.scene !== sceneId)) return false;
+    applySceneSnapshot(sceneId, { ...cameras, scene_id: cameras.scene, actors: index.actors,
+      sun: environment.sun, grid: environment.grid }, { preservePose });
     broadcastViewportControlsState();
     return true;
   } catch (e) {
-    if (requestRevision === sceneCameraBindingRequestRevision) {
+    if (current()) {
       logError('Failed to sync scene camera binding', e);
     }
     return false;
@@ -1297,21 +1306,23 @@ const refreshSceneCameraBinding = ({ force = false, preservePose = true } = {}) 
 };
 
 const restoreCameraViews = async (sceneId) => {
-  if (!viewCurrent() || !sceneId) return;
+  const archive = environmentArchiveSession.value;
+  const current = () => viewCurrent() && archive === environmentArchiveSession.value;
+  if (!current() || !sceneId || !archive) return;
   try {
-    const result = await editorApi.sceneTools.listCameraViews(sceneId);
-    const payload = result?.data ?? result;
+    const payload = await editorApi.scene.readCameras(sceneId, { archive_session: archive });
+    if (!current() || payload.archive_session !== archive || payload.scene !== sceneId) return;
     const openCameras = Array.isArray(payload?.cameras)
       ? payload.cameras.filter((camera) => camera.view_open)
       : [];
     for (const camera of openCameras) {
-      if (!viewCurrent()) return;
+      if (!current()) return;
       if (!await initializeWorldRenderBackend({ api: editorApi, sceneId,
-        cameraId: camera.camera_id || camera.name, isCurrent: viewCurrent })) return;
+        cameraId: camera.camera_id, isCurrent: current }) || !current()) return;
       await appService.createCameraView({ ...camera, scene_id: sceneId });
     }
   } catch (e) {
-    logError('Failed to restore camera views', e);
+    if (current()) logError('Failed to restore camera views', e);
   }
 };
 
@@ -1618,9 +1629,11 @@ const onContextMenu = (event) => {
 };
 
 const refreshActorPickIndex = async (sceneId) => {
-  if (!sceneId) return false;
-  const result = await editorApi.sceneTools.listSceneTree(sceneId);
-  const snapshot = result?.data ?? result;
+  const archive = cameraBindingState.value.archiveSession;
+  const current = () => viewCurrent() && cameraBindingState.value.archiveSession === archive && cameraBindingState.value.sceneId === sceneId;
+  if (!sceneId || !archive || !current()) return false;
+  const snapshot = await editorApi.scene.readActorIndex(sceneId, { archive_session: archive });
+  if (!current() || snapshot.archive_session !== archive || snapshot.scene !== sceneId) return false;
   const actors = Array.isArray(snapshot?.actors) ? snapshot.actors : [];
   actorPickIndex = indexActorsByHandle(actors);
   return actorPickIndex.size > 0;
@@ -1984,12 +1997,12 @@ onMounted(async () => {
   coronaEventBus.on('camera-pose-applied', onCameraPoseApplied);
   coronaEventBus.on('node-graph-panel-open-request', handleNodeGraphPanelOpenRequest);
   if (!viewCurrent()) return;
-  projectOpenedCallbackToken = await subscribeWhileCurrent(callback => editorApi.scene.observe('project', callback), onProjectOpenedEvent);
+  await subscribeWhileCurrent(callback => editorApi.scene.observe('project', callback), onProjectOpenedEvent);
   if (!viewCurrent()) return;
   if (!viewCurrent()) return;
-  actorSelectionCallbackToken = await subscribeWhileCurrent(callback => editorApi.scene.observe('selection', callback), handleActorSelectionForObjectDock);
+  await subscribeWhileCurrent(callback => editorApi.scene.observe('selection', callback), handleActorSelectionForObjectDock);
   if (!viewCurrent()) return;
-  actorTransformCallbackToken = await subscribeWhileCurrent(callback => editorApi.scene.observe('transform', callback), handleActorTransformForCabbage);
+  await subscribeWhileCurrent(callback => editorApi.scene.observe('transform', callback), handleActorTransformForCabbage);
   if (!viewCurrent()) return;
     if (!viewCurrent()) return;
   coronaEventBus.on('model-node-selection', handleModelNodeGizmoSelection);
@@ -2013,7 +2026,7 @@ onMounted(async () => {
   cabbageCandidateTimer = window.setInterval(() => promoteDueCabbageTasks(), 1000);
   window.addEventListener('cabbage-run-failed', onCabbageRunFailed);
   stopProjectChanged = subscribeProjectChanged(onActiveProjectChanged);
-  stopViewportUiCalibrationMessages = webMessages.on('viewportUi.calibrationChanged', () => {
+  stopViewportUiCalibrationMessages = viewportCalibration.subscribe(() => {
     if (viewportUiMode.value === 'stereo3d') applyViewportUiCalibration();
   });
 });
@@ -2044,6 +2057,7 @@ onUnmounted(() => {
   stopProjectChanged = null;
   stopViewportUiCalibrationMessages?.();
   stopViewportUiCalibrationMessages = null;
+  viewportCalibration.dispose();
   closeTutorialSessionChannel();
   coronaEventBus.off('model-node-selection', handleModelNodeGizmoSelection);
   coronaEventBus.off('creative-panel-open', handleCreativePanelOpen);
@@ -2054,25 +2068,7 @@ onUnmounted(() => {
   gizmoClickTimer = 0;
   viewportGizmoController.cancel('cancel');
   viewportGizmoController.clearTarget();
-  if (actorSelectionCallbackToken) {
-    editorApi.off(actorSelectionCallbackToken).catch((error) => {
-      logError('Failed to unregister actor selection callback', error);
-    });
-    actorSelectionCallbackToken = null;
-  }
-  if (actorTransformCallbackToken) {
-    editorApi.off(actorTransformCallbackToken).catch((error) => {
-      logError('Failed to unregister actor transform callback', error);
-    });
-    actorTransformCallbackToken = null;
-  }
   actorTransformBaselines.clear();
-  if (projectOpenedCallbackToken) {
-    editorApi.off(projectOpenedCallbackToken).catch((error) => {
-      logError('Failed to unregister project opened callback', error);
-    });
-    projectOpenedCallbackToken = null;
-  }
   window.removeEventListener('resize', handleViewportLayoutChange);
   window.removeEventListener('blur', handleMainViewportBlur);
   window.removeEventListener('pointercancel', resetRealtimeCameraInput);

@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { registerHooks } from 'node:module';
 import test from 'node:test';
+import { getWebMessages } from '../../src/api/webMessages.js';
 
 globalThis.window = new EventTarget();
 const aliases = registerHooks({
@@ -14,6 +15,7 @@ const aliases = registerHooks({
 const { nodeGraphGenerationIntent } =
   await import('../../src/services/nodeGraphGenerationService.js');
 aliases.deregister();
+test.after(() => getWebMessages(globalThis.window).dispose());
 
 for (const instruction of [
   '请不要删除节点',

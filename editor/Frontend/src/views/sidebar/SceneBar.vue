@@ -441,10 +441,6 @@ const { error: logError, warn: logWarn } = useErrorHandler('SceneBar');
 
 const currentSceneName = ref('');
 const archiveSession = ref('');
-let actorChangedCallbackToken = null;
-let sceneTreeChangedCallbackToken = null;
-let projectOpenedCallbackToken = null;
-let nodeSelectionCallbackToken = null;
 let sceneTreeRequestSeq = 0;
 let sceneTreeSettleTimer = null;
 let sceneTreeSettleTimerScene = '';
@@ -627,11 +623,8 @@ const SelectCamera = (cam) => {
 
 const OpenCameraView = async (cam) => {
   try {
-    const cameraId = cam.camera_id || cam.id || cam.name;
-    const opened = await editorApi.sceneTools.openCameraView(currentSceneName.value, cameraId);
-    const payload = opened?.data ?? opened;
     await appService.createCameraView({
-      ...(payload.camera || cam),
+      ...cam,
       scene_id: currentSceneName.value,
     });
     await OnInitObjTree();
@@ -926,8 +919,9 @@ const ImportCamera = async () => {
     while (existingNames.has(cameraName)) {
       cameraName = `Camera_${suffix++}`;
     }
-    const result = await editorApi.sceneTools.createCameraView(currentSceneName.value, cameraName);
-    const payload = result?.data ?? result;
+    const payload = await editorApi.scene.createCamera(currentSceneName.value, {
+      archive_session: archiveSession.value, name: cameraName,
+    });
     if (!payload?.camera) throw new Error(payload?.message || 'Camera creation failed');
     await appService.createCameraView({
       ...payload.camera,
@@ -1156,83 +1150,74 @@ const DeleteActor = async (scene) => {
 const OnInitObjTree = async () => {
   if (!viewLifetime.current()) return;
   const sceneName = currentSceneName.value;
+  const archive = archiveSession.value;
   const requestSeq = ++sceneTreeRequestSeq;
-  if (!sceneName) return;
+  if (!sceneName || !archive) return;
+  const current = () => viewLifetime.current() && requestSeq === sceneTreeRequestSeq
+    && sceneName === currentSceneName.value && archive === archiveSession.value;
   try {
-    const result = await editorApi.sceneTools.listSceneTree(sceneName);
-    // Scene switches and native tree notifications can overlap.  Only the most
-    // recent request for the still-active route may replace the displayed tree.
-    if (!viewLifetime.current() || requestSeq !== sceneTreeRequestSeq || sceneName !== currentSceneName.value) return;
-
-    // Both transports return the native payload in `data`, but keeping the
-    // direct-payload fallback means a valid snapshot is never discarded when a
-    // CEF bridge has already unwrapped it.
-    const data = result?.data ?? result;
-    if (result?.success !== false && data && typeof data === 'object') {
-      archiveSession.value = data.archive_session || '';
-      const nextActors = Array.isArray(data.actors)
-        ? data.actors.map((item) => ({
-            name: item.name,
-            actor_guid: item.actor_guid || '',
-            model_node_count: Number(item.model_node_count || 0),
-            path: item.path,
-            type: item.type || 'obj',
-            visible: item.visible !== false,
-            handle: normalizeHandle(item.handle),
-            audioResourceId: item.audio_resource_id || '',
-            load_status: item.load_status || 'loaded',
-            load_error: item.load_error || null,
-          }))
-        : [];
-      // Commit the full snapshot atomically.  A failed or stale refresh keeps
-      // the last known tree visible instead of presenting an empty panel.
-      const decision = resolveSceneTreeSnapshot({
-        sceneName,
-        actors: nextActors,
-        settlement: sceneTreeSettlement.value,
-      });
-      sceneTreeSettlement.value = decision.settlement;
-      // Cameras do not depend on actor materialization.
-      if (Array.isArray(data.cameras)) applyCameraList(data.cameras);
-      // An empty snapshot taken while a freshly opened scene is still building its
-      // actors is provisional; committing it left the dock empty for good.
-      if (decision.commit) sceneImages.value = decision.rows;
-      scheduleSceneTreeSettleRetry(decision.retryInMs, sceneName);
-    }
+    const data = await editorApi.scene.readTree(sceneName, { archive_session: archive });
+    if (!current() || data.archive_session !== archive || data.scene !== sceneName) return;
+    const nextActors = Array.isArray(data.actors)
+      ? data.actors.map((item) => ({
+          name: item.name,
+          actor_guid: item.actor_guid || '',
+          model_node_count: Number(item.model_node_count || 0),
+          path: item.path,
+          type: item.type || 'obj',
+          visible: item.visible !== false,
+          handle: normalizeHandle(item.opaque_handle),
+          audioResourceId: item.audio_resource_id || '',
+          load_status: item.load_status || 'loaded',
+          load_error: item.load_error || null,
+        }))
+      : [];
+    // Commit the full snapshot atomically.  A failed or stale refresh keeps
+    // the last known tree visible instead of presenting an empty panel.
+    const decision = resolveSceneTreeSnapshot({
+      sceneName,
+      actors: nextActors,
+      settlement: sceneTreeSettlement.value,
+    });
+    sceneTreeSettlement.value = decision.settlement;
+    // Cameras do not depend on actor materialization.
+    if (Array.isArray(data.cameras)) applyCameraList(data.cameras);
+    // An empty snapshot taken while a freshly opened scene is still building its
+    // actors is provisional; committing it left the dock empty for good.
+    if (decision.commit) sceneImages.value = decision.rows;
+    scheduleSceneTreeSettleRetry(decision.retryInMs, sceneName);
   } catch (e) {
-    if (viewLifetime.current() && requestSeq === sceneTreeRequestSeq) logError('Failed to load scene tree', e);
+    if (current()) logError('Failed to load scene tree', e);
   }
 };
 
 onMounted(async () => {
   coronaEventBus.on('model-node-picked', handleModelNodePick);
-  const result = await editorApi.main.onInit();
+  const active = await editorApi.scene.readActive();
   if (!viewLifetime.current()) return;
   const queryString = window.location.hash?.split('?')[1] || window.location.search?.slice(1);
   const urlSceneName = queryString ? new URLSearchParams(queryString).get('sceneName') : null;
 
-  // OnInit 只返回当前场景。
-  const initData = result?.data ?? result;
-  const activeScene = initData?.scene;
-  currentSceneName.value = urlSceneName || activeScene?.path || DEFAULT_SCENE_NAME;
+  archiveSession.value = active.archive_session;
+  currentSceneName.value = urlSceneName || active.scene || DEFAULT_SCENE_NAME;
 
   await OnInitObjTree();
   if (!viewLifetime.current()) return;
   await RefreshRenderBackendState();
   if (!viewLifetime.current()) return;
   // 后端对象变化：项目打开/物体变化时重新加载场景树
-  actorChangedCallbackToken = await viewLifetime.subscribe(callback => editorApi.scene.observe('selection', callback), onActorChangeEvent, editorApi.off);
+  await viewLifetime.subscribe(callback => editorApi.scene.observe('selection', callback), onActorChangeEvent, editorApi.off);
   if (!viewLifetime.current()) return;
-  sceneTreeChangedCallbackToken =
-    await viewLifetime.subscribe(callback => editorApi.scene.observe('tree', callback), onSceneTreeChangedEvent, editorApi.off);
+  await viewLifetime.subscribe(callback => editorApi.scene.observe('tree', callback), onSceneTreeChangedEvent, editorApi.off);
   if (!viewLifetime.current()) return;
-  projectOpenedCallbackToken = await viewLifetime.subscribe(callback => editorApi.scene.observe('project', callback), onProjectOpenedEvent, editorApi.off);
+  await viewLifetime.subscribe(callback => editorApi.scene.observe('project', callback), onProjectOpenedEvent, editorApi.off);
   if (!viewLifetime.current()) return;
-  nodeSelectionCallbackToken = await viewLifetime.subscribe(callback => editorApi.scene.observe('selection', callback), handleModelNodePick, editorApi.off);
+  await viewLifetime.subscribe(callback => editorApi.scene.observe('selection', callback), handleModelNodePick, editorApi.off);
 });
 
 // 项目打开时刷新当前场景树；actor 选择只更新详情面板，不重建树，避免点击闪烁。
 const onActorChangeEvent = (payload, maybeSceneId /*, actorId, oldPath */) => {
+  if (payload?.archive_session && payload.archive_session !== archiveSession.value) return;
   const type = payload?.actor_type ?? payload?.type ?? payload;
   const sceneId = payload?.scene ?? maybeSceneId;
   if (type !== 'scene' || !sceneId) return;
@@ -1242,6 +1227,7 @@ const onActorChangeEvent = (payload, maybeSceneId /*, actorId, oldPath */) => {
 };
 
 const onSceneTreeChangedEvent = (payload) => {
+  if (payload?.archive_session && payload.archive_session !== archiveSession.value) return;
   const sceneName = payload?.scene ?? payload;
   if (!sceneName || sceneName === currentSceneName.value) {
     OnInitObjTree();
@@ -1250,28 +1236,30 @@ const onSceneTreeChangedEvent = (payload) => {
 
 const onProjectOpenedEvent = (payload = {}) => {
   const sceneRoute = resolveOpenedProjectScene(payload);
-  if (!sceneRoute) return;
+  if (!sceneRoute || !payload.archive_session) return;
   publishModelNodeSelection(null);
+  archiveSession.value = payload.archive_session;
   currentSceneName.value = sceneRoute;
   void OnInitObjTree();
   void RefreshRenderBackendState();
 };
 
 const normalizeCameraPayload = (cam) => ({
+  archive_session: cam.archive_session,
   id: cam.id || cam.camera_id || cam.name,
   camera_id: cam.camera_id || cam.id || cam.name,
   name: cam.name || 'Camera',
   width: cam.width || 0,
   height: cam.height || 0,
   fov: cam.fov ?? null,
-  handle: normalizeHandle(cam.handle ?? cam.camera_handle),
+  handle: normalizeHandle(cam.opaque_handle ?? cam.handle ?? cam.camera_handle),
   render_backend: cam.render_backend || 'native',
   output_mode: cam.output_mode || 'final_color',
   deletable: cam.deletable !== false,
   move_speed: cam.move_speed || 1,
   view_open: !!cam.view_open,
-  view_x: cam.view_x || 120,
-  view_y: cam.view_y || 120,
+  view_x: cam.view_x ?? 120,
+  view_y: cam.view_y ?? 120,
   view_width: cam.view_width || 960,
   view_height: cam.view_height || 540,
 });
@@ -1284,19 +1272,20 @@ const applyCameraList = (cameras) => {
 };
 
 const RefreshCameraListOnly = async () => {
-  if (!viewLifetime.current() || !currentSceneName.value || cameraListRefreshInFlight) {
+  const scene = currentSceneName.value, archive = archiveSession.value;
+  const current = () => viewLifetime.current() && scene === currentSceneName.value && archive === archiveSession.value;
+  if (!current() || !scene || !archive || cameraListRefreshInFlight) {
     return;
   }
   cameraListRefreshInFlight = true;
   try {
-    const result = await editorApi.sceneTools.listSceneTree(currentSceneName.value);
-    if (!viewLifetime.current()) return;
-    const data = result?.data ?? result;
+    const data = await editorApi.scene.readCameras(scene, { archive_session: archive });
+    if (!current() || data.archive_session !== archive || data.scene !== scene) return;
     if (Array.isArray(data?.cameras)) {
       applyCameraList(data.cameras);
     }
   } catch (e) {
-    if (viewLifetime.current()) logError('Failed to refresh camera list', e);
+    if (current()) logError('Failed to refresh camera list', e);
   } finally {
     cameraListRefreshInFlight = false;
   }
@@ -1315,32 +1304,8 @@ onUnmounted(() => {
   viewLifetime.dispose();
   clearSceneTreeSettleRetry();
   coronaEventBus.off('model-node-picked', handleModelNodePick);
-  if (nodeSelectionCallbackToken)
-    editorApi
-      .off(nodeSelectionCallbackToken)
-      .catch((error) => logError('Failed to unregister node selection callback', error));
-  nodeSelectionCallbackToken = null;
   clearActorSingleClickTimer();
   actorFocusSeq++;
-
-  if (actorChangedCallbackToken) {
-    editorApi.off(actorChangedCallbackToken).catch((error) => {
-      logError('Failed to unregister actor changed callback', error);
-    });
-    actorChangedCallbackToken = null;
-  }
-  if (sceneTreeChangedCallbackToken) {
-    editorApi.off(sceneTreeChangedCallbackToken).catch((error) => {
-      logError('Failed to unregister scene tree changed callback', error);
-    });
-    sceneTreeChangedCallbackToken = null;
-  }
-  if (projectOpenedCallbackToken) {
-    editorApi.off(projectOpenedCallbackToken).catch((error) => {
-      logError('Failed to unregister project opened callback', error);
-    });
-    projectOpenedCallbackToken = null;
-  }
 });
 </script>
 

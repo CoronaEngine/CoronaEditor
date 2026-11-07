@@ -15,6 +15,7 @@ import { cancelPendingProjectOpen } from '@/services/projectLauncherService.js';
 import { notifyWorldError } from '@/services/worldSessionLifecycle.js';
 import { coronaEventBus } from '@/utils/eventBus.js';
 import { subscribeProjectChanged } from '@/services/projectMessages.js';
+import { createViewLifetime } from '@/utils/viewLifetime.js';
 
 const route = useRoute();
 const router = useRouter();
@@ -36,8 +37,7 @@ function returnToLauncher() {
 }
 function closeNativePanel() { void appService.closeThisTab('').catch(error => console.error('[NativeDock] close failed', error)); }
 
-let appUnmounted = false;
-let projectOpenedToken = null;
+const viewLifetime = createViewLifetime();
 let observedProjectSession = '';
 let refreshRevision = 0;
 let preparationRevision = 0;
@@ -46,7 +46,7 @@ let lastReadyProjectKey = '';
 // Only the main surface controls native windows. Standalone pages independently
 // resolve the same native metadata before mounting their panel component.
 watch(() => [worldModeState.status, worldModeState.revision, route.path, route.matched.length, windowPolicyRevision.value], async () => {
-  if (!route.matched.length) return;
+  if (!viewLifetime.current() || !route.matched.length) return;
   const preparation = ++preparationRevision;
   const revision = worldModeState.revision;
   const opening = worldModeService.opening;
@@ -63,13 +63,14 @@ watch(() => [worldModeState.status, worldModeState.revision, route.path, route.m
       await appService.setEditorUiEnabled(enabled);
     } else if (isStandalonePanel.value && typeof window.corona?.window?.suspendCameraViews === 'function') {
       const policy = await appService.readEditorUiPolicy();
+      if (!viewLifetime.current() || preparation !== preparationRevision || revision !== worldModeState.revision) return;
       if (!policy?.enabled) { await appService.closeThisTab(''); return; }
     }
-    if (preparation !== preparationRevision || revision !== worldModeState.revision || appUnmounted) return;
+    if (preparation !== preparationRevision || revision !== worldModeState.revision || !viewLifetime.current()) return;
     if (worldModeState.status !== 'ready') return;
-    if (preparation === preparationRevision && revision === worldModeState.revision && !appUnmounted) preparedRevision.value = revision;
+    if (preparation === preparationRevision && revision === worldModeState.revision && viewLifetime.current()) preparedRevision.value = revision;
   } catch (error) {
-    if (preparation !== preparationRevision || revision !== worldModeState.revision || appUnmounted) return;
+    if (preparation !== preparationRevision || revision !== worldModeState.revision || !viewLifetime.current()) return;
     if (opening) return; // The opening caller owns the failure and its single notification.
     if (isStandalonePanel.value) { await appService.closeThisTab('').catch(() => {}); return; }
     await router.replace('/StartScreen');
@@ -78,14 +79,14 @@ watch(() => [worldModeState.status, worldModeState.revision, route.path, route.m
 }, { immediate: true });
 
 async function refreshWorldMode(projectPath = '', force = false) {
-  if (worldModeService.opening) return;
+  if (!viewLifetime.current() || worldModeService.opening) return;
   if (!force && worldModeState.status === 'ready' && projectPath
     && normalizeProjectPath(projectPath) === normalizeProjectPath(worldModeState.projectPath)) return;
   const request = ++refreshRevision;
   try {
     await worldModeService.resolve(projectPath, { force });
   } catch (error) {
-    if (request !== refreshRevision || appUnmounted) return;
+    if (request !== refreshRevision || !viewLifetime.current()) return;
     if (isStandalonePanel.value) {
       await appService.closeThisTab('').catch(() => {});
       return;
@@ -98,7 +99,6 @@ let gcTimer = null;
 let stopNativeCloseRequested;
 let stopProjectChanged;
 let stopWindowPolicyChanged;
-let lanChatEventCallbackToken = null;
 
 function isEscapeKey(event) {
   const modifierKeys = new Set([
@@ -187,14 +187,10 @@ function onLanChatEvent(payload) {
 
 async function registerLanChatEvent() {
   try {
-    const callbackToken = await editorApi.events.onLanChatEvent(onLanChatEvent);
-    if (appUnmounted) {
-      await editorApi.off(callbackToken);
-      return;
-    }
-    lanChatEventCallbackToken = callbackToken;
+    await viewLifetime.subscribe(
+      callback => editorApi.events.onLanChatEvent(callback), onLanChatEvent, token => editorApi.off(token));
   } catch (error) {
-    if (!appUnmounted) {
+    if (viewLifetime.current()) {
       console.warn('[App] failed to subscribe to LANChat events', error);
     }
   }
@@ -203,19 +199,15 @@ async function registerLanChatEvent() {
 onMounted(() => {
   if (window.corona) stopNativeCloseRequested = appService.onWindowCloseRequested(closeNativePanel);
   coronaEventBus.on('creative-return-to-launcher', returnToLauncher);
-  appUnmounted = false;
   stopProjectChanged = subscribeProjectChanged(({ projectPath }) => void refreshWorldMode(projectPath));
   stopWindowPolicyChanged = getWebMessages().on(WINDOW_SESSION_POLICY_EVENT, () => {
     if (isStandalonePanel.value) windowPolicyRevision.value++;
   });
-  void editorApi.scene.observe('project', (payload) => {
+  void viewLifetime.subscribe(callback => editorApi.scene.observe('project', callback), (payload) => {
     const reopened = Boolean(observedProjectSession) && observedProjectSession !== payload.archive_session;
     observedProjectSession = payload.archive_session;
     void refreshWorldMode(payload.path, reopened);
-  }).then((token) => {
-    if (appUnmounted) return editorApi.off(token);
-    projectOpenedToken = token;
-  }).catch((error) => console.warn('[App] project mode subscription failed', error));
+  }, token => editorApi.off(token)).catch((error) => console.warn('[App] project mode subscription failed', error));
   if (!isStandalonePanel.value) {
     void registerLanChatEvent();
   }
@@ -233,22 +225,14 @@ onMounted(() => {
 });
 
 onUnmounted(() => {
+  viewLifetime.dispose();
   stopNativeCloseRequested?.();
   coronaEventBus.off('creative-return-to-launcher', returnToLauncher);
-  appUnmounted = true;
   ++refreshRevision;
   stopProjectChanged?.();
   stopProjectChanged = null;
   stopWindowPolicyChanged?.();
   stopWindowPolicyChanged = null;
-  if (projectOpenedToken) void editorApi.off(projectOpenedToken).catch(() => {});
-  if (lanChatEventCallbackToken) {
-    const callbackToken = lanChatEventCallbackToken;
-    lanChatEventCallbackToken = null;
-    editorApi.off(callbackToken).catch((error) => {
-      console.warn('[App] failed to unsubscribe from LANChat events', error);
-    });
-  }
 
   if (gcTimer) {
     clearInterval(gcTimer);

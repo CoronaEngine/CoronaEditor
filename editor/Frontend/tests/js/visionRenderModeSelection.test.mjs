@@ -162,6 +162,7 @@ function detachedHost({ fields = {}, fail = false, pending = false, accumulation
   const host = new Function('ref', 'visionModes', 'editorApi', `
     const { normalizeVisionRenderMode, visionDenoiseFromCamera, visionAccumulationFromCamera, visionStablePlanesFromCamera, visionDenoiserFromCamera } = visionModes;
     const sceneId = 'scene.ini', cameraId = 'camera-3', unwrap = value => value?.data ?? value;
+    const cameraArchiveSession = 'archive', viewLifetime = { current: () => true };
     ${source}
     return { loadCamera, selectVisionRenderMode, camera, backend, visionRenderMode, errorText,
       visionStablePlanes: typeof visionStablePlanes === 'undefined' ? undefined : visionStablePlanes,
@@ -170,7 +171,8 @@ function detachedHost({ fields = {}, fail = false, pending = false, accumulation
       visionDenoiser, selectVisionDenoiser,
       visionAccumulation: typeof visionAccumulation === 'undefined' ? undefined : visionAccumulation,
       toggleVisionAccumulation: typeof toggleVisionAccumulation === 'undefined' ? undefined : toggleVisionAccumulation };
-  `)(ref, visionModes, { sceneTools: {
+  `)(ref, visionModes, { scene: { readCameras: async () => ({ archive_session: 'archive', scene: 'scene.ini',
+    cameras: cameraSnapshot(fields, 'camera-3').cameras }) }, sceneTools: {
     setVisionDenoiser: async (...args) => {
       calls.push(['denoiser', ...args]);
       if (denoiserFail) throw new Error('denoiser type unavailable');
@@ -181,7 +183,6 @@ function detachedHost({ fields = {}, fail = false, pending = false, accumulation
       if (stablePlanesFail) throw new Error('stable planes unavailable');
       return stablePlanesReply ? stablePlanesReply(args) : { enabled: pending ? !args[2] : args[2], pending };
     },
-    listCameraViews: async () => ({ data: { cameras: cameraSnapshot(fields, 'camera-3').cameras } }),
     isVisionAvailable: async () => ({ available: true }),
     setVisionRenderMode: async (...args) => { calls.push(['mode', ...args]); return { mode: args[2] }; },
     setVisionDenoise: async (...args) => {

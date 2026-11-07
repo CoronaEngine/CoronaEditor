@@ -6,6 +6,7 @@ import * as Vue from 'vue';
 import { createMemoryHistory, createRouter } from 'vue-router';
 import { babelParse, compileScript, parse } from 'vue/compiler-sfc';
 import * as worldMode from '../../src/services/worldModeService.js';
+import { createViewLifetime } from '../../src/utils/viewLifetime.js';
 
 const deferred = () => {
   let resolve;
@@ -58,6 +59,7 @@ for (const first of ['guard', 'observer']) {
         events: { onLanChatEvent: async () => 2 }, off: async () => {},
       } },
       '@/utils/eventBus.js': { coronaEventBus: { on: noop, off: noop } },
+      '@/utils/viewLifetime.js': { createViewLifetime },
       '@/services/worldSessionLifecycle.js': { notifyWorldError: error => errors.push(error) },
       '@/services/projectMessages.js': { subscribeProjectChanged: () => noop },
       '@/api/webMessages.js': { getWebMessages: () => ({ on: () => noop }) },
@@ -68,7 +70,14 @@ for (const first of ['guard', 'observer']) {
     const app = makeApp(modules, host, host, () => 1, noop);
     const scope = Vue.effectScope();
     const page = scope.run(() => app.setup({}, { expose: noop }));
-    t.after(() => { unmounted.forEach(hook => hook()); scope.stop(); });
+    let retired = false;
+    const retire = () => {
+      if (retired) return;
+      retired = true;
+      unmounted.forEach(hook => hook());
+      scope.stop();
+    };
+    t.after(retire);
     mounted.forEach(hook => hook());
     let navigation;
     if (first === 'guard') {
@@ -86,5 +95,73 @@ for (const first of ['guard', 'observer']) {
     assert.equal(page.mayRenderRoute.value, true);
     assert.equal(reads, 1, 'the initial observation must reuse the route metadata read');
     assert.deepEqual(errors, []);
+    retire();
+    observer({ path: 'D:/other-world', archive_session: 'late-archive' });
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(reads, 1, 'a native callback queued before unsubscription cannot restart world resolution after App disposal');
   });
 }
+
+function mountLifecycleApp(t, role = 'peer') {
+  const policy = deferred(), projectRegistration = deferred(), chatRegistration = deferred();
+  const mounted = [], unmounted = [], removed = [], closed = [], chats = [];
+  let projectCallback, chatCallback;
+  const noop = () => {};
+  const modules = Object.fromEntries(imports.map(node => [node.source.value, {}]));
+  const state = Vue.shallowReactive({ status: 'ready', revision: 1, projectPath: 'D:/world', mode: 'creative' });
+  Object.assign(modules, {
+    vue: { ...Vue, onMounted: hook => mounted.push(hook), onUnmounted: hook => unmounted.push(hook) },
+    'vue-router': { useRoute: () => ({ path: '/Object', matched: [{}] }), useRouter: () => ({ replace: async () => {} }) },
+    '@/services/worldModeService.js': { ...worldMode, worldModeState: state,
+      worldModeService: { opening: false, resolve: async () => {} }, editorUiAllowed: () => true },
+    '@/stores/dockStore.js': { useDockStore: () => ({ clearSession: noop }) },
+    '@/stores/lanchat.js': { default: { handleEvent: value => chats.push(value) } },
+    '@/services/appService.js': { appService: {
+      setEditorUiEnabled: async () => {}, readEditorUiPolicy: () => policy.promise,
+      closeThisTab: async () => { closed.push(true); }, onWindowCloseRequested: () => noop,
+    } },
+    '@/api/editorApi.js': { editorApi: {
+      scene: { observe: (_topic, callback) => { projectCallback = callback; return projectRegistration.promise; } },
+      events: { onLanChatEvent: callback => { chatCallback = callback; return chatRegistration.promise; } },
+      off: async token => { removed.push(token); },
+    } },
+    '@/api/webDocument.js': { getWebDocumentIdentity: () => ({ role }) },
+    '@/api/webMessages.js': { getWebMessages: () => ({ on: () => noop }) },
+    '@/services/windowSessionState.js': { WINDOW_SESSION_POLICY_EVENT: 'windowSession.policyChanged' },
+    '@/services/projectMessages.js': { subscribeProjectChanged: () => noop },
+    '@/services/worldSessionLifecycle.js': { notifyWorldError: assert.fail },
+    '@/utils/eventBus.js': { coronaEventBus: { on: noop, off: noop } },
+    '@/utils/viewLifetime.js': { createViewLifetime },
+  });
+  const host = { corona: { window: { suspendCameraViews: noop } }, addEventListener: noop, removeEventListener: noop };
+  const scope = Vue.effectScope();
+  scope.run(() => makeApp(modules, host, host, () => 1, noop).setup({}, { expose: noop }));
+  mounted.forEach(hook => hook());
+  let retired = false;
+  const retire = () => { if (!retired) { retired = true; unmounted.forEach(hook => hook()); scope.stop(); } };
+  t.after(retire);
+  return { policy, projectRegistration, chatRegistration, removed, closed, chats, retire,
+    project: value => projectCallback(value), chat: value => chatCallback(value) };
+}
+
+test('a late disabled-window policy cannot close a surface after App disposal', async t => {
+  const app = mountLifecycleApp(t);
+  app.retire();
+  app.policy.resolve({ enabled: false });
+  app.projectRegistration.resolve(-7);
+  await new Promise(resolve => setImmediate(resolve));
+  assert.deepEqual(app.closed, []);
+  assert.deepEqual(app.removed, [-7], 'a late subscription is removed exactly once');
+});
+
+test('late project and LAN callbacks are fenced while native registration is pending', async t => {
+  const app = mountLifecycleApp(t, 'main');
+  app.retire();
+  app.chat({ text: 'queued native event' });
+  app.project({ path: 'D:/retired', archive_session: 'old' });
+  app.projectRegistration.resolve(-7);
+  app.chatRegistration.resolve(9);
+  await new Promise(resolve => setImmediate(resolve));
+  assert.deepEqual(app.chats, []);
+  assert.deepEqual(app.removed.sort((left, right) => left - right), [-7, 9]);
+});

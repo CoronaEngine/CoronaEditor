@@ -9,6 +9,7 @@ import { createServiceResponseError } from '@/utils/serviceInitialization.js';
 
 const STORAGE_KEY = 'corona.cabbageAssistantContext.v2';
 const CONTEXT_MESSAGE_TYPE = 'cabbage-assistant-context';
+const CONTEXT_UPDATE_MESSAGE_TYPE = 'cabbage-assistant-context.update';
 const PRE_WARNING_MESSAGE_TYPE = 'cabbage-pre-warning';
 const TRANSFORM_DEBOUNCE_MS = 650;
 const PROFILE_POLL_MS = 1200;
@@ -16,6 +17,9 @@ const GOAL_PLAN_POLL_MS = 1000;
 const GOAL_PLAN_TIMEOUT_MS = 60000;
 
 let sceneSavedMessages = null;
+let contextOwnerHandlerMessages = null;
+let contextOwnerHandlerUnsubscribe = null;
+let contextOwnerStorage = null;
 let latestSnapshot = null;
 let writeChain = Promise.resolve();
 let activeScoreUpdateTaskId = '';
@@ -25,6 +29,18 @@ const pendingActorEvents = [];
 
 function getMessages() {
   const messages = getWebMessages();
+  if (messages.role === 'main' && contextOwnerHandlerMessages !== messages) {
+    contextOwnerHandlerUnsubscribe?.();
+    contextOwnerHandlerMessages = messages;
+    contextOwnerStorage = window.localStorage;
+    contextOwnerHandlerUnsubscribe = messages.handle('cabbage-assistant-context.read', ({ projectScopeId = '' } = {}) => {
+      return readCabbageAssistantContext(projectScopeId);
+    });
+    messages.on(CONTEXT_UPDATE_MESSAGE_TYPE, (snapshot) => {
+      const normalized = normalizeSnapshot(snapshot);
+      if (normalized?.projectScopeId === currentScopeId()) publishSnapshot(normalized, { owner: true });
+    });
+  }
   if (sceneSavedMessages !== messages) {
     sceneSavedMessages = messages;
     messages.on('cabbage.scene-saved', projectPath => flushActorEvents(projectPath));
@@ -115,12 +131,19 @@ function normalizePreWarningEnvelope(value) {
   };
 }
 
-function publishSnapshot(snapshot) {
+function publishSnapshot(snapshot, { owner = false } = {}) {
   const normalized = normalizeSnapshot(snapshot);
   if (!normalized) return null;
   latestSnapshot = normalized;
-  try { window.localStorage?.setItem(STORAGE_KEY, JSON.stringify(normalized)); } catch (_) {}
-  void getMessages().emit(CONTEXT_MESSAGE_TYPE, normalized).catch(error => console.warn('[CabbageContext]', error.message));
+  const messages = getMessages();
+  if (messages.role !== 'main' && !owner) {
+    void messages.emit(CONTEXT_MESSAGE_TYPE, normalized).catch(error => console.warn('[CabbageContext]', error.message));
+    void messages.emit(CONTEXT_UPDATE_MESSAGE_TYPE, normalized, { target: 'main' })
+      .catch(error => console.warn('[CabbageContext]', error.message));
+    return normalized;
+  }
+  try { contextOwnerStorage?.setItem(STORAGE_KEY, JSON.stringify(normalized)); } catch (_) {}
+  void messages.emit(CONTEXT_MESSAGE_TYPE, normalized).catch(error => console.warn('[CabbageContext]', error.message));
   return normalized;
 }
 
@@ -210,13 +233,27 @@ export function publishCabbageProjectContext(projectContext = {}, projectScopeId
 
 export function readCabbageAssistantContext(projectScopeId = '') {
   const expectedScope = String(projectScopeId || '');
+  const messages = getMessages();
   let snapshot = latestSnapshot;
-  if (!snapshot || (expectedScope && snapshot.projectScopeId !== expectedScope)) {
-    try { snapshot = normalizeSnapshot(JSON.parse(window.localStorage?.getItem(STORAGE_KEY) || 'null')); } catch (_) { snapshot = null; }
+  if (messages.role === 'main' && (!snapshot || (expectedScope && snapshot.projectScopeId !== expectedScope))) {
+    try { snapshot = normalizeSnapshot(JSON.parse(contextOwnerStorage?.getItem(STORAGE_KEY) || 'null')); } catch (_) { snapshot = null; }
   }
   if (!snapshot) return null;
   if (expectedScope && snapshot.projectScopeId !== expectedScope) return null;
   return clone(snapshot, null);
+}
+
+export async function requestCabbageAssistantContext(projectScopeId = '') {
+  const expectedScope = String(projectScopeId || '');
+  if (getMessages().role === 'main') return readCabbageAssistantContext(expectedScope);
+  try {
+    const snapshot = await getMessages().request('main', 'cabbage-assistant-context.read', {
+      projectScopeId: expectedScope,
+    }, { waitForHandler: true });
+    return normalizeSnapshot(snapshot);
+  } catch (_) {
+    return null;
+  }
 }
 
 export async function loadCurrentWorld() {
@@ -426,6 +463,9 @@ export function subscribeCabbageAssistantContext(listener, { projectScopeId = ''
   if (emitCurrent) {
     const current = readCabbageAssistantContext(getExpectedScope());
     if (current) accept(current);
+    else if (getMessages().role !== 'main') {
+      void requestCabbageAssistantContext(getExpectedScope()).then(accept);
+    }
   }
   return unsubscribe;
 }

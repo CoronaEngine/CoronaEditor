@@ -187,3 +187,16 @@ test('creative camera rebinding uses archive identity even when native handles a
   assert.equal(h.calls.at(-1)[2].archive_session, 'new-archive');
   assert.deepEqual(h.calls.at(-1)[2].position, [5, 0, 0]);
 });
+
+test('typed camera projection binds the active ID and preserves a full opaque handle', t => {
+  const h = mountCreative(t), p = h.page;
+  const next = snapshot();
+  next.active_camera_id = 'second-id';
+  next.cameras.push({ ...next.cameras[0], camera_id: 'second-id', name: 'second',
+    opaque_handle: '18446744073709551615', position: [8, 9, 10] });
+  p.applySceneSnapshot('scene.ini', next);
+  assert.equal(p.cameraBindingState.value.cameraId, 'second-id');
+  assert.equal(p.cameraBindingState.value.cameraName, 'second');
+  assert.equal(p.cameraBindingState.value.cameraHandle, '18446744073709551615');
+  assert.deepEqual(p.cameraState.value.position, [8, 9, 10]);
+});

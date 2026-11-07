@@ -180,6 +180,8 @@ import { nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import { editorApi } from '@/api/editorApi.js';
 import { getWebMessages } from '@/api/webMessages.js';
+import { getWebDocumentIdentity } from '@/api/webDocument.js';
+import { createViewportCalibrationService } from '@/services/viewportCalibrationService.js';
 import { appService } from '@/services/appService.js';
 import { createViewLifetime } from '@/utils/viewLifetime.js';
 import { buildDragRegions, dragRegionsSignature } from '@/utils/cameraDragRegions.js';
@@ -207,6 +209,7 @@ const route = useRoute();
 const viewLifetime = createViewLifetime();
 const sceneId = String(route.query.scene || '');
 const cameraId = String(route.query.camera || '');
+const cameraArchiveSession = String(route.query.archive || '');
 
 const camera = ref(null);
 const cameraName = ref('Camera');
@@ -242,7 +245,6 @@ let scriptInputTimer = 0;
 let scratchMouseMoveFrame = 0;
 let pendingScratchMouseMove = null;
 let actorPickIndex = new Map();
-let actorSelectionCallbackToken = null;
 let pendingScratchClick = null;
 let gizmoDownRequestId = '';
 let gizmoDownPointerId = null;
@@ -264,7 +266,7 @@ const outputModes = [
 const viewportUiModeStore = createViewportUiModeStore();
 const viewportUiCalibrationStore = createViewportUiCalibrationStore();
 const webMessages = getWebMessages();
-const viewportUiCalibrationDescriptor = {};
+const viewportCalibration = createViewportCalibrationService(webMessages, { owner: getWebDocumentIdentity().owner });
 const nativeViewportCursorEnabled = isNativeViewportCursorEnabled();
 const viewportUiModeItems = [
   { mode: 'flat2d', label: '2D UI', title: '普通屏幕 UI' },
@@ -274,10 +276,12 @@ const viewportUiModeItems = [
 const unwrap = (result) => result?.data ?? result;
 
 const loadCamera = async () => {
+  if (!cameraArchiveSession || !viewLifetime.current()) return false;
   const [listResult, visionResult] = await Promise.all([
-    editorApi.sceneTools.listCameraViews(sceneId),
+    editorApi.scene.readCameras(sceneId, { archive_session: cameraArchiveSession }),
     editorApi.sceneTools.isVisionAvailable(),
   ]);
+  if (!viewLifetime.current() || listResult.archive_session !== cameraArchiveSession || listResult.scene !== sceneId) return false;
   const payload = unwrap(listResult);
   camera.value = payload?.cameras?.find(
     (item) => String(item.camera_id || item.id) === cameraId,
@@ -314,6 +318,7 @@ const loadCamera = async () => {
   moveSpeed.value = camera.value.move_speed || 1;
   renderWidth.value = camera.value.width || 960;
   renderHeight.value = camera.value.height || 540;
+  return true;
 };
 
 const renameCamera = async () => {
@@ -572,9 +577,11 @@ const viewportGizmoController = createViewportGizmoController({
 });
 
 const refreshCameraViewActorPickIndex = async () => {
-  if (!sceneId) return false;
-  const result = await editorApi.sceneTools.listSceneTree(sceneId);
-  const snapshot = unwrap(result);
+  const archive = camera.value?.archive_session;
+  if (!viewLifetime.current() || !sceneId || !archive) return false;
+  const snapshot = await editorApi.scene.readActorIndex(sceneId, { archive_session: archive });
+  if (!viewLifetime.current() || camera.value?.archive_session !== archive ||
+      snapshot.archive_session !== archive || snapshot.scene !== sceneId) return false;
   actorPickIndex = indexActorsByHandle(Array.isArray(snapshot?.actors) ? snapshot.actors : []);
   return actorPickIndex.size > 0;
 };
@@ -620,10 +627,11 @@ const syncViewportGizmoSelection = async (payload = {}) => {
 };
 
 const applyViewportUiCalibration = () => {
+  if (!viewportCalibration.ready) return;
   viewportUiCalibrationStore.applyToNative({
     api: editorApi.viewport,
     sceneId, cameraId, archiveSession: camera.value?.archive_session,
-    calibration: viewportUiCalibrationStore.get(viewportUiCalibrationDescriptor),
+    calibration: viewportCalibration.read(),
   }).catch(error => console.warn('[Viewport] Native configuration failed', error));
 };
 
@@ -667,7 +675,6 @@ const saveSettings = async () => {
     const height = Math.max(Number(renderHeight.value) || 540, 64);
     const result = unwrap(await editorApi.scene.setCameraProperties(sceneId, cameraId, {
       archive_session: camera.value?.archive_session,
-      view_open: true,
       move_speed: Math.max(Number(moveSpeed.value) || 1, 0.01),
       width,
       height,
@@ -706,7 +713,6 @@ const syncWindowSize = async (force = false) => {
   try {
     const result = unwrap(await editorApi.scene.setCameraProperties(sceneId, cameraId, {
       archive_session: camera.value?.archive_session,
-      view_open: true,
       width,
       height,
       view_width: width,
@@ -765,9 +771,9 @@ const toggleBorderlessFullscreen = async () => {
 
 const closeView = async () => {
   try {
-    await editorApi.sceneTools.closeCameraView(sceneId, cameraId);
-  } finally {
-    await appService.closeThisTab(`camera:${cameraId}`).catch(() => {});
+    await appService.closeThisTab(`camera:${cameraId}`);
+  } catch (error) {
+    errorText.value = error.message;
   }
 };
 
@@ -1189,11 +1195,10 @@ onMounted(async () => {
   await syncDragRegions({ force: true });
   if (!viewLifetime.current()) return;
   try {
-    await loadCamera();
-    if (!viewLifetime.current()) return;
+    if (!await loadCamera() || !viewLifetime.current()) return;
     await refreshCameraViewActorPickIndex().catch(() => false);
     if (!viewLifetime.current()) return;
-    actorSelectionCallbackToken = await viewLifetime.subscribe(
+    await viewLifetime.subscribe(
       callback => editorApi.scene.observe('selection', callback), syncViewportGizmoSelection, editorApi.off);
     if (!viewLifetime.current()) return;
     syncViewportUiMode();
@@ -1206,7 +1211,10 @@ onMounted(async () => {
   window.addEventListener('resize', scheduleDragRegionSync);
   window.addEventListener('keydown', onKeyDown);
   window.addEventListener('keyup', onKeyUp);
-  stopViewportUiCalibrationMessages = webMessages.on('viewportUi.calibrationChanged', syncViewportUiCalibration);
+  stopViewportUiCalibrationMessages = viewportCalibration.subscribe(syncViewportUiCalibration);
+  void viewportCalibration.hydrate().then(() => {
+    if (viewLifetime.current()) syncViewportUiCalibration();
+  }).catch(error => { if (viewLifetime.current()) errorText.value = error.message; });
   window.addEventListener('blur', handleCameraViewBlur);
   coronaEventBus.on('model-node-selection', handleModelNodeGizmoSelection);
   coronaEventBus.on('camera-pose-applied', onCameraPoseApplied);
@@ -1232,10 +1240,6 @@ onBeforeUnmount(() => {
   viewportGizmoController.cancel('cancel');
   viewportGizmoController.clearTarget();
   cameraViewPickController.dispose();
-  if (actorSelectionCallbackToken) {
-    editorApi.off(actorSelectionCallbackToken).catch(() => {});
-    actorSelectionCallbackToken = null;
-  }
   window.clearTimeout(resizeTimer);
   window.clearInterval(scriptInputTimer);
   window.removeEventListener('resize', scheduleWindowSizeSync);
@@ -1244,6 +1248,7 @@ onBeforeUnmount(() => {
   window.removeEventListener('keyup', onKeyUp);
   stopViewportUiCalibrationMessages?.();
   stopViewportUiCalibrationMessages = null;
+  viewportCalibration.dispose();
   window.removeEventListener('blur', handleCameraViewBlur);
   coronaEventBus.off('model-node-selection', handleModelNodeGizmoSelection);
   coronaEventBus.off('camera-pose-applied', onCameraPoseApplied);

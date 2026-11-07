@@ -1,5 +1,6 @@
 <template>
   <div class="lfd-calib no-drag">
+    <p v-if="errorText" role="alert">{{ errorText }}</p>
     <div class="lfd-calib__group">
       <div class="lfd-calib__group-label">Lenticular (Vision)</div>
       <div class="lfd-calib__row">
@@ -59,29 +60,39 @@
 </template>
 
 <script setup>
-import { reactive, toRaw } from 'vue';
+import { onMounted, onUnmounted, reactive, ref, toRaw } from 'vue';
 import NumberInputWithSlider from '@/components/ui/NumberInputWithSlider.vue';
 import { getWebMessages } from '@/api/webMessages.js';
+import { getWebDocumentIdentity } from '@/api/webDocument.js';
+import { createViewportCalibrationService } from '@/services/viewportCalibrationService.js';
 import {
-  createViewportUiCalibrationStore,
   normalizeLightFieldCalibration,
   DEFAULT_LIGHT_FIELD_CALIBRATION,
 } from '@/utils/viewportUiMode.js';
 
-// dock 面板与 MainPage 用同一固定 key 持久化（标定按显示而非按相机），保证两端一致。
-const DESCRIPTOR = {};
-const store = createViewportUiCalibrationStore();
 const messages = getWebMessages();
-const form = reactive(normalizeLightFieldCalibration(store.get(DESCRIPTOR)));
+const calibration = createViewportCalibrationService(messages, { owner: getWebDocumentIdentity().owner });
+const form = reactive(calibration.read());
+const errorText = ref('');
+let disposed = false;
+const stop = calibration.subscribe(value => Object.assign(form, value));
+onMounted(async () => {
+  try {
+    const current = await calibration.hydrate();
+    if (!disposed && current) Object.assign(form, current);
+  } catch (error) { if (!disposed) errorText.value = error.message; }
+});
+onUnmounted(() => { disposed = true; stop(); calibration.dispose(); });
 
 const fmt2 = (v) => Number(v).toFixed(2);
 const fmt3 = (v) => Number(v).toFixed(3);
 const fmt4 = (v) => Number(v).toFixed(4);
 
-const apply = () => {
-  const calibration = { ...toRaw(form) };
-  store.set(DESCRIPTOR, calibration);
-  void messages.emit('viewportUi.calibrationChanged', calibration);
+const apply = async () => {
+  try {
+    errorText.value = '';
+    await calibration.set({ ...toRaw(form) });
+  } catch (error) { if (!disposed) errorText.value = error.message; }
 };
 
 const resetDefault = () => {

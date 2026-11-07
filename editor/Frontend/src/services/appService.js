@@ -101,7 +101,7 @@ export const appService = {
       sceneId: camera.scene_id,
       cameraId: camera.camera_id || camera.id,
       archiveSession: camera.archive_session,
-      routePath: `/CameraView?scene=${encodeURIComponent(camera.scene_id)}&camera=${encodeURIComponent(camera.camera_id || camera.id)}`,
+      routePath: `/CameraView?scene=${encodeURIComponent(camera.scene_id)}&camera=${encodeURIComponent(camera.camera_id || camera.id)}&archive=${encodeURIComponent(camera.archive_session)}`,
       width: camera.view_width ?? 960,
       height: camera.view_height ?? 540,
       x: camera.view_x ?? 120,

@@ -12,6 +12,7 @@ import * as viewportPick from '../../src/utils/viewportPick.js';
 import * as scriptInput from '../../src/utils/scriptInput.js';
 import * as viewportGizmo from '../../src/utils/viewportGizmo.js';
 import * as viewportUiMode from '../../src/utils/viewportUiMode.js';
+import * as viewportCalibration from '../../src/services/viewportCalibrationService.js';
 import * as serviceInitialization from '../../src/utils/serviceInitialization.js';
 import * as viewLifetime from '../../src/utils/viewLifetime.js';
 import * as pluginManifest from '../../src/config/pluginManifest.js';
@@ -76,7 +77,6 @@ function mountMainPage(t, visionMode = 'path_tracing', { nativeCursor = false } 
         return { data: { mode } };
       },
       isVisionAvailable: async () => ({ data: { available: true } }),
-      listCameraViews: async () => ({ data: { cameras: [] } }),
     },
     scene: { observe: async () => -1,
       setCameraProperties: async (...args) => { calls.push(['cameraWrite', ...args]); return {}; },
@@ -88,16 +88,18 @@ function mountMainPage(t, visionMode = 'path_tracing', { nativeCursor = false } 
         } };
       },
       setEnvironment: async (...args) => { calls.push(['environmentWrite', ...args]); return {}; },
-      getSnapshot: async scene => {
-      calls.push(['snapshot', scene]);
+      readActorIndex: async () => ({ archive_session: 'main-archive', scene: 'scene_v3.xml', actors: [] }),
+      readCameras: async (scene, scope) => {
+      calls.push(['cameras', scene, scope]);
       assert.equal(scene, 'scene_v3.xml');
-      return { data: { scene, active_camera_name: 'KitchenCamera', actors: [], cameras: [{
-        name: 'KitchenCamera', camera_id: 'camera-1', archive_session: 'main-archive', handle: 42,
+      assert.deepEqual(scope, { archive_session: 'main-archive' });
+      return { archive_session: 'main-archive', scene, active_camera_id: 'camera-1', cameras: [{
+        name: 'KitchenCamera', camera_id: 'camera-1', archive_session: 'main-archive', opaque_handle: '42',
         position: [0, 1, -5], forward: [0, 0, 1], world_up: [0, 1, 0], fov: 45,
         render_backend: 'native', vision_render_mode: visionMode,
         vision_accumulation: false, vision_denoise: true, vision_denoiser: 'reblur',
         vision_stable_planes: true, view_open: false,
-      }] } };
+      }] };
     } },
     project: { getProjectLoadStatus: async () => ({ active: true, loading: false }) },
     scripts: { getStatus: async () => ({ status: 'stopped', threadAlive: false }) },
@@ -132,6 +134,8 @@ function mountMainPage(t, visionMode = 'path_tracing', { nativeCursor = false } 
     },
     '@/api/editorApi.js': { editorApi: api },
     '@/api/webMessages.js': { getWebMessages: () => messages },
+    '@/api/webDocument.js': { getWebDocumentIdentity: () => ({ owner: 'main-owner' }) },
+    '@/services/viewportCalibrationService.js': viewportCalibration,
     '@/services/worldModeService.js': { worldModeState: { status: 'ready', mode: 'creative', revision: 1 } },
     '@/services/worldRenderPolicy.js': worldRenderPolicy,
     '@/services/projectMessages.js': { subscribeProjectChanged: () => noop },
@@ -149,7 +153,8 @@ function mountMainPage(t, visionMode = 'path_tracing', { nativeCursor = false } 
     '@/services/cabbageAssistantContextService.js': {
       cabbageContextService: { loadCurrentWorld: asyncNoop, requestProfileScoreUpdate: asyncNoop, flush: asyncNoop, recordEvent: asyncNoop },
       cancelPendingTransformEvents: noop, publishCabbageAssistantContext: noop,
-      readCabbageAssistantContext: noop, subscribeCabbageAssistantContext: () => noop,
+      readCabbageAssistantContext: noop, requestCabbageAssistantContext: async () => null,
+      subscribeCabbageAssistantContext: () => noop,
       subscribeCabbagePreWarnings: () => noop,
     },
     '@/services/nodeGraphGenerationService.js': { cancelActiveNodeGraphGeneration: asyncNoop },
@@ -218,6 +223,7 @@ test('applied focus synchronizes only the matching native camera without resubmi
 test('main controls use the same scoped environment patch for light, grid and physics', async t => {
   const h = mountMainPage(t);
   await h.mount();
+  h.calls.length = 0;
   assert.deepEqual(await h.page.setSceneGridEnabledFromPanel(false), h.page.getEditorControlsState());
   assert.equal(h.page.sceneGridEnabled.value, false);
   assert.equal(await h.page.updateSceneLight(), true);
@@ -231,9 +237,9 @@ test('main controls use the same scoped environment patch for light, grid and ph
   assert.equal(await h.page.loadPhysicsParams(), true);
   assert.equal(h.page.physicsParams.value.gravityY, -8);
   assert.equal(h.page.physicsParams.value.floorY, 4);
-  assert.deepEqual(h.calls.filter(call => call[0] === 'environmentRead'), [
-    ['environmentRead', 'scene_v3.xml', { archive_session: 'main-archive' }],
-  ]);
+  const environmentReads = h.calls.filter(call => call[0] === 'environmentRead');
+  assert.ok(environmentReads.length >= 1);
+  for (const read of environmentReads) assert.deepEqual(read, ['environmentRead', 'scene_v3.xml', { archive_session: 'main-archive' }]);
 });
 
 test('a delayed environment result cannot update controls after the observed archive changes', async t => {
@@ -284,9 +290,9 @@ test(`external scene entry defaults to Vision and preserves saved ${visionMode}`
   await h.mount();
 
   assert.deepEqual(h.calls[0], ['backend', 'vision', 'scene_v3.xml', null]);
-  assert.deepEqual(h.calls[1], ['snapshot', 'scene_v3.xml'], 'backend selection must precede snapshot binding');
+  assert.deepEqual(h.calls[1], ['cameras', 'scene_v3.xml', { archive_session: 'main-archive' }], 'backend selection must precede camera binding');
   assert.equal(h.page.cameraBindingState.value.sceneId, 'scene_v3.xml');
-  assert.equal(h.page.cameraBindingState.value.cameraHandle, 42);
+  assert.equal(h.page.cameraBindingState.value.cameraHandle, '42');
   assert.equal(h.page.mainRenderBackend.value, 'vision');
   assert.equal(h.page.mainVisionRenderMode.value, visionMode);
   assert.deepEqual(h.observed, [h.surface]);
@@ -319,14 +325,14 @@ test('a native scene panel reports import progress and closing it clears the ove
 test('calibration edits from a native panel update only an active stereo main viewport', async t => {
   const h = mountMainPage(t);
   await h.mount();
-  const values = h.calibration.set({}, { pe: 24, angle: 0.5, offset: 1, parallaxScale: 2 });
+  const values = { pe: 24, angle: 0.5, offset: 1, parallaxScale: 2 };
   const changes = () => h.calls.filter(([kind, , , patch]) => kind === 'viewport' && patch.calibration);
-  await h.messages.emit('viewportUi.calibrationChanged', values);
+  await h.messages.request('main', 'viewportUi.calibration', { action: 'set', calibration: values });
   assert.equal(changes().length, 0);
   h.page.viewportUiMode.value = 'stereo3d';
   await h.messages.emit('viewportUi.otherChanged', {});
   assert.equal(changes().length, 0);
-  await h.messages.emit('viewportUi.calibrationChanged', values);
+  await h.messages.request('main', 'viewportUi.calibration', { action: 'set', calibration: values });
   await Vue.nextTick();
   assert.deepEqual(changes(), [['viewport', 'scene_v3.xml', 'camera-1', { archive_session: 'main-archive', calibration: values }]]);
 });

@@ -95,11 +95,10 @@ test('restored Native camera windows select Vision before they become visible', 
     { camera_id: 'closed-camera', render_backend: 'native', view_open: false }];
   const calls = [];
   const restore = new Function('initializeWorldRenderBackend', 'editorApi', 'appService', `
-    const viewCurrent = () => true, logError = error => { throw error; };
+    const viewCurrent = () => true, environmentArchiveSession = { value: 'archive' }, logError = error => { throw error; };
     ${source.slice(node.start, node.end)}
     return restoreCameraViews;
-  `)(initializeWorldRenderBackend, { sceneTools: {
-    listCameraViews: async () => ({ data: { cameras } }),
+  `)(initializeWorldRenderBackend, { scene: { readCameras: async () => ({ archive_session: 'archive', scene: 'scene.ini', cameras }) }, sceneTools: {
     setRenderBackend: async (...args) => { calls.push(['backend', ...args]); return { mode: args[0] }; },
   } }, { createCameraView: async camera => calls.push(['open', camera.camera_id]) });
   await restore('scene.ini');

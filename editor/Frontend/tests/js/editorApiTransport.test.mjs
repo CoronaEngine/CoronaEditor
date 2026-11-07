@@ -79,19 +79,13 @@ const MANIFEST_METHODS = [
     return: 'object',
     allowed_callers: CALLER_CEF,
   },
-  {
-    api: 'SceneTools.list_scene_tree',
-    js_wrapper: 'sceneTools.listSceneTree',
-    params: [{ name: 'sceneName', type: 'string' }],
-    return: 'object',
-    allowed_callers: CALLER_CEF,
-  },
+
 ];
 
 const MANIFEST_EVENTS = [
   {
-    event: 'events.onActorChanged',
-    js_wrapper: 'events.onActorChanged',
+    event: 'LANChat.event',
+    js_wrapper: 'events.onLanChatEvent',
     payload: 'object',
     allowed_callers: CALLER_CEF,
   },
@@ -165,17 +159,16 @@ async function loadEditorApi() {
 test('retired log subscription is absent before and after loading native events', async () => {
   const { editorApi } = await loadEditorApi();
   assert.equal(editorApi.events.onLogBatch, undefined);
-  const token = await editorApi.events.onActorChanged(() => {});
+  const token = await editorApi.events.onLanChatEvent(() => {});
   assert.equal(editorApi.events.onLogBatch, undefined);
   await editorApi.off(token);
-  const extensionToken = await editorApi.events.onExtension(() => {});
-  await editorApi.off(extensionToken);
+  assert.equal(editorApi.events.onExtension, undefined, 'native discovery cannot add implicit capabilities');
 });
 
 test('orphan mesh movement subscription is absent before and after loading native events', async () => {
   const { editorApi } = await loadEditorApi();
   assert.equal(editorApi.events.onMeshMoveResult, undefined);
-  const token = await editorApi.events.onActorChanged(() => {});
+  const token = await editorApi.events.onLanChatEvent(() => {});
   assert.equal(editorApi.events.onMeshMoveResult, undefined);
   await editorApi.off(token);
 });
@@ -217,11 +210,11 @@ test('a callback whose unregister failed must not stay reachable', async () => {
   const { editorApi, host } = await loadEditorApi();
   const seen = [];
 
-  const token = await editorApi.events.onActorChanged((payload) => seen.push(payload));
+  const token = await editorApi.events.onLanChatEvent((payload) => seen.push(payload));
   assert.equal(token, 42, 'the registration must return the native callback token');
 
   // Sanity: while registered, the event reaches the handler.
-  host.emit(token, { n: 1 }, 'events.onActorChanged');
+  host.emit(token, { n: 1 }, 'events.onLanChatEvent');
   assert.deepEqual(seen, [{ n: 1 }]);
 
   // Native refuses the unregister. The local registration must still be dropped, otherwise
@@ -229,7 +222,7 @@ test('a callback whose unregister failed must not stay reachable', async () => {
   host.failFor.add('EditorApi.off');
   await assert.rejects(() => editorApi.off(token));
 
-  host.emit(token, { n: 2 }, 'events.onActorChanged');
+  host.emit(token, { n: 2 }, 'events.onLanChatEvent');
   assert.deepEqual(seen, [{ n: 1 }], 'a handler whose unregister failed must not stay reachable');
 });
 
@@ -365,14 +358,14 @@ test('loading a selected project still times out and ignores its late native rep
 test('a wrapper path resolves through the manifest to its native api name', async () => {
   const { editorApi, host } = await loadEditorApi();
 
-  await editorApi.sceneTools.listSceneTree('SceneA');
+  await editorApi.sceneTools.getRestirSettings('SceneA', 'camera-a');
 
-  const sent = host.requests.find((entry) => entry.api === 'SceneTools.list_scene_tree');
+  const sent = host.requests.find((entry) => entry.api === 'SceneTools.get_restir_settings');
   assert.ok(
     sent,
     `wrapper must resolve to the manifest api, saw: ${host.requests.map((r) => r.api).join(', ')}`
   );
-  assert.deepEqual(sent.args, ['SceneA']);
+  assert.deepEqual(sent.args, ['SceneA', 'camera-a']);
 });
 
 test('ReSTIR wrappers preserve the camera binding and nested settings through the manifest', async () => {
@@ -390,7 +383,7 @@ test('ReSTIR wrappers preserve the camera binding and nested settings through th
 test('an unknown wrapper path is rejected instead of being sent to native', async () => {
   const { editorApi, host } = await loadEditorApi();
 
-  await assert.rejects(() => editorApi.notARealNamespace.notARealMethod());
+  assert.equal(editorApi.notARealNamespace, undefined);
 
   assert.equal(
     host.requests.some((entry) => entry.api === 'notARealNamespace.notARealMethod'),
@@ -399,7 +392,7 @@ test('an unknown wrapper path is rejected instead of being sent to native', asyn
   );
 });
 
-test('static namespaces resolve manifest methods but reject unknown members before native dispatch', async () => {
+test('explicit namespaces resolve declared methods and do not expose unknown members', async () => {
   const { editorApi, host } = await loadEditorApi();
   const getModelNodes = editorApi.sceneTools.getModelNodes;
   assert.equal(editorApi.sceneTools.getModelNodes, getModelNodes);
@@ -409,9 +402,9 @@ test('static namespaces resolve manifest methods but reject unknown members befo
     ['scene.ini', 'Temple']);
 
   const before = host.requests.filter(entry => !entry.api.startsWith('EditorApi.')).length;
-  await assert.rejects(() => editorApi.sceneTools.notARealMethod(), /not defined by C\+\+ manifest/);
+  assert.equal(editorApi.sceneTools.notARealMethod, undefined);
   assert.equal(Object.hasOwn(editorApi.sceneTools, 'getFrameTiming'), false);
-  await assert.rejects(() => editorApi.sceneTools.getFrameTiming('scene.ini', 'camera-1'), /not defined by C\+\+ manifest/);
+  assert.equal(editorApi.sceneTools.getFrameTiming, undefined);
   assert.equal(host.requests.filter(entry => !entry.api.startsWith('EditorApi.')).length, before);
 });
 

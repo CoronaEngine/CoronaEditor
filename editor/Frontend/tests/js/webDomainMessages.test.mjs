@@ -67,6 +67,31 @@ test('Cabbage transient warnings use the common Web topic and stay out of storag
   assert.equal(dock.localStorage.length, 0);
 });
 
+test('assistant context uses the main document as owner without storage fallback', async t => {
+  const { main, dock } = surfaces(t);
+  let peerStorageWrites = 0;
+  main.localStorage = { getItem() { throw new Error('storage disabled'); }, setItem() { throw new Error('storage disabled'); } };
+  dock.localStorage = { getItem() { throw new Error('storage disabled'); }, setItem() { peerStorageWrites++; throw new Error('storage disabled'); } };
+  globalThis.window = main;
+  const owner = await import(`../../src/services/cabbageAssistantContextService.js?context-owner=${crypto.randomUUID()}`);
+  const ownerSnapshots = [];
+  const projectScopeId = '811c9dc5';
+  t.after(owner.subscribeCabbageAssistantContext(value => ownerSnapshots.push(value), { projectScopeId }));
+  owner.publishCabbageAssistantContext({ projectScopeId, worldId: 'world', activeTasks: [{ taskKey: 'owner-task' }] });
+
+  globalThis.window = dock;
+  const peer = await import(`../../src/services/cabbageAssistantContextService.js?context-peer=${crypto.randomUUID()}`);
+  const peerSnapshots = [];
+  t.after(peer.subscribeCabbageAssistantContext(value => peerSnapshots.push(value), { projectScopeId }));
+  for (let i = 0; i < 40 && !peerSnapshots.length; i++) await delay(5);
+  assert.equal(peerSnapshots.at(-1)?.activeTasks[0]?.taskKey, 'owner-task');
+  peer.publishCabbageAssistantContext({ projectScopeId, worldId: 'world', activeTasks: [{ taskKey: 'peer-task' }] });
+  for (let i = 0; i < 40 && ownerSnapshots.at(-1)?.activeTasks[0]?.taskKey !== 'peer-task'; i++) await delay(5);
+  assert.equal(ownerSnapshots.at(-1)?.activeTasks[0]?.taskKey, 'peer-task');
+  assert.equal(peerSnapshots.at(-1)?.activeTasks[0]?.taskKey, 'peer-task');
+  assert.equal(peerStorageWrites, 0);
+});
+
 test('node graph review reaches the shared topic without losing typed data', async t => {
   const { dock, mainMessages } = surfaces(t);
   globalThis.window = dock;

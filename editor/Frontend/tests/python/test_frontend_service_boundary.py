@@ -6,17 +6,12 @@ SERVICES_ROOT = FRONTEND_ROOT / "src" / "services"
 COMPAT_ROOT = FRONTEND_ROOT / "src" / "compat"
 
 EXPECTED_SERVICES = (
-    "sceneService.js",
-    "projectService.js",
     "appService.js",
     "lanChatService.js",
     "networkService.js",
-    "scriptingService.js",
     "aiService.js",
     "cabbageChatRequest.js",
     "projectLauncherService.js",
-    "fileService.js",
-    "projectSettingsService.js",
     "nodeGraphGenerationService.js",
     "nodeGraphReviewService.js",
     "cabbageAssistantContextService.js",
@@ -53,11 +48,6 @@ def test_frontend_services_do_not_define_transport_or_raw_cef_protocols():
 def test_canonical_services_delegate_to_editor_api():
     for service_name in (
         "appService.js",
-        "sceneService.js",
-        "projectService.js",
-        "scriptingService.js",
-        "fileService.js",
-        "projectSettingsService.js",
     ):
         source = (SERVICES_ROOT / service_name).read_text(encoding="utf-8")
         assert "editorApi" in source, service_name
@@ -71,7 +61,7 @@ def test_canonical_services_delegate_to_editor_api():
         assert "editorApi" in source, service_name
 
 
-def test_compatibility_facade_paths_in_services_are_thin_wrappers():
+def test_unused_compatibility_facades_are_retired():
     for service_name in (
         "sceneService.js",
         "projectService.js",
@@ -79,9 +69,7 @@ def test_compatibility_facade_paths_in_services_are_thin_wrappers():
         "fileService.js",
         "projectSettingsService.js",
     ):
-        source = (SERVICES_ROOT / service_name).read_text(encoding="utf-8")
-        assert "../compat/" not in source, service_name
-        assert "export const " in source, service_name
+        assert not (SERVICES_ROOT / service_name).exists(), service_name
         assert not (COMPAT_ROOT / service_name).exists(), service_name
 
 

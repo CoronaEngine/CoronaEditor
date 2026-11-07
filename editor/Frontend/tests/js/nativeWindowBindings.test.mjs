@@ -1,11 +1,11 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { getWebMessages } from '../../src/api/webMessages.js';
 import { memoryStorage } from './windowSessionFixtures.mjs';
 
 globalThis.window = {};
 const { appService } = await import('../../src/services/appService.js');
 const { editorApi } = await import('../../src/api/editorApi.js');
-const { projectService } = await import('../../src/services/projectService.js');
 const { worldModeState } = await import('../../src/services/worldModeService.js');
 
 function nativeWindow(t) {
@@ -22,7 +22,7 @@ function nativeWindow(t) {
     coronaBridge: { dockCommand: () => { throw new Error('legacy Dock transport is forbidden'); } },
     cefQuery: () => { throw new Error('legacy query transport is forbidden'); },
   };
-  t.after(() => { globalThis.window = previous; });
+  t.after(() => { getWebMessages(globalThis.window).dispose(); globalThis.window = previous; });
   return { calls, snapshot, native };
 }
 
@@ -39,14 +39,6 @@ test('application window reads and drag updates call native V8 functions without
   assert.deepEqual(calls[1], [{ x: 1, y: 2, w: 30, h: 10 }]);
   await appService.setCurrentTabDragRegions(undefined);
   assert.deepEqual(calls[2], []);
-});
-
-test('project compatibility facade shares the application window operations', async t => {
-  const { calls } = nativeWindow(t);
-  assert.equal(projectService.setDragRegions, appService.setDragRegions);
-  assert.equal(projectService.setCurrentTabDragRegions, appService.setCurrentTabDragRegions);
-  await projectService.setDragRegions('', 0, 1, 20, 10);
-  assert.deepEqual(calls, [[{ x: 0, y: 1, w: 20, h: 10 }]]);
 });
 
 test('window service preserves native errors without retrying legacy transport', async t => {

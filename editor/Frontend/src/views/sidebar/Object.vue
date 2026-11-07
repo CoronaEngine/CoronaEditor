@@ -352,8 +352,6 @@ const aliasDraft = ref('');
 const aliasSaving = ref(false);
 const aliasError = ref('');
 const placeholderRebinding = ref(false);
-let selectionToken = null;
-let transformToken = null;
 let loadSequence = 0;
 const updateTimers = new Map();
 const pendingTransformUpdates = new Map();
@@ -440,21 +438,25 @@ function vectorChanged(previous, next) {
 }
 
 async function loadActor(sceneName, actorName, session, actorGuid) {
-  if (!sceneName || !actorName) return;
+  if (!sceneName || !actorName || !session || !viewLifetime.current()) return;
   const sequence = ++loadSequence;
   loading.value = true;
-  archiveSession.value = '';
+  archiveSession.value = session;
   selectedSceneName.value = sceneName;
   selectedActorName.value = actorName;
+  actor.actorGuid = '';
+  const current = () => viewLifetime.current() && sequence === loadSequence
+    && selectedSceneName.value === sceneName && selectedActorName.value === actorName
+    && archiveSession.value === session;
   ikController.clear();
   try {
-    const data = unwrap(await editorApi.scene.getActor(sceneName, actorGuid || actorName, session));
-    if (sequence !== loadSequence || selectedActorName.value !== actorName) return;
+    const data = await editorApi.scene.readActorProperties(sceneName, actorGuid || actorName, { archive_session: session });
+    if (!current() || data?.archive_session !== session || data?.scene !== sceneName) return;
     if (!data || data.status === 'error') throw new Error(data?.message || '无法读取对象属性');
     archiveSession.value = data.archive_session || '';
     actor.name = String(data.name || actorName);
     actor.type = String(data.actor_type || data.type || 'model');
-    actor.handle = Number(data.handle || 0);
+    actor.handle = String(data.handle || '');
     actor.actorGuid = String(data.actor_guid || '');
     actor.loadStatus = String(data.load_status || 'loaded');
     actor.loadError = data.load_error || '';
@@ -482,9 +484,9 @@ async function loadActor(sceneName, actorName, session, actorGuid) {
     syncViewportTransformBaseline();
     void ikController.select(sceneName, actorName);
   } catch (error) {
-    if (sequence === loadSequence) logError('加载对象数据失败', error);
+    if (current()) logError('加载对象数据失败', error);
   } finally {
-    if (sequence === loadSequence) loading.value = false;
+    if (current()) loading.value = false;
   }
 }
 
@@ -895,9 +897,9 @@ function handleGuidancePrepare(event) {
 onMounted(async () => {
   coronaEventBus.on('model-node-selection', handleModelNodeSelection);
   // Each window reads the current native selection on its first sample.
-  selectionToken = await viewLifetime.subscribe(callback => editorApi.scene.observe('selection', callback), handleSelection, editorApi.off);
+  await viewLifetime.subscribe(callback => editorApi.scene.observe('selection', callback), handleSelection, editorApi.off);
   if (!viewLifetime.current()) return;
-  transformToken = await viewLifetime.subscribe(callback => editorApi.scene.observe('transform', callback), handleTransform, editorApi.off);
+  await viewLifetime.subscribe(callback => editorApi.scene.observe('transform', callback), handleTransform, editorApi.off);
   if (!viewLifetime.current()) return;
   window.addEventListener('cabbage-guidance-prepare', handleGuidancePrepare);
 });
@@ -912,10 +914,6 @@ onUnmounted(() => {
   pendingTransformUpdates.clear();
   if (transformFrameId !== null) window.cancelAnimationFrame(transformFrameId);
   transformFrameId = null;
-  if (selectionToken) editorApi.off(selectionToken).catch(() => {});
-  if (transformToken) editorApi.off(transformToken).catch(() => {});
-  selectionToken = null;
-  transformToken = null;
   clearViewportTransformBaseline();
   window.removeEventListener('cabbage-guidance-prepare', handleGuidancePrepare);
 });

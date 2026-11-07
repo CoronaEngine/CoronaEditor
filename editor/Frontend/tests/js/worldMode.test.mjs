@@ -1,3 +1,4 @@
+import { getWebMessages } from '../../src/api/webMessages.js';
 import { memoryStorage } from './windowSessionFixtures.mjs';
 import { setImmediate } from 'node:timers';
 import assert from 'node:assert/strict';
@@ -158,7 +159,7 @@ test('late native panel completion is closed after switching between editable pr
     closeTab: async tabId => { closed.push(tabId); return true; },
     suspendCameraViews: async () => ({ closed: 0 }),
   } } };
-  t.after(() => { globalThis.window = previousWindow; });
+  t.after(() => { getWebMessages(globalThis.window).dispose(); globalThis.window = previousWindow; });
   t.mock.method(editorApi.projectSettings, 'getActiveProjectInfo', async () => info('creative', 'creative'));
   await worldModeService.resolve('creative', { force: true });
   const request = deferred(), commands = [];

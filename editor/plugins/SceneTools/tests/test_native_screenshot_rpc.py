@@ -1031,9 +1031,8 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
             "register_typed_editor_api_callback",
             "eventSpec?.js_wrapper !== wrapperName",
             "register_manifest_editor_api_callback",
-            "onActorChanged: (callback) => register_manifest_editor_api_callback('events.onActorChanged', callback)",
-            "onProjectOpened: (callback) => register_manifest_editor_api_callback('events.onProjectOpened', callback)",
-            "__coronaEditorApiDispatch",
+            "onLanChatEvent: (callback) => register_manifest_editor_api_callback('events.onLanChatEvent', callback)",
+            "window.corona.editor.on(eventName,",
             "register_editor_api_callback",
             "unregister_callback",
         ):
@@ -1050,27 +1049,14 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
         self.assertGreater(end, start)
         events_section = bridge_source[start:end]
 
-        expected_wrappers = (
-            "events.onAiChunk",
-            "events.onActorChanged",
-            "events.onActorSelectionChanged",
-            "events.onActorTransformUpdated",
-            "events.onFocusPoseResult",
-            "events.onNetworkActorDeleteSyncBroadcastRequested",
-            "events.onNetworkActorOwnershipClaimed",
-            "events.onNetworkActorStateSyncBroadcastRequested",
-            "events.onNetworkActorSyncBroadcastRequested",
-            "events.onNetworkActorTransformSyncBroadcastRequested",
-            "events.onNetworkAssetImportCompleted",
-            "events.onNetworkFileSyncStatusChanged",
-            "events.onNetworkSyncPauseRequested",
-            "events.onSceneTreeChanged",
-            "events.onProjectOpened",
-            "events.onLanChatEvent",
-        )
-        for wrapper in expected_wrappers:
-            with self.subTest(wrapper=wrapper):
-                self.assertIn(f"register_manifest_editor_api_callback('{wrapper}'", events_section)
+        native_events = self._editor_api_source().split("constexpr auto kEditorApiEvents =", 1)[1].split("\n});", 1)[0]
+        expected_wrappers = {
+            match.group(1) for line in native_events.splitlines()
+            if (match := re.search(r'"(events\.[^"]+)"', line))
+        }
+        actual_wrappers = set(re.findall(r"register_manifest_editor_api_callback\('([^']+)'", events_section))
+        self.assertEqual(actual_wrappers, expected_wrappers)
+        self.assertNotIn("create_dynamic_editor_api_namespace", bridge_source)
         for event_prefix in ("AI.", "Editor.", "SceneTools.", "Network.", "ProjectLauncher.", "LANChat."):
             with self.subTest(event_prefix=event_prefix):
                 self.assertNotIn(event_prefix, events_section)

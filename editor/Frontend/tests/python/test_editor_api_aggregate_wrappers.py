@@ -17,16 +17,11 @@ class EditorApiAggregateWrapperTests(unittest.TestCase):
 
     def test_services_are_thin_canonical_facades(self):
         for name in (
-            "sceneService",
-            "projectService",
             "appService",
             "lanChatService",
             "networkService",
-            "scriptingService",
             "aiService",
             "projectLauncherService",
-            "fileService",
-            "projectSettingsService",
         ):
             path = self.source_root / "services" / f"{name}.js"
             self.assertTrue(path.is_file(), name)
@@ -36,7 +31,9 @@ class EditorApiAggregateWrapperTests(unittest.TestCase):
 
     def test_frontend_exposes_scene_and_viewport_aggregate_wrappers(self):
         for marker in (
-            "getSnapshot: (sceneName = '')",
+            "readCameras: (sceneName, scope)",
+            "readActorIndex: (sceneName, scope)",
+            "readActorProperties: (sceneName, actor, scope)",
             "setActorTransform: (sceneName, actorName, transform)",
             "saveActor: (sceneName, actorName, session)",
             "selectModelFile: (sceneName, actorName, fileType = 'model')",
@@ -45,6 +42,8 @@ class EditorApiAggregateWrapperTests(unittest.TestCase):
             "setCameraProperties: (sceneName, cameraId, patch)",
         ):
             self.assertIn(marker, self.api_source)
+        self.assertNotIn('getSnapshot:', self.api_source)
+        self.assertNotIn('listCameraViews:', self.api_source)
 
     def test_frontend_exposes_project_network_and_lan_chat_aggregates(self):
         for marker in (
