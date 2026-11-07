@@ -5,7 +5,7 @@ import test from 'node:test';
 import { editorApi } from '../../src/api/editorApi.js';
 
 const sourceRoot = path.resolve(import.meta.dirname, '../../src');
-const retired = ['sceneService', 'fileService', 'projectService', 'projectSettingsService', 'scriptingService', 'networkService'];
+const retired = ['sceneService', 'fileService', 'projectService', 'projectSettingsService', 'scriptingService', 'networkService', 'lanChatService'];
 const sources = fs.readdirSync(sourceRoot, { recursive: true })
   .filter(file => /\.(js|vue)$/.test(file));
 

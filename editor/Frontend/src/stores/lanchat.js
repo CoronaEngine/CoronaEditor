@@ -3,14 +3,13 @@
  *
  * 项目未使用 Pinia，这里用 Vue reactive 提供一个模块级单例，行为类似 store：
  * - 持有连接态、房间信息、成员、消息列表。
- * - 提供 open/join/leave/send 等动作（封装 lanChatService 调用）。
+ * - 提供 open/join/leave/send 等动作（使用 editorApi.lanChat 具名调用）。
  * - 暴露 handleEvent(event) 供应用根组件的 LANChat 事件订阅调用，更新本 store。
  *
  * 不直接监听 window 回调；由应用根组件统一分流，避免重复订阅。
  */
 import { reactive, readonly } from 'vue';
 import { trackWorldSessionWork } from '../services/worldSessionLifecycle.js';
-import { lanChatService } from '../services/lanChatService.js';
 import { editorApi } from '../api/editorApi.js';
 import {
   disclosureVisibleForRole,
@@ -388,7 +387,7 @@ async function refreshHistoryRooms() {
   state.historyLoading = true;
   state.historyError = '';
   try {
-    const res = await lanChatService.listHistoryRooms();
+    const res = await editorApi.lanChat.listHistoryRooms();
     if (res && res.ok) {
       state.historyRooms = Array.isArray(res.rooms) ? res.rooms : [];
     } else {
@@ -409,7 +408,7 @@ async function loadHistoryRoom(room) {
   state.historyLoading = true;
   state.historyError = '';
   try {
-    const res = await lanChatService.loadHistoryRoom(roomId);
+    const res = await editorApi.lanChat.loadHistoryRoom(roomId);
     if (res && res.ok) {
       state.selectedHistoryRoom =
         state.historyRooms.find((item) => item.room_id === roomId) ||
@@ -431,16 +430,14 @@ async function loadHistoryRoom(room) {
   }
 }
 
-async function openLocalRoom({ room, password, nickname }) {
+async function openLocalRoom({ room, nickname }) {
   state.error = '';
   if (!String(state.workspaceMode || '').startsWith('solo_')) {
     state.workspaceMode = 'solo_single_agent';
   }
   const hostNickname = (nickname || HOST_NICKNAME).trim() || HOST_NICKNAME;
-  const res = await lanChatService.startLocalRoom({
+  const res = await editorApi.lanChat.startLocalRoom({
     room,
-    password,
-    mode: 'single',
     nickname: hostNickname,
   });
   if (res && res.ok) {
@@ -463,10 +460,8 @@ async function continueHistoryAsLocalRoom({ room, nickname } = {}) {
   const hostNickname = (nickname || HOST_NICKNAME).trim() || HOST_NICKNAME;
   const previewMessages = [...state.messages];
   const previewAgents = [...state.agents];
-  const res = await lanChatService.startLocalRoom({
+  const res = await editorApi.lanChat.startLocalRoom({
     room: roomId,
-    password: '',
-    mode: 'single',
     nickname: hostNickname,
     restore_history: true,
     history_room: roomId,
@@ -500,12 +495,10 @@ async function continueHistoryAsMultiRoom({ room, port, nickname } = {}) {
   const hostNickname = (nickname || HOST_NICKNAME).trim() || HOST_NICKNAME;
   const previewMessages = [...state.messages];
   const previewAgents = [...state.agents];
-  const res = await lanChatService.startRoom({
+  const res = await editorApi.lanChat.startRoom({
     room: roomId,
-    password: '',
     port,
     nickname: hostNickname,
-    mode: 'multi',
     restore_history: true,
     history_room: roomId,
   });
@@ -530,18 +523,16 @@ async function continueHistoryAsMultiRoom({ room, port, nickname } = {}) {
 }
 
 /** 房主开房。返回 { ok, ip, port } 或 { ok:false, error }。 */
-async function openRoomNow({ room, password, port, nickname, mode = 'multi' }) {
+async function openRoomNow({ room, port, nickname, mode = 'multi' }) {
   if (mode === 'single') {
-    return openLocalRoom({ room, password, nickname });
+    return openLocalRoom({ room, nickname });
   }
   state.error = '';
   const hostNickname = (nickname || HOST_NICKNAME).trim() || HOST_NICKNAME;
-  const res = await lanChatService.startRoom({
+  const res = await editorApi.lanChat.startRoom({
     room,
-    password,
     port,
     nickname: hostNickname,
-    mode: 'multi',
   });
   if (res && res.ok) {
     const roomResponse = await withRoomDisplayAddress(res);
@@ -569,17 +560,17 @@ async function finishWorldSession() {
 /** 房主关房。 */
 async function closeRoom() {
   if (state.mode === 'single') {
-    await lanChatService.stopLocalRoom();
+    await editorApi.lanChat.stopLocalRoom();
   } else {
-    await lanChatService.stopRoom();
+    await editorApi.lanChat.stopRoom();
   }
   _resetRoom();
 }
 
 /** 加入方加入房间。 */
-async function joinRoom({ ip, port, room, password, nickname }) {
+async function joinRoom({ ip, port, room, nickname }) {
   state.error = '';
-  const res = await lanChatService.joinRoom({ ip, port, room, password, nickname });
+  const res = await editorApi.lanChat.joinRoom({ ip, port, room, nickname });
   if (res && res.ok) {
     state.role = ROLE.GUEST;
     state.inRoom = false;
@@ -603,7 +594,7 @@ async function joinRoom({ ip, port, room, password, nickname }) {
 
 /** 加入方离开房间。 */
 async function leaveRoom() {
-  await lanChatService.leaveRoom();
+  await editorApi.lanChat.leaveRoom();
   _resetRoom();
 }
 
@@ -615,7 +606,7 @@ async function sendMessage(text, options = {}) {
     state.error = state.connection === 'syncing' ? 'SYNCING' : 'CONNECTING';
     return { ok: false, error: state.error };
   }
-  const res = await lanChatService.sendMessage(trimmed, withStructuredRouteOptions(options));
+  const res = await editorApi.lanChat.sendMessage(trimmed, withStructuredRouteOptions(options));
   if (res && res.ok === false) {
     state.error = res.error || 'SEND_FAILED';
     if (state.error === 'CONNECTING') {
@@ -736,7 +727,7 @@ async function addAgent({ name, persona }) {
   }
   let res;
   try {
-    res = await lanChatService.addAgent({ name, persona });
+    res = await editorApi.lanChat.addAgent({ name, persona });
   } catch (e) {
     state.error = 'ADD_AGENT_FAILED';
     return { ok: false, error: 'ADD_AGENT_FAILED' };
@@ -759,7 +750,7 @@ async function removeAgent(agentId) {
     return { ok: false };
   }
   try {
-    await lanChatService.removeAgent(agentId);
+    await editorApi.lanChat.removeAgent(agentId);
   } catch (e) {
     state.error = 'REMOVE_AGENT_FAILED';
     return { ok: false };

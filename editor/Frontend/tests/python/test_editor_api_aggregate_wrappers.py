@@ -18,7 +18,6 @@ class EditorApiAggregateWrapperTests(unittest.TestCase):
     def test_services_are_thin_canonical_facades(self):
         for name in (
             "appService",
-            "lanChatService",
             "aiService",
             "projectLauncherService",
         ):

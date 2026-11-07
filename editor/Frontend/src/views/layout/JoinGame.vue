@@ -388,9 +388,8 @@ const goHome = () => {
 const loadLocalIp = async () => {
   try {
     const result = await editorApi.lanChat.getLocalIp();
-    const data = result?.data ?? result;
-    if (data?.ip) {
-      localIp.value = data.ip;
+    if (result?.ip) {
+      localIp.value = result.ip;
     }
   } catch (_) {
     localIp.value = '--';
