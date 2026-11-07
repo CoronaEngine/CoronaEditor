@@ -209,7 +209,7 @@ const editorApiStatic = {
   listEvents: () => call_editor_api('EditorApi.list_events', []),
   off: async (callbackToken) => callbackToken < 0 ? sceneReader.off(callbackToken) : unregister_callback(callbackToken),
   app: {
-    closeProcess: () => call_manifest_editor_api('app.closeProcess', []),
+    closeProcess: () => window.corona.app.closeProcess(),
   },
   files: {
     getFileTree: request => window.corona.files.getFileTree(request),

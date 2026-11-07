@@ -6,10 +6,8 @@ import { editorApi } from '../../src/api/editorApi.js';
 const nativeSource = fs.readFileSync(new URL('../../../../../src/systems/ui/editor_api/cef_editor_api.cpp', import.meta.url), 'utf8');
 const nativeMethods = nativeSource.split('constexpr auto kEditorApiMethods =')[1].split('\n});')[0];
 const nativeEvents = nativeSource.split('constexpr auto kEditorApiEvents =')[1].split('\n});')[0];
-const ownMember = (path) => path.split('.').reduce((value, key) =>
-  value && Object.hasOwn(value, key) ? value[key] : undefined, editorApi);
 
-test('all manifest-declared Web methods have explicit own wrappers before discovery', () => {
+test('all Web business methods have retired their manifest wrappers', () => {
   const hasCefCaller = (line) => {
     if (!line.includes('WRAPPED_CALLERS')) return true;
     const declaration = line.trim().replace(/,$/, '');
@@ -22,8 +20,7 @@ test('all manifest-declared Web methods have explicit own wrappers before discov
   const wrappers = nativeMethods.split('\n').filter(line => line.includes('WRAPPED') && hasCefCaller(line))
     .map(line => line.match(/"([^"]*)"/)?.[1])
     .filter(Boolean);
-  assert.ok(wrappers.length > 0, 'the remaining native Web manifest must be inspected');
-  assert.deepEqual(wrappers.filter(path => typeof ownMember(path) !== 'function'), []);
+  assert.deepEqual(wrappers, [], 'Web business methods use named bindings');
 });
 
 test('the public event surface exactly matches the remaining native events', () => {
