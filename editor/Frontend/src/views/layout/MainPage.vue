@@ -115,7 +115,7 @@ import { appService, isCurrentWindowEvent } from '@/services/appService.js';
 import { viewportControlsService } from '@/services/viewportControlsService.js';
 import { worldModeState } from '@/services/worldModeService.js';
 import { initializeWorldRenderBackend } from '@/services/worldRenderPolicy.js';
-import { projectLauncherService, resolveOpenedProjectScene } from '@/services/projectLauncherService.js';
+import { projectLauncherService } from '@/services/projectLauncherService.js';
 import { useErrorHandler } from '@/composables/useErrorHandler.js';
 import { useDockStore } from '@/stores/dockStore.js';
 import { PLUGIN_MANIFEST } from '@/config/pluginManifest.js';
@@ -392,7 +392,7 @@ const handleActorTransformForCabbage = (payload = {}) => {
 };
 
 const emitActorChangeFast = (type, sceneId, actorName, nodeContext = {}) => {
-  editorApi.sceneTools.selectActor(sceneId, type, actorName, {
+  editorApi.scene.selectActor(sceneId, type, actorName, {
     ...nodeContext,
     sourceViewport: 'main',
   }).catch((error) => {
@@ -824,14 +824,18 @@ const initializeCreativeRenderMode = async () => {
   const sceneId = currentMainSceneId();
   const cameraId = currentMainCameraId();
   const cameraHandle = cameraBindingState.value.cameraHandle;
+  const archive = cameraBindingState.value.archiveSession;
+  if (!archive || !cameraId || !cameraHandle) return false;
   const current = () => viewCurrent() && worldModeState.status === 'ready'
     && currentMainSceneId() === sceneId && currentMainCameraId() === cameraId
+    && environmentArchiveSession.value === archive
+    && cameraBindingState.value.archiveSession === archive
     && cameraBindingState.value.cameraHandle === cameraHandle;
   creativeRenderDefaultsBusy.value = true;
   creativeRenderDefaultsError.value = '';
   try {
     if (!await initializeWorldRenderBackend({ api: editorApi, sceneId, cameraId,
-      archiveSession: cameraBindingState.value.archiveSession, isCurrent: current })) return false;
+      archiveSession: archive, isCurrent: current })) return false;
     pendingMainRenderSelection = { sceneId, cameraId, backend: 'vision',
       visionMode: mainVisionRenderMode.value, expiresAt: Date.now() + 3000 };
     mainRenderBackend.value = 'vision';
@@ -1914,19 +1918,21 @@ const onCameraPoseApplied = (result = {}) => {
 
 
 let projectOpenedRefreshRevision = 0;
+let projectOpenedRequestSequence = 0;
 const onProjectOpenedEvent = async (payload = {}) => {
-  const refreshRevision = ++projectOpenedRefreshRevision;
-  environmentArchiveSession.value = payload.archive_session || '';
-  const openedSceneRoute = resolveOpenedProjectScene(payload);
-  applyActualProjectChange(payload?.path, { refreshCamera: false });
-
+  const refreshRevision = ++projectOpenedRequestSequence;
   try {
-    const result = await editorApi.main.onInit();
-    if (!viewCurrent() || refreshRevision !== projectOpenedRefreshRevision) return;
-    currentSceneId.value = resolveOpenedProjectScene(result?.data ?? result)
-      || openedSceneRoute || DEFAULT_SCENE_NAME;
+    const active = await editorApi.scene.readActive();
+    if (!viewCurrent() || refreshRevision < projectOpenedRefreshRevision) return;
+    const sceneId = typeof active?.scene === 'string' ? active.scene.trim() : '';
+    // A sampled project event can arrive after a newer world has committed.
+    // Only the active native archive may establish this view's binding.
+    if (!payload.archive_session || active?.archive_session !== payload.archive_session || !sceneId) return;
+    projectOpenedRefreshRevision = refreshRevision;
+    environmentArchiveSession.value = active.archive_session;
+    currentSceneId.value = sceneId;
+    applyActualProjectChange(active.project_path, { refreshCamera: false });
     resetRealtimeCameraInput();
-    const sceneId = currentSceneId.value || openedSceneRoute || DEFAULT_SCENE_NAME;
     await syncSceneCameraBinding(sceneId, { preservePose: false });
     if (!viewCurrent() || refreshRevision !== projectOpenedRefreshRevision) return;
     syncViewportUiMode();
@@ -1941,14 +1947,15 @@ onMounted(async () => {
   // A reused CEF page must not inherit camera locks from a previous world.
   // Real active workers are added back by reconcileEditorCameraInputLocks().
   clearKnownEditorCameraInputLocks();
-  const result = await editorApi.main.onInit();
-  if (!viewCurrent()) return;
   const active = await editorApi.scene.readActive();
   if (!viewCurrent()) return;
+  const openedSceneId = typeof active?.scene === 'string' ? active.scene.trim() : '';
+  if (!active?.archive_session || !openedSceneId) return;
   environmentArchiveSession.value = active.archive_session;
-  const initData = result?.data ?? result;
-  const openedSceneId = resolveOpenedProjectScene(initData) || DEFAULT_SCENE_NAME;
   currentSceneId.value = openedSceneId;
+  // Render settings require the observed archive and exact camera identity.
+  // A retired or failed binding must not leave a partially mounted viewport.
+  if (!await syncSceneCameraBinding(openedSceneId) || !viewCurrent()) return;
   if (!await initializeCreativeRenderMode() || !viewCurrent()) return;
   await pollProjectResourceLoadStatus();
   if (!viewCurrent()) return;

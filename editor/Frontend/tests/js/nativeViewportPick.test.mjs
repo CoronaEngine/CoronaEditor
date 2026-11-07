@@ -32,7 +32,7 @@ test('viewport facade references one direct native pick binding without legacy t
   const options = { archive_session: 'world-a', x: 1, y: 2, width: 3, height: 4 };
   assert.equal(await editorApi.viewport.pick('scene.ini', 'camera-a', options), 'picked');
   assert.deepEqual(calls, [['scene.ini', 'camera-a', options]]);
-  assert.equal('pickActor' in editorApi.sceneTools, false);
+  assert.equal('pickActor' in (editorApi.sceneTools || {}), false);
   assert.equal(editorApi.events.onActorPickResult, undefined);
 });
 

@@ -23,6 +23,7 @@ function creative({ newProject = false, cameraId = 'camera-2', reply } = {}) {
   } } };
   const host = new Function('ref', 'initializeWorldRenderBackend', 'editorApi', 'worldModeState', 'cameraId', `
     const cameraBindingState = ref({ cameraHandle: cameraId ? 12 : null, archiveSession: 'archive' });
+    const environmentArchiveSession = ref('archive');
     const currentMainSceneId = () => 'scene.ini', currentMainCameraId = () => cameraId;
     const viewCurrent = () => true, logError = () => {};
     let bindings = 0;
@@ -49,10 +50,10 @@ for (const newProject of [false, true]) {
   });
 }
 
-test('first creative entry selects the active camera before a snapshot is bound', async () => {
+test('render initialization requires a bound camera instead of selecting an implicit active camera', async () => {
   const { host, calls } = creative({ cameraId: null });
-  assert.equal(await host.initializeCreativeRenderMode(), true);
-  assert.deepEqual(calls, [['scene.ini', null, { archive_session: 'archive', render_backend: 'vision' }]]);
+  assert.equal(await host.initializeCreativeRenderMode(), false);
+  assert.deepEqual(calls, []);
 });
 
 test('a rejected Vision selection does not bind a Native viewport as successful ray tracing', async () => {

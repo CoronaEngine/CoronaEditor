@@ -1,3 +1,4 @@
+import { toRaw } from 'vue';
 import { aiService } from '@/services/aiService.js';
 import { getWebMessages } from '../api/webMessages.js';
 
@@ -6,7 +7,22 @@ const REVIEW_INTERVAL_MS = 10000;
 const STATUS_POLL_INTERVAL_MS = 2000;
 const OMITTED_SNAPSHOT_KEYS = new Set(['x', 'y', 'selected', 'viewport', 'zoom']);
 function clone(value) {
-  return globalThis.structuredClone(value || {});
+  // Workspace arrays and nested Blockly state may be Vue proxies, including
+  // inside a plain wrapper. Unwrap the DTO recursively before structured clone.
+  const seen = new WeakMap();
+  const unwrap = input => {
+    const raw = toRaw(input);
+    if (!raw || typeof raw !== 'object') return raw;
+    if (seen.has(raw)) return seen.get(raw);
+    if (!Array.isArray(raw) && Object.getPrototypeOf(raw) !== Object.prototype) return raw;
+    const result = Array.isArray(raw) ? [] : {};
+    seen.set(raw, result);
+    for (const key of Object.keys(raw)) {
+      Object.defineProperty(result, key, { value: unwrap(raw[key]), enumerable: true, writable: true, configurable: true });
+    }
+    return result;
+  };
+  return globalThis.structuredClone(unwrap(value || {}));
 }
 
 function createReviewSnapshot(workspace) {

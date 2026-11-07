@@ -104,9 +104,9 @@ test('camera close goes through the session retirement barrier once and exposes 
 });
 
 test('retired camera window state toggles are absent and camera object creation has its own typed binding', () => {
-  assert.equal(editorApi.sceneTools.openCameraView, undefined);
-  assert.equal(editorApi.sceneTools.closeCameraView, undefined);
-  assert.equal(editorApi.sceneTools.createCameraView, undefined);
+  assert.equal(editorApi.sceneTools?.openCameraView, undefined);
+  assert.equal(editorApi.sceneTools?.closeCameraView, undefined);
+  assert.equal(editorApi.sceneTools?.createCameraView, undefined);
   assert.equal(typeof editorApi.scene.createCamera, 'function');
 });
 

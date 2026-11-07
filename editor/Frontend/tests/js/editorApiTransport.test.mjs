@@ -27,11 +27,6 @@ const MANIFEST_METHODS = [
     return: 'object', allowed_callers: CALLER_CEF,
   },
   {
-    api: 'MainView.import_resource_file', js_wrapper: 'main.importResourceFile',
-    params: [{ name: 'scene_name', type: 'string' }, { name: 'file_type', type: 'string' }],
-    return: 'object', allowed_callers: CALLER_CEF,
-  },
-  {
     api: 'SceneTools.get_model_nodes',
     js_wrapper: 'sceneTools.getModelNodes',
     params: [{ name: 'scene_name', type: 'string' }, { name: 'actor_name', type: 'string' },
@@ -169,8 +164,8 @@ test('orphan mesh movement subscription is absent before and after loading nativ
 
 test('model node operations are not exposed through the manifest transport', async () => {
   const { editorApi, host } = await loadEditorApi();
-  assert.equal(editorApi.sceneTools.getModelNodes, undefined);
-  assert.equal(editorApi.sceneTools.setModelNodeState, undefined);
+  assert.equal(editorApi.sceneTools?.getModelNodes, undefined);
+  assert.equal(editorApi.sceneTools?.setModelNodeState, undefined);
   assert.equal(host.requests.some((item) => item.api === 'SceneTools.get_model_nodes' || item.api === 'SceneTools.set_model_node_state'), false);
 });
 
@@ -188,13 +183,13 @@ test('camera render settings use one scoped V8 patch and expose no legacy Web se
   assert.deepEqual(host.requests.find(item => item.api === 'corona.scene.setCameraRenderSettings'), {
     api: 'corona.scene.setCameraRenderSettings', args: ['SceneA', 'camera-1', patch],
   });
-  assert.equal(editorApi.sceneTools.setRenderBackend, undefined);
-  assert.equal(editorApi.sceneTools.setOutputMode, undefined);
-  assert.equal(editorApi.sceneTools.setVisionRenderMode, undefined);
-  assert.equal(editorApi.sceneTools.setVisionAccumulation, undefined);
-  assert.equal(editorApi.sceneTools.setVisionDenoise, undefined);
-  assert.equal(editorApi.sceneTools.setVisionDenoiser, undefined);
-  assert.equal(editorApi.sceneTools.setVisionStablePlanes, undefined);
+  assert.equal(editorApi.sceneTools?.setRenderBackend, undefined);
+  assert.equal(editorApi.sceneTools?.setOutputMode, undefined);
+  assert.equal(editorApi.sceneTools?.setVisionRenderMode, undefined);
+  assert.equal(editorApi.sceneTools?.setVisionAccumulation, undefined);
+  assert.equal(editorApi.sceneTools?.setVisionDenoise, undefined);
+  assert.equal(editorApi.sceneTools?.setVisionDenoiser, undefined);
+  assert.equal(editorApi.sceneTools?.setVisionStablePlanes, undefined);
   assert.equal(host.requests.some(item => item.api.startsWith('SceneTools.set_')), false);
 });
 
@@ -294,13 +289,6 @@ const PICKER_CASES = [
     invoke: (editorApi) => editorApi.project.browseFolder('C:/Projects'),
     selected: 'C:/Projects/Kitchen',
     canceled: '',
-  },
-  {
-    api: 'MainView.import_resource_file',
-    invoke: (editorApi) => editorApi.main.importResourceFile('scene.ini', 'model'),
-    selected: { status: 'success', scene: 'scene.ini', path: 'Assets/Chair.glb',
-      file_path: 'Assets/Chair.glb', actor_type: 'model' },
-    canceled: { status: 'canceled', message: '用户取消了文件选择' },
   },
 ];
 
@@ -402,16 +390,16 @@ test('an unknown wrapper path is rejected instead of being sent to native', asyn
 
 test('explicit namespaces resolve declared methods and do not expose unknown members', async () => {
   const { editorApi, host } = await loadEditorApi();
-  assert.equal(editorApi.sceneTools.getModelNodes, undefined);
+  assert.equal(editorApi.sceneTools?.getModelNodes, undefined);
   assert.equal(typeof editorApi.scene.readCameraRenderSettings, 'function');
-  assert.equal(typeof editorApi.sceneTools.getRestirSettings, 'undefined');
-  assert.equal(typeof editorApi.sceneTools.setRestirSettings, 'undefined');
-  assert.equal(editorApi.sceneTools.then, undefined);
+  assert.equal(typeof editorApi.sceneTools?.getRestirSettings, 'undefined');
+  assert.equal(typeof editorApi.sceneTools?.setRestirSettings, 'undefined');
+  assert.equal(editorApi.sceneTools?.then, undefined);
 
   const before = host.requests.filter(entry => !entry.api.startsWith('EditorApi.')).length;
-  assert.equal(editorApi.sceneTools.notARealMethod, undefined);
-  assert.equal(Object.hasOwn(editorApi.sceneTools, 'getFrameTiming'), false);
-  assert.equal(editorApi.sceneTools.getFrameTiming, undefined);
+  assert.equal(editorApi.sceneTools?.notARealMethod, undefined);
+  assert.equal(Object.hasOwn(editorApi.sceneTools || {}, 'getFrameTiming'), false);
+  assert.equal(editorApi.sceneTools?.getFrameTiming, undefined);
   assert.equal(host.requests.filter(entry => !entry.api.startsWith('EditorApi.')).length, before);
 });
 

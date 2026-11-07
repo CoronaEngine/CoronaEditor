@@ -27,35 +27,41 @@ class CoronaEditor:
     _runtime_watchdog_file = None
 
     @classmethod
+    def dispatch_script_values_from_cpp(cls, module_name, func_name, args):
+        """Invoke the existing service with owned values, without JSON transport."""
+        try:
+            if not isinstance(module_name, str) or not module_name or not isinstance(func_name, str) or not func_name:
+                raise ValueError("Please input script module and function")
+            if not isinstance(args, (list, tuple)):
+                raise TypeError("Script service arguments must be an array")
+            module = cls.module_list.get(module_name)
+            if module is None or not hasattr(module, func_name):
+                raise ValueError("Not find script function")
+            result = getattr(module, func_name)(*args)
+            return {"success": True, "data": result}
+        except Exception as error:
+            return {"success": False, "error": f"Error processing request: {error}"}
+
+    @classmethod
     def _dispatch_script_request(cls, json_str):
+        # Retain the non-Web text adapter; both forms use the same service owner.
         try:
             request = json.loads(json_str)
             if 'api' in request:
-                return create_error_response(
-                    "Editor API payload is not accepted by Python script service dispatcher"
-                )
-            module_name = request.get('module', None)
-            func_name = request.get('function', None)
-            args = request.get('args', [])
-            log_level = logging.DEBUG  # 全量降为 DEBUG，默认静默
-            logger.log(log_level, f"script request: {module_name}.{func_name} args: {args}")
-            if not module_name or not func_name:
-                return create_error_response("Please input script module and function")
-
-            if module_name not in cls.module_list or not hasattr(cls.module_list[module_name], func_name):
-                return create_error_response("Not find script function")
-
-            module = cls.module_list.get(module_name, None)
-            result = getattr(module, func_name)(*args)
-            return create_success_response(result)
-        except json.JSONDecodeError as e:
-            return create_error_response(f"Invalid JSON: {str(e)}")
-        except Exception as e:
-            return create_error_response(f"Error processing request: {str(e)}")
+                return create_error_response("Editor API payload is not accepted by Python script service dispatcher")
+            response = cls.dispatch_script_values_from_cpp(
+                request.get('module'), request.get('function'), request.get('args', []))
+            if response["success"]:
+                return create_success_response(response["data"])
+            return create_error_response(response["error"])
+        except json.JSONDecodeError as error:
+            return create_error_response(f"Invalid JSON: {error}")
+        except Exception as error:
+            return create_error_response(f"Error processing request: {error}")
 
     @classmethod
     def dispatch_script_request_from_cpp(cls, json_str):
-        """C++ 脚本服务显式调用 Python 运行时时使用的内部入口。"""
+        """Compatibility adapter for existing non-Web dispatcher registrations."""
         return cls._dispatch_script_request(json_str)
 
     @classmethod

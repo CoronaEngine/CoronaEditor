@@ -11,6 +11,39 @@ ENGINE_ROOT = EDITOR_ROOT.parent.parent
 
 
 class CoronaEditorLifecycleTests(unittest.TestCase):
+    def test_structured_service_call_does_not_serialize_values(self):
+        editor = self._load_editor()
+        value = {"id": 2**64 - 1, "text": "嵌套\x00值", "nodes": [True, None, {"x": 1.5}]}
+        editor.module_list = {"Fixture": SimpleNamespace(echo=lambda payload: payload)}
+        with patch("json.loads", side_effect=AssertionError("JSON transport forbidden")), \
+                patch("json.dumps", side_effect=AssertionError("JSON transport forbidden")):
+            reply = editor.dispatch_script_values_from_cpp("Fixture", "echo", [value])
+        self.assertTrue(reply["success"])
+        self.assertIs(reply["data"], value)
+
+    def test_structured_service_errors_remain_explicit(self):
+        editor = self._load_editor()
+        editor.module_list = {"Fixture": SimpleNamespace(fail=Mock(side_effect=ValueError("fixture failed")))}
+        for module, function, args in [("Missing", "fail", []), ("Fixture", "missing", []),
+                                       ("Fixture", "fail", []), ("Fixture", "fail", "not an argument array")]:
+            reply = editor.dispatch_script_values_from_cpp(module, function, args)
+            self.assertFalse(reply["success"])
+            self.assertIsInstance(reply["error"], str)
+
+    def test_registered_text_adapter_retains_its_contract_and_rejects_editor_api_payloads(self):
+        import json
+        editor = self._load_editor()
+        echo = Mock(return_value={"status": "ready"})
+        editor.module_list = {"Fixture": SimpleNamespace(echo=echo)}
+        # The fixture's response helpers return dictionaries so the adapter's
+        # choice of success/error helper can be checked independently.
+        reply = editor.dispatch_script_request_from_cpp(json.dumps({"module": "Fixture", "function": "echo", "args": [42]}))
+        self.assertEqual(reply, {"data": {"status": "ready"}})
+        echo.assert_called_once_with(42)
+        rejected = editor.dispatch_script_request_from_cpp(json.dumps({"api": "Fixture.echo"}))
+        self.assertIn("not accepted", rejected["error"])
+        self.assertEqual(echo.call_count, 1)
+
     def _load_editor(self):
         engine = SimpleNamespace()
         corona_engine = ModuleType("runtime.native_engine")

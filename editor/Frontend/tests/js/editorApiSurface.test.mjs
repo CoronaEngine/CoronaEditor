@@ -12,8 +12,9 @@ const ownMember = (path) => path.split('.').reduce((value, key) =>
 test('all manifest-declared Web methods have explicit own wrappers before discovery', () => {
   const hasCefCaller = (line) => {
     if (!line.includes('WRAPPED_CALLERS')) return true;
-    const callers = line.slice(line.lastIndexOf(',') + 1);
-    if (callers.includes('~caller_mask(EditorApiCaller::Cef)')) return false;
+    const declaration = line.trim().replace(/,$/, '');
+    const callers = declaration.slice(declaration.lastIndexOf(',') + 1);
+    if (callers.includes('non_cef_') || callers.includes('~caller_mask(EditorApiCaller::Cef)')) return false;
     return callers.includes('caller_mask(EditorApiCaller::Cef)') ||
       callers.includes('all_callers()') || callers.includes('animation_callers()') ||
       callers.includes('cef_and_script_runtime_callers()');
@@ -21,7 +22,7 @@ test('all manifest-declared Web methods have explicit own wrappers before discov
   const wrappers = nativeMethods.split('\n').filter(line => line.includes('WRAPPED') && hasCefCaller(line))
     .map(line => line.match(/"([^"]*)"/)?.[1])
     .filter(Boolean);
-  assert.ok(wrappers.length > 100, 'the real native manifest must be inspected');
+  assert.ok(wrappers.length > 0, 'the remaining native Web manifest must be inspected');
   assert.deepEqual(wrappers.filter(path => typeof ownMember(path) !== 'function'), []);
 });
 
@@ -37,7 +38,7 @@ test('unknown and retired capabilities are absent without mutating the API surfa
     assert.equal(Object.hasOwn(editorApi.scene, name), false, name);
   }
   assert.equal(editorApi.notARealNamespace, undefined);
-  assert.equal(editorApi.sceneTools.getFrameTiming, undefined);
+  assert.equal(editorApi.sceneTools?.getFrameTiming, undefined);
   assert.deepEqual(Object.keys(editorApi.scene), before);
 });
 

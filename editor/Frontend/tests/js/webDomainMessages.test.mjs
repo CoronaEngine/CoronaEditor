@@ -1,3 +1,4 @@
+import { reactive } from 'vue';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { registerHooks } from 'node:module';
@@ -102,4 +103,17 @@ test('node graph review reaches the shared topic without losing typed data', asy
   for (let i = 0; i < 30 && !received.length; i++) await delay(5);
   assert.equal(received.length, 1);
   assert.deepEqual(received[0].bytes, new Uint8Array([9]));
+});
+
+
+test('node graph review snapshots nested Vue proxies without changing live graph state', async () => {
+  const review = await import('../../src/services/nodeGraphReviewService.js');
+  const graph = reactive({ nodes: [{ id: 'a', x: 40, blocks: { selected: true, type: 'start' } }], edges: [] });
+  const workspace = { version: 1, nodes: graph.nodes, edges: graph.edges };
+  const expected = { version: 1, nodes: [{ id: 'a', blocks: { type: 'start' } }], edges: [] };
+  assert.equal(review.graphRevision(workspace, 'world'), review.graphRevision(expected, 'world'));
+  assert.equal(graph.nodes[0].x, 40);
+  assert.equal(graph.nodes[0].blocks.selected, true);
+  graph.nodes[0].blocks.type = 'end';
+  assert.notEqual(review.graphRevision(workspace, 'world'), review.graphRevision(expected, 'world'));
 });

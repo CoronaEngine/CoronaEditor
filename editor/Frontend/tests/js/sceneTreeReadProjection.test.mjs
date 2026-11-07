@@ -24,7 +24,7 @@ test('rich tree uses one scoped V8 facade and retires the manifest reader', asyn
   const scope = { archive_session: 'archive' };
   assert.equal(await editorApi.scene.readTree('scene.ini', scope), result);
   assert.deepEqual(calls, [['scene.ini', scope]]);
-  assert.equal(editorApi.sceneTools.listSceneTree, undefined);
+  assert.equal(editorApi.sceneTools?.listSceneTree, undefined);
 });
 
 function fixture(read) {

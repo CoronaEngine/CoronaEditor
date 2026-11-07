@@ -69,16 +69,16 @@ function mountMainPage(t, visionMode = 'path_tracing', { nativeCursor = false } 
   const document = { hidden: false, addEventListener: noop, removeEventListener: noop };
   const api = {
     viewport: { configure: async (...args) => { calls.push(['viewport', ...args]); return {}; } },
-    main: { onInit: async () => ({ data: { scene: { path: 'scene_v3.xml' } } }) },
-    sceneTools: {
-      setRenderBackend: async (mode, scene, camera) => {
-        calls.push(['backend', mode, scene, camera]);
-        if (scene !== 'scene_v3.xml') throw new Error(`Request does not identify the current scene: ${scene}`);
-        return { data: { mode } };
-      },
-    },
+    sceneTools: {},
     scene: { observe: async () => -1,
       isVisionAvailable: async () => ({ available: true }),
+      setCameraRenderSettings: async (scene, camera, patch) => {
+        calls.push(['backend', patch.render_backend, scene, camera, patch]);
+        assert.equal(scene, 'scene_v3.xml');
+        assert.equal(camera, 'camera-1');
+        assert.equal(patch.archive_session, 'main-archive');
+        return { archive_session: 'main-archive', scene, camera_id: camera, render_backend: patch.render_backend };
+      },
       setCameraProperties: async (...args) => { calls.push(['cameraWrite', ...args]); return {}; },
       readActive: async () => ({ archive_session: 'main-archive', scene: 'scene_v3.xml' }),
       getEnvironment: async (...args) => {
@@ -178,6 +178,7 @@ function mountMainPage(t, visionMode = 'path_tracing', { nativeCursor = false } 
   t.after(() => { for (const hook of unmounted) hook(); });
   return { page, calls, errors, observed, surface, dock, bus, windowEvents, messages, calibration, api, creativeActions,
     async mount() { for (const hook of mounted) await hook(); },
+    unmount() { for (const hook of unmounted) hook(); },
     flushFrames() {
       const pending = [...frames.values()];
       frames.clear();
@@ -192,6 +193,36 @@ test('world entry retains the initialized scene controls and scene manager', asy
   assert.equal(h.dock.panels.SceneControls.open, false);
   assert.equal(h.dock.panels.SceneTools.open, false);
   assert.deepEqual(h.errors, []);
+});
+
+for (const retiredBy of ['archive', 'unmount']) {
+  test(`world entry does not select a backend after ${retiredBy} retires the initial camera read`, async t => {
+    const h = mountMainPage(t);
+    const read = h.api.scene.readCameras;
+    h.api.scene.readCameras = async (...args) => {
+      const result = await read(...args);
+      if (retiredBy === 'archive') h.page.environmentArchiveSession.value = 'replacement';
+      else h.unmount();
+      return result;
+    };
+    await h.mount();
+    assert.ok(h.calls.some(call => call[0] === 'cameras'), 'the initial scoped camera read must run');
+    assert.deepEqual(h.calls.filter(call => call[0] === 'backend'), []);
+    assert.deepEqual(h.observed, []);
+  });
+}
+
+test('backend completion from a replaced archive cannot continue viewport initialization', async t => {
+  const h = mountMainPage(t);
+  await h.mount();
+  h.calls.length = 0;
+  h.api.scene.setCameraRenderSettings = async () => {
+    h.page.environmentArchiveSession.value = 'replacement';
+    return { render_backend: 'vision' };
+  };
+  assert.equal(await h.page.initializeCreativeRenderMode(), false);
+  assert.deepEqual(h.calls, []);
+  assert.equal(h.page.creativeRenderDefaultsError.value, '');
 });
 
 test('applied focus synchronizes only the matching native camera without resubmitting a pose', async t => {
@@ -289,8 +320,12 @@ test(`external scene entry defaults to Vision and preserves saved ${visionMode}`
   assert.equal(h.page.cameraBindingState.value.cameraHandle, null);
   await h.mount();
 
-  assert.deepEqual(h.calls[0], ['backend', 'vision', 'scene_v3.xml', null]);
-  assert.deepEqual(h.calls[1], ['cameras', 'scene_v3.xml', { archive_session: 'main-archive' }], 'backend selection must precede camera binding');
+  const cameraRead = h.calls.findIndex(call => call[0] === 'cameras');
+  const backendWrite = h.calls.findIndex(call => call[0] === 'backend');
+  assert.ok(cameraRead >= 0 && backendWrite > cameraRead, 'bind the archive and exact camera before selecting its backend');
+  assert.deepEqual(h.calls[backendWrite], ['backend', 'vision', 'scene_v3.xml', 'camera-1', {
+    archive_session: 'main-archive', render_backend: 'vision',
+  }]);
   assert.equal(h.page.cameraBindingState.value.sceneId, 'scene_v3.xml');
   assert.equal(h.page.cameraBindingState.value.cameraHandle, '42');
   assert.equal(h.page.mainRenderBackend.value, 'vision');
@@ -382,4 +417,70 @@ test('main viewport blur and pointer cancellation retire the native cursor throu
       archive_session: 'main-archive', pointer: { cursor: 'hidden' },
     }], handler);
   }
+});
+
+
+test('world entry reads the active scene without the retired main facade', async t => {
+  const h = mountMainPage(t);
+  delete h.api.main;
+  let reads = 0;
+  const read = h.api.scene.readActive;
+  h.api.scene.readActive = async () => { reads++; return read(); };
+  await h.mount();
+  assert.equal(reads, 1);
+  assert.equal(h.page.currentSceneId.value, 'scene_v3.xml');
+  assert.deepEqual(h.errors, []);
+});
+for (const active of [{ archive_session: '', scene: '' }, { archive_session: 'main-archive', scene: '' }]) {
+  test(`world entry does not invent a default scene for ${JSON.stringify(active)}`, async t => {
+    const h = mountMainPage(t);
+    h.api.scene.readActive = async () => active;
+    await h.mount();
+    assert.deepEqual(h.calls, []);
+    assert.deepEqual(h.observed, []);
+  });
+}
+test('unmounted world entry ignores an active-scene response', async t => {
+  const h = mountMainPage(t);
+  h.api.scene.readActive = async () => { h.unmount(); return { archive_session: 'main-archive', scene: 'scene_v3.xml' }; };
+  await h.mount();
+  assert.deepEqual(h.calls, []);
+});
+test('old project notification cannot replace the current archive', async t => {
+  const h = mountMainPage(t);
+  await h.mount();
+  h.calls.length = 0;
+  await h.page.onProjectOpenedEvent({ archive_session: 'retired', path: 'old-world', scene: { path: 'old.ini' } });
+  assert.equal(h.page.environmentArchiveSession.value, 'main-archive');
+  assert.equal(h.page.currentSceneId.value, 'scene_v3.xml');
+  assert.deepEqual(h.calls, []);
+});
+test('interleaved project notifications discard the earlier active-scene reply', async t => {
+  const h = mountMainPage(t);
+  await h.mount();
+  let release;
+  h.api.scene.readActive = () => new Promise(resolve => { release = resolve; });
+  const earlier = h.page.onProjectOpenedEvent({ archive_session: 'retired', scene: { path: 'old.ini' } });
+  assert.equal(typeof release, 'function');
+  h.api.scene.readActive = async () => ({ archive_session: 'main-archive', scene: 'scene_v3.xml' });
+  await h.page.onProjectOpenedEvent({ archive_session: 'main-archive', scene: { path: 'scene_v3.xml' } });
+  release({ archive_session: 'retired', scene: 'old.ini' });
+  await earlier;
+  assert.equal(h.page.environmentArchiveSession.value, 'main-archive');
+  assert.equal(h.page.currentSceneId.value, 'scene_v3.xml');
+});
+
+
+test('a rejected stale notification cannot cancel a valid project refresh already in flight', async t => {
+  const h = mountMainPage(t);
+  await h.mount();
+  h.calls.length = 0;
+  let release;
+  h.api.scene.readActive = () => new Promise(resolve => { release = resolve; });
+  const current = h.page.onProjectOpenedEvent({ archive_session: 'main-archive' });
+  h.api.scene.readActive = async () => ({ archive_session: 'main-archive', scene: 'scene_v3.xml' });
+  await h.page.onProjectOpenedEvent({ archive_session: 'retired' });
+  release({ archive_session: 'main-archive', scene: 'scene_v3.xml' });
+  await current;
+  assert.ok(h.calls.some(call => call[0] === 'cameras'), 'valid refresh must still bind its camera');
 });

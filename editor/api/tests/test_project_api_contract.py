@@ -20,7 +20,6 @@ def test_project_lifecycle_manifest_methods_have_public_wrappers():
         "ProjectLauncher.open_project_file": ("project.openProjectFile", "project.open_project_file"),
         "ProjectSettings.get_active_project_info": ("projectSettings.getActiveProjectInfo", "project_settings.get_active_project_info"),
         "ProjectSettings.save_active_project_info": ("projectSettings.saveActiveProjectInfo", "project_settings.save_active_project_info"),
-        "MainView.import_resource_file": ("main.importResourceFile", "main.import_resource_file"),
         "MainView.on_init": ("main.onInit", "main.on_init"),
     }
     for api_name, (js_wrapper, python_wrapper) in expected.items():

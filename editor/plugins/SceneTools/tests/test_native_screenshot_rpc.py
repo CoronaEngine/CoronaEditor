@@ -2563,7 +2563,6 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
         source = self._editor_api_source()
 
         expected = {
-            "MainView.import_resource_file": ("kMainViewImportResourceFileParams", "EditorApiValueType::Object"),
             "MainView.on_init": ("kPathOptionalParam", "EditorApiValueType::Object"),
             "MainView.scene_save": ("kSceneSaveParams", "EditorApiValueType::Object"),
         }
@@ -2582,11 +2581,9 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
 
         for snippet in (
             "main: {",
-            "importResourceFile: (sceneName, fileType) =>",
             "onInit: (projectPath = '') =>",
             "sceneSave: (sceneName, session) => call_manifest_editor_api('main.sceneSave', [sceneName, { archive_session: session }])",
             "OnInit: (projectPath = window.localStorage?.getItem('corona.activeProjectPath') || '') =>\n    editorApi.main.onInit",
-            "importResourceFileByDialog: (sceneName, fileType) =>\n    editorApi.main.importResourceFile",
         ):
             with self.subTest(snippet=snippet):
                 self.assertIn(snippet, bridge_source)

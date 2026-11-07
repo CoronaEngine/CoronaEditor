@@ -27,7 +27,7 @@ test('focus applies once through scoped V8 and has no obsolete focus facades or 
   assert.equal(typeof editorApi.scene.focusActor, 'function');
   assert.equal(await editorApi.scene.focusActor('scene.ini', 'actor-guid', 'camera-id', scope), result);
   assert.deepEqual(calls, [['scene.ini', 'actor-guid', 'camera-id', scope]]);
-  assert.equal('focusActor' in editorApi.sceneTools, false);
+  assert.equal('focusActor' in (editorApi.sceneTools || {}), false);
   assert.equal('focusActor' in editorApi.resourceSearch, false);
   assert.equal('onFocusPoseResult' in editorApi.events, false);
   const failure = Object.assign(new Error('old archive'), { code: 'PROJECT_CONTEXT_CHANGED' });
@@ -41,8 +41,9 @@ test('scene facade reads native values and selects through the same V8 object wi
   t.after(() => { JSON.stringify = stringify; JSON.parse = parse; });
   JSON.stringify = JSON.parse = () => { throw new Error('JSON transport is forbidden'); };
   assert.equal(await editorApi.scene.readActive(), snapshot);
+  assert.equal('selectActor' in (editorApi.sceneTools || {}), false);
   const context = { sourceViewport: 'cameraView', sourceCameraId: 'camera/max', node_index: 7 };
-  assert.deepEqual(await editorApi.sceneTools.selectActor('scene.ini', 'model', 'Probe', context), { status: 'success' });
+  assert.deepEqual(await editorApi.scene.selectActor('scene.ini', 'model', 'Probe', context), { status: 'success' });
   assert.deepEqual(calls, [['scene.ini', 'model', 'Probe', context]]);
 });
 
@@ -52,7 +53,7 @@ test('scene facade preserves native failures and does not retry an old route', a
   native.readActive = () => Promise.reject(failure);
   native.selectActor = () => Promise.reject(failure);
   await assert.rejects(editorApi.scene.readActive(), error => error === failure);
-  await assert.rejects(editorApi.sceneTools.selectActor('scene.ini', 'model', 'Probe'), error => error === failure);
+  await assert.rejects(editorApi.scene.selectActor('scene.ini', 'model', 'Probe'), error => error === failure);
 });
 
 test('vision availability uses the typed scene binding without JSON or the legacy facade', async t => {
@@ -65,7 +66,7 @@ test('vision availability uses the typed scene binding without JSON or the legac
   JSON.stringify = JSON.parse = () => { throw new Error('vision availability JSON transport forbidden'); };
   assert.equal(await editorApi.scene.isVisionAvailable(), result);
   assert.deepEqual(calls, [[]]);
-  assert.equal('isVisionAvailable' in editorApi.sceneTools, false);
+  assert.equal('isVisionAvailable' in (editorApi.sceneTools || {}), false);
 });
 
 test('selection ownership compares stable camera IDs exactly', () => {
@@ -111,7 +112,7 @@ test('Actor properties merge state, physics and camera lock into one raw V8 patc
   assert.equal(await editorApi.scene.setActorProperties('scene.ini', 'actor-id', patch), result);
   assert.deepEqual(calls, [['scene.ini', 'actor-id', patch]]);
   for (const retired of ['setActorState', 'setActorPhysics', 'setActorCameraLock']) {
-    assert.equal(retired in editorApi.sceneTools, false, `${retired} must be removed`);
+    assert.equal(retired in (editorApi.sceneTools || {}), false, `${retired} must be removed`);
   }
 });
 
@@ -141,7 +142,7 @@ test('environment has one raw V8 read and patch for sun, grid and physics with J
   assert.equal(await editorApi.scene.setEnvironment('scene.ini', patch), result);
   assert.deepEqual(calls, [['getEnvironment', 'scene.ini', scope], ['setEnvironment', 'scene.ini', patch]]);
   for (const old of ['getEnvironment', 'setEnvironment', 'sunDirection', 'floorGrid', 'getPhysicsParams', 'setPhysicsParams']) {
-    assert.equal(old in editorApi.sceneTools, false, `retired environment wrapper: ${old}`);
+    assert.equal(old in (editorApi.sceneTools || {}), false, `retired environment wrapper: ${old}`);
   }
 });
 
@@ -167,8 +168,8 @@ test('screenshot uses one raw scoped V8 operation for explicit paths and interac
   const scope = { archive_session: 'archive' };
   assert.equal(await editorApi.scene.captureScreenshot('scene.ini', 'camera-guid', scope), result);
   assert.deepEqual(calls, [['scene.ini', 'camera-guid', options], ['scene.ini', 'camera-guid', scope]]);
-  assert.equal('selectScreenshotPath' in editorApi.sceneTools, false);
-  assert.equal('saveScreenshot' in editorApi.sceneTools, false);
+  assert.equal('selectScreenshotPath' in (editorApi.sceneTools || {}), false);
+  assert.equal('saveScreenshot' in (editorApi.sceneTools || {}), false);
   assert.equal('capture' in editorApi.viewport, false);
 });
 
@@ -194,7 +195,7 @@ test('camera pose and view settings share one scoped V8 patch with JSON disabled
   assert.equal(await editorApi.scene.setCameraProperties('scene.ini', 'camera-id', patch), result);
   assert.deepEqual(calls, [['scene.ini', 'camera-id', patch]]);
   assert.equal('setCameraPose' in editorApi.viewport, false);
-  assert.equal('updateCameraView' in editorApi.sceneTools, false);
+  assert.equal('updateCameraView' in (editorApi.sceneTools || {}), false);
 });
 
 test('camera patch propagates native input ownership and archive failures without a Fast fallback', async t => {
@@ -220,7 +221,7 @@ test('Actor rename uses the scoped typed scene binding with JSON disabled', asyn
   const scope = { archive_session: 'archive' };
   assert.equal(await editorApi.scene.renameActor('scene.ini', 'actor-id', 'Renamed', scope), result);
   assert.deepEqual(calls, [['scene.ini', 'actor-id', 'Renamed', scope]]);
-  assert.equal('renameActor' in editorApi.sceneTools, false);
+  assert.equal('renameActor' in (editorApi.sceneTools || {}), false);
 });
 
 test('Actor rename errors propagate without retrying a manifest route', async t => {
@@ -244,7 +245,7 @@ test('Actor delete uses the scoped typed scene binding and clears no legacy faca
   const scope = { archive_session: 'archive' };
   assert.equal(await editorApi.scene.deleteActor('scene.ini', 'actor-id', scope), result);
   assert.deepEqual(calls, [['scene.ini', 'actor-id', scope]]);
-  assert.equal('removeActor' in editorApi.sceneTools, false);
+  assert.equal('removeActor' in (editorApi.sceneTools || {}), false);
 });
 
 test('Actor delete errors propagate without retrying a manifest route', async t => {
@@ -267,7 +268,7 @@ test('Actor resource rebinding uses the scoped typed scene binding with JSON dis
   const scope = { archive_session: 'archive' };
   assert.equal(await editorApi.scene.rebindActorResource('scene.ini', 'actor-id', 'Models/probe.obj', scope), result);
   assert.deepEqual(calls, [['scene.ini', 'actor-id', 'Models/probe.obj', scope]]);
-  assert.equal('rebindActorResource' in editorApi.sceneTools, false);
+  assert.equal('rebindActorResource' in (editorApi.sceneTools || {}), false);
 });
 
 test('Actor resource rebinding errors never retry a manifest route', async t => {
@@ -290,8 +291,8 @@ test('scene save uses one scoped typed V8 operation and retires duplicate save f
   const scope = { archive_session: 'archive' };
   assert.equal(await editorApi.scene.save('scene.ini', scope), result);
   assert.deepEqual(calls, [['scene.ini', scope]]);
-  assert.equal('saveActor' in editorApi.sceneTools, false);
-  assert.equal('sceneSave' in editorApi.main, false);
+  assert.equal('saveActor' in (editorApi.sceneTools || {}), false);
+  assert.equal(editorApi.main, undefined);
 });
 
 test('scene save preserves native archive failures without an actor or manifest fallback', async t => {
@@ -311,7 +312,7 @@ test('model file selection uses one scoped typed V8 operation and preserves canc
   const scope = { archive_session: 'archive' };
   assert.equal(await editorApi.scene.selectModelFile('scene.ini', 'model', scope), '');
   assert.deepEqual(calls, [['scene.ini', { ...scope, file_type: 'model' }]]);
-  assert.equal('selectModelFile' in editorApi.sceneTools, false);
+  assert.equal('selectModelFile' in (editorApi.sceneTools || {}), false);
 });
 
 test('IK reads and revisioned writes use one scoped V8 contract with JSON disabled', async t => {
@@ -336,7 +337,7 @@ test('IK reads and revisioned writes use one scoped V8 contract with JSON disabl
     ['write', 'scene.ini', 'actor-guid', chains, 4, scope],
   ]);
   for (const method of ['getActorSkeletonLeaves', 'getActorIkChains', 'setActorIkChains']) {
-    assert.equal(method in editorApi.sceneTools, false, `legacy IK facade ${method} must be retired`);
+    assert.equal(method in (editorApi.sceneTools || {}), false, `legacy IK facade ${method} must be retired`);
   }
 });
 

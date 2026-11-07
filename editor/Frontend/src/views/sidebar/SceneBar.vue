@@ -524,7 +524,7 @@ const selectModelNode = (identity) => {
   const actorName = identity?.actorName || previous?.actorName;
   if (!actorName) return;
   const actor = sceneImages.value.find((item) => item.name === actorName);
-  editorApi.sceneTools
+  editorApi.scene
     .selectActor(currentSceneName.value, actor?.type || 'model', actorName, {
       node_index: identity?.nodeIndex ?? null,
     })
@@ -545,6 +545,7 @@ const camerasExpanded = ref(true);
 const actorsExpanded = ref(true);
 
 const sceneImages = ref([]);
+const pendingAudioRows = new WeakSet();
 const playingStates = reactive({}); // { name: true/false } — 音频播放状态
 const route = useRoute();
 const px = ref('1.0'),
@@ -586,7 +587,7 @@ const SelectActor = (scene) => {
       source: 'scene_tree',
     },
   });
-  editorApi.sceneTools
+  editorApi.scene
     .selectActor(currentSceneName.value, scene.type || 'actor', scene.name)
     .catch((error) => {
       logError('Failed to publish actor selection', error);
@@ -684,41 +685,34 @@ const onActorRowDoubleClick = (scene, event) => {
 
 /// 切换音频播放/停止
 const handlePlayToggle = async (scene) => {
-  // audio Actor（来自场景树、有 handle）走空间音频；扁平媒体资源走全局播放。
+  if (!viewLifetime.current() || pendingAudioRows.has(scene)) return;
   const isAudioActor = scene.type === 'audio' && scene.handle != null && !scene.resourceId;
   const rid = scene.resourceId;
   if (!isAudioActor && !rid) {
     logWarn('[audio] No resource_id for', scene.name);
     return;
   }
+  const sceneId = currentSceneName.value, archive = archiveSession.value;
+  const current = () => viewLifetime.current() && sceneId === currentSceneName.value
+    && archive === archiveSession.value;
   const key = scene.name;
   const playing = playingStates[key] ?? scene._playing ?? false;
-  if (playing) {
-    // 停止
-    try {
-      if (isAudioActor) {
-        await editorApi.sceneTools.actorStopAudio(scene.name);
-      } else {
-        await editorApi.sceneTools.stopAudio(rid);
-      }
-    } catch (e) {
-      logError('[audio] stop failed', e);
-    }
-    playingStates[key] = false;
-    if (scene._playing !== undefined) scene._playing = false;
-  } else {
-    // 播放（单次，不循环）
-    try {
-      if (isAudioActor) {
-        await editorApi.sceneTools.actorPlayAudio(scene.name, false);
-      } else {
-        await editorApi.sceneTools.playAudio(rid, false);
-      }
-    } catch (e) {
-      logError('[audio] play failed', e);
-    }
-    playingStates[key] = true;
-    if (scene._playing !== undefined) scene._playing = true;
+  pendingAudioRows.add(scene);
+  try {
+    if (isAudioActor) {
+      const actor = scene.actor_guid || scene.name;
+      const scope = { archive_session: archive };
+      if (playing) await editorApi.audio.stopActor(sceneId, actor, scope);
+      else await editorApi.audio.playActor(sceneId, actor, scope, false);
+    } else if (playing) await editorApi.audio.stopResource(rid);
+    else await editorApi.audio.playResource(rid, false);
+    if (!current()) return;
+    playingStates[key] = !playing;
+    if (scene._playing !== undefined) scene._playing = !playing;
+  } catch (e) {
+    if (current()) logError(playing ? '[audio] stop failed' : '[audio] play failed', e);
+  } finally {
+    pendingAudioRows.delete(scene);
   }
 };
 
@@ -890,186 +884,60 @@ const ImportCamera = async () => {
   }
 };
 
-const unwrapBridgePayload = (result) => result?.data ?? result;
-
-const selectedPathFromImportPayload = (payload) =>
-  payload?.path || payload?.file_path || payload?.selected_path || payload?.source_path || '';
-
-const createActorFromSelectedFile = async (payload, actorType, logLabel) => {
-  const status = payload?.status;
-  if (status === 'canceled') {
-    return null;
+let importSequence = 0;
+const importSceneResource = async (fileType, actorType, errorTitle) => {
+  ShowModelDropdown.value = false;
+  const scene = currentSceneName.value;
+  const archive = archiveSession.value;
+  const sequence = ++importSequence;
+  const current = () => viewLifetime.current() && sequence === importSequence &&
+    scene === currentSceneName.value && archive === archiveSession.value;
+  const matches = value => value?.archive_session === archive && value?.scene === scene;
+  if (!scene || !archive) {
+    reportImportError(errorTitle, '当前没有活动场景，请先打开或新建场景');
+    return;
   }
-  const selectedPath = selectedPathFromImportPayload(payload);
-  if (!selectedPath) {
-    // 静默 return null 会让调用方以为成功，但场景栏里什么都没有。
-    // 抛出去交给统一的错误上报，用户至少知道失败了。
-    throw new Error(`${logLabel}: 未能获取所选文件路径`);
-  }
-
-  publishImportProgress(true, '创建对象', 55);
-  const createResult = await editorApi.sceneTools.createActor(
-    currentSceneName.value,
-    selectedPath,
-    actorType
-  );
-  const createPayload = unwrapBridgePayload(createResult);
-  if (createResult?.success === false || createPayload?.status === 'error') {
-    throw new Error(
-      createPayload?.message || createResult?.error || `${logLabel} native create failed`
-    );
-  }
-
-  await OnInitObjTree();
-  const actor = createPayload?.actor;
-  if (actor?.name) {
-    selectedItem.value = actor.name;
-  }
-  publishImportProgress(true, '导入完成', 100);
-  if (actorType === 'model') {
-    void cabbageContextService.recordEvent({
-      type: 'model_imported',
-      category: 'scene',
-      success: true,
-      details: {
-        sceneName: currentSceneName.value,
-        actorName: String(actor?.name || ''),
-        actorId: String(actor?.handle || actor?.id || actor?.actor_id || ''),
-        actorType: 'model',
-        resourcePath: String(selectedPath || ''),
-      },
+  publishImportProgress(true, '请稍候...');
+  try {
+    const payload = await editorApi.scene.importResourceFile(scene, fileType, { archive_session: archive });
+    if (!current() || payload?.status === 'canceled' || !matches(payload)) return;
+    if (payload?.status !== 'success') throw new Error(payload?.message || '资源导入失败');
+    const media = payload.media;
+    if (fileType === 'multimedia' && media?.type !== 'audio') {
+      if (media?.name) await addMediaToList(media);
+      return;
+    }
+    const path = media?.path || payload.path;
+    if (!path) throw new Error('未能获取所选文件路径');
+    publishImportProgress(true, '创建对象', 55);
+    const actor = await editorApi.scene.createActor(scene, path, {
+      archive_session: archive,
+      actor_type: actorType,
+      ...(actorType === 'audio' ? { audio_resource_id: String(media?.resource_id || ''), actor_name: media?.name } : {}),
     });
-  }
-  return actor || null;
-};
-
-const HandleFileImport = async () => {
-  ShowModelDropdown.value = false;
-  if (!currentSceneName.value) {
-    reportImportError('模型导入失败', '当前没有活动场景，请先打开或新建场景');
-    return;
-  }
-  publishImportProgress(true, '请稍候...');
-  try {
-    const result = await editorApi.main.importResourceFile(currentSceneName.value, 'model');
-    const payload = unwrapBridgePayload(result);
-    const status = payload?.status;
-    if (result?.success === false || status === 'error') {
-      reportImportError('模型导入失败', payload?.message || result?.error || 'unknown error');
-      return;
+    if (!current() || !matches(actor)) return;
+    await OnInitObjTree();
+    if (!current()) return;
+    if (actor.name) selectedItem.value = actor.name;
+    publishImportProgress(true, '导入完成', 100);
+    if (actorType === 'model') {
+      void cabbageContextService.recordEvent({
+        type: 'model_imported', category: 'scene', success: true,
+        details: { sceneName: scene, actorName: String(actor.name || ''),
+          actorId: String(actor.handle || ''), actorType, resourcePath: String(path) },
+      });
     }
-    if (status === 'canceled') {
-      // 用户主动取消,无需弹错
-      return;
-    }
-    await createActorFromSelectedFile(payload, 'model', 'File import');
-  } catch (e) {
-    reportImportError('模型导入失败', e);
+  } catch (error) {
+    if (current()) reportImportError(errorTitle, error);
   } finally {
-    publishImportProgress(false);
+    if (viewLifetime.current() && sequence === importSequence) publishImportProgress(false);
   }
 };
 
-const HandleUiImageImport = async () => {
-  // 导入一张图片，自动创建一个带该图为纹理的 quad（光场 UI 平面），默认作为 UI。
-  ShowModelDropdown.value = false;
-  if (!currentSceneName.value) {
-    reportImportError('图片导入失败', '当前没有活动场景，请先打开或新建场景');
-    return;
-  }
-  publishImportProgress(true, '请稍候...');
-  try {
-    const result = await editorApi.main.importResourceFile(currentSceneName.value, 'ui_image');
-    const payload = unwrapBridgePayload(result);
-    const status = payload?.status;
-    if (result?.success === false || status === 'error') {
-      reportImportError('图片导入失败', payload?.message || result?.error || 'unknown error');
-      return;
-    }
-    if (status === 'canceled') {
-      return;
-    }
-    await createActorFromSelectedFile(payload, 'ui_image', 'UI image import');
-  } catch (e) {
-    reportImportError('图片导入失败', e);
-  } finally {
-    publishImportProgress(false);
-  }
-};
-
-const HandleActorImport = async () => {
-  ShowModelDropdown.value = false;
-  if (!currentSceneName.value) {
-    reportImportError('Actor 导入失败', '当前没有活动场景，请先打开或新建场景');
-    return;
-  }
-  publishImportProgress(true, '请稍候...');
-  try {
-    const result = await editorApi.main.importResourceFile(currentSceneName.value, 'actor');
-    const payload = unwrapBridgePayload(result);
-    const status = payload?.status;
-    if (result?.success === false || status === 'error') {
-      reportImportError('Actor 导入失败', payload?.message || result?.error || 'unknown error');
-      return;
-    }
-    if (status === 'canceled') {
-      return;
-    }
-    await createActorFromSelectedFile(payload, 'actor', 'Actor import');
-  } catch (e) {
-    reportImportError('Actor 导入失败', e);
-  } finally {
-    publishImportProgress(false);
-  }
-};
-
-const HandleMultimediaImport = async () => {
-  ShowModelDropdown.value = false;
-  publishImportProgress(true, '请稍候...');
-  try {
-    const result = await editorApi.main.importResourceFile(currentSceneName.value, 'multimedia');
-    // 兼容包装型 { success, data } 与直返型两种形态
-    const payload = result?.data ?? result;
-    const status = payload?.status;
-    if (result?.success === false || status === 'error') {
-      reportImportError('音视频导入失败', payload?.message || result?.error || 'unknown error');
-      return;
-    }
-    if (status === 'canceled') {
-      return;
-    }
-    // 音视频是独立资源；音频额外创建一个可定位的 audio Actor（复用物体栏控制 3D 位置）。
-    const media = payload?.media;
-    if (media && media.name) {
-      if (media.type === 'audio' && media.resource_id) {
-        // 创建 audio Actor：复用 create_actor，把 resource_id 作为 actor_data 传入。
-        const createResult = await editorApi.sceneTools.createActor(
-          currentSceneName.value,
-          media.path,
-          'audio',
-          { audio_resource_id: String(media.resource_id), actor_name: media.name }
-        );
-        const createPayload = unwrapBridgePayload(createResult);
-        if (createResult?.success === false || createPayload?.status === 'error') {
-          reportImportError('音频对象创建失败', createPayload?.message || createResult?.error);
-        } else {
-          await OnInitObjTree();
-          const actor = createPayload?.actor;
-          if (actor?.name) {
-            selectedItem.value = actor.name;
-          }
-        }
-      } else {
-        await addMediaToList(media);
-      }
-      publishImportProgress(true, '导入完成', 100);
-    }
-  } catch (e) {
-    reportImportError('音视频导入失败', e);
-  } finally {
-    publishImportProgress(false);
-  }
-};
+const HandleFileImport = () => importSceneResource('model', 'model', '模型导入失败');
+const HandleUiImageImport = () => importSceneResource('ui_image', 'ui_image', '图片导入失败');
+const HandleActorImport = () => importSceneResource('actor', 'actor', 'Actor 导入失败');
+const HandleMultimediaImport = () => importSceneResource('multimedia', 'audio', '音视频导入失败');
 
 const addMediaToList = async (media) => {
   if (!media || !media.name) return;

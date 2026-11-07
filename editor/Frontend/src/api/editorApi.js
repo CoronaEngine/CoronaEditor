@@ -17,7 +17,6 @@ const CURRENT_CALLER = 'SceneBar';
 const INTERACTIVE_FILE_PICKER_APIS = new Set([
   'ProjectLauncher.open_project_file',
   'ProjectLauncher.browse_folder',
-  'MainView.import_resource_file',
 ]);
 
 // How long a non-interactive manifest-backed request waits for a native reply before failing.
@@ -457,7 +456,17 @@ const editorApiStatic = {
       call_manifest_editor_api('project.openProject', [projectPath, options]),
     openProjectFile: () => call_manifest_editor_api('project.openProjectFile', []),
   },
+  audio: {
+    playResource: (resourceId, loop = false) => window.corona.audio.playResource(resourceId, loop),
+    stopResource: (resourceId) => window.corona.audio.stopResource(resourceId),
+    playActor: (sceneName, actor, scope, loop = false) =>
+      window.corona.audio.playActor(sceneName, actor, { ...(scope || {}), loop }),
+    stopActor: (sceneName, actor, scope) => window.corona.audio.stopActor(sceneName, actor, scope),
+  },
   scene: {
+    selectActor: (sceneName, actorType, actorName, context = null) =>
+      context ? window.corona.scene.selectActor(sceneName, actorType, actorName, context)
+        : window.corona.scene.selectActor(sceneName, actorType, actorName),
     createCamera: (sceneName, options) => window.corona.scene.createCamera(sceneName, options),
     isVisionAvailable: () => window.corona.scene.isVisionAvailable(),
     observe: async (kind, callback) => sceneReader.observe(kind, callback),
@@ -468,6 +477,9 @@ const editorApiStatic = {
     readActorIndex: (sceneName, scope) => window.corona.scene.readActorIndex(sceneName, scope),
     selectModelFile: (sceneName, fileType = 'model', scope) =>
       window.corona.scene.selectModelFile(sceneName, { ...(scope || {}), file_type: fileType }),
+    createActor: (sceneName, path, options) => window.corona.scene.createActor(sceneName, path, options),
+    importResourceFile: (sceneName, fileType = 'model', scope) =>
+      window.corona.scene.importResourceFile(sceneName, { ...(scope || {}), file_type: fileType }),
     readActorProperties: (sceneName, actor, scope) => window.corona.scene.readActorProperties(sceneName, actor, scope),
     readActorSkeleton: (sceneName, actor, scope) => window.corona.scene.readActorSkeleton(sceneName, actor, scope),
     readActorIkChains: (sceneName, actor, scope) => window.corona.scene.readActorIkChains(sceneName, actor, scope),
@@ -523,27 +535,6 @@ const editorApiStatic = {
   projectFiles: {
     save: request => call_manifest_editor_api('projectFiles.save', [request]),
     load: request => call_manifest_editor_api('projectFiles.load', [request]),
-  },
-  sceneTools: {
-    createActor: (sceneName, objPath, actorType = 'model', actorData = null) =>
-      callProjectAssetOperation('sceneTools.createActor', actorData || {}, [sceneName, objPath, actorType]),
-    selectActor: (sceneName, actorType, actorName, context = null) =>
-      context ? window.corona.scene.selectActor(sceneName, actorType, actorName, context)
-        : window.corona.scene.selectActor(sceneName, actorType, actorName),
-    playAudio: (resourceId, loop) =>
-      call_manifest_editor_api('sceneTools.playAudio', [resourceId, loop]),
-    stopAudio: (resourceId) =>
-      call_manifest_editor_api('sceneTools.stopAudio', [resourceId]),
-    actorPlayAudio: (actorName, loop = false) =>
-      call_manifest_editor_api('sceneTools.actorPlayAudio', [actorName, loop]),
-    actorStopAudio: (actorName) =>
-      call_manifest_editor_api('sceneTools.actorStopAudio', [actorName]),
-  },
-  main: {
-    importResourceFile: (sceneName, fileType) =>
-      call_manifest_editor_api('main.importResourceFile', [sceneName, fileType]),
-    onInit: (projectPath = '') =>
-      call_manifest_editor_api('main.onInit', projectPath ? [projectPath] : []),
   },
   projectSettings: {
     readProjectDocument: (request) => call_manifest_editor_api('projectSettings.readProjectDocument', [request]),

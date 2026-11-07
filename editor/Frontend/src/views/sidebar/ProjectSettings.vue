@@ -110,7 +110,7 @@ const loadSettings = async () => {
   errorMsg.value = '';
   try {
     const res = await editorApi.projectSettings.getActiveProjectInfo();
-    if (res && res.success && res.data) {
+    if (res && res.status === 'success' && res.data) {
       form.value = { ...form.value, ...res.data };
     } else {
       errorMsg.value = (res && res.error) || t('projectSettings.loadFailed');
@@ -131,7 +131,7 @@ const handleSave = async () => {
       core_version: form.value.core_version,
     };
     const res = await editorApi.projectSettings.saveActiveProjectInfo(payload);
-    if (res && res.success) {
+    if (res && res.status === 'success') {
       setStatus(t('projectSettings.saveSuccess'), true);
     } else {
       setStatus((res && res.error) || t('projectSettings.saveFailed'), false);

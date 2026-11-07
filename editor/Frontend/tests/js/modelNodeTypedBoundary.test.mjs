@@ -17,8 +17,8 @@ test('model node operations use the typed scene surface with archive and actor i
   assert.match(component, /archive_session:\s*archiveSession/);
   assert.match(component, /actor_guid:\s*actorGuid/);
   assert.match(component, /actor_version/);
-  assert.equal(editorApi.sceneTools.getModelNodes, undefined);
-  assert.equal(editorApi.sceneTools.setModelNodeState, undefined);
+  assert.equal(editorApi.sceneTools?.getModelNodes, undefined);
+  assert.equal(editorApi.sceneTools?.setModelNodeState, undefined);
 });
 
 test('model node manifest routes are unavailable to CEF callers', () => {

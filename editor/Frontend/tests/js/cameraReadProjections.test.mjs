@@ -26,7 +26,7 @@ test('one camera V8 facade replaces both legacy Web snapshot and camera list rea
   assert.equal(await editorApi.scene.readCameras('scene.ini', scope), result);
   assert.deepEqual(calls, [['scene.ini', scope]]);
   assert.equal(editorApi.scene.getSnapshot, undefined);
-  assert.equal(editorApi.sceneTools.listCameraViews, undefined);
+  assert.equal(editorApi.sceneTools?.listCameraViews, undefined);
 });
 
 test('camera editing uses scoped scene V8 methods and retires sceneTools manifest routes', async t => {
@@ -42,8 +42,8 @@ test('camera editing uses scoped scene V8 methods and retires sceneTools manifes
   assert.equal(await editorApi.scene.deleteCamera('scene.ini', 'camera', scope), deleted);
   assert.deepEqual(calls, [['rename', 'scene.ini', 'camera', 'New name', scope],
     ['delete', 'scene.ini', 'camera', scope]]);
-  assert.equal(editorApi.sceneTools.renameCameraView, undefined);
-  assert.equal(editorApi.sceneTools.deleteCamera, undefined);
+  assert.equal(editorApi.sceneTools?.renameCameraView, undefined);
+  assert.equal(editorApi.sceneTools?.deleteCamera, undefined);
   const cameraView = readFileSync(new URL('../../src/views/tools/CameraView.vue', import.meta.url), 'utf8');
   const sceneBar = readFileSync(new URL('../../src/views/sidebar/SceneBar.vue', import.meta.url), 'utf8');
   assert.match(cameraView, /scene\.renameCamera\(sceneId, cameraId, cameraName\.value\.trim\(\), \{\s*archive_session: cameraArchiveSession/);

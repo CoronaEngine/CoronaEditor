@@ -579,7 +579,7 @@ const cameraViewPickController = createViewportPickController({
   getRenderRect: getCameraRenderRect,
   onResult: (payload, result) => handleCameraViewActorPickResult(payload, result),
   emitActorChange: (type, scene, actorName, nodeContext) =>
-    editorApi.sceneTools.selectActor(scene, type, actorName, { ...cameraViewSelectionContext(), ...nodeContext }),
+    editorApi.scene.selectActor(scene, type, actorName, { ...cameraViewSelectionContext(), ...nodeContext }),
 });
 
 const viewportGizmoController = createViewportGizmoController({
@@ -1051,7 +1051,7 @@ const handleCameraViewActorPickResult = (payload, result) => {
   if (result.status === 'selected') coronaEventBus.emit('model-node-picked', { ...payload, actor_name: payload?.actor_name || result.actor?.name });
   if (result.status === 'miss') coronaEventBus.emit('model-node-picked', payload);
   if (result.status === 'miss') {
-    editorApi.sceneTools.selectActor(
+    editorApi.scene.selectActor(
       sceneId,
       'scene',
       '',
