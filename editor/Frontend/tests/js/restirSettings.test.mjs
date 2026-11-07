@@ -26,11 +26,20 @@ const delay = () => new Promise(resolve => setTimeout(resolve, 200));
 async function fixture(api = {}) {
   assert.ok(fs.existsSync(moduleUrl), 'ReSTIR must provide its own settings state module');
   const module = await import(moduleUrl.href);
-  const props = reactive({ sceneId: 'room', cameraId: 'camera-a', enabled: true });
+  const props = reactive({ sceneId: 'room', cameraId: 'camera-a', archiveSession: 'archive-a', enabled: true });
   const scope = effectScope(), sent = [], reads = [];
   const state = scope.run(() => module.useRestirSettings(props, {
     getRestirSettings: async (...args) => { reads.push(args); return { success: true, data: { settings: fresh(), ready: true } }; },
     setRestirSettings: async (...args) => { sent.push(args); return { success: true, data: { settings: args[2], pending: true } }; },
+    readCameraRenderSettings: async (...args) => {
+      const result = await (api.getRestirSettings || (async () => ({ settings: fresh(), ready: true })))(args[0], args[1]);
+      return result?.data ?? result;
+    },
+    setCameraRenderSettings: async (...args) => {
+      if (!api.setRestirSettings) sent.push([args[0], args[1], args[2].settings]);
+      const result = await (api.setRestirSettings || (async () => ({ settings: args[2].settings, pending: true })))(args[0], args[1], args[2].settings);
+      return result?.data ?? result;
+    },
     ...api,
   }));
   return { props, state, sent, reads, module, stop: () => scope.stop() };

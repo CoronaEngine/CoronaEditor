@@ -5,12 +5,21 @@ import { relaxDefaults, validateRelaxSettings, useRelaxSettings } from '../../sr
 
 const settle = () => new Promise(resolve => setImmediate(resolve));
 function fixture(api = {}) {
-  const props = reactive({ sceneId: 'kitchen', cameraId: 'camera-a', enabled: true });
+  const props = reactive({ sceneId: 'kitchen', cameraId: 'camera-a', archiveSession: 'archive-a', enabled: true });
   const scope = effectScope();
   const sent = [];
   const state = scope.run(() => useRelaxSettings(props, {
     getRelaxSettings: async () => ({ settings: { diffuse_history: 18, anti_firefly: false } }),
     setRelaxSettings: async (...args) => { sent.push(args); return { settings: args[2], pending: true }; },
+    readCameraRenderSettings: async (...args) => {
+      const result = await (api.getRelaxSettings || (async () => ({ settings: { diffuse_history: 18, anti_firefly: false } })))(args[0], args[1]);
+      return result?.data ?? result;
+    },
+    setCameraRenderSettings: async (...args) => {
+      if (!api.setRelaxSettings) sent.push([args[0], args[1], args[2].settings]);
+      const result = await (api.setRelaxSettings || (async () => ({ settings: args[2].settings, pending: true })))(args[0], args[1], args[2].settings);
+      return result?.data ?? result;
+    },
     ...api,
   }));
   return { props, state, sent, stop: () => scope.stop() };

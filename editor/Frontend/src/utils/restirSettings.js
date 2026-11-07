@@ -106,7 +106,8 @@ export function useRestirSettings(props, api) {
       const deadline = Date.now() + 120000;
       let response;
       while (true) {
-        const result = await api.getRestirSettings(props.sceneId, props.cameraId);
+        const result = await api.readCameraRenderSettings(props.sceneId, props.cameraId,
+          { archive_session: props.archiveSession, family: 'restir' });
         response = result?.data ?? result;
         if (token !== generation) return;
         if (response?.status === 'error') throw new Error(response.message || '读取参数失败');
@@ -136,7 +137,8 @@ export function useRestirSettings(props, api) {
     const token = generation, settings = copySettings(draft.value);
     busy.value = true;
     try {
-      const result = await api.setRestirSettings(props.sceneId, props.cameraId, settings);
+      const result = await api.setCameraRenderSettings(props.sceneId, props.cameraId,
+        { archive_session: props.archiveSession, family: 'restir', settings });
       const response = result?.data ?? result;
       if (token !== generation) return false;
       if (response?.status === 'error') throw new Error(response.message || '应用参数失败');

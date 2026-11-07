@@ -2973,9 +2973,20 @@ function reconcileSceneActorReferenceIssues() {
 }
 async function refreshSceneActorOptions({ rescan = false } = {}) {
   const refreshSequence = ++actorOptionsRefreshSequence;
-  const requestedSceneName = String(props.sceneName || '').trim();
+  const archive = loadedArchiveSession;
+  const graphSequence = graphLoadSequence;
+  const current = () => viewLifetime.current() && !panelClosing && archive
+    && archive === loadedArchiveSession && graphSequence === graphLoadSequence;
+  let requestedSceneName = String(props.sceneName || '').trim();
   try {
-    const response = await editorApi.scene.listActorTree(requestedSceneName);
+    if (!current()) return false;
+    if (!requestedSceneName) {
+      const active = await editorApi.scene.readActive();
+      if (!current() || active.archive_session !== archive) return false;
+      requestedSceneName = String(active.scene || '').trim();
+    }
+    const response = await editorApi.scene.readActorTree(requestedSceneName, { archive_session: archive });
+    if (!current() || response?.archive_session !== archive || response?.scene !== requestedSceneName) return false;
     if (response?.success === false || response?.status === 'error') {
       throw new Error(response?.message || 'Actor tree query failed');
     }
@@ -2997,7 +3008,7 @@ async function refreshSceneActorOptions({ rescan = false } = {}) {
     }
     const actors = Array.from(actorsByName.values())
       .sort((left, right) => left.name.localeCompare(right.name, 'zh-CN'));
-    if (!componentMounted || refreshSequence !== actorOptionsRefreshSequence) return false;
+    if (!componentMounted || refreshSequence !== actorOptionsRefreshSequence || !current()) return false;
 
     const revision = actorContextRevision(requestedSceneName, actors);
     const changed = sceneActorContext.available !== true
@@ -3021,7 +3032,7 @@ async function refreshSceneActorOptions({ rescan = false } = {}) {
     }
     return changed;
   } catch (error) {
-    if (componentMounted && refreshSequence === actorOptionsRefreshSequence) {
+    if (componentMounted && refreshSequence === actorOptionsRefreshSequence && current()) {
       sceneActorContext.sceneName = requestedSceneName;
       sceneActorContext.available = false;
       sceneActorContext.revision = '';

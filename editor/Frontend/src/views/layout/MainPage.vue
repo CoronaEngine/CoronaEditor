@@ -148,7 +148,6 @@ import {
   subscribeCabbagePreWarnings,
 } from '@/services/cabbageAssistantContextService.js';
 import { cancelActiveNodeGraphGeneration } from '@/services/nodeGraphGenerationService.js';
-import { setActorContext } from '@/blockly/composables/useActorContext.js';
 import { closeTutorialSessionChannel } from '@/services/cabbageTutorialSessionService.js';
 import { provideCreativePanelState } from '@/services/creativePanelState.js';
 import { subscribeProjectChanged } from '@/services/projectMessages.js';
@@ -413,7 +412,6 @@ const handleActorSelectionForObjectDock = async (payload = {}, maybeSceneId = ''
   }
 
   const resolvedSceneId = sceneId || currentSceneId.value || DEFAULT_SCENE_NAME;
-  setActorContext(resolvedSceneId, actorName);
   void seedActorTransformBaseline(resolvedSceneId, actorName);
   const ownsGizmo = isViewportGizmoSelectionOwner({
     viewportScope: 'main',
@@ -832,7 +830,8 @@ const initializeCreativeRenderMode = async () => {
   creativeRenderDefaultsBusy.value = true;
   creativeRenderDefaultsError.value = '';
   try {
-    if (!await initializeWorldRenderBackend({ api: editorApi, sceneId, cameraId, isCurrent: current })) return false;
+    if (!await initializeWorldRenderBackend({ api: editorApi, sceneId, cameraId,
+      archiveSession: cameraBindingState.value.archiveSession, isCurrent: current })) return false;
     pendingMainRenderSelection = { sceneId, cameraId, backend: 'vision',
       visionMode: mainVisionRenderMode.value, expiresAt: Date.now() + 3000 };
     mainRenderBackend.value = 'vision';
@@ -865,10 +864,11 @@ const selectMainRenderMode = async (mode) => {
         expiresAt: Date.now() + 3000,
       };
       mainRenderBackend.value = 'native';
-      const result = unwrapBridgeData(
-        await editorApi.sceneTools.setRenderBackend('native', sceneId, cameraId),
-      );
-      mainRenderBackend.value = result?.mode || 'native';
+      const result = unwrapBridgeData(await editorApi.scene.setCameraRenderSettings(sceneId, cameraId, {
+        archive_session: cameraBindingState.value.archiveSession,
+        render_backend: 'native',
+      }));
+      mainRenderBackend.value = result?.render_backend || 'native';
       await syncSceneCameraBinding(sceneId);
       return true;
     }
@@ -883,17 +883,14 @@ const selectMainRenderMode = async (mode) => {
     mainRenderBackend.value = 'vision';
     mainVisionRenderMode.value = mode;
 
-    const modeResult = unwrapBridgeData(
-      await editorApi.sceneTools.setVisionRenderMode(sceneId, cameraId, mode),
-    );
-    mainVisionRenderMode.value = modeResult?.pending ? mode : modeResult?.mode || mode;
-
-    await editorApi.sceneTools.setOutputMode(sceneId, cameraId, 'final_color');
-
-    const backendResult = unwrapBridgeData(
-      await editorApi.sceneTools.setRenderBackend('vision', sceneId, cameraId),
-    );
-    mainRenderBackend.value = backendResult?.mode || 'native';
+    const result = unwrapBridgeData(await editorApi.scene.setCameraRenderSettings(sceneId, cameraId, {
+      archive_session: cameraBindingState.value.archiveSession,
+      render_backend: 'vision',
+      output_mode: 'final_color',
+      vision: { render_mode: mode },
+    }));
+    mainVisionRenderMode.value = result?.pending ? mode : result?.vision?.render_mode || mode;
+    mainRenderBackend.value = result?.render_backend || 'native';
     if (mainRenderBackend.value !== 'vision') {
       pendingMainRenderSelection = null;
       return false;
@@ -923,12 +920,13 @@ const toggleMainVisionAccumulation = async () => {
   mainVisionAccumulation.value = selection.enabled;
   mainVisionAccumulationError.value = '';
   try {
-    const result = unwrapBridgeData(
-      await editorApi.sceneTools.setVisionAccumulation(sceneId, cameraId, selection.enabled),
-    );
+    const result = unwrapBridgeData(await editorApi.scene.setCameraRenderSettings(sceneId, cameraId, {
+      archive_session: cameraBindingState.value.archiveSession,
+      vision: { accumulation: selection.enabled },
+    }));
     if (isCurrent()) {
-      selection.enabled = result?.pending || typeof result?.enabled !== 'boolean'
-        ? selection.enabled : result.enabled;
+      selection.enabled = result?.pending || typeof result?.vision?.accumulation !== 'boolean'
+        ? selection.enabled : result.vision.accumulation;
       mainVisionAccumulation.value = selection.enabled;
       if (currentMainCamera.value) currentMainCamera.value.vision_accumulation = selection.enabled;
     }
@@ -962,11 +960,14 @@ const toggleMainVisionDenoise = async () => {
   mainVisionDenoiseError.value = '';
   try {
     const result = unwrapBridgeData(
-      await editorApi.sceneTools.setVisionDenoise(sceneId, cameraId, selection.enabled),
+      await editorApi.scene.setCameraRenderSettings(sceneId, cameraId, {
+        archive_session: cameraBindingState.value.archiveSession,
+        vision: { denoise: selection.enabled },
+      }),
     );
     if (isCurrent()) {
-      selection.enabled = result?.pending || typeof result?.enabled !== 'boolean'
-        ? selection.enabled : result.enabled;
+      selection.enabled = result?.pending || typeof result?.vision?.denoise !== 'boolean'
+        ? selection.enabled : result.vision.denoise;
       mainVisionDenoise.value = selection.enabled;
       if (currentMainCamera.value) currentMainCamera.value.vision_denoise = selection.enabled;
     }
@@ -1001,10 +1002,13 @@ const selectMainVisionDenoiser = async (type) => {
   mainVisionDenoiserError.value = '';
   try {
     const result = unwrapBridgeData(
-      await editorApi.sceneTools.setVisionDenoiser(sceneId, cameraId, type),
+      await editorApi.scene.setCameraRenderSettings(sceneId, cameraId, {
+        archive_session: cameraBindingState.value.archiveSession,
+        vision: { denoiser: type },
+      }),
     );
     if (isCurrent()) {
-      if (!result?.pending && result?.type) selection.type = result.type;
+      if (!result?.pending && result?.vision?.denoiser) selection.type = result.vision.denoiser;
       mainVisionDenoiser.value = selection.type;
       if (currentMainCamera.value) currentMainCamera.value.vision_denoiser = selection.type;
     }
@@ -1038,11 +1042,14 @@ const toggleMainVisionStablePlanes = async () => {
   mainVisionStablePlanesError.value = '';
   try {
     const result = unwrapBridgeData(
-      await editorApi.sceneTools.setVisionStablePlanes(sceneId, cameraId, selection.enabled),
+      await editorApi.scene.setCameraRenderSettings(sceneId, cameraId, {
+        archive_session: cameraBindingState.value.archiveSession,
+        vision: { stable_planes: selection.enabled },
+      }),
     );
     if (isCurrent()) {
-      selection.enabled = result?.pending || typeof result?.enabled !== 'boolean'
-        ? selection.enabled : result.enabled;
+      selection.enabled = result?.pending || typeof result?.vision?.stable_planes !== 'boolean'
+        ? selection.enabled : result.vision.stable_planes;
       mainVisionStablePlanes.value = selection.enabled;
       if (currentMainCamera.value) currentMainCamera.value.vision_stable_planes = selection.enabled;
     }
@@ -1318,7 +1325,7 @@ const restoreCameraViews = async (sceneId) => {
     for (const camera of openCameras) {
       if (!current()) return;
       if (!await initializeWorldRenderBackend({ api: editorApi, sceneId,
-        cameraId: camera.camera_id, isCurrent: current }) || !current()) return;
+        cameraId: camera.camera_id, archiveSession: payload.archive_session, isCurrent: current }) || !current()) return;
       await appService.createCameraView({ ...camera, scene_id: sceneId });
     }
   } catch (e) {
@@ -1946,7 +1953,7 @@ onMounted(async () => {
   await pollProjectResourceLoadStatus();
   if (!viewCurrent()) return;
   try {
-    const visionResult = unwrapBridgeData(await editorApi.sceneTools.isVisionAvailable());
+    const visionResult = await editorApi.scene.isVisionAvailable();
     if (!viewCurrent()) return;
     visionAvailable.value = !!visionResult?.available;
   } catch (error) {

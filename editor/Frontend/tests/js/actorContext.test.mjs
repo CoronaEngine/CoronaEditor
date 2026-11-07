@@ -61,6 +61,11 @@ test('revision changes when transform or physics state changes', () => {
   assert.notEqual(actorContextRevision('default', base), actorContextRevision('default', moved));
 });
 
+test('typed scene projection physics_enabled is consumed by assistant context', () => {
+  const actor = actorRecordFromSceneItem({ name: 'crate', physics_enabled: true });
+  assert.equal(actor.physicsEnabled, true);
+});
+
 test('actorRecordsFromSceneTree recursively keeps actors under folders', () => {
   const actors = actorRecordsFromSceneTree({
     name: 'Scene Root',

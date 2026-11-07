@@ -27,24 +27,8 @@ const MANIFEST_METHODS = [
     return: 'object', allowed_callers: CALLER_CEF,
   },
   {
-    api: 'SceneTools.select_model_file', js_wrapper: 'sceneTools.selectModelFile',
-    params: [{ name: 'scene_name', type: 'string' }, { name: 'actor_name', type: 'string' },
-      { name: 'file_type', type: 'string', optional: true }],
-    return: 'string', allowed_callers: CALLER_CEF,
-  },
-  {
     api: 'MainView.import_resource_file', js_wrapper: 'main.importResourceFile',
     params: [{ name: 'scene_name', type: 'string' }, { name: 'file_type', type: 'string' }],
-    return: 'object', allowed_callers: CALLER_CEF,
-  },
-  {
-    api: 'SceneTools.get_restir_settings', js_wrapper: 'sceneTools.getRestirSettings',
-    params: [{ name: 'scene_name', type: 'string' }, { name: 'camera_id', type: 'string' }],
-    return: 'object', allowed_callers: CALLER_CEF,
-  },
-  {
-    api: 'SceneTools.set_restir_settings', js_wrapper: 'sceneTools.setRestirSettings',
-    params: [{ name: 'scene_name', type: 'string' }, { name: 'camera_id', type: 'string' }, { name: 'settings', type: 'object' }],
     return: 'object', allowed_callers: CALLER_CEF,
   },
   {
@@ -109,6 +93,16 @@ function createFakeCefHost() {
     pending,
     callbacks,
     corona: {
+      scene: {
+        readCameraRenderSettings(...args) {
+          requests.push({ api: 'corona.scene.readCameraRenderSettings', args });
+          return Promise.resolve({ archive_session: args[2].archive_session, scene: args[0], camera_id: args[1], settings: {} });
+        },
+        setCameraRenderSettings(...args) {
+          requests.push({ api: 'corona.scene.setCameraRenderSettings', args });
+          return Promise.resolve({ archive_session: args[2].archive_session, scene: args[0], camera_id: args[1] });
+        },
+      },
       editor: {
         invoke(api, args) {
           const payload = { api, args };
@@ -173,15 +167,35 @@ test('orphan mesh movement subscription is absent before and after loading nativ
   await editorApi.off(token);
 });
 
-test('model node wrappers preserve actor and numeric node identity in native requests', async () => {
+test('model node operations are not exposed through the manifest transport', async () => {
   const { editorApi, host } = await loadEditorApi();
-  await editorApi.sceneTools.getModelNodes('scene.ini', 'Temple', -1, 0, 50);
-  const patch = { visible: false, position: [1, 2, 3] };
-  await editorApi.sceneTools.setModelNodeState('scene.ini', 'Temple', 12, patch);
-  assert.deepEqual(host.requests.find((item) => item.api === 'SceneTools.get_model_nodes').args,
-    ['scene.ini', 'Temple', -1, 0, 50]);
-  assert.deepEqual(host.requests.find((item) => item.api === 'SceneTools.set_model_node_state').args,
-    ['scene.ini', 'Temple', 12, patch]);
+  assert.equal(editorApi.sceneTools.getModelNodes, undefined);
+  assert.equal(editorApi.sceneTools.setModelNodeState, undefined);
+  assert.equal(host.requests.some((item) => item.api === 'SceneTools.get_model_nodes' || item.api === 'SceneTools.set_model_node_state'), false);
+});
+
+test('camera render settings use one scoped V8 patch and expose no legacy Web setters', async () => {
+  const { editorApi, host } = await loadEditorApi();
+  const patch = {
+    archive_session: 'archive-7',
+    render_backend: 'vision',
+    output_mode: 'final_color',
+    vision: { render_mode: 'restir', accumulation: true },
+  };
+
+  await editorApi.scene.setCameraRenderSettings('SceneA', 'camera-1', patch);
+
+  assert.deepEqual(host.requests.find(item => item.api === 'corona.scene.setCameraRenderSettings'), {
+    api: 'corona.scene.setCameraRenderSettings', args: ['SceneA', 'camera-1', patch],
+  });
+  assert.equal(editorApi.sceneTools.setRenderBackend, undefined);
+  assert.equal(editorApi.sceneTools.setOutputMode, undefined);
+  assert.equal(editorApi.sceneTools.setVisionRenderMode, undefined);
+  assert.equal(editorApi.sceneTools.setVisionAccumulation, undefined);
+  assert.equal(editorApi.sceneTools.setVisionDenoise, undefined);
+  assert.equal(editorApi.sceneTools.setVisionDenoiser, undefined);
+  assert.equal(editorApi.sceneTools.setVisionStablePlanes, undefined);
+  assert.equal(host.requests.some(item => item.api.startsWith('SceneTools.set_')), false);
 });
 
 test('editor API calls pass structured values through the typed V8 binding', async () => {
@@ -282,12 +296,6 @@ const PICKER_CASES = [
     canceled: '',
   },
   {
-    api: 'SceneTools.select_model_file',
-    invoke: (editorApi) => editorApi.sceneTools.selectModelFile('scene.ini', 'Chair'),
-    selected: 'Assets/Chair.glb',
-    canceled: '',
-  },
-  {
     api: 'MainView.import_resource_file',
     invoke: (editorApi) => editorApi.main.importResourceFile('scene.ini', 'model'),
     selected: { status: 'success', scene: 'scene.ini', path: 'Assets/Chair.glb',
@@ -355,28 +363,28 @@ test('loading a selected project still times out and ignores its late native rep
 
 // Characterization tests for wrapper -> manifest resolution. These pin behaviour so the
 // lookup can be refactored (reverse map instead of a linear scan per call) without risk.
-test('a wrapper path resolves through the manifest to its native api name', async () => {
+test('camera render settings use one scoped V8 patch and expose no legacy Web setters', async () => {
   const { editorApi, host } = await loadEditorApi();
 
-  await editorApi.sceneTools.getRestirSettings('SceneA', 'camera-a');
+  await editorApi.scene.readCameraRenderSettings('SceneA', 'camera-a', { archive_session: 'archive-a', family: 'restir' });
 
-  const sent = host.requests.find((entry) => entry.api === 'SceneTools.get_restir_settings');
+  const sent = host.requests.find((entry) => entry.api === 'corona.scene.readCameraRenderSettings');
   assert.ok(
     sent,
-    `wrapper must resolve to the manifest api, saw: ${host.requests.map((r) => r.api).join(', ')}`
+    `typed binding must reach native, saw: ${host.requests.map((r) => r.api).join(', ')}`
   );
-  assert.deepEqual(sent.args, ['SceneA', 'camera-a']);
+  assert.deepEqual(sent.args, ['SceneA', 'camera-a', { archive_session: 'archive-a', family: 'restir' }]);
 });
 
-test('ReSTIR wrappers preserve the camera binding and nested settings through the manifest', async () => {
+test('ReSTIR settings preserve the camera binding and nested settings through V8', async () => {
   const { editorApi, host } = await loadEditorApi();
   const settings = { direct: { temporal: { open: false, radius: 8 } }, indirect: { open: true } };
-  await editorApi.sceneTools.getRestirSettings('SceneA', 'camera-b');
-  await editorApi.sceneTools.setRestirSettings('SceneA', 'camera-b', settings);
-  const calls = host.requests.filter(entry => entry.api.includes('restir_settings'));
+  await editorApi.scene.readCameraRenderSettings('SceneA', 'camera-b', { archive_session: 'archive-a', family: 'restir' });
+  await editorApi.scene.setCameraRenderSettings('SceneA', 'camera-b', { family: 'restir', settings, archive_session: 'archive-a' });
+  const calls = host.requests.filter(entry => entry.api.includes('CameraRenderSettings'));
   assert.deepEqual(calls.map(({ api, args }) => ({ api, args })), [
-    { api: 'SceneTools.get_restir_settings', args: ['SceneA', 'camera-b'] },
-    { api: 'SceneTools.set_restir_settings', args: ['SceneA', 'camera-b', settings] },
+    { api: 'corona.scene.readCameraRenderSettings', args: ['SceneA', 'camera-b', { archive_session: 'archive-a', family: 'restir' }] },
+    { api: 'corona.scene.setCameraRenderSettings', args: ['SceneA', 'camera-b', { family: 'restir', settings, archive_session: 'archive-a' }] },
   ]);
 });
 
@@ -394,12 +402,11 @@ test('an unknown wrapper path is rejected instead of being sent to native', asyn
 
 test('explicit namespaces resolve declared methods and do not expose unknown members', async () => {
   const { editorApi, host } = await loadEditorApi();
-  const getModelNodes = editorApi.sceneTools.getModelNodes;
-  assert.equal(editorApi.sceneTools.getModelNodes, getModelNodes);
+  assert.equal(editorApi.sceneTools.getModelNodes, undefined);
+  assert.equal(typeof editorApi.scene.readCameraRenderSettings, 'function');
+  assert.equal(typeof editorApi.sceneTools.getRestirSettings, 'undefined');
+  assert.equal(typeof editorApi.sceneTools.setRestirSettings, 'undefined');
   assert.equal(editorApi.sceneTools.then, undefined);
-  await getModelNodes('scene.ini', 'Temple');
-  assert.deepEqual(host.requests.find(entry => entry.api === 'SceneTools.get_model_nodes').args,
-    ['scene.ini', 'Temple']);
 
   const before = host.requests.filter(entry => !entry.api.startsWith('EditorApi.')).length;
   assert.equal(editorApi.sceneTools.notARealMethod, undefined);

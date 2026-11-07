@@ -76,9 +76,9 @@ function mountMainPage(t, visionMode = 'path_tracing', { nativeCursor = false } 
         if (scene !== 'scene_v3.xml') throw new Error(`Request does not identify the current scene: ${scene}`);
         return { data: { mode } };
       },
-      isVisionAvailable: async () => ({ data: { available: true } }),
     },
     scene: { observe: async () => -1,
+      isVisionAvailable: async () => ({ available: true }),
       setCameraProperties: async (...args) => { calls.push(['cameraWrite', ...args]); return {}; },
       readActive: async () => ({ archive_session: 'main-archive', scene: 'scene_v3.xml' }),
       getEnvironment: async (...args) => {

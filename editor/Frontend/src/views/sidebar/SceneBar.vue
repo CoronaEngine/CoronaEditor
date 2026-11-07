@@ -432,7 +432,6 @@ import { DEFAULT_SCENE_NAME } from '@/utils/constants.js';
 import { resolveOpenedProjectScene } from '@/services/projectLauncherService.js';
 import { emptySceneTreeSettlement, resolveSceneTreeSnapshot } from '@/utils/sceneTreeSnapshot.js';
 import { useErrorHandler } from '@/composables/useErrorHandler.js';
-import { setActorContext } from '@/blockly/composables/useActorContext.js';
 import { coronaEventBus } from '@/utils/eventBus.js';
 import { cabbageContextService } from '@/services/cabbageAssistantContextService.js';
 
@@ -553,9 +552,7 @@ const px = ref('1.0'),
   pz = ref('1.0');
 const recording = ref(false);
 
-const ACTOR_SINGLE_CLICK_DELAY_MS = 280;
 const CAMERA_LIST_HOVER_REFRESH_MS = 500;
-let actorSingleClickTimer = null;
 let actorFocusSeq = 0;
 let cameraListRefreshInFlight = false;
 let lastCameraListHoverRefreshAt = 0;
@@ -571,30 +568,12 @@ const normalizeHandle = (value) => {
   return Number.isFinite(handle) && handle > 0 ? handle : 0;
 };
 
-const clearActorSingleClickTimer = () => {
-  if (actorSingleClickTimer) {
-    clearTimeout(actorSingleClickTimer);
-    actorSingleClickTimer = null;
-  }
-};
-
-const ControlObject = async (scene) => {
-  // 音视频是独立资源，没有可操作的 Actor；但 audio Actor 是真实 Actor。
-  if (isMediaItem(scene) && !isAudioActor(scene)) return;
-  try {
-    await editorApi.sceneTools.openActor(currentSceneName.value, scene.name);
-  } catch (e) {
-    logError('Failed to open actor', e);
-  }
-};
-
 const SelectActor = (scene) => {
   publishModelNodeSelection(null);
   selectedItem.value = scene.name;
   // 扁平音视频资源仅作选中；audio Actor 走正常 Actor 选中（打开物体栏变换编辑器）。
   if (isMediaItem(scene) && !isAudioActor(scene)) return;
   // 通知积木编辑器当前选中的物体
-  setActorContext(currentSceneName.value, scene.name);
   void cabbageContextService.recordEvent({
     type: 'actor_selected',
     category: 'scene',
@@ -637,11 +616,12 @@ const isCameraDeletable = (cam) => cam?.deletable !== false;
 
 const DeleteCamera = async (cam) => {
   if (sceneCameras.value.length <= 1 || !isCameraDeletable(cam)) return;
+  const scope = { archive_session: archiveSession.value };
   try {
     const cameraId = cam.camera_id || cam.id || cam.name;
     await appService.closeCameraView(currentSceneName.value, cameraId);
     await new Promise((resolve) => setTimeout(resolve, 0));
-    await editorApi.sceneTools.deleteCamera(currentSceneName.value, cameraId);
+    await editorApi.scene.deleteCamera(currentSceneName.value, cameraId, scope);
     if (selectedCameraName.value === cam.name) selectedCameraName.value = null;
     if (selectedItem.value === `cam:${cam.name}`) selectedItem.value = null;
     await OnInitObjTree();
@@ -679,26 +659,11 @@ const focusActorFromList = async (scene) => {
   }
 };
 
-const onActorRowClick = (scene, event) => {
-  clearActorSingleClickTimer();
+const onActorRowClick = (scene) => {
   SelectActor(scene);
-
-  if (
-    isActorRowActionEvent(event) ||
-    Number(event?.detail) > 1 ||
-    (isMediaItem(scene) && !isAudioActor(scene))
-  ) {
-    return;
-  }
-
-  actorSingleClickTimer = setTimeout(() => {
-    actorSingleClickTimer = null;
-    ControlObject(scene);
-  }, ACTOR_SINGLE_CLICK_DELAY_MS);
 };
 
 const onActorRowDoubleClick = (scene, event) => {
-  clearActorSingleClickTimer();
   SelectActor(scene);
 
   if (isActorRowActionEvent(event)) {
@@ -785,9 +750,8 @@ const SaveScene = async () => {
       )
     )
       return;
-    const result = await editorApi.main.sceneSave(currentSceneName.value, archiveSession.value);
-    const saved = result?.data ?? result;
-    if (!saved?.ok) throw new Error(saved?.message || "保存场景失败");
+    const saved = await editorApi.scene.save(currentSceneName.value, { archive_session: archiveSession.value });
+    if (saved?.status !== 'saved') throw new Error(saved?.message || "保存场景失败");
     cabbageContextService.notifySceneSaved(saved.filepath);
     if (saved?.unresolved_actor_count > 0) {
       logWarn(`Scene saved with ${saved.unresolved_actor_count} unresolved actors`);
@@ -799,17 +763,16 @@ const SaveScene = async () => {
 
 const RebindActorResource = async (scene) => {
   try {
-    const selected = await editorApi.sceneTools.selectModelFile(
-      currentSceneName.value,
-      scene.name,
-      'model'
+    const selected = await editorApi.scene.selectModelFile(
+      currentSceneName.value, 'model', { archive_session: archiveSession.value },
     );
     const path = selected?.data ?? selected;
     if (!path) return;
-    const result = await editorApi.sceneTools.rebindActorResource(
+    const result = await editorApi.scene.rebindActorResource(
       currentSceneName.value,
       scene.actor_guid,
-      path
+      path,
+      { archive_session: archiveSession.value }
     );
     const rebound = result?.data ?? result;
     if (!rebound?.ok) {
@@ -859,21 +822,22 @@ const activeRenderBackend = ref('native');
 
 const RefreshRenderBackendState = async () => {
   try {
-    const availResult = await editorApi.sceneTools.isVisionAvailable();
-    const availPayload = availResult?.data ?? availResult;
-    visionAvailable.value = !!availPayload?.available;
+    const scene = currentSceneName.value;
+    const archive = archiveSession.value;
+    const current = () => viewLifetime.current() && scene === currentSceneName.value && archive === archiveSession.value;
+    if (!scene || !archive) return;
+    const [cameraResult, availResult] = await Promise.all([
+      editorApi.scene.readCameras(scene, { archive_session: archive }),
+      editorApi.scene.isVisionAvailable(),
+    ]);
+    if (!current() || cameraResult.archive_session !== archive || cameraResult.scene !== scene) return;
+    visionAvailable.value = !!availResult?.available;
     if (!visionAvailable.value) {
       return;
     }
     const target = getTargetCamera();
-    const modeResult = await editorApi.sceneTools.getRenderBackend(
-      currentSceneName.value,
-      target?.camera_id || target?.name || null
-    );
-    const modePayload = modeResult?.data ?? modeResult;
-    if (modePayload?.mode) {
-      activeRenderBackend.value = modePayload.mode;
-    }
+    const camera = cameraResult.cameras?.find(item => item.camera_id === target?.camera_id);
+    if (camera?.render_backend) activeRenderBackend.value = camera.render_backend;
   } catch (e) {
     logError('Failed to query render backend state', e);
   }
@@ -883,20 +847,12 @@ const ToggleRenderBackend = async () => {
   const next = activeRenderBackend.value === 'vision' ? 'native' : 'vision';
   try {
     const target = getTargetCamera();
-    const result = await editorApi.sceneTools.setRenderBackend(
-      next,
-      currentSceneName.value,
-      target?.camera_id || target?.name || null
-    );
-    const payload = result?.data ?? result;
-    if (result?.success === false || payload?.status === 'error') {
-      logError(
-        'Switch render backend failed',
-        payload?.message || result?.error || 'unknown error'
-      );
-    } else {
-      activeRenderBackend.value = next;
-    }
+    if (!target?.camera_id || !archiveSession.value) throw new Error('没有可用的活动相机');
+    const payload = await editorApi.scene.setCameraRenderSettings(currentSceneName.value, target.camera_id, {
+      archive_session: archiveSession.value,
+      render_backend: next,
+    });
+    activeRenderBackend.value = payload.render_backend;
   } catch (e) {
     logError('Failed to switch render backend', e);
   }
@@ -1135,10 +1091,17 @@ const addMediaToList = async (media) => {
 };
 
 const DeleteActor = async (scene) => {
-  sceneImages.value = sceneImages.value.filter((item) => item.name !== scene.name);
-
   try {
-    await editorApi.sceneTools.removeActor(currentSceneName.value, scene.name);
+    const result = await editorApi.scene.deleteActor(
+      currentSceneName.value,
+      scene.actor_guid || scene.name,
+      { archive_session: archiveSession.value },
+    );
+    if (result?.actor_guid === scene.actor_guid || result?.old_name === scene.name) {
+      if (selectedItem.value === scene.name) selectedItem.value = null;
+      if (modelNodeSelection.value?.actorGuid === scene.actor_guid || modelNodeSelection.value?.actorName === scene.name)
+        publishModelNodeSelection(null);
+    }
     await OnInitObjTree();
   } catch (error) {
     logError('Delete actor failed', error);
@@ -1162,6 +1125,8 @@ const OnInitObjTree = async () => {
       ? data.actors.map((item) => ({
           name: item.name,
           actor_guid: item.actor_guid || '',
+          actor_version: Number(item.actor_version || 1),
+          archive_session: archive,
           model_node_count: Number(item.model_node_count || 0),
           path: item.path,
           type: item.type || 'obj',
@@ -1304,7 +1269,6 @@ onUnmounted(() => {
   viewLifetime.dispose();
   clearSceneTreeSettleRetry();
   coronaEventBus.off('model-node-picked', handleModelNodePick);
-  clearActorSingleClickTimer();
   actorFocusSeq++;
 });
 </script>

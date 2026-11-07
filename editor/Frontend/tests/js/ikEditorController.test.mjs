@@ -57,8 +57,8 @@ const config = (chains = [chain()], revision = 4) => ({
 
 function setup(overrides = {}) {
   const api = {
-    getActorSkeletonLeaves: async () => ({ is_skinned: true, leaves: ['Foot'] }),
-    getActorIkChains: async () => config(),
+    readActorSkeleton: async () => ({ is_skinned: true, leaves: ['Foot'] }),
+    readActorIkChains: async () => config(),
     setActorIkChains: async (_scene, _actor, chains, revision) => config(chains, revision + 1),
     ...overrides,
   };
@@ -95,9 +95,9 @@ test('old actor responses cannot replace a newer actor, even with the same name 
   const oldConfig = deferred();
   const oldSkeleton = deferred();
   const { controller, state } = setup({
-    getActorSkeletonLeaves: (scene) =>
+    readActorSkeleton: (scene) =>
       scene === 'A' ? oldSkeleton.promise : Promise.resolve({ leaves: ['NewFoot'] }),
-    getActorIkChains: (scene) =>
+    readActorIkChains: (scene) =>
       scene === 'A' ? oldConfig.promise : Promise.resolve(config([chain('NewFoot')], 7)),
   });
   const oldLoad = controller.select('A', 'Character');
@@ -113,7 +113,7 @@ test('old actor responses cannot replace a newer actor, even with the same name 
 test('selection immediately clears drafts and stale rejected loads leave current actor alone', async () => {
   const first = deferred();
   const { controller, state } = setup({
-    getActorIkChains: (_scene, actor) =>
+    readActorIkChains: (_scene, actor) =>
       actor === 'A' ? first.promise : Promise.resolve(config([])),
   });
   const oldLoad = controller.select('Scene', 'A');
@@ -171,8 +171,8 @@ test('switching actor discards queued writes and ignores the in-flight old respo
   const oldReply = deferred();
   const requests = [];
   const { controller, state } = setup({
-    getActorSkeletonLeaves: async () => ({ leaves: ['A', 'B'] }),
-    getActorIkChains: async (_scene, actor) => config([chain(actor)], actor === 'B' ? 20 : 4),
+    readActorSkeleton: async () => ({ leaves: ['A', 'B'] }),
+    readActorIkChains: async (_scene, actor) => config([chain(actor)], actor === 'B' ? 20 : 4),
     setActorIkChains: (...args) => {
       requests.push(args);
       return oldReply.promise;
@@ -211,7 +211,7 @@ test('failed updates stop the queue until explicit refresh acquires a current re
   let attempts = 0;
   let revision = 1;
   const { controller, state } = setup({
-    getActorIkChains: async () => config([chain()], revision),
+    readActorIkChains: async () => config([chain()], revision),
     setActorIkChains: async () => {
       attempts += 1;
       throw new Error('409 revision conflict');
@@ -233,7 +233,7 @@ test('failed updates stop the queue until explicit refresh acquires a current re
 test('a resource readiness failure cannot expose a writable empty draft', async () => {
   let writes = 0;
   const { controller, state } = setup({
-    getActorIkChains: async () => ({ ready: false, is_skinned: true }),
+    readActorIkChains: async () => ({ ready: false, is_skinned: true }),
     setActorIkChains: async () => {
       writes += 1;
     },
@@ -247,7 +247,7 @@ test('a resource readiness failure cannot expose a writable empty draft', async 
 
 test('FootPlant only offers leaf children; other modes retain non-root joints', async () => {
   const { controller, state } = setup({
-    getActorSkeletonLeaves: async () => ({
+    readActorSkeleton: async () => ({
       leaves: ['Toe_End'],
       nodes: [
         { name: 'Root', parent: -1, leaf: false },
@@ -268,12 +268,12 @@ test('FootPlant only offers leaf children; other modes retain non-root joints', 
 test('legacy non-leaf Foot configuration stays visible and editable until explicitly corrected', async () => {
   const writes = [];
   const { controller, state } = setup({
-    getActorSkeletonLeaves: async () => ({ nodes: [
+    readActorSkeleton: async () => ({ nodes: [
       { name: 'Root', parent: -1, leaf: false },
       { name: 'Ankle', parent: 0, leaf: false },
       { name: 'Toe', parent: 1, leaf: true },
     ] }),
-    getActorIkChains: async () => config([chain('Ankle')]),
+    readActorIkChains: async () => config([chain('Ankle')]),
     setActorIkChains: async (_scene, _actor, chains, revision) => {
       writes.push(chains);
       return config(chains, revision + 1);
@@ -298,7 +298,7 @@ test('legacy non-leaf Foot configuration stays visible and editable until explic
 
 test('node metadata excludes roots, ambiguous names and unproven leaves', async () => {
   const { controller, state } = setup({
-    getActorSkeletonLeaves: async () => ({ leaves: ['Unknown'], nodes: [
+    readActorSkeleton: async () => ({ leaves: ['Unknown'], nodes: [
       { name: 'Root', parent: -1, leaf: true },
       { name: 'Ambiguous', parent: -1, leaf: false },
       { name: 'Ambiguous', parent: 0, leaf: true },
@@ -315,8 +315,8 @@ test('node metadata excludes roots, ambiguous names and unproven leaves', async 
 
 test('legacy leaves fallback excludes malformed and ambiguous names without inventing a selection', async () => {
   const { controller, state } = setup({
-    getActorSkeletonLeaves: async () => ({ leaves: ['Leaf', '', null, 1, 'Duplicate', 'Duplicate', '  '] }),
-    getActorIkChains: async () => config([]),
+    readActorSkeleton: async () => ({ leaves: ['Leaf', '', null, 1, 'Duplicate', 'Duplicate', '  '] }),
+    readActorIkChains: async () => config([]),
   });
   await controller.select('Scene', 'Actor');
   assert.deepEqual(state.boneNames, ['Leaf']);

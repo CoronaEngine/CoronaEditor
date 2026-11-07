@@ -57,9 +57,9 @@
 import { ref } from 'vue';
 import { editorApi } from '@/api/editorApi.js';
 import { restirPathFields, restirGroups, restirReuseGroups, useRestirSettings } from '@/utils/restirSettings.js';
-const props = defineProps({ sceneId: { type: String, default: '' }, cameraId: { type: String, default: '' }, enabled: Boolean });
+const props = defineProps({ sceneId: { type: String, default: '' }, cameraId: { type: String, default: '' }, archiveSession: { type: String, default: '' }, enabled: Boolean });
 const trigger = ref(null);
-const { open, busy, error, saved, draft, loaded, apply, reset } = useRestirSettings(props, editorApi.sceneTools);
+const { open, busy, error, saved, draft, loaded, apply, reset } = useRestirSettings(props, editorApi.scene);
 </script>
 
 <style scoped>

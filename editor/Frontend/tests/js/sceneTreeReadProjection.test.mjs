@@ -51,7 +51,7 @@ test('SceneBar reads a complete rich projection under its observed archive', asy
   const f = fixture(async () => snapshot());
   await f.run();
   assert.deepEqual(f.calls, [['scene.ini', { archive_session: 'archive' }]]);
-  assert.deepEqual(f.deps.sceneImages.value, [{ actor_guid: 'probe', name: 'Probe', path: 'model.ply', type: 'model',
+  assert.deepEqual(f.deps.sceneImages.value, [{ actor_guid: 'probe', actor_version: 1, archive_session: 'archive', name: 'Probe', path: 'model.ply', type: 'model',
     visible: false, handle: '18446744073709551615', model_node_count: 42,
     audioResourceId: '18446744073709551614', load_status: 'gpu_failed', load_error: { code: 'failed', message: 'Import failed' } }]);
   assert.deepEqual(f.cameras, [snapshot().cameras]);

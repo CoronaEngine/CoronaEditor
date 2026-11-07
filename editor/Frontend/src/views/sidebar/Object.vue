@@ -330,7 +330,7 @@ const saving = ref(false);
 
 // The controller binds reads and serialized writes to one actor selection.
 const ikState = reactive(createIkEditorState());
-const ikController = createIkEditorController(editorApi.sceneTools, ikState);
+const ikController = createIkEditorController(editorApi.scene, ikState);
 
 function addFoot() {
   ikState.feet.push(makeIkFoot());
@@ -482,7 +482,7 @@ async function loadActor(sceneName, actorName, session, actorGuid) {
     aliasDraft.value = actor.name;
     aliasError.value = '';
     syncViewportTransformBaseline();
-    void ikController.select(sceneName, actorName);
+    void ikController.select(sceneName, actorGuid || actorName, { archive_session: session });
   } catch (error) {
     if (current()) logError('加载对象数据失败', error);
   } finally {
@@ -507,14 +507,18 @@ async function commitAlias() {
   aliasSaving.value = true;
   aliasError.value = '';
   try {
-    const result = unwrap(await editorApi.sceneTools.renameActor(currentScene, currentName, nextName));
+    const result = await editorApi.scene.renameActor(
+      currentScene,
+      actor.actorGuid || currentName,
+      nextName,
+      { archive_session: archiveSession.value },
+    );
     if (selectedActorName.value !== currentName || selectedSceneName.value !== currentScene) return;
-    if (result?.status === 'error') throw new Error(result.message || '修改名称失败');
-    const savedName = String(result?.actor?.name || result?.new_name || nextName);
+    const savedName = String(result?.new_name || nextName);
     selectedActorName.value = savedName;
     actor.name = savedName;
     aliasDraft.value = savedName;
-    void ikController.select(currentScene, savedName);
+    void ikController.select(currentScene, actor.actorGuid || savedName, { archive_session: archiveSession.value });
   } catch (error) {
     aliasError.value = error?.message || '修改名称失败';
     aliasDraft.value = actor.name;
@@ -627,7 +631,9 @@ async function setRenderSpace(enabled) {
 async function selectModelFile() {
   if (!selectedActorName.value) return;
   try {
-    const raw = await editorApi.sceneTools.selectModelFile(selectedSceneName.value, selectedActorName.value, 'model');
+    const raw = await editorApi.scene.selectModelFile(
+      selectedSceneName.value, 'model', { archive_session: archiveSession.value },
+    );
     const payload = unwrap(raw);
     const path = typeof payload === 'string' ? payload : payload?.path || payload?.data || '';
     if (path) actor.modelPath = String(path);
@@ -641,10 +647,8 @@ async function rebindPlaceholderResource() {
   placeholderRebinding.value = true;
   try {
     const selected = unwrap(
-      await editorApi.sceneTools.selectModelFile(
-        selectedSceneName.value,
-        selectedActorName.value,
-        'model'
+      await editorApi.scene.selectModelFile(
+        selectedSceneName.value, 'model', { archive_session: archiveSession.value },
       )
     );
     const path = typeof selected === 'string'
@@ -652,10 +656,11 @@ async function rebindPlaceholderResource() {
       : selected?.path || selected?.data || '';
     if (!path) return;
     const result = unwrap(
-      await editorApi.sceneTools.rebindActorResource(
+      await editorApi.scene.rebindActorResource(
         selectedSceneName.value,
         actor.actorGuid,
-        path
+        path,
+        { archive_session: archiveSession.value }
       )
     );
     if (!result || result.status === 'error' || result.ok === false) {
@@ -810,9 +815,8 @@ async function saveActor() {
       flushTransformUpdates();
     }
     await transformFlushPromise;
-    const result = await editorApi.sceneTools.saveActor(sceneName, actorName, session);
-    const saved = result?.data ?? result;
-    if (saved?.ok === false) throw new Error(saved.message || '保存对象失败');
+    const saved = await editorApi.scene.save(sceneName, { archive_session: session, actors_only: true });
+    if (saved?.status === 'read_only') throw new Error(saved.message || '保存对象失败');
     cabbageContextService.notifySceneSaved(saved?.filepath);
   } catch (error) {
     logError('保存对象失败', error);

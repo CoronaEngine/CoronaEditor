@@ -20,7 +20,7 @@ async function renderPanel(f) {
 
 const settle = () => new Promise(resolve => setImmediate(resolve));
 function fixture(api = {}) {
-  const props = reactive({ sceneId: 'room', cameraId: 'camera-a', enabled: true });
+  const props = reactive({ sceneId: 'room', cameraId: 'camera-a', archiveSession: 'archive-a', enabled: true });
   const scope = effectScope();
   const sent = [];
   const state = scope.run(() => usePtSettings(props, {
@@ -29,6 +29,15 @@ function fixture(api = {}) {
       adaptive: { enabled: false, threshold: 0.002, start_index: 256 },
     } }),
     setPtSettings: async (...args) => { sent.push(args); return { success: true, data: { settings: args[2], pending: true } }; },
+    readCameraRenderSettings: async (...args) => {
+      const result = await (api.getPtSettings || (async () => ({ settings: { max_depth: 12, min_depth: 3, rr_threshold: 0.75 } })))(args[0], args[1]);
+      return result?.data ?? result;
+    },
+    setCameraRenderSettings: async (...args) => {
+      if (!api.setPtSettings) sent.push([args[0], args[1], args[2].settings]);
+      const result = await (api.setPtSettings || (async () => ({ settings: args[2].settings, pending: true })))(args[0], args[1], args[2].settings);
+      return result?.data ?? result;
+    },
     ...api,
   }));
   return { props, state, sent, stop: () => scope.stop() };

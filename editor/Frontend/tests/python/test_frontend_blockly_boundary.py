@@ -9,7 +9,6 @@ BLOCKLY_ROOT = SRC_ROOT / "blockly"
 EXPECTED_DIRECTORIES = (
     "blocks",
     "components",
-    "composables",
     "configs",
     "generators",
     "i18n",

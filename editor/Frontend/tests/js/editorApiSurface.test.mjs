@@ -10,8 +10,17 @@ const ownMember = (path) => path.split('.').reduce((value, key) =>
   value && Object.hasOwn(value, key) ? value[key] : undefined, editorApi);
 
 test('all manifest-declared Web methods have explicit own wrappers before discovery', () => {
-  const wrappers = nativeMethods.split('\n').filter(line => line.includes('WRAPPED'))
-    .map(line => line.match(/"([^"]*)"/)?.[1]).filter(Boolean);
+  const hasCefCaller = (line) => {
+    if (!line.includes('WRAPPED_CALLERS')) return true;
+    const callers = line.slice(line.lastIndexOf(',') + 1);
+    if (callers.includes('~caller_mask(EditorApiCaller::Cef)')) return false;
+    return callers.includes('caller_mask(EditorApiCaller::Cef)') ||
+      callers.includes('all_callers()') || callers.includes('animation_callers()') ||
+      callers.includes('cef_and_script_runtime_callers()');
+  };
+  const wrappers = nativeMethods.split('\n').filter(line => line.includes('WRAPPED') && hasCefCaller(line))
+    .map(line => line.match(/"([^"]*)"/)?.[1])
+    .filter(Boolean);
   assert.ok(wrappers.length > 100, 'the real native manifest must be inspected');
   assert.deepEqual(wrappers.filter(path => typeof ownMember(path) !== 'function'), []);
 });

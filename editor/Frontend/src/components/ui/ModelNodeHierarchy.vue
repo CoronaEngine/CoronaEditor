@@ -122,8 +122,12 @@ const scrollTop = ref(0);
 const viewportHeight = ref(280);
 let request = 0;
 let resizeObserver;
+let mutationChain = Promise.resolve();
 
 const actorName = computed(() => props.actor?.name || '');
+const actorGuid = computed(() => props.actor?.actor_guid || '');
+const archiveSession = computed(() => props.actor?.archive_session || '');
+const actorVersion = ref(Number(props.actor?.actor_version || 1));
 const nodeCount = computed(() => Number(props.actor?.model_node_count || 0));
 const rootKey = computed(() => String(displayRoot.value));
 const flatRows = computed(() => flattenLoadedNodes(pages.value, expanded.value, rootKey.value));
@@ -143,6 +147,28 @@ const isSelected = (node) =>
   Number(node.node_index) === Number(props.selection?.nodeIndex) &&
   props.selection?.actorName === actorName.value;
 
+const persistNodePatch = (node, patch) => {
+  const identity = {
+    archive_session: archiveSession.value,
+    scene: props.sceneName,
+    actor_guid: actorGuid.value,
+    node_index: Number(node.node_index),
+  };
+  const operation = mutationChain.then(async () => {
+    if (identity.archive_session !== archiveSession.value || identity.scene !== props.sceneName || identity.actor_guid !== actorGuid.value) {
+      throw new Error('Model node edit belongs to an inactive Actor');
+    }
+    const data = responseData(await editorApi.scene.setModelNodeState({
+      ...identity,
+      expected_actor_version: actorVersion.value,
+    }, patch));
+    actorVersion.value = Number(data.actor_version || actorVersion.value);
+    return data;
+  });
+  mutationChain = operation.catch(() => {});
+  return operation;
+};
+
 const loadPage = async (parentIndex, offset = 0) => {
   if (!actorName.value) return null;
   const key = pageKey(parentIndex);
@@ -152,13 +178,13 @@ const loadPage = async (parentIndex, offset = 0) => {
   loading.value = true;
   try {
     const data = responseData(
-      await editorApi.sceneTools.getModelNodes(
-        props.sceneName,
-        actorName.value,
-        parentIndex,
+      await editorApi.scene.readModelNodes(props.sceneName, {
+        archive_session: archiveSession.value,
+        actor_guid: actorGuid.value,
+        parent_index: parentIndex,
         offset,
-        pageSize
-      )
+        limit: pageSize,
+      })
     );
     if (token !== request) return null;
     const previous = pages.value[key]?.items || [];
@@ -169,6 +195,7 @@ const loadPage = async (parentIndex, offset = 0) => {
       next_offset: Number(data.next_offset || 0),
       loading: false,
     };
+    actorVersion.value = Number(data.actor_version || actorVersion.value);
     pages.value = { ...pages.value, [key]: page };
     return page;
   } catch {
@@ -253,34 +280,15 @@ const select = (node) =>
   });
 
 const toggleVisibility = async (node) => {
-  const data = responseData(
-    await editorApi.sceneTools.setModelNodeState(
-      props.sceneName,
-      actorName.value,
-      Number(node.node_index),
-      {
-        visible: !node.visible,
-      }
-    )
-  );
-  applyNode(data.node);
-  select(data.node || node);
+  const data = await persistNodePatch(node, { visible: !node.visible });
+  const updated = data.nodes?.[0] || node; applyNode(updated); select(updated);
 };
 
 const save = async (key) => {
   const node = selectedNode.value;
   if (!node) return;
-  const data = responseData(
-    await editorApi.sceneTools.setModelNodeState(
-      props.sceneName,
-      actorName.value,
-      Number(node.node_index),
-      {
-        [key]: [...node[key]],
-      }
-    )
-  );
-  applyNode(data.node);
+  const data = await persistNodePatch(node, { [key]: [...node[key]] });
+  applyNode(data.nodes?.[0] || node);
 };
 
 const onScroll = (event) => {
@@ -289,8 +297,9 @@ const onScroll = (event) => {
 };
 
 watch(
-  () => [props.active, props.sceneName, actorName.value],
+  () => [props.active, props.sceneName, actorName.value, actorGuid.value, archiveSession.value, props.actor?.actor_version],
   () => {
+    actorVersion.value = Number(props.actor?.actor_version || 1);
     void refresh();
   },
   { immediate: true }

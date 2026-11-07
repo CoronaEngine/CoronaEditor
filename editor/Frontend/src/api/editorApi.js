@@ -17,7 +17,6 @@ const CURRENT_CALLER = 'SceneBar';
 const INTERACTIVE_FILE_PICKER_APIS = new Set([
   'ProjectLauncher.open_project_file',
   'ProjectLauncher.browse_folder',
-  'SceneTools.select_model_file',
   'MainView.import_resource_file',
 ]);
 
@@ -460,20 +459,45 @@ const editorApiStatic = {
   },
   scene: {
     createCamera: (sceneName, options) => window.corona.scene.createCamera(sceneName, options),
+    isVisionAvailable: () => window.corona.scene.isVisionAvailable(),
     observe: async (kind, callback) => sceneReader.observe(kind, callback),
     readTree: (sceneName, scope) => window.corona.scene.readTree(sceneName, scope),
-    listActorTree: (sceneName) => call_manifest_editor_api('scene.listActorTree', [sceneName]),
+    readActorTree: (sceneName, scope) => window.corona.scene.readActorTree(sceneName, scope),
     readCameras: (sceneName, scope) => window.corona.scene.readCameras(sceneName, scope),
     readActive: () => window.corona.scene.readActive(),
     readActorIndex: (sceneName, scope) => window.corona.scene.readActorIndex(sceneName, scope),
+    selectModelFile: (sceneName, fileType = 'model', scope) =>
+      window.corona.scene.selectModelFile(sceneName, { ...(scope || {}), file_type: fileType }),
     readActorProperties: (sceneName, actor, scope) => window.corona.scene.readActorProperties(sceneName, actor, scope),
+    readActorSkeleton: (sceneName, actor, scope) => window.corona.scene.readActorSkeleton(sceneName, actor, scope),
+    readActorIkChains: (sceneName, actor, scope) => window.corona.scene.readActorIkChains(sceneName, actor, scope),
+    readModelNodes: (sceneName, options) => window.corona.scene.readModelNodes(sceneName, options),
+    setModelNodeState: (identity, patch) => window.corona.scene.setModelNodeState(identity, patch),
+    setActorIkChains: (sceneName, actor, chains, expectedRevision, scope) => expectedRevision === undefined
+      ? window.corona.scene.setActorIkChains(sceneName, actor, chains, scope)
+      : window.corona.scene.setActorIkChains(sceneName, actor, chains, expectedRevision, scope),
     readTransforms: (session, actors) => window.corona.scene.readTransforms({ archive_session: session, actors }),
     setActorTransform: (sceneName, actorName, transform) =>
       window.corona.scene.setActorTransform(sceneName, actorName, transform),
     setActorProperties: (sceneName, actorName, patch) =>
       window.corona.scene.setActorProperties(sceneName, actorName, patch),
+    renameActor: (sceneName, actor, name, scope) =>
+      window.corona.scene.renameActor(sceneName, actor, name, scope),
+    deleteActor: (sceneName, actor, scope) =>
+      window.corona.scene.deleteActor(sceneName, actor, scope),
+    rebindActorResource: (sceneName, actorGuid, path, scope) =>
+      window.corona.scene.rebindActorResource(sceneName, actorGuid, path, scope),
+    save: (sceneName, scope) => window.corona.scene.save(sceneName, scope),
     focusActor: (sceneName, actorName, cameraId, scope) => window.corona.scene.focusActor(sceneName, actorName, cameraId, scope),
     setCameraProperties: (sceneName, cameraId, patch) => window.corona.scene.setCameraProperties(sceneName, cameraId, patch),
+    setCameraRenderSettings: (sceneName, cameraId, patch) =>
+      window.corona.scene.setCameraRenderSettings(sceneName, cameraId, patch),
+    readCameraRenderSettings: (sceneName, cameraId, scope) =>
+      window.corona.scene.readCameraRenderSettings(sceneName, cameraId, scope),
+    renameCamera: (sceneName, cameraId, name, scope) =>
+      window.corona.scene.renameCamera(sceneName, cameraId, name, scope),
+    deleteCamera: (sceneName, cameraId, scope) =>
+      window.corona.scene.deleteCamera(sceneName, cameraId, scope),
     captureScreenshot: (sceneName, cameraId, options) => window.corona.scene.captureScreenshot(sceneName, cameraId, options),
     getEnvironment: (sceneName, scope) => window.corona.scene.getEnvironment(sceneName, scope),
     setEnvironment: (sceneName, patch) => window.corona.scene.setEnvironment(sceneName, patch),
@@ -501,69 +525,11 @@ const editorApiStatic = {
     load: request => call_manifest_editor_api('projectFiles.load', [request]),
   },
   sceneTools: {
-    setVisionDenoiser: (...args) => call_manifest_editor_api('sceneTools.setVisionDenoiser', args),
-    setReblurSettings: (...args) => call_manifest_editor_api('sceneTools.setReblurSettings', args),
-    setPtSettings: (...args) => call_manifest_editor_api('sceneTools.setPtSettings', args),
-    setRestirSettings: (...args) => call_manifest_editor_api('sceneTools.setRestirSettings', args),
-    setRelaxSettings: (...args) => call_manifest_editor_api('sceneTools.setRelaxSettings', args),
-    getPtSettings: (...args) => call_manifest_editor_api('sceneTools.getPtSettings', args),
-    getRestirSettings: (...args) => call_manifest_editor_api('sceneTools.getRestirSettings', args),
-    getReblurSettings: (...args) => call_manifest_editor_api('sceneTools.getReblurSettings', args),
-    getRelaxSettings: (...args) => call_manifest_editor_api('sceneTools.getRelaxSettings', args),
-    pauseActorAnimation: (...args) => call_manifest_editor_api('sceneTools.pauseActorAnimation', args),
-    resumeActorAnimation: (...args) => call_manifest_editor_api('sceneTools.resumeActorAnimation', args),
-    getModelNodes: (...args) => call_manifest_editor_api('sceneTools.getModelNodes', args),
-    setModelNodeState: (...args) => call_manifest_editor_api('sceneTools.setModelNodeState', args),
-    reloadScene: (sceneName, projectPath = '') =>
-      call_manifest_editor_api('sceneTools.reloadScene', projectPath ? [sceneName, projectPath] : [sceneName]),
-    rebindActorResource: (sceneName, actorGuid, path, scope) =>
-      callProjectFileMutation('sceneTools.rebindActorResource', [sceneName, actorGuid, path], scope),
     createActor: (sceneName, objPath, actorType = 'model', actorData = null) =>
       callProjectAssetOperation('sceneTools.createActor', actorData || {}, [sceneName, objPath, actorType]),
-    removeActor: (sceneName, actorName) =>
-      call_manifest_editor_api('sceneTools.removeActor', [sceneName, actorName]),
-    renameActor: (sceneName, actorName, name) =>
-      call_manifest_editor_api('sceneTools.renameActor', [sceneName, actorName, name]),
-    openActor: (sceneName, actorName) =>
-      call_manifest_editor_api('sceneTools.openActor', [sceneName, actorName]),
     selectActor: (sceneName, actorType, actorName, context = null) =>
       context ? window.corona.scene.selectActor(sceneName, actorType, actorName, context)
         : window.corona.scene.selectActor(sceneName, actorType, actorName),
-    setActorAnimation: (sceneName, actorName, animation, blendSeconds = 0.2) =>
-      call_manifest_editor_api('sceneTools.setActorAnimation', [sceneName, actorName, animation, blendSeconds]),
-    saveActor: (sceneName, actorName, session) =>
-      call_manifest_editor_api('sceneTools.saveActor', [sceneName, actorName, { archive_session: session }]),
-    selectModelFile: (sceneName, actorName, fileType = 'model') =>
-      call_manifest_editor_api('sceneTools.selectModelFile', [sceneName, actorName, fileType]),
-    setRenderBackend: (mode, sceneName = null, cameraId = null) =>
-      call_manifest_editor_api('sceneTools.setRenderBackend', [mode, sceneName, cameraId]),
-    getRenderBackend: (sceneName = null, cameraId = null) =>
-      call_manifest_editor_api('sceneTools.getRenderBackend', [sceneName, cameraId]),
-    setVisionRenderMode: (sceneName, cameraId = null, mode = 'path_tracing') =>
-      call_manifest_editor_api('sceneTools.setVisionRenderMode', [sceneName, cameraId, mode]),
-    getVisionRenderMode: (sceneName, cameraId = null) =>
-      call_manifest_editor_api('sceneTools.getVisionRenderMode', [sceneName, cameraId]),
-    setVisionAccumulation: (sceneName, cameraId = null, enabled = false) =>
-      call_manifest_editor_api('sceneTools.setVisionAccumulation', [sceneName, cameraId, !!enabled]),
-    getVisionAccumulation: (sceneName, cameraId = null) =>
-      call_manifest_editor_api('sceneTools.getVisionAccumulation', [sceneName, cameraId]),
-    setVisionDenoise: (sceneName, cameraId = null, enabled = false) =>
-      call_manifest_editor_api('sceneTools.setVisionDenoise', [sceneName, cameraId, !!enabled]),
-    getVisionDenoise: (sceneName, cameraId = null) =>
-      call_manifest_editor_api('sceneTools.getVisionDenoise', [sceneName, cameraId]),
-    setVisionStablePlanes: (sceneName, cameraId = null, enabled = true) =>
-      call_manifest_editor_api('sceneTools.setVisionStablePlanes', [sceneName, cameraId, !!enabled]),
-    getVisionStablePlanes: (sceneName, cameraId = null) =>
-      call_manifest_editor_api('sceneTools.getVisionStablePlanes', [sceneName, cameraId]),
-    renameCameraView: (sceneName, cameraId, name) =>
-      call_manifest_editor_api('sceneTools.renameCameraView', [sceneName, cameraId, name]),
-    deleteCamera: (sceneName, cameraId) =>
-      call_manifest_editor_api('sceneTools.deleteCamera', [sceneName, cameraId]),
-    setOutputMode: (sceneName, cameraName, mode) =>
-      call_manifest_editor_api('sceneTools.setOutputMode', [sceneName, cameraName, mode]),
-    getOutputMode: (sceneName, cameraName) =>
-      call_manifest_editor_api('sceneTools.getOutputMode', [sceneName, cameraName]),
-    isVisionAvailable: () => call_manifest_editor_api('sceneTools.isVisionAvailable', []),
     playAudio: (resourceId, loop) =>
       call_manifest_editor_api('sceneTools.playAudio', [resourceId, loop]),
     stopAudio: (resourceId) =>
@@ -572,21 +538,12 @@ const editorApiStatic = {
       call_manifest_editor_api('sceneTools.actorPlayAudio', [actorName, loop]),
     actorStopAudio: (actorName) =>
       call_manifest_editor_api('sceneTools.actorStopAudio', [actorName]),
-    getActorSkeletonLeaves: (sceneName, actorName) =>
-      call_manifest_editor_api('sceneTools.getActorSkeletonLeaves', [sceneName, actorName]),
-    getActorIkChains: (sceneName, actorName) =>
-      call_manifest_editor_api('sceneTools.getActorIkChains', [sceneName, actorName]),
-    setActorIkChains: (sceneName, actorName, chains, expectedRevision) =>
-      call_manifest_editor_api('sceneTools.setActorIkChains', expectedRevision === undefined
-        ? [sceneName, actorName, chains]
-        : [sceneName, actorName, chains, expectedRevision]),
   },
   main: {
     importResourceFile: (sceneName, fileType) =>
       call_manifest_editor_api('main.importResourceFile', [sceneName, fileType]),
     onInit: (projectPath = '') =>
       call_manifest_editor_api('main.onInit', projectPath ? [projectPath] : []),
-    sceneSave: (sceneName, session) => call_manifest_editor_api('main.sceneSave', [sceneName, { archive_session: session }]),
   },
   projectSettings: {
     readProjectDocument: (request) => call_manifest_editor_api('projectSettings.readProjectDocument', [request]),

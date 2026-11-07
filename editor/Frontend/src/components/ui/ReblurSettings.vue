@@ -37,9 +37,9 @@
 import { ref } from 'vue';
 import { editorApi } from '@/api/editorApi.js';
 import { reblurGroups, useReblurSettings } from '@/utils/reblurSettings.js';
-const props = defineProps({ sceneId: { type: String, default: '' }, cameraId: { type: String, default: '' }, enabled: Boolean });
+const props = defineProps({ sceneId: { type: String, default: '' }, cameraId: { type: String, default: '' }, archiveSession: { type: String, default: '' }, enabled: Boolean });
 const trigger = ref(null);
-const { open, busy, error, saved, draft, apply, reset } = useReblurSettings(props, editorApi.sceneTools);
+const { open, busy, error, saved, draft, apply, reset } = useReblurSettings(props, editorApi.scene);
 </script>
 
 <style scoped>

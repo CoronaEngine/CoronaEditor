@@ -29,6 +29,27 @@ test('one camera V8 facade replaces both legacy Web snapshot and camera list rea
   assert.equal(editorApi.sceneTools.listCameraViews, undefined);
 });
 
+test('camera editing uses scoped scene V8 methods and retires sceneTools manifest routes', async t => {
+  const previous = globalThis.window;
+  t.after(() => { globalThis.window = previous; });
+  const calls = [], renamed = { camera_id: 'camera', name: 'New name' }, deleted = { camera_id: 'camera' };
+  globalThis.window = { corona: { scene: {
+    renameCamera: async (...args) => { calls.push(['rename', ...args]); return renamed; },
+    deleteCamera: async (...args) => { calls.push(['delete', ...args]); return deleted; },
+  } } };
+  const scope = { archive_session: 'archive' };
+  assert.equal(await editorApi.scene.renameCamera('scene.ini', 'camera', 'New name', scope), renamed);
+  assert.equal(await editorApi.scene.deleteCamera('scene.ini', 'camera', scope), deleted);
+  assert.deepEqual(calls, [['rename', 'scene.ini', 'camera', 'New name', scope],
+    ['delete', 'scene.ini', 'camera', scope]]);
+  assert.equal(editorApi.sceneTools.renameCameraView, undefined);
+  assert.equal(editorApi.sceneTools.deleteCamera, undefined);
+  const cameraView = readFileSync(new URL('../../src/views/tools/CameraView.vue', import.meta.url), 'utf8');
+  const sceneBar = readFileSync(new URL('../../src/views/sidebar/SceneBar.vue', import.meta.url), 'utf8');
+  assert.match(cameraView, /scene\.renameCamera\(sceneId, cameraId, cameraName\.value\.trim\(\), \{\s*archive_session: cameraArchiveSession/);
+  assert.match(sceneBar, /const scope = \{ archive_session: archiveSession\.value \};[\s\S]*?scene\.deleteCamera\(currentSceneName\.value, cameraId, scope\)/);
+});
+
 function mainDeps() {
   const calls = [], applied = [], errors = [];
   const identity = { archive_session: 'archive', scene: 'scene.ini' };
@@ -53,7 +74,7 @@ function cameraDeps(read) {
     pendingDenoiserSelection: null, pendingStablePlanesSelection: null,
     normalizeVisionRenderMode, visionAccumulationFromCamera, visionDenoiseFromCamera,
     visionDenoiserFromCamera, visionStablePlanesFromCamera,
-    editorApi: { scene: { readCameras: read }, sceneTools: { isVisionAvailable: async () => ({ available: true }) } },
+    editorApi: { scene: { readCameras: read, isVisionAvailable: async () => ({ available: true }) } },
   };
   for (const key of ['camera', 'cameraName', 'backend', 'visionAvailable', 'visionAccumulation', 'visionDenoise',
     'visionDenoiser', 'visionStablePlanes', 'visionRenderMode', 'outputMode', 'moveSpeed', 'renderWidth', 'renderHeight'])

@@ -135,16 +135,16 @@ export function createIkEditorController(api, state) {
     Object.assign(state, createIkEditorState());
   };
 
-  async function select(sceneName, actorName) {
+  async function select(sceneName, actorName, scope) {
     clear();
     if (!sceneName || !actorName) return;
-    const session = { sceneName, actorName, revision: 0, pending: null, flushing: null };
+    const session = { sceneName, actorName, scope, revision: 0, pending: null, flushing: null };
     active = session;
     state.loading = true;
     try {
       const [skeletonRaw, configRaw] = await Promise.all([
-        api.getActorSkeletonLeaves(sceneName, actorName),
-        api.getActorIkChains(sceneName, actorName),
+        api.readActorSkeleton(sceneName, actorName, scope),
+        api.readActorIkChains(sceneName, actorName, scope),
       ]);
       if (active !== session) return;
       const skeleton = resultData(skeletonRaw);
@@ -172,7 +172,7 @@ export function createIkEditorController(api, state) {
         const chains = session.pending;
         session.pending = null;
         const response = resultData(
-          await api.setActorIkChains(session.sceneName, session.actorName, chains, session.revision)
+          await api.setActorIkChains(session.sceneName, session.actorName, chains, session.revision, session.scope)
         );
         if (active !== session) return;
         if (!Number.isSafeInteger(response.revision) || response.revision <= session.revision) {
@@ -217,7 +217,7 @@ export function createIkEditorController(api, state) {
     const session = active;
     if (!session) return;
     if (session.flushing) await session.flushing;
-    if (active === session) await select(session.sceneName, session.actorName);
+    if (active === session) await select(session.sceneName, session.actorName, session.scope);
   }
 
   return { select, apply, refresh, clear };

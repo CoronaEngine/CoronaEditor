@@ -68,13 +68,13 @@
           </button>
         </div>
       </div>
-      <PtSettings :scene-id="sceneId" :camera-id="cameraId"
+      <PtSettings :scene-id="sceneId" :camera-id="cameraId" :archive-session="cameraArchiveSession"
         :enabled="backend === 'vision' && visionRenderMode === 'path_tracing'" />
-      <RestirSettings :scene-id="sceneId" :camera-id="cameraId"
+      <RestirSettings :scene-id="sceneId" :camera-id="cameraId" :archive-session="cameraArchiveSession"
         :enabled="backend === 'vision' && visionRenderMode === 'restir'" />
-      <ReblurSettings :scene-id="sceneId" :camera-id="cameraId"
+      <ReblurSettings :scene-id="sceneId" :camera-id="cameraId" :archive-session="cameraArchiveSession"
         :enabled="backend === 'vision' && visionRenderMode !== 'ssat' && visionDenoiser === 'reblur' && !visionDenoiserBusy" />
-      <RelaxSettings :scene-id="sceneId" :camera-id="cameraId"
+      <RelaxSettings :scene-id="sceneId" :camera-id="cameraId" :archive-session="cameraArchiveSession"
         :enabled="backend === 'vision' && visionRenderMode !== 'ssat' && visionDenoiser === 'relax' && !visionDenoiserBusy" />
       <label class="vision-setting no-drag" title="累积 PT / ReSTIR 样本">
         <input
@@ -279,7 +279,7 @@ const loadCamera = async () => {
   if (!cameraArchiveSession || !viewLifetime.current()) return false;
   const [listResult, visionResult] = await Promise.all([
     editorApi.scene.readCameras(sceneId, { archive_session: cameraArchiveSession }),
-    editorApi.sceneTools.isVisionAvailable(),
+    editorApi.scene.isVisionAvailable(),
   ]);
   if (!viewLifetime.current() || listResult.archive_session !== cameraArchiveSession || listResult.scene !== sceneId) return false;
   const payload = unwrap(listResult);
@@ -324,9 +324,11 @@ const loadCamera = async () => {
 const renameCamera = async () => {
   if (!camera.value || !cameraName.value.trim() || cameraName.value === camera.value.name) return;
   try {
-    const result = unwrap(await editorApi.sceneTools.renameCameraView(sceneId, cameraId, cameraName.value.trim()));
-    Object.assign(camera.value, result.camera);
-    cameraName.value = result.camera.name;
+    const result = unwrap(await editorApi.scene.renameCamera(sceneId, cameraId, cameraName.value.trim(), {
+      archive_session: cameraArchiveSession,
+    }));
+    Object.assign(camera.value, result);
+    cameraName.value = result.name;
   } catch (error) {
     errorText.value = error.message;
     cameraName.value = camera.value.name;
@@ -335,12 +337,17 @@ const renameCamera = async () => {
 
 const changeBackend = async () => {
   try {
-    const result = unwrap(await editorApi.sceneTools.setRenderBackend(backend.value, sceneId, cameraId));
-    backend.value = result.mode;
+    const result = unwrap(await editorApi.scene.setCameraRenderSettings(sceneId, cameraId, {
+      archive_session: cameraArchiveSession,
+      render_backend: backend.value,
+      ...(backend.value === 'vision' ? {
+        output_mode: 'final_color',
+        vision: { render_mode: visionRenderMode.value },
+      } : {}),
+    }));
+    backend.value = result.render_backend;
     if (backend.value === 'vision') {
       outputMode.value = 'final_color';
-      await editorApi.sceneTools.setOutputMode(sceneId, cameraId, 'final_color');
-      await editorApi.sceneTools.setVisionRenderMode(sceneId, cameraId, visionRenderMode.value);
     }
   } catch (error) {
     errorText.value = error.message;
@@ -361,19 +368,18 @@ const selectVisionRenderMode = async (mode) => {
   visionModeMenuOpen.value = false;
   if (visionRenderMode.value === mode && backend.value === 'vision') return;
   try {
-    const result = unwrap(await editorApi.sceneTools.setVisionRenderMode(sceneId, cameraId, mode));
-    visionRenderMode.value = result.pending ? mode : result.mode || mode;
+    const result = unwrap(await editorApi.scene.setCameraRenderSettings(sceneId, cameraId, {
+      archive_session: cameraArchiveSession,
+      render_backend: 'vision',
+      output_mode: 'final_color',
+      vision: { render_mode: mode },
+    }));
+    visionRenderMode.value = result?.pending ? mode : result?.vision?.render_mode || mode;
+    backend.value = result?.render_backend || 'vision';
     if (camera.value) {
       camera.value.vision_render_mode = visionRenderMode.value;
     }
-    if (backend.value !== 'vision') {
-      const backendResult = unwrap(await editorApi.sceneTools.setRenderBackend('vision', sceneId, cameraId));
-      backend.value = backendResult.mode || 'vision';
-      if (backend.value === 'vision') {
-        outputMode.value = 'final_color';
-        await editorApi.sceneTools.setOutputMode(sceneId, cameraId, 'final_color');
-      }
-    }
+    outputMode.value = 'final_color';
   } catch (error) {
     errorText.value = error.message;
   }
@@ -389,9 +395,12 @@ const toggleVisionAccumulation = async () => {
   visionAccumulation.value = next;
   errorText.value = '';
   try {
-    const result = unwrap(await editorApi.sceneTools.setVisionAccumulation(sceneId, cameraId, next));
-    visionAccumulation.value = result?.pending || typeof result?.enabled !== 'boolean'
-      ? next : result.enabled;
+    const result = unwrap(await editorApi.scene.setCameraRenderSettings(sceneId, cameraId, {
+      archive_session: cameraArchiveSession,
+      vision: { accumulation: next },
+    }));
+    visionAccumulation.value = result?.pending || typeof result?.vision?.accumulation !== 'boolean'
+      ? next : result.vision.accumulation;
     if (camera.value) camera.value.vision_accumulation = visionAccumulation.value;
     return true;
   } catch (error) {
@@ -413,9 +422,12 @@ const toggleVisionDenoise = async () => {
   visionDenoise.value = next;
   errorText.value = '';
   try {
-    const result = unwrap(await editorApi.sceneTools.setVisionDenoise(sceneId, cameraId, next));
-    visionDenoise.value = result?.pending || typeof result?.enabled !== 'boolean'
-      ? next : result.enabled;
+    const result = unwrap(await editorApi.scene.setCameraRenderSettings(sceneId, cameraId, {
+      archive_session: cameraArchiveSession,
+      vision: { denoise: next },
+    }));
+    visionDenoise.value = result?.pending || typeof result?.vision?.denoise !== 'boolean'
+      ? next : result.vision.denoise;
     if (camera.value) camera.value.vision_denoise = visionDenoise.value;
     return true;
   } catch (error) {
@@ -440,9 +452,12 @@ const selectVisionDenoiser = async (type) => {
   visionDenoiser.value = type;
   errorText.value = '';
   try {
-    const result = unwrap(await editorApi.sceneTools.setVisionDenoiser(sceneId, cameraId, type));
+    const result = unwrap(await editorApi.scene.setCameraRenderSettings(sceneId, cameraId, {
+      archive_session: cameraArchiveSession,
+      vision: { denoiser: type },
+    }));
     if (isCurrent()) {
-      if (!result?.pending && result?.type) selection.type = result.type;
+      if (!result?.pending && result?.vision?.denoiser) selection.type = result.vision.denoiser;
       visionDenoiser.value = selection.type;
       camera.value.vision_denoiser = selection.type;
     }
@@ -472,10 +487,13 @@ const toggleVisionStablePlanes = async () => {
   visionStablePlanes.value = selection.enabled;
   errorText.value = '';
   try {
-    const result = unwrap(await editorApi.sceneTools.setVisionStablePlanes(sceneId, cameraId, selection.enabled));
+    const result = unwrap(await editorApi.scene.setCameraRenderSettings(sceneId, cameraId, {
+      archive_session: cameraArchiveSession,
+      vision: { stable_planes: selection.enabled },
+    }));
     if (isCurrent()) {
-      selection.enabled = result?.pending || typeof result?.enabled !== 'boolean'
-        ? selection.enabled : result.enabled;
+      selection.enabled = result?.pending || typeof result?.vision?.stable_planes !== 'boolean'
+        ? selection.enabled : result.vision.stable_planes;
       visionStablePlanes.value = selection.enabled;
       camera.value.vision_stable_planes = selection.enabled;
     }
@@ -496,7 +514,10 @@ const toggleVisionStablePlanes = async () => {
 const changeOutput = async () => {
   if (backend.value === 'vision') return;
   try {
-    await editorApi.sceneTools.setOutputMode(sceneId, cameraId, outputMode.value);
+    await editorApi.scene.setCameraRenderSettings(sceneId, cameraId, {
+      archive_session: cameraArchiveSession,
+      output_mode: outputMode.value,
+    });
   } catch (error) {
     errorText.value = error.message;
   }
