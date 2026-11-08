@@ -1,3 +1,4 @@
+import { sceneQueryFixture } from './sceneQueryFixtures.mjs';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
@@ -19,10 +20,10 @@ test('rich tree uses one scoped V8 facade and retires the manifest reader', asyn
   const oldWindow = globalThis.window, oldParse = JSON.parse, oldStringify = JSON.stringify;
   t.after(() => { globalThis.window = oldWindow; JSON.parse = oldParse; JSON.stringify = oldStringify; });
   const calls = [], result = { archive_session: 'archive', scene: 'scene.ini', tree_revision: 2, actors: [], cameras: [] };
-  globalThis.window = { corona: { scene: { readTree: async (...args) => { calls.push(args); return result; } } } };
+  globalThis.window = { corona: { scene: { ...sceneQueryFixture({ tree: async (...args) => { calls.push(args); return result; } }),   } } };
   JSON.parse = JSON.stringify = () => { throw Error('JSON tree transport'); };
   const scope = { archive_session: 'archive' };
-  assert.equal(await editorApi.scene.readTree('scene.ini', scope), result);
+  assert.equal(await editorApi.scene.readScene({ ...(scope), scene: 'scene.ini', actors: 'tree', cameras: true }), result);
   assert.deepEqual(calls, [['scene.ini', scope]]);
   assert.equal(editorApi.sceneTools?.listSceneTree, undefined);
 });
@@ -33,7 +34,7 @@ function fixture(read) {
     viewLifetime: { current: () => true }, currentSceneName: { value: 'scene.ini' },
     archiveSession: { value: 'archive' }, sceneTreeRequestSeq: 0,
     sceneTreeSettlement: { value: emptySceneTreeSettlement() }, sceneImages: { value: [{ name: 'previous' }] },
-    editorApi: { scene: { readTree: (...args) => { calls.push(args); return read(...args); } } },
+    editorApi: { scene: { ...sceneQueryFixture({ tree: (...args) => { calls.push(args); return read(...args); } }),   } },
     normalizeHandle: value => String(value ?? ''), resolveSceneTreeSnapshot,
     applyCameraList: value => cameras.push(value),
     scheduleSceneTreeSettleRetry: (...args) => retries.push(args), logError: (...args) => errors.push(args),

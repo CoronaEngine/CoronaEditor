@@ -30,15 +30,15 @@ class EditorApiAggregateWrapperTests(unittest.TestCase):
 
     def test_frontend_exposes_scene_and_viewport_aggregate_wrappers(self):
         for marker in (
-            "readCameras: (sceneName, scope)",
-            "readActorIndex: (sceneName, scope)",
+            "readScene: request =>",
+            "readActorRig: (sceneName, actor, scope)",
             "readActorProperties: (sceneName, actor, scope)",
             "setActorTransform: (sceneName, actorName, transform)",
             "save: (sceneName, scope)",
             "selectModelFile: (sceneName, fileType = 'model', scope)",
-            "setActorProperties: (sceneName, actorName, patch)",
+            "updateActor: (sceneName, actorName, patch)",
             "captureScreenshot: (sceneName, cameraId, options)",
-            "setCameraProperties: (sceneName, cameraId, patch)",
+            "updateCamera: (sceneName, cameraId, patch)",
         ):
             self.assertIn(marker, self.api_source)
         self.assertNotIn('getSnapshot:', self.api_source)

@@ -53,25 +53,21 @@ const editorApiStatic = {
     stopActor: (sceneName, actor, scope) => window.corona.audio.stopActor(sceneName, actor, scope),
   },
   scene: {
+    readScene: request => window.corona.scene.readScene(request),
+    readActorRig: (sceneName, actor, scope) => window.corona.scene.readActorRig(sceneName, actor, scope),
     selectActor: (sceneName, actorType, actorName, context = null) =>
       context ? window.corona.scene.selectActor(sceneName, actorType, actorName, context)
         : window.corona.scene.selectActor(sceneName, actorType, actorName),
     createCamera: (sceneName, options) => window.corona.scene.createCamera(sceneName, options),
     isVisionAvailable: () => window.corona.scene.isVisionAvailable(),
     observe: async (kind, callback) => sceneReader.observe(kind, callback),
-    readTree: (sceneName, scope) => window.corona.scene.readTree(sceneName, scope),
-    readActorTree: (sceneName, scope) => window.corona.scene.readActorTree(sceneName, scope),
-    readCameras: (sceneName, scope) => window.corona.scene.readCameras(sceneName, scope),
     readActive: () => window.corona.scene.readActive(),
-    readActorIndex: (sceneName, scope) => window.corona.scene.readActorIndex(sceneName, scope),
     selectModelFile: (sceneName, fileType = 'model', scope) =>
       window.corona.scene.selectModelFile(sceneName, { ...(scope || {}), file_type: fileType }),
     createActor: (sceneName, path, options) => window.corona.scene.createActor(sceneName, path, options),
     importResourceFile: (sceneName, fileType = 'model', scope) =>
       window.corona.scene.importResourceFile(sceneName, { ...(scope || {}), file_type: fileType }),
     readActorProperties: (sceneName, actor, scope) => window.corona.scene.readActorProperties(sceneName, actor, scope),
-    readActorSkeleton: (sceneName, actor, scope) => window.corona.scene.readActorSkeleton(sceneName, actor, scope),
-    readActorIkChains: (sceneName, actor, scope) => window.corona.scene.readActorIkChains(sceneName, actor, scope),
     readModelNodes: (sceneName, options) => window.corona.scene.readModelNodes(sceneName, options),
     setModelNodeState: (identity, patch) => window.corona.scene.setModelNodeState(identity, patch),
     setActorIkChains: (sceneName, actor, chains, expectedRevision, scope) => expectedRevision === undefined
@@ -80,23 +76,19 @@ const editorApiStatic = {
     readTransforms: (session, actors) => window.corona.scene.readTransforms({ archive_session: session, actors }),
     setActorTransform: (sceneName, actorName, transform) =>
       window.corona.scene.setActorTransform(sceneName, actorName, transform),
-    setActorProperties: (sceneName, actorName, patch) =>
-      window.corona.scene.setActorProperties(sceneName, actorName, patch),
-    renameActor: (sceneName, actor, name, scope) =>
-      window.corona.scene.renameActor(sceneName, actor, name, scope),
+    updateActor: (sceneName, actorName, patch) =>
+      window.corona.scene.updateActor(sceneName, actorName, patch),
     deleteActor: (sceneName, actor, scope) =>
       window.corona.scene.deleteActor(sceneName, actor, scope),
     rebindActorResource: (sceneName, actorGuid, path, scope) =>
       window.corona.scene.rebindActorResource(sceneName, actorGuid, path, scope),
     save: (sceneName, scope) => window.corona.scene.save(sceneName, scope),
     focusActor: (sceneName, actorName, cameraId, scope) => window.corona.scene.focusActor(sceneName, actorName, cameraId, scope),
-    setCameraProperties: (sceneName, cameraId, patch) => window.corona.scene.setCameraProperties(sceneName, cameraId, patch),
+    updateCamera: (sceneName, cameraId, patch) => window.corona.scene.updateCamera(sceneName, cameraId, patch),
     setCameraRenderSettings: (sceneName, cameraId, patch) =>
       window.corona.scene.setCameraRenderSettings(sceneName, cameraId, patch),
     readCameraRenderSettings: (sceneName, cameraId, scope) =>
       window.corona.scene.readCameraRenderSettings(sceneName, cameraId, scope),
-    renameCamera: (sceneName, cameraId, name, scope) =>
-      window.corona.scene.renameCamera(sceneName, cameraId, name, scope),
     deleteCamera: (sceneName, cameraId, scope) =>
       window.corona.scene.deleteCamera(sceneName, cameraId, scope),
     captureScreenshot: (sceneName, cameraId, options) => window.corona.scene.captureScreenshot(sceneName, cameraId, options),

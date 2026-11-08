@@ -28,13 +28,13 @@ def test_actor_transform_has_one_v8_facade_without_the_old_manifest_route():
 
 def test_actor_properties_have_one_facade_and_no_retired_state_physics_or_camera_lock_wrappers():
     api = (SOURCE_ROOT / 'api/editorApi.js').read_text(encoding='utf-8-sig')
-    assert 'window.corona.scene.setActorProperties(sceneName, actorName, patch)' in api
+    assert 'window.corona.scene.updateActor(sceneName, actorName, patch)' in api
     retired = re.compile(r'\bsetActor(?:State|Physics|CameraLock)\b')
     assert [path.relative_to(SOURCE_ROOT).as_posix() for path in sources()
             if retired.search(path.read_text(encoding='utf-8-sig'))] == []
     for name in ['Object.vue', 'SceneBar.vue']:
         source = (SOURCE_ROOT / 'views/sidebar' / name).read_text(encoding='utf-8-sig')
-        assert 'editorApi.scene.setActorProperties(' in source
+        assert 'editorApi.scene.updateActor(' in source
         assert 'archive_session: archiveSession.value' in source
 
 

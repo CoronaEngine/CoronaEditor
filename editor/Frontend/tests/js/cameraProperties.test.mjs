@@ -20,7 +20,7 @@ test('CameraView settings share scoped properties and preserve camera metadata o
     viewLifetime: createViewLifetime(),
     camera, sceneId: 'scene.ini', cameraId: 'camera-id', renderWidth: ref(640), renderHeight: ref(480), moveSpeed: ref(0.5),
     errorText: ref(''), unwrap: value => value,
-    editorApi: { scene: { setCameraProperties: async (...args) => {
+    editorApi: { scene: { updateCamera: async (...args) => {
       calls.push(args); return { camera: { width: 640, height: 480, move_speed: 0.5 } };
     } } }, appService: { resizeThisCameraView: async (...args) => calls.push(['resize', ...args]) },
   });
@@ -37,7 +37,7 @@ test('CameraView pose publisher submits copied vectors through the same scoped i
   const calls = [], camera = ref({ archive_session: 'archive', position: [1, 2, 3], forward: [0, 0, 1], world_up: [0, 1, 0], fov: 45 });
   const flush = handler('flushPose', { camera, sceneId: 'scene.ini', cameraId: 'camera-id', errorText: ref(''),
     isEditorInputLocked: () => false, performance: { now: () => 100 },
-    editorApi: { scene: { setCameraProperties: async (...args) => calls.push(args) } },
+    editorApi: { scene: { updateCamera: async (...args) => calls.push(args) } },
   });
   flush();
   camera.value.position[0] = 9;
@@ -54,7 +54,7 @@ test('camera size synchronization cannot reopen a retiring window', async () => 
   const deps = { camera, sceneId: 'scene.ini', cameraId: 'camera-id',
     window: { innerWidth: 800, innerHeight: 600 }, renderWidth: ref(640), renderHeight: ref(480), moveSpeed: ref(0.5),
     errorText: ref(''), unwrap: value => value,
-    editorApi: { scene: { setCameraProperties: async (...args) => { calls.push(args); return { camera: {} }; } } },
+    editorApi: { scene: { updateCamera: async (...args) => { calls.push(args); return { camera: {} }; } } },
   };
   const sync = new Function('deps', `const {${Object.keys(deps).join(',')}} = deps; let lastSyncedWidth = 0, lastSyncedHeight = 0; ${source.slice(node.start, node.end)}; return syncWindowSize;`)(deps);
   await sync();
@@ -67,7 +67,7 @@ test('CameraView pose publisher respects runtime input ownership and surfaces na
   const errorText = ref(''), calls = [], camera = ref({ archive_session: 'archive', position: [1, 2, 3], forward: [0, 0, 1], world_up: [0, 1, 0], fov: 45 });
   const flush = handler('flushPose', { camera, sceneId: 'scene.ini', cameraId: 'camera-id', errorText,
     isEditorInputLocked: () => locked, performance: { now: () => 100 },
-    editorApi: { scene: { setCameraProperties: async (...args) => { calls.push(args); throw new Error('EDITOR_INPUT_LOCKED'); } } },
+    editorApi: { scene: { updateCamera: async (...args) => { calls.push(args); throw new Error('EDITOR_INPUT_LOCKED'); } } },
   });
   flush(); assert.equal(calls.length, 0);
   locked = false; flush(); await Promise.resolve();

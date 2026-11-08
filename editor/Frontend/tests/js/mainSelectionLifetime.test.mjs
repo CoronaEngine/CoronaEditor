@@ -38,7 +38,7 @@ function retire(h, kind) {
 for (const retirement of ['unmount', 'archive', 'scene', 'camera', 'handle', 'scene ABA', 'archive ABA', 'camera ABA', 'handle ABA']) {
   for (const failure of [false, true]) test(`main selection ${failure ? 'failure' : 'reply'} after ${retirement} has no gizmo or Dock effects`, async t => {
     const h = await mount(t), pending = deferred();
-    h.api.scene.readActorIndex = () => pending.promise;
+    h.api.scene.readScene.projections.index = () => pending.promise;
     const old = h.page.handleActorSelectionForObjectDock(selection('A'));
     retire(h, retirement);
     const before = h.effects.slice();
@@ -50,7 +50,7 @@ for (const retirement of ['unmount', 'archive', 'scene', 'camera', 'handle', 'sc
 
 for (const failure of [false, true]) test(`new selection wins over an older index ${failure ? 'failure' : 'reply'}`, async t => {
   const h = await mount(t), pending = deferred(); let reads = 0;
-  h.api.scene.readActorIndex = () => ++reads === 1 ? pending.promise : Promise.resolve(snapshot([actor('B', 'new-B')]));
+  h.api.scene.readScene.projections.index = () => ++reads === 1 ? pending.promise : Promise.resolve(snapshot([actor('B', 'new-B')]));
   const old = h.page.handleActorSelectionForObjectDock(selection('A'));
   await h.page.handleActorSelectionForObjectDock(selection('B'));
   const before = h.effects.slice();
@@ -63,7 +63,7 @@ for (const failure of [false, true]) test(`new selection wins over an older inde
 
 for (const replacement of ['empty', 'node', 'cameraView']) test(`${replacement} selection retires an in-flight main Actor selection`, async t => {
   const h = await mount(t), pending = deferred();
-  h.api.scene.readActorIndex = () => pending.promise;
+  h.api.scene.readScene.projections.index = () => pending.promise;
   const old = h.page.handleActorSelectionForObjectDock(selection('A'));
   if (replacement === 'empty') await h.page.handleActorSelectionForObjectDock({ scene, actor_type: 'scene' });
   if (replacement === 'node') h.bus.emit('model-node-selection', { actorName: 'B', nodeIndex: 1 });
@@ -77,7 +77,7 @@ for (const replacement of ['empty', 'node', 'cameraView']) test(`${replacement} 
 for (const scope of ['unmount', 'scene', 'archive']) test(`selection entry rejects ${scope} before publishing or reading`, async t => {
   const h = await mount(t);
   let reads = 0, events = 0;
-  h.api.scene.readActorIndex = h.api.scene.readActorProperties = async () => { reads++; return snapshot([]); };
+  h.api.scene.readScene.projections.index = h.api.scene.readActorProperties = async () => { reads++; return snapshot([]); };
   h.bus.on('model-node-selection', () => events++);
   if (scope === 'unmount') h.unmount();
   const payload = { ...selection('A'), actor_name: 'A', node_index: 1 };
@@ -90,7 +90,7 @@ for (const scope of ['unmount', 'scene', 'archive']) test(`selection entry rejec
 
 test('current selection still opens Object and installs the resolved native gizmo target', async t => {
   const h = await mount(t);
-  h.api.scene.readActorIndex = async () => snapshot([actor('A')]);
+  h.api.scene.readScene.projections.index = async () => snapshot([actor('A')]);
   await h.page.handleActorSelectionForObjectDock(selection('A'));
   assert.deepEqual(h.effects, [
     ['gizmo', scene, 'camera-1', { archive_session: archive, actor_guid: 'A' }], ['open', 'Object'],
@@ -99,7 +99,7 @@ test('current selection still opens Object and installs the resolved native gizm
 
 test('a current failed Actor lookup still permits opening Object', async t => {
   const h = await mount(t);
-  h.api.scene.readActorIndex = async () => { throw Error('index unavailable'); };
+  h.api.scene.readScene.projections.index = async () => { throw Error('index unavailable'); };
   await h.page.handleActorSelectionForObjectDock(selection('A'));
   assert.deepEqual(h.effects.at(-1), ['open', 'Object']);
   assert.equal(h.effects[0][3].actor_guid, null);
@@ -108,14 +108,14 @@ test('a current failed Actor lookup still permits opening Object', async t => {
 test('selection without a bound camera can still open Object without a native gizmo write', async t => {
   const h = await mount(t);
   h.page.cameraBindingState.value.cameraId = null;
-  h.api.scene.readActorIndex = async () => snapshot([actor('A')]);
+  h.api.scene.readScene.projections.index = async () => snapshot([actor('A')]);
   await h.page.handleActorSelectionForObjectDock(selection('A'));
   assert.deepEqual(h.effects, [['open', 'Object']]);
 });
 
 test('a projection refresh of the same camera binding preserves the current selection request', async t => {
   const h = await mount(t), pending = deferred();
-  h.api.scene.readActorIndex = () => pending.promise;
+  h.api.scene.readScene.projections.index = () => pending.promise;
   const selecting = h.page.handleActorSelectionForObjectDock(selection('A'));
   h.page.cameraBindingState.value = { ...h.page.cameraBindingState.value };
   pending.resolve(snapshot([actor('A')])); await selecting;
@@ -126,7 +126,7 @@ test('a projection refresh of the same camera binding preserves the current sele
 test('retired selection cannot seed an old transform baseline after selection changes', async t => {
   const h = await mount(t), pending = deferred();
   h.api.scene.readActorProperties = () => pending.promise;
-  h.api.scene.readActorIndex = async () => snapshot([actor('A')]);
+  h.api.scene.readScene.projections.index = async () => snapshot([actor('A')]);
   await h.page.handleActorSelectionForObjectDock(selection('A'));
   await h.page.handleActorSelectionForObjectDock({ scene, actor_type: 'scene' });
   pending.resolve({ scene, archive_session: archive, geometry: { position: [9, 9, 9] } });

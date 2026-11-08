@@ -22,7 +22,7 @@ for (const outcome of ['success', 'failure']) {
       renderWidth: { value: 960 }, renderHeight: { value: 540 }, moveSpeed: { value: 1 },
       camera: { value: { archive_session: 'original', width: 960, height: 540 } },
       errorText: { value: '' },
-      editorApi: { scene: { setCameraProperties: () => pending.promise } },
+      editorApi: { scene: { updateCamera: () => pending.promise } },
       appService: { resizeThisCameraView: async (...args) => resized.push(args) },
     };
     const saving = action('saveSettings', scope)();
@@ -43,7 +43,7 @@ test('CameraView applies a settings reply and resizes its live window', async ()
     viewLifetime: createViewLifetime(), sceneId: 'scene', cameraId: 'camera',
     renderWidth: { value: 960 }, renderHeight: { value: 540 }, moveSpeed: { value: 1 },
     camera: { value: { archive_session: 'original' } }, errorText: { value: '' },
-    editorApi: { scene: { setCameraProperties: async () => ({ camera: { width: 1200, height: 800 } }) } },
+    editorApi: { scene: { updateCamera: async () => ({ camera: { width: 1200, height: 800 } }) } },
     appService: { resizeThisCameraView: async (...args) => resized.push(args) },
   };
   await action('saveSettings', scope)();

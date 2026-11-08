@@ -521,14 +521,12 @@ async function commitAlias() {
   aliasSaving.value = true;
   aliasError.value = '';
   try {
-    const result = await editorApi.scene.renameActor(
-      currentScene,
-      actor.actorGuid || currentName,
-      nextName,
-      { archive_session: operation.session },
-    );
+    const result = await editorApi.scene.updateActor(currentScene, actor.actorGuid || currentName, {
+      archive_session: operation.session,
+      name: nextName,
+    });
     if (!operation.current()) return;
-    const savedName = String(result?.new_name || nextName);
+    const savedName = String(result?.actor?.name || nextName);
     selectedActorName.value = savedName;
     actor.name = savedName;
     aliasDraft.value = savedName;
@@ -641,7 +639,7 @@ async function setRenderSpace(enabled) {
   const previous = actor.followCamera;
   actor.followCamera = enabled;
   try {
-    await editorApi.scene.setActorProperties(
+    await editorApi.scene.updateActor(
       selectedSceneName.value,
       selectedActorName.value,
       { archive_session: archiveSession.value, follow_camera: Boolean(enabled) },
@@ -701,7 +699,7 @@ async function setBodyType(type) {
   const next = normalizeBodyType(type);
   actor.mechanics.bodyType = next;
   try {
-    await editorApi.scene.setActorProperties(
+    await editorApi.scene.updateActor(
       selectedSceneName.value,
       selectedActorName.value,
       { archive_session: archiveSession.value, mechanics: { body_type: next } },
@@ -740,7 +738,7 @@ async function updateMechanic(operation, value) {
     return;
   }
   try {
-    await editorApi.scene.setActorProperties(
+    await editorApi.scene.updateActor(
       selectedSceneName.value,
       selectedActorName.value,
       { archive_session: archiveSession.value, mechanics: { [field]: value } },
@@ -772,7 +770,7 @@ async function updateLocks(operation, values) {
     return;
   }
   try {
-    await editorApi.scene.setActorProperties(
+    await editorApi.scene.updateActor(
       selectedSceneName.value,
       selectedActorName.value,
       { archive_session: archiveSession.value, mechanics: { [field]: values.map((value) => Boolean(value)) } },
@@ -797,7 +795,7 @@ async function updateCameraLock() {
   if (!viewLifetime.current() || !selectedActorName.value) return;
   const context = actorOperation();
   try {
-    await editorApi.scene.setActorProperties(
+    await editorApi.scene.updateActor(
       selectedSceneName.value,
       selectedActorName.value,
       { archive_session: archiveSession.value, camera_lock: { enabled: actor.cameraLock.enabled } },
@@ -816,7 +814,7 @@ async function updateCameraLockOffset() {
     return Number.isFinite(number) ? number : fallback;
   };
   try {
-    await editorApi.scene.setActorProperties(
+    await editorApi.scene.updateActor(
       selectedSceneName.value,
       selectedActorName.value,
       {

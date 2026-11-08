@@ -102,14 +102,14 @@ test('Actor properties merge state, physics and camera lock into one raw V8 patc
   const { native } = nativeScene(t);
   const calls = [];
   const result = { status: 'success', actor: { actor_guid: 'actor-id', actor_version: 8 } };
-  native.setActorProperties = async (...args) => { calls.push(args); return result; };
+  native.updateActor = async (...args) => { calls.push(args); return result; };
   const stringify = JSON.stringify, parse = JSON.parse;
   t.after(() => { JSON.stringify = stringify; JSON.parse = parse; });
   JSON.stringify = JSON.parse = () => { throw new Error('JSON properties are forbidden'); };
   const patch = { archive_session: 'archive', visible: false, follow_camera: true,
     mechanics: { mass: 4, body_type: 'kinematic', linear_lock: [true, false, false] },
     camera_lock: { enabled: true, position_offset: [1, 2, 3] }, animation_sources: [] };
-  assert.equal(await editorApi.scene.setActorProperties('scene.ini', 'actor-id', patch), result);
+  assert.equal(await editorApi.scene.updateActor('scene.ini', 'actor-id', patch), result);
   assert.deepEqual(calls, [['scene.ini', 'actor-id', patch]]);
   for (const retired of ['setActorState', 'setActorPhysics', 'setActorCameraLock']) {
     assert.equal(retired in (editorApi.sceneTools || {}), false, `${retired} must be removed`);
@@ -119,8 +119,8 @@ test('Actor properties merge state, physics and camera lock into one raw V8 patc
 test('Actor property failures preserve native errors and never retry a legacy route', async t => {
   const { native } = nativeScene(t);
   const failure = Object.assign(new Error('old archive'), { code: 'PROJECT_CONTEXT_CHANGED' });
-  native.setActorProperties = () => Promise.reject(failure);
-  await assert.rejects(editorApi.scene.setActorProperties('scene.ini', 'actor-id', {
+  native.updateActor = () => Promise.reject(failure);
+  await assert.rejects(editorApi.scene.updateActor('scene.ini', 'actor-id', {
     archive_session: 'old', visible: false,
   }), error => error === failure);
 });
@@ -186,13 +186,13 @@ test('screenshot cancellation and native errors do not retry or invoke an old pi
 test('camera pose and view settings share one scoped V8 patch with JSON disabled', async t => {
   const { native } = nativeScene(t), calls = [];
   const result = { archive_session: 'archive', scene: 'scene.ini', camera: { camera_id: 'camera-id', opaque_handle: '18446744073709551615' } };
-  native.setCameraProperties = async (...args) => { calls.push(args); return result; };
+  native.updateCamera = async (...args) => { calls.push(args); return result; };
   const stringify = JSON.stringify, parse = JSON.parse;
   t.after(() => { JSON.stringify = stringify; JSON.parse = parse; });
   JSON.stringify = JSON.parse = () => { throw new Error('camera JSON transport is forbidden'); };
   const patch = { archive_session: 'archive', position: [0, 2, -3], forward: [0, 0, 1], world_up: [0, 1, 0], fov: 50,
     width: 640, height: 480, move_speed: 0.5, view_open: false };
-  assert.equal(await editorApi.scene.setCameraProperties('scene.ini', 'camera-id', patch), result);
+  assert.equal(await editorApi.scene.updateCamera('scene.ini', 'camera-id', patch), result);
   assert.deepEqual(calls, [['scene.ini', 'camera-id', patch]]);
   assert.equal('setCameraPose' in editorApi.viewport, false);
   assert.equal('updateCameraView' in (editorApi.sceneTools || {}), false);
@@ -202,8 +202,8 @@ test('camera patch propagates native input ownership and archive failures withou
   const { native } = nativeScene(t);
   for (const code of ['PROJECT_CONTEXT_CHANGED', 'EDITOR_INPUT_LOCKED']) {
     const failure = Object.assign(new Error(code), { code });
-    native.setCameraProperties = () => Promise.reject(failure);
-    await assert.rejects(editorApi.scene.setCameraProperties('scene.ini', 'camera-id', {
+    native.updateCamera = () => Promise.reject(failure);
+    await assert.rejects(editorApi.scene.updateCamera('scene.ini', 'camera-id', {
       archive_session: 'archive', position: [1, 2, 3],
     }), error => error === failure);
   }
@@ -214,23 +214,23 @@ test('Actor rename uses the scoped typed scene binding with JSON disabled', asyn
   const calls = [];
   const result = { status: 'success', archive_session: 'archive', scene: 'scene.ini',
     actor_guid: 'actor-id', old_name: 'Probe', new_name: 'Renamed' };
-  native.renameActor = async (...args) => { calls.push(args); return result; };
+  native.updateActor = async (...args) => { calls.push(args); return result; };
   const stringify = JSON.stringify, parse = JSON.parse;
   t.after(() => { JSON.stringify = stringify; JSON.parse = parse; });
   JSON.stringify = JSON.parse = () => { throw new Error('actor rename JSON transport is forbidden'); };
   const scope = { archive_session: 'archive' };
-  assert.equal(await editorApi.scene.renameActor('scene.ini', 'actor-id', 'Renamed', scope), result);
-  assert.deepEqual(calls, [['scene.ini', 'actor-id', 'Renamed', scope]]);
+  assert.equal(await editorApi.scene.updateActor('scene.ini', 'actor-id', { ...(scope), name: 'Renamed' }), result);
+  assert.deepEqual(calls, [['scene.ini', 'actor-id', { ...scope, name: 'Renamed' }]]);
   assert.equal('renameActor' in (editorApi.sceneTools || {}), false);
 });
 
 test('Actor rename errors propagate without retrying a manifest route', async t => {
   const { native } = nativeScene(t);
   const failure = Object.assign(new Error('old archive'), { code: 'PROJECT_CONTEXT_CHANGED' });
-  native.renameActor = () => Promise.reject(failure);
-  await assert.rejects(editorApi.scene.renameActor('scene.ini', 'actor-id', 'Renamed', {
+  native.updateActor = () => Promise.reject(failure);
+  await assert.rejects(editorApi.scene.updateActor('scene.ini', 'actor-id', { ...({
     archive_session: 'old',
-  }), error => error === failure);
+  }), name: 'Renamed' }), error => error === failure);
 });
 
 test('Actor delete uses the scoped typed scene binding and clears no legacy facade', async t => {
@@ -320,20 +320,18 @@ test('IK reads and revisioned writes use one scoped V8 contract with JSON disabl
   const skeleton = { is_skinned: true, nodes: [{ name: 'Root', index: 0, parent: -1, leaf: false }] };
   const config = { ready: true, is_skinned: true, revision: 4, chains: [] };
   const written = { ready: true, is_skinned: true, revision: 5, chains: [] };
-  native.readActorSkeleton = async (...args) => { calls.push(['skeleton', ...args]); return skeleton; };
-  native.readActorIkChains = async (...args) => { calls.push(['read', ...args]); return config; };
+  const rig = { skeleton, ik: config };
+  native.readActorRig = async (...args) => { calls.push(['rig', ...args]); return rig; };
   native.setActorIkChains = async (...args) => { calls.push(['write', ...args]); return written; };
   const stringify = JSON.stringify, parse = JSON.parse;
   t.after(() => { JSON.stringify = stringify; JSON.parse = parse; });
   JSON.stringify = JSON.parse = () => { throw new Error('IK JSON transport is forbidden'); };
   const scope = { archive_session: 'archive' };
   const chains = [{ id: 'foot', bone_name: 'Foot', mode: 'foot_plant', enabled: true }];
-  assert.equal(await editorApi.scene.readActorSkeleton('scene.ini', 'actor-guid', scope), skeleton);
-  assert.equal(await editorApi.scene.readActorIkChains('scene.ini', 'actor-guid', scope), config);
+  assert.equal(await editorApi.scene.readActorRig('scene.ini', 'actor-guid', scope), rig);
   assert.equal(await editorApi.scene.setActorIkChains('scene.ini', 'actor-guid', chains, 4, scope), written);
   assert.deepEqual(calls, [
-    ['skeleton', 'scene.ini', 'actor-guid', scope],
-    ['read', 'scene.ini', 'actor-guid', scope],
+    ['rig', 'scene.ini', 'actor-guid', scope],
     ['write', 'scene.ini', 'actor-guid', chains, 4, scope],
   ]);
   for (const method of ['getActorSkeletonLeaves', 'getActorIkChains', 'setActorIkChains']) {
@@ -344,9 +342,8 @@ test('IK reads and revisioned writes use one scoped V8 contract with JSON disabl
 test('IK V8 failures are propagated without retrying manifest routes', async t => {
   const { native } = nativeScene(t);
   const failure = Object.assign(new Error('archive changed'), { code: 'PROJECT_CONTEXT_CHANGED' });
-  native.readActorSkeleton = native.readActorIkChains = native.setActorIkChains = () => Promise.reject(failure);
-  await assert.rejects(editorApi.scene.readActorSkeleton('scene.ini', 'actor', { archive_session: 'old' }), error => error === failure);
-  await assert.rejects(editorApi.scene.readActorIkChains('scene.ini', 'actor', { archive_session: 'old' }), error => error === failure);
+  native.readActorRig = native.setActorIkChains = () => Promise.reject(failure);
+  await assert.rejects(editorApi.scene.readActorRig('scene.ini', 'actor', { archive_session: 'old' }), error => error === failure);
   await assert.rejects(editorApi.scene.setActorIkChains('scene.ini', 'actor', [], 4, { archive_session: 'old' }), error => error === failure);
 });
 
@@ -358,12 +355,12 @@ test('actor context reads use one scoped typed V8 projection without the legacy 
       geometry: { position: [1, 2, 3], rotation: [0, 0, 0], scale: [1, 1, 1] },
       size: [2, 3, 4], collision: 'box', physics_enabled: true }],
   };
-  native.readActorTree = async (...args) => { calls.push(args); return result; };
+  native.readScene = async (...args) => { calls.push(args); return result; };
   const stringify = JSON.stringify, parse = JSON.parse;
   t.after(() => { JSON.stringify = stringify; JSON.parse = parse; });
   JSON.stringify = JSON.parse = () => { throw new Error('actor context JSON transport is forbidden'); };
   const scope = { archive_session: 'archive' };
-  assert.equal(await editorApi.scene.readActorTree('scene.ini', scope), result);
-  assert.deepEqual(calls, [['scene.ini', scope]]);
+  assert.equal(await editorApi.scene.readScene({ ...(scope), scene: 'scene.ini', actors: 'context' }), result);
+  assert.deepEqual(calls, [[{ ...scope, scene: 'scene.ini', actors: 'context' }]]);
   assert.equal('listActorTree' in editorApi.scene, false);
 });

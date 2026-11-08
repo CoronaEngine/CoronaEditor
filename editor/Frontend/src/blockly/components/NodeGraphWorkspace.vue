@@ -2335,7 +2335,7 @@ async function selectRunTarget(event) {
       if (!current() || active.archive_session !== archive) return;
       sceneName = active.scene;
     }
-    const scene = await editorApi.scene.readActorIndex(sceneName, { archive_session: archive });
+    const scene = await editorApi.scene.readScene({ archive_session: archive, scene: sceneName, actors: 'index' });
     if (!current() || scene.archive_session !== archive) return;
     const route = scene.scene;
     if (actorName && (!route || !scene.actors?.some(actor => actor.name === actorName))) {
@@ -2977,7 +2977,7 @@ async function refreshSceneActorOptions({ rescan = false } = {}) {
       if (!current() || active.archive_session !== archive) return false;
       requestedSceneName = String(active.scene || '').trim();
     }
-    const response = await editorApi.scene.readActorTree(requestedSceneName, { archive_session: archive });
+    const response = await editorApi.scene.readScene({ archive_session: archive, scene: requestedSceneName, actors: 'context' });
     if (!current() || response?.archive_session !== archive || response?.scene !== requestedSceneName) return false;
     if (response?.success === false || response?.status === 'error') {
       throw new Error(response?.message || 'Actor tree query failed');

@@ -1,3 +1,4 @@
+import { sceneQueryFixture } from './sceneQueryFixtures.mjs';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { EventEmitter } from 'node:events';
@@ -71,26 +72,7 @@ export function mountMainPage(t, visionMode = 'path_tracing', { nativeCursor = f
   const api = {
     viewport: { configure: async (...args) => { calls.push(['viewport', ...args]); return {}; } },
     sceneTools: {},
-    scene: { observe: async () => -1,
-      isVisionAvailable: async () => ({ available: true }),
-      setCameraRenderSettings: async (scene, camera, patch) => {
-        calls.push(['backend', patch.render_backend, scene, camera, patch]);
-        assert.equal(scene, 'scene_v3.xml');
-        assert.equal(camera, 'camera-1');
-        assert.equal(patch.archive_session, 'main-archive');
-        return { archive_session: 'main-archive', scene, camera_id: camera, render_backend: patch.render_backend };
-      },
-      setCameraProperties: async (...args) => { calls.push(['cameraWrite', ...args]); return {}; },
-      readActive: async () => ({ archive_session: 'main-archive', scene: 'scene_v3.xml' }),
-      getEnvironment: async (...args) => {
-        calls.push(['environmentRead', ...args]);
-        return { archive_session: 'main-archive', scene: 'scene_v3.xml', physics: {
-          gravity: [1, -8, 2], floor_y: 4, floor_restitution: 0.3, fixed_dt: 0.02,
-        } };
-      },
-      setEnvironment: async (...args) => { calls.push(['environmentWrite', ...args]); return {}; },
-      readActorIndex: async () => ({ archive_session: 'main-archive', scene: 'scene_v3.xml', actors: [] }),
-      readCameras: async (scene, scope) => {
+    scene: { ...sceneQueryFixture({ index: async () => ({ archive_session: 'main-archive', scene: 'scene_v3.xml', actors: [] }), cameras: async (scene, scope) => {
       calls.push(['cameras', scene, scope]);
       assert.equal(scene, 'scene_v3.xml');
       assert.deepEqual(scope, { archive_session: 'main-archive' });
@@ -101,7 +83,26 @@ export function mountMainPage(t, visionMode = 'path_tracing', { nativeCursor = f
         vision_accumulation: false, vision_denoise: true, vision_denoiser: 'reblur',
         vision_stable_planes: true, view_open: false,
       }] };
-    } },
+    } }),  observe: async () => -1,
+      isVisionAvailable: async () => ({ available: true }),
+      setCameraRenderSettings: async (scene, camera, patch) => {
+        calls.push(['backend', patch.render_backend, scene, camera, patch]);
+        assert.equal(scene, 'scene_v3.xml');
+        assert.equal(camera, 'camera-1');
+        assert.equal(patch.archive_session, 'main-archive');
+        return { archive_session: 'main-archive', scene, camera_id: camera, render_backend: patch.render_backend };
+      },
+      updateCamera: async (...args) => { calls.push(['cameraWrite', ...args]); return {}; },
+      readActive: async () => ({ archive_session: 'main-archive', scene: 'scene_v3.xml' }),
+      getEnvironment: async (...args) => {
+        calls.push(['environmentRead', ...args]);
+        return { archive_session: 'main-archive', scene: 'scene_v3.xml', physics: {
+          gravity: [1, -8, 2], floor_y: 4, floor_restitution: 0.3, fixed_dt: 0.02,
+        } };
+      },
+      setEnvironment: async (...args) => { calls.push(['environmentWrite', ...args]); return {}; },
+
+       },
     project: { getProjectLoadStatus: async () => ({ active: true, loading: false }) },
     scripts: { getStatus: async () => ({ status: 'stopped', threadAlive: false }) },
     input: { dispatch: asyncNoop },

@@ -1,3 +1,4 @@
+import { sceneQueryFixture } from './sceneQueryFixtures.mjs';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
@@ -121,10 +122,10 @@ test('actor index facade calls the named V8 binding with the observed scope and 
   const parse = JSON.parse, stringify = JSON.stringify;
   t.after(() => { globalThis.window = previous; JSON.parse = parse; JSON.stringify = stringify; });
   const calls = [], result = { archive_session: 'archive', scene: 'scene.ini', actors: [] };
-  globalThis.window = { corona: { scene: { readActorIndex: async (...args) => { calls.push(args); return result; } } } };
+  globalThis.window = { corona: { scene: { ...sceneQueryFixture({ index: async (...args) => { calls.push(args); return result; } }),   } } };
   JSON.parse = JSON.stringify = () => { throw new Error('JSON DTO transport'); };
   const scope = { archive_session: 'archive' };
-  assert.equal(await editorApi.scene.readActorIndex('scene.ini', scope), result);
+  assert.equal(await editorApi.scene.readScene({ ...(scope), scene: 'scene.ini', actors: 'index' }), result);
   assert.deepEqual(calls, [['scene.ini', scope]]);
 });
 
@@ -132,10 +133,10 @@ test('CameraView picks use a scoped actor index without loading the full scene t
   const calls = [];
   const deps = { sceneId: 'scene.ini', camera: { value: { archive_session: 'archive' } },
     viewLifetime: { current: () => true }, actorPickIndex: new Map(), indexActorsByHandle,
-    editorApi: { scene: { readActorIndex: async (...args) => {
+    editorApi: { scene: { ...sceneQueryFixture({ index: async (...args) => {
       calls.push(args);
       return { scene: 'scene.ini', archive_session: 'archive', actors: [{ actor_guid: 'actor', name: 'Probe', type: '.actor' }] };
-    } } },
+    } }),   } },
   };
   const refresh = handler('views/tools/CameraView', 'refreshCameraViewActorPickIndex', deps);
   assert.equal(await refresh(), true);
@@ -149,7 +150,7 @@ for (const change of ['archive', 'unmount']) {
     const original = new Map([['original', { name: 'Old' }]]);
     const deps = { sceneId: 'scene.ini', camera: { value: { archive_session: 'archive' } },
       viewLifetime: { current: () => mounted }, actorPickIndex: original, indexActorsByHandle,
-      editorApi: { scene: { readActorIndex: () => pending.promise } },
+      editorApi: { scene: { ...sceneQueryFixture({ index: () => pending.promise }),   } },
     };
     const refresh = handler('views/tools/CameraView', 'refreshCameraViewActorPickIndex', deps);
     const work = refresh();
@@ -165,10 +166,10 @@ test('main viewport uses the same scoped actor index for Gizmo identity lookup',
   const calls = [], deps = {
     cameraBindingState: { value: { sceneId: 'scene.ini', archiveSession: 'archive' } },
     viewCurrent: () => true, actorPickIndex: new Map(), indexActorsByHandle,
-    editorApi: { scene: { readActorIndex: async (...args) => {
+    editorApi: { scene: { ...sceneQueryFixture({ index: async (...args) => {
       calls.push(args);
       return { scene: 'scene.ini', archive_session: 'archive', actors: [{ actor_guid: 'actor', name: 'Probe', type: 'actor' }] };
-    } } },
+    } }),   } },
   };
   const refresh = handler('views/layout/MainPage', 'refreshActorPickIndex', deps);
   assert.equal(await refresh('scene.ini'), true);
@@ -182,7 +183,7 @@ for (const change of ['archive', 'scene', 'unmount']) {
     const original = new Map([['original', { name: 'Old' }]]);
     const deps = { cameraBindingState: { value: { sceneId: 'scene.ini', archiveSession: 'archive' } },
       viewCurrent: () => mounted, actorPickIndex: original, indexActorsByHandle,
-      editorApi: { scene: { readActorIndex: () => pending.promise },
+      editorApi: { scene: { ...sceneQueryFixture({ index: () => pending.promise }),   },
         sceneTools: {} },
     };
     const work = handler('views/layout/MainPage', 'refreshActorPickIndex', deps)('scene.ini');
@@ -200,7 +201,7 @@ function targetDeps(read) {
     loadedArchiveSession: 'archive', graphLoadSequence: 1, panelClosing: false,
     viewLifetime: { current: () => true }, saveNow: async () => true,
     runStatus: { value: '' }, emit: () => {},
-    editorApi: { scene: { readActorIndex: read } },
+    editorApi: { scene: { ...sceneQueryFixture({ index: read }),   } },
   };
 }
 

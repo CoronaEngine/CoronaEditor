@@ -1,3 +1,4 @@
+import { sceneQueryFixture } from './sceneQueryFixtures.mjs';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import test from 'node:test';
@@ -106,7 +107,7 @@ test('restored Native camera windows select Vision before they become visible', 
     const viewCurrent = () => true, environmentArchiveSession = { value: 'archive' }, logError = error => { throw error; };
     ${source.slice(node.start, node.end)}
     return restoreCameraViews;
-  `)(initializeWorldRenderBackend, { scene: { readCameras: async () => ({ archive_session: 'archive', scene: 'scene.ini', cameras }),
+  `)(initializeWorldRenderBackend, { scene: { ...sceneQueryFixture({ cameras: async () => ({ archive_session: 'archive', scene: 'scene.ini', cameras }) }),
     setCameraRenderSettings: async (...args) => { calls.push(['backend', args[2].render_backend, args[0], args[1]]); return { render_backend: args[2].render_backend }; },
   } }, { createCameraView: async camera => calls.push(['open', camera.camera_id]) });
   await restore('scene.ini');

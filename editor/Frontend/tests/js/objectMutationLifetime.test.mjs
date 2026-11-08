@@ -73,7 +73,7 @@ for (const retire of ['unmount', 'actor', 'archive']) {
 
   test(`Object rename success ignores its reply after ${retire}`, async t => {
     const pending = deferred();
-    const page = mount(t, { renameActor: () => pending.promise });
+    const page = mount(t, { updateActor: () => pending.promise });
     const renaming = page.state.commitAlias();
     change(page);
     const before = page.state.actor.name;
@@ -84,7 +84,7 @@ for (const retire of ['unmount', 'actor', 'archive']) {
 
   test(`Object rename failure cannot replace current draft after ${retire}`, async t => {
     const pending = deferred();
-    const page = mount(t, { renameActor: () => pending.promise });
+    const page = mount(t, { updateActor: () => pending.promise });
     const renaming = page.state.commitAlias();
     change(page);
     const before = page.state.aliasDraft.value;
@@ -114,7 +114,7 @@ for (const retire of ['unmount', 'actor', 'archive']) {
   for (const [method, args] of [['setRenderSpace', [true]], ['setBodyType', ['static']]]) {
     test(`Object ${method} rejection cannot roll back a retired selection after ${retire}`, async t => {
       const pending = deferred();
-      const page = mount(t, { setActorProperties: () => pending.promise });
+      const page = mount(t, { updateActor: () => pending.promise });
       const editing = page.state[method](...args);
       change(page);
       page.state.actor.followCamera = true;
@@ -130,7 +130,7 @@ for (const retire of ['unmount', 'actor', 'archive']) {
     ['updateLocks', ['SetLinearLock', [true, false, false]]]]) {
     test(`Object ${method} does not record an old operation after ${retire}`, async t => {
       const pending = deferred();
-      const page = mount(t, { setActorProperties: () => pending.promise });
+      const page = mount(t, { updateActor: () => pending.promise });
       const editing = page.state[method](...args);
       change(page); pending.resolve({}); await editing;
       assert.deepEqual(page.events, []);
@@ -163,7 +163,7 @@ for (const retire of ['unmount', 'actor', 'archive']) {
     ['updateCameraLock', []], ['updateCameraLockOffset', []]]) {
     test(`Object ${method} late native failure is ignored after ${retire}`, async t => {
       const pending = deferred();
-      const page = mount(t, { setActorProperties: () => pending.promise });
+      const page = mount(t, { updateActor: () => pending.promise });
       const editing = page.state[method](...args);
       change(page); pending.reject(new Error('old edit failed')); await editing;
       assert.deepEqual(page.errors, []);
@@ -175,7 +175,7 @@ for (const [method, values, read] of [['setRenderSpace', [true, false, true], pa
   ['setBodyType', ['static', 'kinematic', 'static'], page => page.state.actor.mechanics.bodyType]]) {
   test(`Object ${method} older failure cannot undo a newer same-value edit`, async t => {
     const pending = deferred(); let writes = 0;
-    const page = mount(t, { setActorProperties: () => ++writes === 1 ? pending.promise : Promise.resolve({}) });
+    const page = mount(t, { updateActor: () => ++writes === 1 ? pending.promise : Promise.resolve({}) });
     const first = page.state[method](values[0]);
     await page.state[method](values[1]); await page.state[method](values[2]);
     pending.reject(new Error('first edit failed')); await first;
@@ -271,7 +271,7 @@ test('live Object resource chooser still rebinds the captured Actor', async t =>
 });
 
 test('live Object rename clears its busy state and preserves the stable GUID', async t => {
-  const page = mount(t, { renameActor: async () => ({ new_name: 'Renamed' }) });
+  const page = mount(t, { updateActor: async () => ({ actor: { name: 'Renamed' } }) });
   await page.state.commitAlias();
   assert.equal(page.state.actor.name, 'Renamed');
   assert.equal(page.state.actor.actorGuid, 'first-guid');

@@ -1,3 +1,4 @@
+import { sceneQueryFixture } from './sceneQueryFixtures.mjs';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
@@ -20,10 +21,10 @@ test('one camera V8 facade replaces both legacy Web snapshot and camera list rea
   const previous = globalThis.window, parse = JSON.parse, stringify = JSON.stringify;
   t.after(() => { globalThis.window = previous; JSON.parse = parse; JSON.stringify = stringify; });
   const calls = [], result = { archive_session: 'archive', scene: 'scene.ini', cameras: [] };
-  globalThis.window = { corona: { scene: { readCameras: async (...args) => { calls.push(args); return result; } } } };
+  globalThis.window = { corona: { scene: { ...sceneQueryFixture({ cameras: async (...args) => { calls.push(args); return result; } }),   } } };
   JSON.parse = JSON.stringify = () => { throw new Error('JSON camera transport'); };
   const scope = { archive_session: 'archive' };
-  assert.equal(await editorApi.scene.readCameras('scene.ini', scope), result);
+  assert.equal(await editorApi.scene.readScene({ ...(scope), scene: 'scene.ini', cameras: true }), result);
   assert.deepEqual(calls, [['scene.ini', scope]]);
   assert.equal(editorApi.scene.getSnapshot, undefined);
   assert.equal(editorApi.sceneTools?.listCameraViews, undefined);
@@ -34,19 +35,20 @@ test('camera editing uses scoped scene V8 methods and retires sceneTools manifes
   t.after(() => { globalThis.window = previous; });
   const calls = [], renamed = { camera_id: 'camera', name: 'New name' }, deleted = { camera_id: 'camera' };
   globalThis.window = { corona: { scene: {
-    renameCamera: async (...args) => { calls.push(['rename', ...args]); return renamed; },
+    updateCamera: async (...args) => { calls.push(['rename', ...args]); return renamed; },
     deleteCamera: async (...args) => { calls.push(['delete', ...args]); return deleted; },
   } } };
   const scope = { archive_session: 'archive' };
-  assert.equal(await editorApi.scene.renameCamera('scene.ini', 'camera', 'New name', scope), renamed);
+  assert.equal(await editorApi.scene.updateCamera('scene.ini', 'camera', { ...(scope), name: 'New name' }), renamed);
   assert.equal(await editorApi.scene.deleteCamera('scene.ini', 'camera', scope), deleted);
-  assert.deepEqual(calls, [['rename', 'scene.ini', 'camera', 'New name', scope],
+  assert.deepEqual(calls, [['rename', 'scene.ini', 'camera', { ...scope, name: 'New name' }],
     ['delete', 'scene.ini', 'camera', scope]]);
   assert.equal(editorApi.sceneTools?.renameCameraView, undefined);
   assert.equal(editorApi.sceneTools?.deleteCamera, undefined);
   const cameraView = readFileSync(new URL('../../src/views/tools/CameraView.vue', import.meta.url), 'utf8');
   const sceneBar = readFileSync(new URL('../../src/views/sidebar/SceneBar.vue', import.meta.url), 'utf8');
-  assert.match(cameraView, /scene\.renameCamera\(sceneId, cameraId, cameraName\.value\.trim\(\), \{\s*archive_session: cameraArchiveSession/);
+  assert.match(cameraView, /scene\.updateCamera\(sceneId, cameraId,/);
+  assert.match(cameraView, /name: cameraName\.value\.trim\(\)/);
   assert.match(sceneBar, /const scope = \{ archive_session: context\.archive \};[\s\S]*?scene\.deleteCamera\(context\.scene, cameraId, scope\)/);
 });
 
@@ -57,13 +59,13 @@ function mainDeps() {
     currentSceneId: { value: 'scene.ini' }, mainEnvironmentRevision: 0, mainEnvironmentWrites: new Map(),
     sceneCameraBindingRequestRevision: 0, applySceneSnapshot: (...args) => applied.push(args),
     broadcastViewportControlsState() {}, logError: (...args) => errors.push(args),
-    editorApi: { scene: {
-      readCameras: async (...args) => { calls.push(['cameras', ...args]); return { ...identity,
+    editorApi: { scene: { ...sceneQueryFixture({ cameras: async (...args) => { calls.push(['cameras', ...args]); return { ...identity,
         active_camera_id: 'main', cameras: [{ camera_id: 'main', opaque_handle: '18446744073709551615',
-          vision_accumulation: true, vision_denoise: false, vision_denoiser: 'relax', vision_stable_planes: false }] }; },
+          vision_accumulation: true, vision_denoise: false, vision_denoiser: 'relax', vision_stable_planes: false }] }; }, index: async (...args) => { calls.push(['actors', ...args]); return { ...identity, actors: [{ actor_guid: 'actor', name: 'Probe' }] }; } }),
+
       getEnvironment: async (...args) => { calls.push(['environment', ...args]); return { ...identity,
         sun: { enabled: false, direction: [3, 2, 1] }, grid: { enabled: false } }; },
-      readActorIndex: async (...args) => { calls.push(['actors', ...args]); return { ...identity, actors: [{ actor_guid: 'actor', name: 'Probe' }] }; },
+
     } },
   };
   return { deps, calls, applied, errors };
@@ -75,7 +77,7 @@ function cameraDeps(read) {
     pendingDenoiserSelection: null, pendingStablePlanesSelection: null,
     normalizeVisionRenderMode, visionAccumulationFromCamera, visionDenoiseFromCamera,
     visionDenoiserFromCamera, visionStablePlanesFromCamera,
-    editorApi: { scene: { readCameras: read, isVisionAvailable: async () => ({ available: true }) } },
+    editorApi: { scene: { ...sceneQueryFixture({ cameras: read }),   isVisionAvailable: async () => ({ available: true }) } },
   };
   for (const key of ['camera', 'cameraName', 'backend', 'visionAvailable', 'visionAccumulation', 'visionDenoise',
     'visionDenoiser', 'visionStablePlanes', 'visionRenderMode', 'outputMode', 'moveSpeed', 'renderWidth', 'renderHeight'])
@@ -107,7 +109,7 @@ test('CameraView never applies initialization after its document has retired', a
 test('main viewport composes complete camera, environment and pick projections under one observed scope', async () => {
   const { deps, calls, applied } = mainDeps();
   assert.equal(await handler('views/layout/MainPage', 'syncSceneCameraBinding', deps)('scene.ini', { preservePose: true }), true);
-  assert.deepEqual(calls, ['cameras', 'environment', 'actors'].map(kind => [kind, 'scene.ini', { archive_session: 'archive' }]));
+  assert.deepEqual(calls, ['actors', 'environment', 'cameras'].map(kind => [kind, 'scene.ini', { archive_session: 'archive' }]));
   const [scene, payload, options] = applied[0];
   assert.equal(scene, 'scene.ini'); assert.equal(payload.active_camera_id, 'main');
   assert.equal(payload.cameras[0].vision_denoiser, 'relax');
@@ -120,7 +122,7 @@ test('main viewport composes complete camera, environment and pick projections u
 for (const change of ['archive', 'unmount', 'newer request', 'wrong response scope']) {
   test(`main viewport rejects composed projections after ${change}`, async () => {
     const { deps, applied } = mainDeps(), pending = deferred();
-    deps.editorApi.scene.readCameras = () => pending.promise;
+    deps.editorApi.scene.readScene.projections.cameras = () => pending.promise;
     const work = handler('views/layout/MainPage', 'syncSceneCameraBinding', deps)('scene.ini');
     if (change === 'archive') deps.environmentArchiveSession.value = 'next';
     if (change === 'unmount') deps.viewCurrent = () => false;
@@ -140,8 +142,8 @@ test('camera restoration never opens a camera after its archive has retired duri
   const pending = deferred(), opened = [];
   const deps = { viewCurrent: () => true, environmentArchiveSession: { value: 'archive' },
     currentSceneId: { value: 'scene.ini' }, mainEnvironmentRevision: 0, mainEnvironmentWrites: new Map(),
-    editorApi: { scene: { readCameras: async () => ({ archive_session: 'archive', scene: 'scene.ini',
-      cameras: [{ archive_session: 'archive', camera_id: 'camera', view_open: true }] }) } },
+    editorApi: { scene: { ...sceneQueryFixture({ cameras: async () => ({ archive_session: 'archive', scene: 'scene.ini',
+      cameras: [{ archive_session: 'archive', camera_id: 'camera', view_open: true }] }) }),   } },
     initializeWorldRenderBackend: () => pending.promise,
     appService: { createCameraView: value => opened.push(value) }, logError() {},
   };
@@ -154,8 +156,8 @@ test('SceneBar camera-only hover reads do not build a rich Actor tree', async ()
   const calls = [], applied = [];
   const deps = { viewLifetime: { current: () => true }, currentSceneName: { value: 'scene.ini' },
     archiveSession: { value: 'archive' }, cameraListRefreshInFlight: false,
-    editorApi: { scene: { readCameras: async (...args) => { calls.push(args); return {
-      archive_session: 'archive', scene: 'scene.ini', cameras: [{ camera_id: 'camera' }] }; } } },
+    editorApi: { scene: { ...sceneQueryFixture({ cameras: async (...args) => { calls.push(args); return {
+      archive_session: 'archive', scene: 'scene.ini', cameras: [{ camera_id: 'camera' }] }; } }),   } },
     applyCameraList: value => applied.push(value), logError() {},
   };
   await handler('views/sidebar/SceneBar', 'RefreshCameraListOnly', deps)();
@@ -168,7 +170,7 @@ for (const change of ['archive', 'scene', 'unmount']) {
     const pending = deferred(), calls = [], applied = [];
     const deps = { viewLifetime: { current: () => true }, currentSceneName: { value: 'scene.ini' },
       archiveSession: { value: 'archive' }, cameraListRefreshInFlight: false,
-      editorApi: { scene: { readCameras: (...args) => { calls.push(args); return pending.promise; } } },
+      editorApi: { scene: { ...sceneQueryFixture({ cameras: (...args) => { calls.push(args); return pending.promise; } }),   } },
       applyCameraList: value => applied.push(value), logError() {},
     };
     const work = handler('views/sidebar/SceneBar', 'RefreshCameraListOnly', deps)();

@@ -276,7 +276,7 @@ const viewportUiModeItems = [
 const loadCamera = async () => {
   if (!cameraArchiveSession || !viewLifetime.current()) return false;
   const [listResult, visionResult] = await Promise.all([
-    editorApi.scene.readCameras(sceneId, { archive_session: cameraArchiveSession }),
+    editorApi.scene.readScene({ archive_session: cameraArchiveSession, scene: sceneId, cameras: true }),
     editorApi.scene.isVisionAvailable(),
   ]);
   if (!viewLifetime.current() || listResult.archive_session !== cameraArchiveSession || listResult.scene !== sceneId) return false;
@@ -322,8 +322,9 @@ const loadCamera = async () => {
 const renameCamera = async () => {
   if (!camera.value || !cameraName.value.trim() || cameraName.value === camera.value.name) return;
   try {
-    const result = await editorApi.scene.renameCamera(sceneId, cameraId, cameraName.value.trim(), {
+    const result = await editorApi.scene.updateCamera(sceneId, cameraId, {
       archive_session: cameraArchiveSession,
+      name: cameraName.value.trim(),
     });
     Object.assign(camera.value, result);
     cameraName.value = result.name;
@@ -598,7 +599,7 @@ const viewportGizmoController = createViewportGizmoController({
 const refreshCameraViewActorPickIndex = async () => {
   const archive = camera.value?.archive_session;
   if (!viewLifetime.current() || !sceneId || !archive) return false;
-  const snapshot = await editorApi.scene.readActorIndex(sceneId, { archive_session: archive });
+  const snapshot = await editorApi.scene.readScene({ archive_session: archive, scene: sceneId, actors: 'index' });
   if (!viewLifetime.current() || camera.value?.archive_session !== archive ||
       snapshot.archive_session !== archive || snapshot.scene !== sceneId) return false;
   actorPickIndex = indexActorsByHandle(Array.isArray(snapshot?.actors) ? snapshot.actors : []);
@@ -693,7 +694,7 @@ const saveSettings = async () => {
   try {
     const width = Math.max(Number(renderWidth.value) || 960, 64);
     const height = Math.max(Number(renderHeight.value) || 540, 64);
-    const result = await editorApi.scene.setCameraProperties(sceneId, cameraId, {
+    const result = await editorApi.scene.updateCamera(sceneId, cameraId, {
       archive_session: camera.value?.archive_session,
       move_speed: Math.max(Number(moveSpeed.value) || 1, 0.01),
       width,
@@ -732,7 +733,7 @@ const syncWindowSize = async (force = false) => {
   renderWidth.value = width;
   renderHeight.value = height;
   try {
-    const result = await editorApi.scene.setCameraProperties(sceneId, cameraId, {
+    const result = await editorApi.scene.updateCamera(sceneId, cameraId, {
       archive_session: camera.value?.archive_session,
       width,
       height,
@@ -836,7 +837,7 @@ const flushPose = () => {
   if (isEditorInputLocked()) return;
   const item = camera.value;
   if (!item?.archive_session) return;
-  editorApi.scene.setCameraProperties(sceneId, cameraId, {
+  editorApi.scene.updateCamera(sceneId, cameraId, {
     archive_session: item.archive_session,
     position: Array.from(item.position), forward: Array.from(item.forward),
     world_up: Array.from(item.world_up), fov: item.fov,

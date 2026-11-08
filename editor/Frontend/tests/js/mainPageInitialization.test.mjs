@@ -14,8 +14,8 @@ test('world entry retains the initialized scene controls and scene manager', asy
 for (const retiredBy of ['archive', 'unmount']) {
   test(`world entry does not select a backend after ${retiredBy} retires the initial camera read`, async t => {
     const h = mountMainPage(t);
-    const read = h.api.scene.readCameras;
-    h.api.scene.readCameras = async (...args) => {
+    const read = h.api.scene.readScene.projections.cameras;
+    h.api.scene.readScene.projections.cameras = async (...args) => {
       const result = await read(...args);
       if (retiredBy === 'archive') h.page.environmentArchiveSession.value = 'replacement';
       else h.unmount();

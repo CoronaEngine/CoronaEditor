@@ -142,13 +142,10 @@ export function createIkEditorController(api, state) {
     active = session;
     state.loading = true;
     try {
-      const [skeletonRaw, configRaw] = await Promise.all([
-        api.readActorSkeleton(sceneName, actorName, scope),
-        api.readActorIkChains(sceneName, actorName, scope),
-      ]);
+      const rig = await api.readActorRig(sceneName, actorName, scope);
       if (active !== session) return;
-      const skeleton = resultData(skeletonRaw);
-      const config = resultData(configRaw);
+      const skeleton = resultData(rig.skeleton);
+      const config = resultData(rig.ik);
       if (config.ready !== true) throw new Error('IK 数据尚未就绪，请刷新后重试');
       if (!Number.isSafeInteger(config.revision) || config.revision < 0) {
         throw new Error('IK 配置版本无效，请刷新后重试');

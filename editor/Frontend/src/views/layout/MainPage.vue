@@ -1333,12 +1333,12 @@ const syncSceneCameraBinding = async (sceneId, { preservePose = false } = {}) =>
     && archive === environmentArchiveSession.value && sceneId === currentSceneId.value;
   try {
     const scope = { archive_session: archive };
-    const [cameras, environment, index] = await Promise.all([
-      editorApi.scene.readCameras(sceneId, scope), editorApi.scene.getEnvironment(sceneId, scope),
-      editorApi.scene.readActorIndex(sceneId, scope),
+    const [snapshot, environment] = await Promise.all([
+      editorApi.scene.readScene({ ...scope, scene: sceneId, actors: 'index', cameras: true }),
+      editorApi.scene.getEnvironment(sceneId, scope),
     ]);
-    if (!current() || [cameras, environment, index].some(value => value.archive_session !== archive || value.scene !== sceneId)) return false;
-    applySceneSnapshot(sceneId, { ...cameras, scene_id: cameras.scene, actors: index.actors,
+    if (!current() || [snapshot, environment].some(value => value.archive_session !== archive || value.scene !== sceneId)) return false;
+    applySceneSnapshot(sceneId, { ...snapshot, scene_id: snapshot.scene,
       sun: environment.sun, grid: environment.grid }, { preservePose,
       ...(environmentRevision !== mainEnvironmentRevision || mainEnvironmentWrites.size
         ? { preserveEnvironment: true } : {}) });
@@ -1406,7 +1406,7 @@ const restoreCameraViews = async (sceneId) => {
   const current = () => viewCurrent() && archive === environmentArchiveSession.value;
   if (!current() || !sceneId || !archive) return;
   try {
-    const payload = await editorApi.scene.readCameras(sceneId, { archive_session: archive });
+    const payload = await editorApi.scene.readScene({ archive_session: archive, scene: sceneId, cameras: true });
     if (!current() || payload.archive_session !== archive || payload.scene !== sceneId) return;
     const openCameras = Array.isArray(payload?.cameras)
       ? payload.cameras.filter((camera) => camera.view_open)
@@ -1728,7 +1728,7 @@ const refreshActorPickIndex = async (sceneId, isCurrent = () => true) => {
   const archive = cameraBindingState.value.archiveSession;
   const current = () => viewCurrent() && isCurrent() && cameraBindingState.value.archiveSession === archive && cameraBindingState.value.sceneId === sceneId;
   if (!sceneId || !archive || !current()) return false;
-  const snapshot = await editorApi.scene.readActorIndex(sceneId, { archive_session: archive });
+  const snapshot = await editorApi.scene.readScene({ archive_session: archive, scene: sceneId, actors: 'index' });
   if (!current() || snapshot.archive_session !== archive || snapshot.scene !== sceneId) return false;
   const actors = Array.isArray(snapshot?.actors) ? snapshot.actors : [];
   actorPickIndex = indexActorsByHandle(actors);
@@ -1767,7 +1767,7 @@ const sendCameraUpdateFast = () => {
   const { sceneId, cameraId, archiveSession } = cameraBindingState.value;
   if (!sceneId || !cameraId || !archiveSession) return false;
   try {
-    editorApi.scene.setCameraProperties(sceneId, cameraId, {
+    editorApi.scene.updateCamera(sceneId, cameraId, {
       archive_session: archiveSession,
       position: [...cameraState.value.position],
       forward: [...cameraState.value.forward],

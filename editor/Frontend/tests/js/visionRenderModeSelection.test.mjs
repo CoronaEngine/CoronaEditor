@@ -1,3 +1,4 @@
+import { sceneQueryFixture } from './sceneQueryFixtures.mjs';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import test from 'node:test';
@@ -184,8 +185,8 @@ function detachedHost({ fields = {}, fail = false, pending = false, accumulation
       visionDenoiser, selectVisionDenoiser,
       visionAccumulation: typeof visionAccumulation === 'undefined' ? undefined : visionAccumulation,
       toggleVisionAccumulation: typeof toggleVisionAccumulation === 'undefined' ? undefined : toggleVisionAccumulation };
-  `)(ref, visionModes, { scene: { readCameras: async () => ({ archive_session: 'archive', scene: 'scene.ini',
-    cameras: cameraSnapshot(fields, 'camera-3').cameras }), setCameraRenderSettings: async (scene, cameraId, patch) => {
+  `)(ref, visionModes, { scene: { ...sceneQueryFixture({ cameras: async () => ({ archive_session: 'archive', scene: 'scene.ini',
+    cameras: cameraSnapshot(fields, 'camera-3').cameras }) }),   setCameraRenderSettings: async (scene, cameraId, patch) => {
       patches.push([scene, cameraId, structuredClone(patch)]);
       const vision = patch.vision || {};
       if (vision.denoiser) {

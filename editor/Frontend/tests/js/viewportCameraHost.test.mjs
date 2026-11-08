@@ -68,7 +68,7 @@ function mountCreative(t, { native = true } = {}) {
     ref, reactive, cameraMovementKey, createScriptInputSender, normalizeVisionRenderMode, visionAccumulationFromCamera, visionDenoiseFromCamera, visionStablePlanesFromCamera, visionDenoiserFromCamera,
     createViewportCameraController: options => createViewportCameraController({ ...options, ...clock }),
     window, document, viewCurrent: () => current,
-    editorApi: { scene: { setCameraProperties: async (scene, camera, patch) => {
+    editorApi: { scene: { updateCamera: async (scene, camera, patch) => {
       if (native) calls.push([scene, camera, patch]);
     } }, input: { dispatch: async (...args) => { scratch.push(args); return { status: 'queued' }; } } },
     cabbageContextService: { recordEvent: async record => records.push(record) },

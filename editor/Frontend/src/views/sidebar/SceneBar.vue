@@ -743,7 +743,7 @@ const ToggleVisible = async (scene) => {
   // 音视频资源没有对应 Actor，仅在前端切换可见标记
   if (isMediaItem(scene)) return;
   try {
-    await editorApi.scene.setActorProperties(context.scene, scene.actor_guid || scene.name, {
+    await editorApi.scene.updateActor(context.scene, scene.actor_guid || scene.name, {
       archive_session: context.archive,
       visible: newVisible,
     });
@@ -855,7 +855,7 @@ const RefreshRenderBackendState = async () => {
     const current = () => viewLifetime.current() && scene === currentSceneName.value && archive === archiveSession.value;
     if (!scene || !archive) return;
     const [cameraResult, availResult] = await Promise.all([
-      editorApi.scene.readCameras(scene, { archive_session: archive }),
+      editorApi.scene.readScene({ archive_session: archive, scene: scene, cameras: true }),
       editorApi.scene.isVisionAvailable(),
     ]);
     if (!current() || sequence !== renderBackendSequence || cameraResult.archive_session !== archive || cameraResult.scene !== scene) return;
@@ -1033,7 +1033,7 @@ const OnInitObjTree = async () => {
   const current = () => viewLifetime.current() && requestSeq === sceneTreeRequestSeq
     && sceneName === currentSceneName.value && archive === archiveSession.value;
   try {
-    const data = await editorApi.scene.readTree(sceneName, { archive_session: archive });
+    const data = await editorApi.scene.readScene({ archive_session: archive, scene: sceneName, actors: 'tree', cameras: true });
     if (!current() || data.archive_session !== archive || data.scene !== sceneName) return;
     const nextActors = Array.isArray(data.actors)
       ? data.actors.map((item) => ({
@@ -1158,7 +1158,7 @@ const RefreshCameraListOnly = async () => {
   }
   cameraListRefreshInFlight = true;
   try {
-    const data = await editorApi.scene.readCameras(scene, { archive_session: archive });
+    const data = await editorApi.scene.readScene({ archive_session: archive, scene: scene, cameras: true });
     if (!current() || data.archive_session !== archive || data.scene !== scene) return;
     if (Array.isArray(data?.cameras)) {
       applyCameraList(data.cameras);

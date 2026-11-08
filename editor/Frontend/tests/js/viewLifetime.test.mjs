@@ -1,3 +1,4 @@
+import { sceneQueryFixture } from './sceneQueryFixtures.mjs';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import fs from 'node:fs';
@@ -65,7 +66,7 @@ for (const name of ['OnInitObjTree', 'RefreshCameraListOnly']) {
     const scope = {
       currentSceneName: { value: 'scene' }, sceneTreeRequestSeq: 0,
       cameraListRefreshInFlight: false, viewLifetime: { current: () => active },
-      editorApi: { scene: { readTree: () => pending.promise, readCameras: () => pending.promise } },
+      editorApi: { scene: { ...sceneQueryFixture({ tree: () => pending.promise, cameras: () => pending.promise }),    } },
       archiveSession: { value: 'archive' }, sceneTreeSettlement: { value: null }, sceneImages: { value: [] },
       resolveSceneTreeSnapshot: () => ({ settlement: {}, commit: true, rows: [], retryInMs: 100 }),
       applyCameraList: () => { applied++; }, scheduleSceneTreeSettleRetry: () => { scheduled++; },
