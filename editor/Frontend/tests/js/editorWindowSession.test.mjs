@@ -274,6 +274,54 @@ test('user close waits for native closure instead of broadcasting an optimistic 
 });
 
 for (const initiatedByMain of [false, true]) {
+  test(`a delayed save cannot close a panel retired during its wait (main=${initiatedByMain})`, async () => {
+    const pending = deferred();
+    const h = harness({ beforeClose: () => pending.promise });
+    await h.main.prepare(true);
+    const { tab_id } = await h.main.open(panel);
+    const child = h.child(h.commands.find(command => command.cmd === panel.cmd));
+    const closing = initiatedByMain ? h.main.closeTab(tab_id, '') : child.closeThis('');
+    await setImmediate();
+    await h.main.prepare(false);
+    h.commands.length = 0;
+    pending.resolve(true);
+    await closing;
+    assert.equal(h.commands.length, 0, 'the owner already retired this document');
+    assert.equal(h.main.policy().records.length, 0, 'a late close cannot resurrect a retired record');
+  });
+  test(`panel close preserves the live document until its save succeeds (main=${initiatedByMain})`, async () => {
+    const pending = deferred();
+    const seen = [];
+    let save = pending.promise;
+    const h = harness({ beforeClose: record => {
+      seen.push(record.panelId);
+      return save;
+    } });
+    await h.main.prepare(true);
+    const { tab_id } = await h.main.open({ ...panel, panelId: 'NodeGraph' });
+    const child = h.child(h.commands.find(command => command.cmd === panel.cmd));
+    h.commands.length = 0;
+    const close = () => initiatedByMain ? h.main.closeTab(tab_id, '') : child.closeThis('');
+    const closing = close();
+    const rejected = assert.rejects(closing, /graph save failed/);
+    await setImmediate();
+    assert.deepEqual(seen, ['NodeGraph'], 'use the stored panel identity, including title-bar closes');
+    assert.equal(h.commands.length, 0, 'a pending graph save must keep its native document alive');
+    pending.reject(new Error('graph save failed'));
+    await rejected;
+    assert.equal(h.commands.length, 0, 'failed saving must not close the document');
+    assert.equal(child.policy().enabled, true, 'the document must remain usable for explicit retry');
+    assert.equal(h.main.policy().records[0].status, 'ready');
+    save = Promise.resolve(true);
+    await close();
+    assert.deepEqual(seen, ['NodeGraph', 'NodeGraph']);
+    assert.equal(h.storage.length, 1);
+    assert.deepEqual(h.commands.map(command => command.cmd),
+      [initiatedByMain ? 'closePanelTab' : 'closeThisTab']);
+  });
+}
+
+for (const initiatedByMain of [false, true]) {
   test(`closing a panel drains its outstanding requests (main=${initiatedByMain})`, async () => {
     const pending = deferred();
     const h = harness();

@@ -212,7 +212,9 @@ const openTool = panelId => appService.crossTabBroadcast('creative-panel-open', 
 const physicsFields = ['gravityX', 'gravityY', 'gravityZ', 'floorY', 'floorRestitution', 'fixedDt'];
 const physicsDraft = ref({});
 // Camera state is broadcast frequently. Refresh the form only when the actual physics values change.
-watch(() => JSON.stringify(state.value.physics ?? {}), value => { physicsDraft.value = JSON.parse(value); }, { immediate: true });
+watch(physicsFields.map(field => () => state.value.physics?.[field]), () => {
+  physicsDraft.value = { ...(state.value.physics ?? {}) };
+}, { immediate: true });
 const refreshPhysics = event => { if (event.target.open) void act('refreshPhysics'); };
 const activeMenu = ref(null);
 const toggleMenu = menu => { activeMenu.value = activeMenu.value === menu ? null : menu; };

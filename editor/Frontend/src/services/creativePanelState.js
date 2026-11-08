@@ -4,10 +4,17 @@ import { getWebMessages } from '../api/webMessages.js';
 const METHOD = 'creative.controls';
 const STATE = 'creative-controls-state';
 const fail = (code, message) => Object.assign(new Error(message), { code });
+// A Vue route can remount its provider while the CEF document and clients survive.
+const providerRevisions = new WeakMap();
+const nextProviderRevision = messages => {
+  const revision = (providerRevisions.get(messages) || 0) + 1;
+  providerRevisions.set(messages, revision);
+  return revision;
+};
 
 /** Only camera business state and serialized writes live here. */
 export function createCreativePanelProvider(messages, { snapshot, actions, isCurrent }) {
-  let disposed = false, revision = 0;
+  let disposed = false, revision = nextProviderRevision(messages);
   let writes = Promise.resolve();
   const current = () => {
     if (disposed || !isCurrent()) throw fail('CONTEXT_CHANGED', 'Creative controls document is no longer current');
@@ -16,7 +23,7 @@ export function createCreativePanelProvider(messages, { snapshot, actions, isCur
     current();
     return { owner: messages.documentId, revision, state: structuredClone(snapshot()) };
   };
-  const notify = async () => { current(); revision++; await messages.emit(STATE, read()); };
+  const notify = async () => { current(); revision = nextProviderRevision(messages); await messages.emit(STATE, read()); };
   const apply = async request => {
     const state = read().state;
     if (!state.available || ['sceneId', 'cameraId', 'cameraHandle'].some(key => request[key] !== state[key])) {

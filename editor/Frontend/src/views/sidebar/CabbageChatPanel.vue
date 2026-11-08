@@ -508,7 +508,7 @@ onMounted(() => {
   const currentProjectScopeId = () =>
     reviewScopeId(String(worldModeState.activeProjectPath || ''));
   unsubscribeAssistantContext = subscribeCabbageAssistantContext(
-    (snapshot) => assistant.hydrateContext(snapshot),
+    assistant.hydrateContext,
     { projectScopeId: currentProjectScopeId, emitCurrent: true }
   );
 });

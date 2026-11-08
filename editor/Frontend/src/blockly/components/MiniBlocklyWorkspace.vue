@@ -16,6 +16,7 @@ import { nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useErrorHandler } from '@/composables/useErrorHandler.js';
 import { registerDataNamesFromState } from '@/blockly/blocks/variable.js';
+import { cloneWebDto } from '@/utils/cloneWebDto.js';
 
 const props = defineProps({
   workspaceKey: { type: String, default: '' },
@@ -114,7 +115,7 @@ function hasSerializedWorkspaceContent(state) {
 
 function cloneState(state) {
   try {
-    return JSON.parse(JSON.stringify(state || {}));
+    return cloneWebDto(state || {});
   } catch {
     return {};
   }

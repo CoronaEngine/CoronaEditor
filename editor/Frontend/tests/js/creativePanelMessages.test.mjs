@@ -129,3 +129,23 @@ test('disposing a provider invalidates queued writes and suppresses late notific
   assert.deepEqual(calls, [1]);
   assert.deepEqual(notifications, []);
 });
+
+for (const role of ['local', 'dock']) {
+  test(`creative state versions survive provider remount in the same document for ${role}`, async t => {
+    const { main, dock, state } = fixture(t);
+    const options = { snapshot: () => state, isCurrent: () => true,
+      actions: { speed: value => { state.speed = value; } } };
+    const previous = creative.createCreativePanelProvider(main, options);
+    const seen = [];
+    const client = creative.createCreativePanelClient(role === 'local' ? main : dock,
+      { receive: value => seen.push(value.speed) });
+    t.after(() => { client.dispose(); previous.dispose(); });
+    await client.ready;
+    await client.act('speed', 2); await client.act('speed', 3); await client.act('speed', 4);
+    previous.dispose();
+    const replacement = creative.createCreativePanelProvider(main, options);
+    t.after(() => replacement.dispose());
+    assert.equal((await client.act('speed', 5)).speed, 5);
+    assert.equal(seen.at(-1), 5);
+  });
+}

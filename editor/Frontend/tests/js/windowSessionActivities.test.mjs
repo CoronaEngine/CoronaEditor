@@ -36,3 +36,37 @@ test('main window can drain activities for one closing tab without blocking anot
   await main.drain(activity => activity.source === 'tab-22');
   dock.end(closingTab);
 });
+
+test('activity drain recollects after a participant leaves without ignoring surviving work', async t => {
+  const scope = crypto.randomUUID();
+  const mainMessages = createWebMessages({ scope, role: 'main', getGeneration: () => 'world' });
+  const leavingMessages = createWebMessages({ scope, getGeneration: () => 'world' });
+  const liveMessages = createWebMessages({ scope, getGeneration: () => 'world' });
+  const main = createWindowSessionActivities(mainMessages, { wait: () => delay(1) });
+  const live = createWindowSessionActivities(liveMessages);
+  const active = live.begin({ source: 'live-tab' });
+  let leave;
+  const announced = new Promise(resolve => { leave = resolve; });
+  leavingMessages.handle('windowSession.activitySnapshot', () => {
+    leave();
+    leavingMessages.dispose();
+    return [];
+  });
+  t.after(() => { main.dispose(); live.dispose(); mainMessages.dispose(); leavingMessages.dispose(); liveMessages.dispose(); });
+  let drained = false;
+  const draining = main.drain().then(() => { drained = true; });
+  // Attach rejection observation immediately while preserving the assertion.
+  draining.catch(() => {});
+  await announced;
+  await delay(100);
+  assert.equal(drained, false, 'surviving activities must still block closing');
+  live.end(active);
+  await draining;
+  assert.equal(drained, true);
+});
+
+test('activity drain propagates context changes unrelated to participant departure', async () => {
+  const changed = Object.assign(new Error('world replaced'), { code: 'CONTEXT_CHANGED' });
+  const main = createWindowSessionActivities({ handle: () => () => {}, requestAll: async () => { throw changed; } });
+  await assert.rejects(main.drain(), error => error === changed);
+});

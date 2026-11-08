@@ -8,7 +8,7 @@ import { drainWorldSession } from '../../src/services/worldSessionLifecycle.js';
 
 const source = parse(fs.readFileSync(new URL('../../src/views/layout/MainPage.vue', import.meta.url), 'utf8'))
   .descriptor.scriptSetup.content;
-const names = new Set(['initializeCreativeRenderMode', 'creativeRenderDefaultsBusy',
+const names = new Set(['mainRenderOperations', 'mainCameraOperation', 'initializeCreativeRenderMode', 'creativeRenderDefaultsBusy',
   'creativeRenderDefaultsError', 'mainRenderBackend', 'mainVisionRenderMode', 'pendingMainRenderSelection']);
 const declarations = babelParse(source, { sourceType: 'module' }).program.body
   .filter(node => node.type === 'VariableDeclaration' && node.declarations.some(item => names.has(item.id.name)))

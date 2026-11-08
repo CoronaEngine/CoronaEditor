@@ -13,6 +13,8 @@ const declarations = babelParse(descriptor.scriptSetup.content, { sourceType: 'm
 // Execute the real creative camera host declarations with unrelated services stubbed.
 // No duplicate handlers or movement algorithms live in this test.
 const names = new Set([
+  'mainRenderOperations', 'retireMainRenderOperations', 'creativeRenderDefaultsBusy', 'creativeRenderDefaultsError',
+  'mainVisionAccumulationBusy', 'mainVisionDenoiseBusy', 'mainVisionDenoiserBusy', 'mainVisionStablePlanesBusy',
   'cameraState', 'cameraBindingState', 'cameraSpeed', 'mouseSensitivity', 'viewportPickSurfaceRef',
   'cameraMovementGestures', 'movementAxisGroups', 'mouseRotateStartForward', 'mouseRotateMoved',
   'cameraControls', 'isRealtimeCameraInputActive', 'scheduleCameraUpdate',

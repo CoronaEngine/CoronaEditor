@@ -1,4 +1,5 @@
 import { defineStore } from 'pinia';
+import { cloneWebDto } from '../utils/cloneWebDto.js';
 
 const DEFAULT_PROFILE = Object.freeze({
   score: 0,
@@ -50,7 +51,7 @@ const PATTERN_FIELDS = [
 
 function clone(value, fallback = {}) {
   try {
-    return JSON.parse(JSON.stringify(value));
+    return value === undefined ? fallback : cloneWebDto(value);
   } catch (_) {
     return fallback;
   }
@@ -411,6 +412,7 @@ export const useCabbageAssistantStore = defineStore('cabbageAssistant', {
     lastOptimizationTipAt: 0,
     shownOptimizationRevisions: [],
     contextUpdatedAt: 0,
+    contextOwnerEpoch: '',
     preWarning: null,
     shownPreWarningKeys: [],
     activePreWarningSignatures: [],
@@ -500,6 +502,7 @@ export const useCabbageAssistantStore = defineStore('cabbageAssistant', {
       this.lastOptimizationTipAt = 0;
       this.shownOptimizationRevisions = [];
       this.contextUpdatedAt = 0;
+      this.contextOwnerEpoch = '';
       this.preWarning = null;
       this.shownPreWarningKeys = [];
       this.activePreWarningSignatures = [];
@@ -509,7 +512,7 @@ export const useCabbageAssistantStore = defineStore('cabbageAssistant', {
       this.resetWorld(projectScopeId);
     },
 
-    hydrateContext(snapshot = {}) {
+    hydrateContext(snapshot = {}, { ownerEpoch = '' } = {}) {
       const context =
         snapshot.context && typeof snapshot.context === 'object' ? snapshot.context : snapshot;
       const scope = String(
@@ -517,7 +520,10 @@ export const useCabbageAssistantStore = defineStore('cabbageAssistant', {
       );
       const worldId = String(context.worldId || '');
       const incomingUpdatedAt = Math.max(0, Number(context.updatedAt || snapshot.updatedAt) || 0);
+      const incomingOwnerEpoch = String(ownerEpoch || '');
+      const ownerChanged = Boolean(incomingOwnerEpoch && incomingOwnerEpoch !== this.contextOwnerEpoch);
       const sameContext =
+        !ownerChanged &&
         (!worldId || !this.worldId || worldId === this.worldId) &&
         (!scope || !this.projectScopeId || scope === this.projectScopeId);
       if (
@@ -528,11 +534,13 @@ export const useCabbageAssistantStore = defineStore('cabbageAssistant', {
       )
         return false;
       if (
+        ownerChanged ||
         (this.worldId && worldId && this.worldId !== worldId) ||
         (this.projectScopeId && scope && this.projectScopeId !== scope)
       ) {
         this.resetWorld(scope);
       }
+      if (incomingOwnerEpoch) this.contextOwnerEpoch = incomingOwnerEpoch;
       if (worldId) this.worldId = worldId;
       if (scope) this.projectScopeId = scope;
       if (snapshot.graphRevision !== undefined)
@@ -585,6 +593,8 @@ export const useCabbageAssistantStore = defineStore('cabbageAssistant', {
         }))
         .filter((message) => message.content);
       this.recentOperationEvents = clone(context.recentOperationEvents || [], []);
+      const selectedTaskKey = snapshot.selectedTaskKey ?? context.selectedTaskKey;
+      if (selectedTaskKey !== undefined) this.selectTask(selectedTaskKey);
       if (
         this.selectedTaskKey &&
         !this.tasks.some((task) => task.taskKey === this.selectedTaskKey) &&

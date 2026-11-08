@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import { ref } from 'vue';
 import { babelParse, parse } from 'vue/compiler-sfc';
+import { createViewLifetime } from '../../src/utils/viewLifetime.js';
 
 const { descriptor } = parse(readFileSync(new URL('../../src/views/tools/CameraView.vue', import.meta.url), 'utf8'));
 const script = descriptor.scriptSetup.content;
@@ -16,6 +17,7 @@ test('CameraView settings share scoped properties and preserve camera metadata o
   const calls = [], camera = ref({ archive_session: 'archive', camera_id: 'camera-id', handle: 42,
     position: [1, 2, 3], render_backend: 'vision', vision_denoise: true });
   const save = handler('saveSettings', {
+    viewLifetime: createViewLifetime(),
     camera, sceneId: 'scene.ini', cameraId: 'camera-id', renderWidth: ref(640), renderHeight: ref(480), moveSpeed: ref(0.5),
     errorText: ref(''), unwrap: value => value,
     editorApi: { scene: { setCameraProperties: async (...args) => {

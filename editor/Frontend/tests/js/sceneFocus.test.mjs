@@ -9,9 +9,13 @@ const source = readFileSync(new URL('../../src/views/sidebar/SceneBar.vue', impo
 const { descriptor } = parse(source);
 const node = babelParse(descriptor.scriptSetup.content, { sourceType: 'module' }).program.body
   .find(node => node.type === 'VariableDeclaration' && node.declarations.some(d => d.id.name === 'focusActorFromList'));
+const operation = babelParse(descriptor.scriptSetup.content, { sourceType: 'module' }).program.body
+  .find(node => node.type === 'VariableDeclaration' && node.declarations.some(d => d.id.name === 'sceneOperation'));
 const makeFocus = new Function('deps', `
   const { editorApi, appService, currentSceneName, archiveSession, getTargetCamera, getTargetCameraName,
     SelectActor, coronaEventBus, logWarn, logError } = deps;
+  const viewLifetime = { current: () => true };
+  ${descriptor.scriptSetup.content.slice(operation.start, operation.end)}
   let actorFocusSeq = 0;
   ${descriptor.scriptSetup.content.slice(node.start, node.end)}
   return focusActorFromList;

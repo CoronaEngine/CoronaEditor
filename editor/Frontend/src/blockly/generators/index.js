@@ -1,6 +1,7 @@
 // 统一注册各分类的 Python 代码生成器，并自定义 workspaceToCode
 import * as Blockly from 'blockly/core';
 import { pythonGenerator } from 'blockly/python';
+import { cloneWebDto } from '../../utils/cloneWebDto.js';
 import { resetPrelude, renderPreludeAt } from './prelude';
 import { emitFileProgram } from './fileProgram';
 
@@ -251,7 +252,7 @@ function hasWorkspaceBlocks(state) {
 function loadSerializedWorkspace(state) {
   const workspace = new Blockly.Workspace();
   if (state && typeof state === 'object' && Object.keys(state).length) {
-    Blockly.serialization.workspaces.load(JSON.parse(JSON.stringify(state)), workspace);
+    Blockly.serialization.workspaces.load(cloneWebDto(state), workspace);
   }
   return workspace;
 }

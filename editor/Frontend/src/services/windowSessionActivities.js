@@ -21,9 +21,20 @@ export function createWindowSessionActivities(messages, {
     async drain(predicate = () => true) {
       const started = Date.now();
       while (true) {
-        const snapshots = await messages.requestAll(METHOD, null, {
-          timeoutMs: Math.min(timeoutMs, Math.max(1, timeoutMs - (Date.now() - started))),
-        });
+        let snapshots;
+        try {
+          snapshots = await messages.requestAll(METHOD, null, {
+            timeoutMs: Math.min(timeoutMs, Math.max(1, timeoutMs - (Date.now() - started))),
+          });
+        } catch (error) {
+          // A normally closing Dock can leave during this read-only snapshot.
+          // Recollect from the remaining participants; never retry native work,
+          // saves, world changes, or an unresponsive participant's timeout.
+          if (error.code !== 'CONTEXT_CHANGED' || error.details?.reason !== 'PEER_LEFT'
+            || Date.now() - started >= timeoutMs) throw error;
+          await wait(20);
+          continue;
+        }
         if (!snapshots.flat().some(predicate)) return;
         if (Date.now() - started >= timeoutMs) throw new Error('等待旧窗口请求结束超时，已取消切换世界，请重试。');
         await wait(20);

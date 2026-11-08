@@ -164,7 +164,7 @@ export function createWebMessages({ scope, documentId = uniqueId(), role = 'peer
       for (const [id, entry] of pending) {
         if (entry.candidates?.get(message.sender)?.epoch === message.epoch) entry.candidates.delete(message.sender);
         if (entry.recipientEpoch === message.epoch || entry.expected.get(message.sender)?.epoch === message.epoch) {
-          finish(id, failure('CONTEXT_CHANGED'));
+          finish(id, failure('CONTEXT_CHANGED', 'Web participant left', { reason: 'PEER_LEFT' }));
         }
       }
       return;
@@ -210,7 +210,8 @@ export function createWebMessages({ scope, documentId = uniqueId(), role = 'peer
     if (message.kind !== 'event' || !contextMatches(message) ||
         (message.ownerEpoch && message.ownerEpoch !== ownerEpoch)) return;
     for (const handler of [...(subscriptions.get(message.topic) || [])]) {
-      try { Promise.resolve(handler(message.payload, { sender: message.sender, generation: message.generation })).catch(onError); }
+      try { Promise.resolve(handler(message.payload, { sender: message.sender, generation: message.generation,
+        ownerEpoch: message.ownerEpoch || null })).catch(onError); }
       catch (error) { onError(error); }
     }
   }
@@ -223,6 +224,7 @@ export function createWebMessages({ scope, documentId = uniqueId(), role = 'peer
   const api = {
     documentId,
     role,
+    get ownerEpoch() { return ownerEpoch; },
     setGeneration(provider) {
       if (typeof provider !== 'function') throw failure('INVALID_ARGUMENT', 'Generation provider must be a function');
       getGeneration = provider;

@@ -689,6 +689,7 @@ const selectViewportUiMode = (mode) => {
 let stopViewportUiCalibrationMessages = null;
 
 const saveSettings = async () => {
+  if (!viewLifetime.current()) return;
   try {
     const width = Math.max(Number(renderWidth.value) || 960, 64);
     const height = Math.max(Number(renderHeight.value) || 540, 64);
@@ -700,6 +701,7 @@ const saveSettings = async () => {
       view_width: width,
       view_height: height,
     });
+    if (!viewLifetime.current()) return;
     Object.assign(camera.value, result.camera);
     renderWidth.value = result.camera.width || width;
     renderHeight.value = result.camera.height || height;
@@ -710,7 +712,7 @@ const saveSettings = async () => {
       cameraId,
     ).catch(() => {});
   } catch (error) {
-    errorText.value = error.message;
+    if (viewLifetime.current()) errorText.value = error.message;
   }
 };
 
@@ -1199,12 +1201,14 @@ watch(() => backend.value === 'vision' && visionRenderMode.value !== 'ssat' &&
 scheduleDragRegionSync, { flush: 'post' });
 
 const pollScriptInputLock = async () => {
+  if (!viewLifetime.current()) return;
   try {
     const scriptStatus = (await editorApi.scripts.getStatus()) || {};
+    if (!viewLifetime.current()) return;
     nodeGraphInputLocked.value = Boolean(scriptStatus.inputLocked);
     if (nodeGraphInputLocked.value) resetCameraInput();
   } catch {
-    nodeGraphInputLocked.value = false;
+    if (viewLifetime.current()) nodeGraphInputLocked.value = false;
   }
 };
 

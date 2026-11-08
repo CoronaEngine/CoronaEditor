@@ -9,6 +9,7 @@ import * as launcher from '../../src/services/projectLauncherService.js';
 import * as worldMode from '../../src/services/worldModeService.js';
 import * as lifecycle from '../../src/services/worldSessionLifecycle.js';
 import lanchat from '../../src/stores/lanchat.js';
+import { createViewLifetime } from '../../src/utils/viewLifetime.js';
 
 // Compile the real creation page rather than duplicating its orchestration here.
 // Only lifecycle/router/UI dependencies are injected; the launcher is production code.
@@ -92,6 +93,7 @@ async function mountCreationPage(t, { stopResult = idle() } = {}) {
     '@/services/cabbageAssistantContextService.js': { initializeWorldTasks: async () => {} },
     '@/stores/lanchat.js': { default: lanchat },
     '@/i18n/domTranslator.js': { translateUiText: text => text },
+    '@/utils/viewLifetime.js': { createViewLifetime },
   });
   const page = component.setup({}, { expose() {} });
   for (const hook of mounted) hook();

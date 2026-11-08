@@ -226,8 +226,10 @@ import { onMounted, onUnmounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { editorApi } from '@/api/editorApi.js';
 import { projectLauncherService, isProjectOpenSuperseded } from '@/services/projectLauncherService.js';
+import { createViewLifetime } from '@/utils/viewLifetime.js';
 
 const router = useRouter();
+const viewLifetime = createViewLifetime();
 
 const tabs = [
   { id: 'join', label: '加入房间', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="w-5 h-5"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>' },
@@ -245,6 +247,8 @@ const errorMsg = ref('');
 
 const rooms = ref([]);
 let discoveryRefreshTimer = null;
+let discoveryDelayTimer = null;
+let finishDiscoveryDelay = null;
 
 const manual = ref({ ip: '', port: '27960' });
 
@@ -258,23 +262,27 @@ const parsePort = (value) => {
 const playerName = () => nickname.value.trim() || '玩家';
 
 const runBusy = async (message, work) => {
-  if (busy.value) return;
+  if (!viewLifetime.current() || busy.value) return;
   busy.value = true;
   busyText.value = message;
   errorMsg.value = '';
   try {
     await work();
   } catch (error) {
-    errorMsg.value = error?.message || String(error);
+    if (viewLifetime.current()) errorMsg.value = error?.message || String(error);
   } finally {
-    busy.value = false;
-    busyText.value = '';
+    if (viewLifetime.current()) {
+      busy.value = false;
+      busyText.value = '';
+    }
   }
 };
 
 const stopExistingSession = async () => {
+  if (!viewLifetime.current()) return;
   try {
     const info = await editorApi.network.getSessionInfo();
+    if (!viewLifetime.current()) return;
     if (info?.active) {
       await editorApi.network.stopSession();
     }
@@ -284,20 +292,23 @@ const stopExistingSession = async () => {
 };
 
 const prepareMultiplayerProject = async (role) => {
+  if (!viewLifetime.current()) return null;
   busyText.value = '正在准备联机存档…';
   const project = await editorApi.project.createMultiplayerProject({ role });
+  if (!viewLifetime.current()) return null;
   if (!project?.path) {
     throw new Error('创建联机存档失败');
   }
 
   const opened = await projectLauncherService.openProject(project.path);
-  if (isProjectOpenSuperseded(opened)) return null;
+  if (!viewLifetime.current() || isProjectOpenSuperseded(opened)) return null;
   const openedOk = opened;
   if (!openedOk?.ok) {
     throw new Error('打开联机存档失败');
   }
 
   const rootResult = await editorApi.network.setProjectRoot(project.path);
+  if (!viewLifetime.current()) return null;
   if (rootResult?.ok === false) {
     throw new Error(rootResult.error || '设置联机项目目录失败');
   }
@@ -305,8 +316,10 @@ const prepareMultiplayerProject = async (role) => {
 };
 
 const startSession = async (role, port, instanceName = playerName()) => {
+  if (!viewLifetime.current()) return null;
   busyText.value = role === 'host' ? '正在创建房间…' : '正在启动本地客户端…';
   const result = await editorApi.network.startSession(instanceName, 0, port, role);
+  if (!viewLifetime.current()) return null;
   if (!result?.ok) {
     throw new Error(result?.error || '启动联机会话失败');
   }
@@ -314,41 +327,54 @@ const startSession = async (role, port, instanceName = playerName()) => {
   return result;
 };
 
-const handleRefresh = () => {
-  if (scanning.value) return;
+const handleRefresh = async () => {
+  if (!viewLifetime.current() || scanning.value) return;
   scanning.value = true;
-  editorApi.network.clearDiscoveredPeers()
-    .catch(() => {})
-    .then(() => editorApi.network.searchLan())
-    .then(() => new Promise((resolve) => setTimeout(resolve, 1500)))
-    .then(() => editorApi.network.getDiscoveredPeers())
-    .then((result) => {
-      const peers = Array.isArray(result?.peers) ? result.peers : [];
-      rooms.value = peers
-        .filter((peer) => peer.role === 'host')
-        .map((peer) => ({
-          id: peer.stable_id,
-          name: peer.name || '局域网房间',
-          host: peer.ip,
-          port: peer.port,
-          hostName: peer.name,
-        }));
-      selectedRoom.value = rooms.value[0]?.id || null;
-    })
-    .catch((error) => {
-      errorMsg.value = error?.message || '局域网搜索失败';
-    })
-    .finally(() => { scanning.value = false; });
+  try {
+    await editorApi.network.clearDiscoveredPeers().catch(() => {});
+    if (!viewLifetime.current()) return;
+    await editorApi.network.searchLan();
+    if (!viewLifetime.current()) return;
+    await new Promise(resolve => {
+      finishDiscoveryDelay = resolve;
+      discoveryDelayTimer = setTimeout(() => {
+        discoveryDelayTimer = null;
+        finishDiscoveryDelay = null;
+        resolve();
+      }, 1500);
+    });
+    if (!viewLifetime.current()) return;
+    const result = await editorApi.network.getDiscoveredPeers();
+    if (!viewLifetime.current()) return;
+    const peers = Array.isArray(result?.peers) ? result.peers : [];
+    rooms.value = peers
+      .filter((peer) => peer.role === 'host')
+      .map((peer) => ({
+        id: peer.stable_id,
+        name: peer.name || '局域网房间',
+        host: peer.ip,
+        port: peer.port,
+        hostName: peer.name,
+      }));
+    selectedRoom.value = rooms.value[0]?.id || null;
+  } catch (error) {
+    if (viewLifetime.current()) errorMsg.value = error?.message || '局域网搜索失败';
+  } finally {
+    if (viewLifetime.current()) scanning.value = false;
+  }
 };
 
 const joinHost = async ({ ip, port, peerName = '' }) => {
   await runBusy('正在加入房间…', async () => {
     await stopExistingSession();
+    if (!viewLifetime.current()) return;
     if (!await prepareMultiplayerProject('guest')) return;
     await startSession('client', port);
+    if (!viewLifetime.current()) return;
 
     busyText.value = '正在连接房主…';
     const result = await editorApi.network.connectToPeer(ip, port, peerName || playerName());
+    if (!viewLifetime.current()) return;
     if (!result?.ok) {
       throw new Error(result?.error || '连接房主失败');
     }
@@ -375,9 +401,10 @@ const handleManualJoin = () => {
 const handleCreateRoom = () => {
   runBusy('正在创建房间…', async () => {
     await stopExistingSession();
+    if (!viewLifetime.current()) return;
     if (!await prepareMultiplayerProject('host')) return;
     await startSession('host', parsePort(host.value.port), host.value.roomName.trim() || playerName());
-    router.push('/');
+    if (viewLifetime.current()) router.push('/');
   });
 };
 
@@ -386,13 +413,15 @@ const goHome = () => {
 };
 
 const loadLocalIp = async () => {
+  if (!viewLifetime.current()) return;
   try {
     const result = await editorApi.lanChat.getLocalIp();
+    if (!viewLifetime.current()) return;
     if (result?.ip) {
       localIp.value = result.ip;
     }
   } catch (_) {
-    localIp.value = '--';
+    if (viewLifetime.current()) localIp.value = '--';
   }
 };
 
@@ -405,6 +434,11 @@ onMounted(() => {
 });
 
 onUnmounted(() => {
+  void viewLifetime.dispose();
+  if (discoveryDelayTimer !== null) clearTimeout(discoveryDelayTimer);
+  discoveryDelayTimer = null;
+  finishDiscoveryDelay?.();
+  finishDiscoveryDelay = null;
   if (discoveryRefreshTimer) {
     clearInterval(discoveryRefreshTimer);
     discoveryRefreshTimer = null;

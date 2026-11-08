@@ -20,6 +20,7 @@ function mainHost({ fail = false, pending = false, denoiseFail = false, denoiseR
   const calls = [], patches = [];
   const source = declarations('../../src/views/layout/MainPage.vue', [
     'mainRenderModeOptions', 'mainRenderModeLabel', 'pendingMainRenderSelection',
+    'mainRenderOperations', 'mainCameraOperation', 'retireMainRenderOperations',
     'currentMainCameraId', 'selectMainRenderMode',
     'currentMainSceneId', 'currentMainCamera', 'mainVisionDenoise', 'mainVisionDenoiseBusy',
     'mainVisionDenoiseError', 'pendingMainDenoiseSelection', 'toggleMainVisionDenoise',
@@ -72,6 +73,8 @@ function mainHost({ fail = false, pending = false, denoiseFail = false, denoiseR
   const host = new Function('ref', 'computed', 'visionModes', 'editorApi', `
     const { visionRenderModes, normalizeVisionRenderMode, visionDenoiseFromCamera, visionAccumulationFromCamera, visionStablePlanesFromCamera, visionDenoiserFromCamera } = visionModes;
     const currentSceneId = ref('scene.ini'), activeMenu = ref(null);
+    const environmentArchiveSession = ref('archive'), viewCurrent = () => true;
+    const creativeRenderDefaultsBusy = ref(false), creativeRenderDefaultsError = ref('');
     const cameraBindingState = ref({ sceneId: 'scene.ini', cameraId: 'camera-2', archiveSession: 'archive' });
     const mainRenderBackend = ref('native'), mainVisionRenderMode = ref('path_tracing');
     const DEFAULT_SCENE_NAME = 'scene.ini';
@@ -153,7 +156,7 @@ test('detached camera selects ReSTIR and stores the returned camera mode', async
 });
 
 const cameraSnapshot = (fields = {}, cameraId = 'camera-2') => ({
-  scene_id: 'scene.ini', active_camera_name: cameraId,
+  scene_id: 'scene.ini', archive_session: 'archive', active_camera_name: cameraId,
   cameras: [{ camera_id: cameraId, name: cameraId, handle: cameraId === 'camera-2' ? 2 : 3,
     render_backend: 'vision', vision_render_mode: 'path_tracing', vision_denoise: false, ...fields }],
 });
@@ -288,7 +291,7 @@ for (const fail of [false, true]) {
     main.applySceneSnapshot('scene.ini', cameraSnapshot({ vision_denoiser: 'svgf' }, 'camera-3'));
     if (fail) reject(new Error('old camera error'));
     else resolve({ type: 'reblur', pending: true });
-    assert.equal(await request, !fail);
+    assert.equal(await request, false);
     assert.equal(main.mainVisionDenoiser.value, 'svgf');
     assert.equal(main.currentMainCamera.value.vision_denoiser, 'svgf');
     assert.equal(main.mainVisionDenoiserError.value, '');
@@ -421,7 +424,7 @@ test('a late main denoise response cannot modify the newly bound camera', async 
   assert.equal(await host.toggleMainVisionDenoise(), false);
   host.applySceneSnapshot('scene.ini', cameraSnapshot({ vision_denoise: false }, 'camera-3'));
   reply({ enabled: true, pending: true });
-  assert.equal(await request, true);
+  assert.equal(await request, false);
   assert.equal(host.mainVisionDenoise.value, false);
   assert.equal(host.currentMainCamera.value.camera_id, 'camera-3');
   assert.equal(host.currentMainCamera.value.vision_denoise, false);
@@ -557,7 +560,7 @@ test('a late accumulation response cannot modify the newly bound camera', async 
   assert.equal(await host.toggleMainVisionAccumulation(), false);
   host.applySceneSnapshot('scene.ini', cameraSnapshot({ vision_accumulation: false }, 'camera-3'));
   reply({ enabled: true, pending: true });
-  assert.equal(await request, true);
+  assert.equal(await request, false);
   assert.equal(host.mainVisionAccumulation.value, false);
   assert.equal(host.currentMainCamera.value.camera_id, 'camera-3');
   assert.equal(host.currentMainCamera.value.vision_accumulation, false);
@@ -657,7 +660,7 @@ for (const fail of [false, true]) {
     main.applySceneSnapshot('scene.ini', cameraSnapshot({ vision_render_mode: 'restir' }, 'camera-3'));
     if (fail) reject(new Error('old camera error'));
     else resolve({ enabled: false, pending: true });
-    assert.equal(await request, !fail);
+    assert.equal(await request, false);
     assert.equal(main.mainVisionStablePlanes.value, true);
     assert.equal(main.currentMainCamera.value.vision_stable_planes, true);
     assert.equal(main.mainVisionStablePlanesError.value, '');

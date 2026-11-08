@@ -342,17 +342,20 @@ const transformVectorChanged = (previous, next) => ['x', 'y', 'z'].some((axis) =
   Math.abs(Number(previous?.[axis] || 0) - Number(next?.[axis] || 0)) > ACTOR_TRANSFORM_EPSILON
 ));
 
-const seedActorTransformBaseline = async (sceneId, actorName) => {
+const seedActorTransformBaseline = async (sceneId, actorName, isCurrent = () => true) => {
   const scene = String(sceneId || '').trim();
   const actor = String(actorName || '').trim();
   const archive = cameraBindingState.value.archiveSession;
-  if (!scene || !actor || !archive || cameraBindingState.value.sceneId !== scene || !viewCurrent()) return;
+  if (!scene || !actor || !archive || cameraBindingState.value.sceneId !== scene || !viewCurrent() || !isCurrent()) return;
+  const key = actorTransformKey(scene, actor);
+  const context = mainSceneOperation(`transform:${key}`);
+  if (!context.current() || context.archive !== archive || context.sceneId !== scene) return;
   try {
     const data = await editorApi.scene.readActorProperties(scene, actor, { archive_session: archive });
-    if (!viewCurrent() || cameraBindingState.value.archiveSession !== archive
+    if (!viewCurrent() || !context.current() || !isCurrent() || cameraBindingState.value.archiveSession !== archive
         || cameraBindingState.value.sceneId !== scene || data?.archive_session !== archive || data?.scene !== scene) return;
     actorTransformBaselines.set(
-      actorTransformKey(scene, actor),
+      key,
       normalizeActorTransform(data.geometry || {}),
     );
   } catch (_) {
@@ -363,8 +366,10 @@ const seedActorTransformBaseline = async (sceneId, actorName) => {
 const handleActorTransformForCabbage = (payload = {}) => {
   const sceneId = String(payload?.scene || payload?.scene_id || '').trim();
   const actorName = String(payload?.actor || payload?.actor_name || '').trim();
-  if (!sceneId || !actorName) return;
+  if (!viewCurrent() || !sceneId || !actorName || sceneId !== currentSceneId.value
+      || !environmentArchiveSession.value || payload.archive_session !== environmentArchiveSession.value) return;
   const key = actorTransformKey(sceneId, actorName);
+  mainSceneOperations.delete(`transform:${key}`);
   const previous = actorTransformBaselines.get(key);
   const next = normalizeActorTransform(payload, previous || {});
   actorTransformBaselines.set(key, next);
@@ -400,18 +405,24 @@ const emitActorChangeFast = (type, sceneId, actorName, nodeContext = {}) => {
 };
 
 const handleActorSelectionForObjectDock = async (payload = {}, maybeSceneId = '', maybeActorName = '') => {
-  coronaEventBus.modelNodeSelection = pickedNodeIdentity(payload);
-  coronaEventBus.emit('model-node-selection', coronaEventBus.modelNodeSelection);
+  if (!viewCurrent()) return false;
   const actorType = String(payload?.actor_type || payload?.type || '').trim().toLowerCase();
   const sceneId = String(payload?.scene || payload?.scene_id || maybeSceneId || '').trim();
   const actorName = String(payload?.actor || payload?.actor_name || maybeActorName || '').trim();
+  const resolvedSceneId = sceneId || currentSceneId.value || DEFAULT_SCENE_NAME;
+  const archive = String(payload?.archive_session || payload?.archiveSession || '').trim();
+  if (resolvedSceneId !== (currentSceneId.value || DEFAULT_SCENE_NAME)
+      || (archive && archive !== environmentArchiveSession.value)) return false;
+  coronaEventBus.modelNodeSelection = pickedNodeIdentity(payload);
+  coronaEventBus.emit('model-node-selection', coronaEventBus.modelNodeSelection);
+  const context = mainSelectionOperation();
+  if (!context.current()) return false;
   if (!actorName || actorType === 'scene') {
     viewportGizmoController.clearTarget();
-    return;
+    return true;
   }
 
-  const resolvedSceneId = sceneId || currentSceneId.value || DEFAULT_SCENE_NAME;
-  void seedActorTransformBaseline(resolvedSceneId, actorName);
+  void seedActorTransformBaseline(resolvedSceneId, actorName, context.current);
   const ownsGizmo = isViewportGizmoSelectionOwner({
     viewportScope: 'main',
     cameraId: cameraBindingState.value.cameraId,
@@ -423,13 +434,15 @@ const handleActorSelectionForObjectDock = async (payload = {}, maybeSceneId = ''
       scene: resolvedSceneId,
       actor: actorName,
       actor_type: actorType,
-    });
+    }, null, context);
   } else {
     viewportGizmoController.clearTarget();
   }
+  if (!context.current()) return false;
   if (!dockStore.panels.Object?.open) {
     dockStore.openPanel('Object');
   }
+  return true;
 };
 
 const viewportPickController = createViewportPickController({
@@ -452,11 +465,16 @@ const viewportGizmoController = createViewportGizmoController({
   },
 });
 
-const handleModelNodeGizmoSelection = (identity) => { if (identity) viewportGizmoController.clearTarget(); };
-const syncMainViewportGizmoSelection = async (selection = {}, pickResult = null) => {
+const handleModelNodeGizmoSelection = (identity) => {
+  mainSceneOperations.delete('selection');
+  if (viewCurrent() && identity) viewportGizmoController.clearTarget();
+};
+const syncMainViewportGizmoSelection = async (selection = {}, pickResult = null, context = mainSelectionOperation()) => {
+  if (!context.current()) return null;
   if (coronaEventBus.modelNodeSelection) { viewportGizmoController.clearTarget(); return; }
   const sceneId =
     String(cameraBindingState.value.sceneId || currentSceneId.value || '').trim();
+  if (sceneId !== context.sceneId || cameraBindingState.value.archiveSession !== context.archive) return null;
   let target = resolveViewportGizmoTarget({
     sceneId,
     selection,
@@ -464,7 +482,8 @@ const syncMainViewportGizmoSelection = async (selection = {}, pickResult = null)
     actorIndex: actorPickIndex,
   });
   if (!target && selection?.actor && String(selection.actor_type || selection.type) !== 'scene') {
-    await refreshActorPickIndex(sceneId).catch(() => false);
+    await refreshActorPickIndex(sceneId, context.current).catch(() => false);
+    if (!context.current()) return null;
     target = resolveViewportGizmoTarget({
       sceneId,
       selection,
@@ -647,6 +666,66 @@ const currentMainCameraId = () =>
 const currentMainSceneId = () =>
   cameraBindingState.value.sceneId || currentSceneId.value || DEFAULT_SCENE_NAME;
 
+const mainRenderOperations = new Map();
+const mainCameraOperation = (kind) => {
+  const sceneId = currentMainSceneId(), cameraId = currentMainCameraId();
+  const { archiveSession: archive, cameraHandle } = cameraBindingState.value;
+  const token = {};
+  mainRenderOperations.set(kind, token);
+  return { sceneId, cameraId, archive, current: () => viewCurrent() && !!archive && !!cameraId
+    && mainRenderOperations.get(kind) === token
+    && sceneId === currentMainSceneId() && cameraId === currentMainCameraId()
+    && archive === cameraBindingState.value.archiveSession && archive === environmentArchiveSession.value
+    && cameraHandle === cameraBindingState.value.cameraHandle };
+};
+const retireMainRenderOperations = () => {
+  mainRenderOperations.clear();
+  creativeRenderDefaultsBusy.value = false;
+  creativeRenderDefaultsError.value = '';
+  pendingMainRenderSelection = null;
+  pendingMainAccumulationSelection = null;
+  pendingMainDenoiseSelection = null;
+  pendingMainDenoiserSelection = null;
+  pendingMainStablePlanesSelection = null;
+  mainVisionAccumulationBusy.value = false;
+  mainVisionDenoiseBusy.value = false;
+  mainVisionDenoiserBusy.value = false;
+  mainVisionStablePlanesBusy.value = false;
+};
+
+const mainSceneOperations = new Map();
+const mainEnvironmentWrites = new Map();
+let mainEnvironmentRevision = 0;
+const mainSceneOperation = (kind) => {
+  const sceneId = currentSceneId.value || DEFAULT_SCENE_NAME, archive = environmentArchiveSession.value;
+  const token = {};
+  mainSceneOperations.set(kind, token);
+  return { sceneId, archive, current: () => viewCurrent() && !!archive
+    && sceneId === (currentSceneId.value || DEFAULT_SCENE_NAME) && archive === environmentArchiveSession.value
+    && mainSceneOperations.get(kind) === token };
+};
+
+const mainSelectionOperation = () => {
+  const context = mainSceneOperation('selection');
+  const { sceneId, cameraId, cameraHandle, archiveSession } = cameraBindingState.value;
+  return { ...context, current: () => context.current()
+    && sceneId === cameraBindingState.value.sceneId && cameraId === cameraBindingState.value.cameraId
+    && cameraHandle === cameraBindingState.value.cameraHandle
+    && archiveSession === cameraBindingState.value.archiveSession };
+};
+const beginEnvironmentWrite = (kind) => {
+  const context = mainSceneOperation(kind);
+  if (context.current()) {
+    mainEnvironmentRevision++;
+    mainEnvironmentWrites.set(kind, context);
+  }
+  return { ...context, finish: () => {
+    if (mainEnvironmentWrites.get(kind) !== context) return;
+    mainEnvironmentWrites.delete(kind);
+    mainEnvironmentRevision++;
+  } };
+};
+
 // Cabbage assistant: world-scoped tutorial and node-logic tasks.
 let unsubscribeNodeGraphReview = null;
 let unsubscribeCabbageContext = null;
@@ -674,15 +753,28 @@ function currentProjectReviewScopeId() {
 
 async function persistCabbageTaskActions(actions = []) {
   const validActions = Array.isArray(actions) ? actions.filter((item) => item?.task) : [];
-  for (const action of validActions) {
-    try {
-      await cabbageContextService.updateTask(action);
-    } catch (error) {
-      console.warn('[CabbageContext] failed to persist task', error?.message || error);
+  if (!validActions.length || !viewCurrent()) return;
+  // Each batch remains independent; scene/archive retirement invalidates all batches.
+  const kind = Symbol('cabbage-tasks');
+  const context = mainSceneOperation(kind);
+  const projectPath = normalizeActiveProjectPath(readActiveProjectPath());
+  const current = () => context.current()
+    && projectPath === normalizeActiveProjectPath(readActiveProjectPath());
+  try {
+    for (const action of validActions) {
+      if (!current()) return;
+      try {
+        await cabbageContextService.updateTask(action);
+      } catch (error) {
+        if (!current()) return;
+        console.warn('[CabbageContext] failed to persist task', error?.message || error);
+      }
     }
-  }
-  if (validActions.length) {
-    void cabbageContextService.requestProfileScoreUpdate().catch(() => {});
+    if (current()) {
+      void cabbageContextService.requestProfileScoreUpdate().catch(() => {});
+    }
+  } finally {
+    mainSceneOperations.delete(kind);
   }
 }
 
@@ -820,16 +912,10 @@ function onCabbageRunFailed(event) {
 // Apply Vision both before first binding and after restoring camera windows,
 // which can recreate the camera from an archive that still remembers Native.
 const initializeCreativeRenderMode = async () => {
-  const sceneId = currentMainSceneId();
-  const cameraId = currentMainCameraId();
-  const cameraHandle = cameraBindingState.value.cameraHandle;
-  const archive = cameraBindingState.value.archiveSession;
-  if (!archive || !cameraId || !cameraHandle) return false;
-  const current = () => viewCurrent() && worldModeState.status === 'ready'
-    && currentMainSceneId() === sceneId && currentMainCameraId() === cameraId
-    && environmentArchiveSession.value === archive
-    && cameraBindingState.value.archiveSession === archive
-    && cameraBindingState.value.cameraHandle === cameraHandle;
+  const context = mainCameraOperation('mode');
+  const { sceneId, cameraId, archive } = context;
+  if (!context.current() || !cameraBindingState.value.cameraHandle) return false;
+  const current = () => context.current() && worldModeState.status === 'ready';
   creativeRenderDefaultsBusy.value = true;
   creativeRenderDefaultsError.value = '';
   try {
@@ -839,7 +925,7 @@ const initializeCreativeRenderMode = async () => {
       visionMode: mainVisionRenderMode.value, expiresAt: Date.now() + 3000 };
     mainRenderBackend.value = 'vision';
     await syncSceneCameraBinding(sceneId, { preservePose: true });
-    return true;
+    return current();
   } catch (error) {
     if (current()) {
       creativeRenderDefaultsError.value = `初始化创造模式渲染设置失败：${error.message}`;
@@ -847,13 +933,15 @@ const initializeCreativeRenderMode = async () => {
     }
     return false;
   } finally {
-    creativeRenderDefaultsBusy.value = false;
+    if (current()) creativeRenderDefaultsBusy.value = false;
   }
 };
 
 const selectMainRenderMode = async (mode) => {
-  const sceneId = currentMainSceneId();
-  const cameraId = currentMainCameraId();
+  const context = mainCameraOperation('mode');
+  if (!context.current()) return false;
+  const { sceneId, cameraId } = context;
+  creativeRenderDefaultsBusy.value = false;
   const previousBackend = mainRenderBackend.value;
   const previousMode = mainVisionRenderMode.value;
 
@@ -868,12 +956,13 @@ const selectMainRenderMode = async (mode) => {
       };
       mainRenderBackend.value = 'native';
       const result = await editorApi.scene.setCameraRenderSettings(sceneId, cameraId, {
-        archive_session: cameraBindingState.value.archiveSession,
+        archive_session: context.archive,
         render_backend: 'native',
       });
+      if (!context.current()) return false;
       mainRenderBackend.value = result?.render_backend || 'native';
       await syncSceneCameraBinding(sceneId);
-      return true;
+      return context.current();
     }
 
     pendingMainRenderSelection = {
@@ -887,11 +976,12 @@ const selectMainRenderMode = async (mode) => {
     mainVisionRenderMode.value = mode;
 
     const result = await editorApi.scene.setCameraRenderSettings(sceneId, cameraId, {
-      archive_session: cameraBindingState.value.archiveSession,
+      archive_session: context.archive,
       render_backend: 'vision',
       output_mode: 'final_color',
       vision: { render_mode: mode },
     });
+    if (!context.current()) return false;
     mainVisionRenderMode.value = result?.pending ? mode : result?.vision?.render_mode || mode;
     mainRenderBackend.value = result?.render_backend || 'native';
     if (mainRenderBackend.value !== 'vision') {
@@ -899,8 +989,9 @@ const selectMainRenderMode = async (mode) => {
       return false;
     }
     await syncSceneCameraBinding(sceneId);
-    return true;
+    return context.current();
   } catch (error) {
+    if (!context.current()) return false;
     pendingMainRenderSelection = null;
     mainRenderBackend.value = previousBackend;
     mainVisionRenderMode.value = previousMode;
@@ -914,37 +1005,37 @@ const toggleMainVisionAccumulation = async () => {
   const cameraId = currentMainCameraId();
   if (mainRenderBackend.value !== 'vision' || mainVisionRenderMode.value === 'ssat'
     || mainVisionAccumulationBusy.value || !cameraId) return false;
+  const context = mainCameraOperation('Accumulation');
+  if (!context.current()) return false;
   const previous = mainVisionAccumulation.value;
   const previousSelection = pendingMainAccumulationSelection;
   const selection = { sceneId, cameraId, enabled: !previous };
-  const isCurrent = () => currentMainSceneId() === sceneId && currentMainCameraId() === cameraId;
+  const isCurrent = context.current;
   pendingMainAccumulationSelection = selection;
   mainVisionAccumulationBusy.value = true;
   mainVisionAccumulation.value = selection.enabled;
   mainVisionAccumulationError.value = '';
   try {
     const result = await editorApi.scene.setCameraRenderSettings(sceneId, cameraId, {
-      archive_session: cameraBindingState.value.archiveSession,
+      archive_session: context.archive,
       vision: { accumulation: selection.enabled },
     });
-    if (isCurrent()) {
-      selection.enabled = result?.pending || typeof result?.vision?.accumulation !== 'boolean'
-        ? selection.enabled : result.vision.accumulation;
-      mainVisionAccumulation.value = selection.enabled;
-      if (currentMainCamera.value) currentMainCamera.value.vision_accumulation = selection.enabled;
-    }
+    if (!isCurrent()) return false;
+    selection.enabled = result?.pending || typeof result?.vision?.accumulation !== 'boolean'
+      ? selection.enabled : result.vision.accumulation;
+    mainVisionAccumulation.value = selection.enabled;
+    if (currentMainCamera.value) currentMainCamera.value.vision_accumulation = selection.enabled;
     return true;
   } catch (error) {
-    if (isCurrent()) {
-      pendingMainAccumulationSelection = previousSelection;
-      mainVisionAccumulation.value = previous;
-      if (currentMainCamera.value) currentMainCamera.value.vision_accumulation = previous;
-      mainVisionAccumulationError.value = error.message;
-    }
+    if (!isCurrent()) return false;
+    pendingMainAccumulationSelection = previousSelection;
+    mainVisionAccumulation.value = previous;
+    if (currentMainCamera.value) currentMainCamera.value.vision_accumulation = previous;
+    mainVisionAccumulationError.value = error.message;
     logError('Failed to set main viewport sample accumulation', error);
     return false;
   } finally {
-    mainVisionAccumulationBusy.value = false;
+    if (isCurrent()) mainVisionAccumulationBusy.value = false;
   }
 };
 
@@ -953,37 +1044,37 @@ const toggleMainVisionDenoise = async () => {
   const cameraId = currentMainCameraId();
   if (mainRenderBackend.value !== 'vision' || mainVisionRenderMode.value === 'ssat'
     || mainVisionDenoiseBusy.value || !cameraId) return false;
+  const context = mainCameraOperation('Denoise');
+  if (!context.current()) return false;
   const previous = mainVisionDenoise.value;
   const previousSelection = pendingMainDenoiseSelection;
   const selection = { sceneId, cameraId, enabled: !previous };
-  const isCurrent = () => currentMainSceneId() === sceneId && currentMainCameraId() === cameraId;
+  const isCurrent = context.current;
   pendingMainDenoiseSelection = selection;
   mainVisionDenoiseBusy.value = true;
   mainVisionDenoise.value = selection.enabled;
   mainVisionDenoiseError.value = '';
   try {
     const result = await editorApi.scene.setCameraRenderSettings(sceneId, cameraId, {
-      archive_session: cameraBindingState.value.archiveSession,
+      archive_session: context.archive,
       vision: { denoise: selection.enabled },
     });
-    if (isCurrent()) {
-      selection.enabled = result?.pending || typeof result?.vision?.denoise !== 'boolean'
-        ? selection.enabled : result.vision.denoise;
-      mainVisionDenoise.value = selection.enabled;
-      if (currentMainCamera.value) currentMainCamera.value.vision_denoise = selection.enabled;
-    }
+    if (!isCurrent()) return false;
+    selection.enabled = result?.pending || typeof result?.vision?.denoise !== 'boolean'
+      ? selection.enabled : result.vision.denoise;
+    mainVisionDenoise.value = selection.enabled;
+    if (currentMainCamera.value) currentMainCamera.value.vision_denoise = selection.enabled;
     return true;
   } catch (error) {
-    if (isCurrent()) {
-      pendingMainDenoiseSelection = previousSelection;
-      mainVisionDenoise.value = previous;
-      if (currentMainCamera.value) currentMainCamera.value.vision_denoise = previous;
-      mainVisionDenoiseError.value = error.message;
-    }
+    if (!isCurrent()) return false;
+    pendingMainDenoiseSelection = previousSelection;
+    mainVisionDenoise.value = previous;
+    if (currentMainCamera.value) currentMainCamera.value.vision_denoise = previous;
+    mainVisionDenoiseError.value = error.message;
     logError('Failed to set main viewport denoising', error);
     return false;
   } finally {
-    mainVisionDenoiseBusy.value = false;
+    if (isCurrent()) mainVisionDenoiseBusy.value = false;
   }
 };
 
@@ -993,36 +1084,36 @@ const selectMainVisionDenoiser = async (type) => {
   const cameraId = currentMainCameraId();
   if (mainRenderBackend.value !== 'vision' || mainVisionRenderMode.value === 'ssat'
     || mainVisionDenoiserBusy.value || !cameraId) return false;
+  const context = mainCameraOperation('Denoiser');
+  if (!context.current()) return false;
   const previous = mainVisionDenoiser.value;
   const previousSelection = pendingMainDenoiserSelection;
   const selection = { sceneId, cameraId, type };
-  const isCurrent = () => currentMainSceneId() === sceneId && currentMainCameraId() === cameraId;
+  const isCurrent = context.current;
   pendingMainDenoiserSelection = selection;
   mainVisionDenoiserBusy.value = true;
   mainVisionDenoiser.value = type;
   mainVisionDenoiserError.value = '';
   try {
     const result = await editorApi.scene.setCameraRenderSettings(sceneId, cameraId, {
-      archive_session: cameraBindingState.value.archiveSession,
+      archive_session: context.archive,
       vision: { denoiser: type },
     });
-    if (isCurrent()) {
-      if (!result?.pending && result?.vision?.denoiser) selection.type = result.vision.denoiser;
-      mainVisionDenoiser.value = selection.type;
-      if (currentMainCamera.value) currentMainCamera.value.vision_denoiser = selection.type;
-    }
+    if (!isCurrent()) return false;
+    if (!result?.pending && result?.vision?.denoiser) selection.type = result.vision.denoiser;
+    mainVisionDenoiser.value = selection.type;
+    if (currentMainCamera.value) currentMainCamera.value.vision_denoiser = selection.type;
     return true;
   } catch (error) {
-    if (isCurrent()) {
-      pendingMainDenoiserSelection = previousSelection;
-      mainVisionDenoiser.value = previous;
-      if (currentMainCamera.value) currentMainCamera.value.vision_denoiser = previous;
-      mainVisionDenoiserError.value = error.message;
-    }
+    if (!isCurrent()) return false;
+    pendingMainDenoiserSelection = previousSelection;
+    mainVisionDenoiser.value = previous;
+    if (currentMainCamera.value) currentMainCamera.value.vision_denoiser = previous;
+    mainVisionDenoiserError.value = error.message;
     logError('Failed to set main viewport denoiser type', error);
     return false;
   } finally {
-    mainVisionDenoiserBusy.value = false;
+    if (isCurrent()) mainVisionDenoiserBusy.value = false;
   }
 };
 
@@ -1031,37 +1122,37 @@ const toggleMainVisionStablePlanes = async () => {
   const cameraId = currentMainCameraId();
   if (mainRenderBackend.value !== 'vision' || mainVisionRenderMode.value !== 'restir'
     || mainVisionStablePlanesBusy.value || !cameraId) return false;
+  const context = mainCameraOperation('StablePlanes');
+  if (!context.current()) return false;
   const previous = mainVisionStablePlanes.value;
   const previousSelection = pendingMainStablePlanesSelection;
   const selection = { sceneId, cameraId, enabled: !previous };
-  const isCurrent = () => currentMainSceneId() === sceneId && currentMainCameraId() === cameraId;
+  const isCurrent = context.current;
   pendingMainStablePlanesSelection = selection;
   mainVisionStablePlanesBusy.value = true;
   mainVisionStablePlanes.value = selection.enabled;
   mainVisionStablePlanesError.value = '';
   try {
     const result = await editorApi.scene.setCameraRenderSettings(sceneId, cameraId, {
-      archive_session: cameraBindingState.value.archiveSession,
+      archive_session: context.archive,
       vision: { stable_planes: selection.enabled },
     });
-    if (isCurrent()) {
-      selection.enabled = result?.pending || typeof result?.vision?.stable_planes !== 'boolean'
-        ? selection.enabled : result.vision.stable_planes;
-      mainVisionStablePlanes.value = selection.enabled;
-      if (currentMainCamera.value) currentMainCamera.value.vision_stable_planes = selection.enabled;
-    }
+    if (!isCurrent()) return false;
+    selection.enabled = result?.pending || typeof result?.vision?.stable_planes !== 'boolean'
+      ? selection.enabled : result.vision.stable_planes;
+    mainVisionStablePlanes.value = selection.enabled;
+    if (currentMainCamera.value) currentMainCamera.value.vision_stable_planes = selection.enabled;
     return true;
   } catch (error) {
-    if (isCurrent()) {
-      pendingMainStablePlanesSelection = previousSelection;
-      mainVisionStablePlanes.value = previous;
-      if (currentMainCamera.value) currentMainCamera.value.vision_stable_planes = previous;
-      mainVisionStablePlanesError.value = error.message;
-    }
+    if (!isCurrent()) return false;
+    pendingMainStablePlanesSelection = previousSelection;
+    mainVisionStablePlanes.value = previous;
+    if (currentMainCamera.value) currentMainCamera.value.vision_stable_planes = previous;
+    mainVisionStablePlanesError.value = error.message;
     logError('Failed to set main viewport stable planes', error);
     return false;
   } finally {
-    mainVisionStablePlanesBusy.value = false;
+    if (isCurrent()) mainVisionStablePlanesBusy.value = false;
   }
 };
 
@@ -1078,9 +1169,10 @@ const sceneGridEnabledFromSnapshot = (snapshot = {}) => {
   return null;
 };
 
-const applySceneSnapshot = (sceneId, payload, { preservePose = false } = {}) => {
+const applySceneSnapshot = (sceneId, payload, { preservePose = false, preserveEnvironment = false } = {}) => {
   const snapshot = payload;
   if (!snapshot || typeof snapshot !== 'object' || Array.isArray(snapshot)) {
+    retireMainRenderOperations();
     resetRealtimeCameraInput();
     currentMainCamera.value = null;
     mainVisionAccumulation.value = false;
@@ -1103,14 +1195,16 @@ const applySceneSnapshot = (sceneId, payload, { preservePose = false } = {}) => 
 
   const normalizedSceneId =
     snapshot.scene_id ?? snapshot.sceneId ?? snapshot.id ?? sceneId ?? DEFAULT_SCENE_NAME;
-  const gridEnabled = sceneGridEnabledFromSnapshot(snapshot);
-  if (gridEnabled !== null) sceneGridEnabled.value = gridEnabled;
-  const sun = snapshot.sun && typeof snapshot.sun === 'object' ? snapshot.sun : {};
-  const lightDirection = Array.isArray(sun.direction) ? sun.direction : [1, 1, 1];
-  sceneLightSettings.enabled = sun.enabled !== false;
-  sceneLightSettings.direction.x = Number(lightDirection[0] ?? 1);
-  sceneLightSettings.direction.y = Number(lightDirection[1] ?? 1);
-  sceneLightSettings.direction.z = Number(lightDirection[2] ?? 1);
+  if (!preserveEnvironment) {
+    const gridEnabled = sceneGridEnabledFromSnapshot(snapshot);
+    if (gridEnabled !== null) sceneGridEnabled.value = gridEnabled;
+    const sun = snapshot.sun && typeof snapshot.sun === 'object' ? snapshot.sun : {};
+    const lightDirection = Array.isArray(sun.direction) ? sun.direction : [1, 1, 1];
+    sceneLightSettings.enabled = sun.enabled !== false;
+    sceneLightSettings.direction.x = Number(lightDirection[0] ?? 1);
+    sceneLightSettings.direction.y = Number(lightDirection[1] ?? 1);
+    sceneLightSettings.direction.z = Number(lightDirection[2] ?? 1);
+  }
   const cameras = Array.isArray(snapshot.cameras) ? snapshot.cameras : [];
   actorPickIndex = indexActorsByHandle(Array.isArray(snapshot.actors) ? snapshot.actors : []);
   const activeCameraName =
@@ -1124,7 +1218,10 @@ const applySceneSnapshot = (sceneId, payload, { preservePose = false } = {}) => 
     || cameraBindingState.value.cameraHandle !== nextHandle
     || cameraBindingState.value.cameraId !== (activeCamera?.camera_id ?? activeCamera?.id ?? null)
     || cameraBindingState.value.archiveSession !== (activeCamera?.archive_session || snapshot.archive_session || '');
-  if (bindingChanged) resetRealtimeCameraInput();
+  if (bindingChanged) {
+    retireMainRenderOperations();
+    resetRealtimeCameraInput();
+  }
   cameraBindingState.value = {
     sceneId: normalizedSceneId,
     archiveSession: activeCamera?.archive_session || snapshot.archive_session || '',
@@ -1230,9 +1327,10 @@ const syncSceneCameraBinding = async (sceneId, { preservePose = false } = {}) =>
     return false;
   }
 
+  const environmentRevision = mainEnvironmentRevision;
   const requestRevision = ++sceneCameraBindingRequestRevision;
   const current = () => viewCurrent() && requestRevision === sceneCameraBindingRequestRevision
-    && archive === environmentArchiveSession.value;
+    && archive === environmentArchiveSession.value && sceneId === currentSceneId.value;
   try {
     const scope = { archive_session: archive };
     const [cameras, environment, index] = await Promise.all([
@@ -1241,7 +1339,9 @@ const syncSceneCameraBinding = async (sceneId, { preservePose = false } = {}) =>
     ]);
     if (!current() || [cameras, environment, index].some(value => value.archive_session !== archive || value.scene !== sceneId)) return false;
     applySceneSnapshot(sceneId, { ...cameras, scene_id: cameras.scene, actors: index.actors,
-      sun: environment.sun, grid: environment.grid }, { preservePose });
+      sun: environment.sun, grid: environment.grid }, { preservePose,
+      ...(environmentRevision !== mainEnvironmentRevision || mainEnvironmentWrites.size
+        ? { preserveEnvironment: true } : {}) });
     broadcastViewportControlsState();
     return true;
   } catch (e) {
@@ -1254,36 +1354,31 @@ const syncSceneCameraBinding = async (sceneId, { preservePose = false } = {}) =>
 
 const updateSceneLight = async (axis = '') => {
   if (sceneLightBusy.value) return false;
-  const sceneId = cameraBindingState.value.sceneId
-    || currentSceneId.value
-    || DEFAULT_SCENE_NAME;
-  const direction = sceneLightSettings.direction;
-  const scope = { archive_session: environmentArchiveSession.value };
+  const context = beginEnvironmentWrite('light');
+  if (!context.current()) return false;
+  const { sceneId, archive } = context;
+  const direction = { ...sceneLightSettings.direction };
+  const sun = { enabled: sceneLightSettings.enabled,
+    direction: [Number(direction.x) || 0, Number(direction.y) || 0, Number(direction.z) || 0] };
   sceneLightBusy.value = true;
   try {
-    await editorApi.scene.setEnvironment(sceneId, { ...scope, sun: {
-      enabled: sceneLightSettings.enabled,
-      direction: [Number(direction.x) || 0, Number(direction.y) || 0, Number(direction.z) || 0],
-    } });
-    if (!viewCurrent() || scope.archive_session !== environmentArchiveSession.value) return false;
+    await editorApi.scene.setEnvironment(sceneId, { archive_session: archive, sun });
+    if (!context.current()) return false;
     void cabbageContextService.recordEvent({
-      type: 'lighting_changed',
-      category: 'lighting',
-      success: true,
-      details: {
-        sceneName: sceneId,
-        axis: String(axis || '').toLowerCase(),
-        value: axis ? Number(direction[axis]) || 0 : undefined,
-        source: 'property_panel',
-      },
+      type: 'lighting_changed', category: 'lighting', success: true,
+      details: { sceneName: sceneId, axis: String(axis || '').toLowerCase(),
+        value: axis ? Number(direction[axis]) || 0 : undefined, source: 'property_panel' },
     });
     return true;
   } catch (error) {
+    if (!context.current()) return false;
     logError('更新场景光照失败', error);
+    context.finish();
     await syncSceneCameraBinding(sceneId, { preservePose: true });
     return false;
   } finally {
-    sceneLightBusy.value = false;
+    context.finish();
+    if (context.current()) sceneLightBusy.value = false;
   }
 };
 
@@ -1629,9 +1724,9 @@ const onContextMenu = (event) => {
   event.preventDefault();
 };
 
-const refreshActorPickIndex = async (sceneId) => {
+const refreshActorPickIndex = async (sceneId, isCurrent = () => true) => {
   const archive = cameraBindingState.value.archiveSession;
-  const current = () => viewCurrent() && cameraBindingState.value.archiveSession === archive && cameraBindingState.value.sceneId === sceneId;
+  const current = () => viewCurrent() && isCurrent() && cameraBindingState.value.archiveSession === archive && cameraBindingState.value.sceneId === sceneId;
   if (!sceneId || !archive || !current()) return false;
   const snapshot = await editorApi.scene.readActorIndex(sceneId, { archive_session: archive });
   if (!current() || snapshot.archive_session !== archive || snapshot.scene !== sceneId) return false;
@@ -1691,8 +1786,10 @@ const sendCameraUpdateFast = () => {
 const handleCameraMove = (direction) => cameraControls.move(direction);
 
 const handleApplyPhysics = async () => {
-  const sceneId = currentSceneId.value || DEFAULT_SCENE_NAME;
-  const scope = { archive_session: environmentArchiveSession.value };
+  const context = beginEnvironmentWrite('physics');
+  if (!context.current()) return false;
+  const { sceneId } = context;
+  const scope = { archive_session: context.archive };
 
   try {
     await editorApi.scene.setEnvironment(sceneId, { ...scope, physics: {
@@ -1705,19 +1802,25 @@ const handleApplyPhysics = async () => {
       floor_restitution: physicsParams.value.floorRestitution,
       fixed_dt: physicsParams.value.fixedDt,
     } });
-    return viewCurrent() && scope.archive_session === environmentArchiveSession.value;
+    return context.current();
   } catch (e) {
+    if (!context.current()) return false;
     logError('Apply physics params failed', e);
     return false;
+  } finally {
+    context.finish();
   }
 };
 
 const loadPhysicsParams = async () => {
-  const sceneId = currentSceneId.value || DEFAULT_SCENE_NAME;
-  const scope = { archive_session: environmentArchiveSession.value };
+  if (mainEnvironmentWrites.has('physics')) return false;
+  const context = mainSceneOperation('physics');
+  if (!context.current()) return false;
+  const { sceneId } = context;
+  const scope = { archive_session: context.archive };
   try {
     const environment = await editorApi.scene.getEnvironment(sceneId, scope);
-    if (!viewCurrent() || scope.archive_session !== environmentArchiveSession.value) return false;
+    if (!context.current() || environment.archive_session !== context.archive || environment.scene !== sceneId) return false;
     const data = environment.physics;
     if (data) {
       const g = data.gravity || [0, -9.8, 0];
@@ -1731,12 +1834,14 @@ const loadPhysicsParams = async () => {
     }
     return false;
   } catch (e) {
+    if (!context.current()) return false;
     logError('Load physics params failed', e);
     return false;
   }
 };
 
 const stopProjectResourceLoadPolling = () => {
+  mainSceneOperations.delete('resources');
   if (projectResourceLoadPollTimer !== null) {
     window.clearTimeout(projectResourceLoadPollTimer);
     projectResourceLoadPollTimer = null;
@@ -1746,23 +1851,41 @@ const stopProjectResourceLoadPolling = () => {
 const pollProjectResourceLoadStatus = async () => {
   if (!viewCurrent()) return;
   stopProjectResourceLoadPolling();
+  const context = mainSceneOperation('resources');
+  if (!context.current()) return;
   try {
     const status = await editorApi.project.getProjectLoadStatus();
-    if (!viewCurrent()) return;
+    if (!context.current()) return;
     projectResourceLoadStatus.value = status?.active ? status : null;
     if (status?.loading) {
       projectResourceLoadPollTimer = window.setTimeout(
-        pollProjectResourceLoadStatus,
+        () => { if (context.current()) void pollProjectResourceLoadStatus(); },
         250,
       );
     } else {
       projectResourceLoadStatus.value = null;
     }
   } catch (error) {
+    if (!context.current()) return;
     projectResourceLoadStatus.value = null;
     logWarn('Failed to query project resource load status', error);
   }
 };
+
+watch(() => [currentSceneId.value, environmentArchiveSession.value], () => {
+  mainSceneOperations.clear();
+  actorTransformBaselines.clear();
+  mainEnvironmentWrites.clear();
+  mainEnvironmentRevision++;
+  sceneLightBusy.value = false;
+  stopProjectResourceLoadPolling();
+  projectResourceLoadStatus.value = null;
+}, { flush: 'sync' });
+
+watch([
+  () => cameraBindingState.value.sceneId, () => cameraBindingState.value.cameraId,
+  () => cameraBindingState.value.cameraHandle, () => cameraBindingState.value.archiveSession,
+], () => mainSceneOperations.delete('selection'), { flush: 'sync' });
 
 const getPhysicsSnapshot = () => ({
   gravityX: Number(physicsParams.value.gravityX),
@@ -1794,29 +1917,37 @@ const setViewportUiModeFromPanel = (mode) => {
 };
 
 const setSceneGridEnabledFromPanel = async (enabled, requestedSceneId = '') => {
-  const sceneId = currentSceneId.value || DEFAULT_SCENE_NAME;
+  const context = beginEnvironmentWrite('grid');
+  if (!context.current()) return false;
+  const { sceneId } = context;
   const requested = String(requestedSceneId || '').trim();
-  if (requested && requested !== sceneId) {
-    await syncSceneCameraBinding(sceneId, { preservePose: true });
-    broadcastViewportControlsState();
-    return getEditorControlsState();
-  }
-
   const nextEnabled = Boolean(enabled);
-  const scope = { archive_session: environmentArchiveSession.value };
+  const scope = { archive_session: context.archive };
   try {
+    if (requested && requested !== sceneId) {
+      context.finish();
+      await syncSceneCameraBinding(sceneId, { preservePose: true });
+      if (!context.current()) return false;
+      broadcastViewportControlsState();
+      return getEditorControlsState();
+    }
+
     await editorApi.scene.setEnvironment(sceneId, { ...scope, grid: { enabled: nextEnabled } });
-    if (!viewCurrent() || scope.archive_session !== environmentArchiveSession.value) return false;
+    if (!context.current()) return false;
     sceneGridEnabled.value = nextEnabled;
     broadcastViewportControlsState();
     return getEditorControlsState();
   } catch (error) {
+    if (!context.current()) return false;
     logError('更新场景编辑网格失败', error);
     return false;
+  } finally {
+    context.finish();
   }
 };
 
 const applyPhysicsFromSettings = async (nextParams = {}) => {
+  if (!viewCurrent() || !environmentArchiveSession.value) return false;
   const current = getPhysicsSnapshot();
   physicsParams.value = {
     gravityX: coerceNumber(nextParams.gravityX, current.gravityX),
@@ -1906,10 +2037,14 @@ const onCameraPoseApplied = (result = {}) => {
 let projectOpenedRefreshRevision = 0;
 let projectOpenedRequestSequence = 0;
 const onProjectOpenedEvent = async (payload = {}) => {
+  if (!viewCurrent()) return;
   const refreshRevision = ++projectOpenedRequestSequence;
+  let archive = environmentArchiveSession.value, scene = currentSceneId.value;
+  const current = () => viewCurrent() && refreshRevision >= projectOpenedRefreshRevision
+    && archive === environmentArchiveSession.value && scene === currentSceneId.value;
   try {
     const active = await editorApi.scene.readActive();
-    if (!viewCurrent() || refreshRevision < projectOpenedRefreshRevision) return;
+    if (!current()) return;
     const sceneId = typeof active?.scene === 'string' ? active.scene.trim() : '';
     // A sampled project event can arrive after a newer world has committed.
     // Only the active native archive may establish this view's binding.
@@ -1917,15 +2052,20 @@ const onProjectOpenedEvent = async (payload = {}) => {
     projectOpenedRefreshRevision = refreshRevision;
     environmentArchiveSession.value = active.archive_session;
     currentSceneId.value = sceneId;
+    archive = active.archive_session;
+    scene = sceneId;
     applyActualProjectChange(active.project_path, { refreshCamera: false });
+    void pollProjectResourceLoadStatus();
     resetRealtimeCameraInput();
     await syncSceneCameraBinding(sceneId, { preservePose: false });
-    if (!viewCurrent() || refreshRevision !== projectOpenedRefreshRevision) return;
+    if (!current() || refreshRevision !== projectOpenedRefreshRevision) return;
     syncViewportUiMode();
     scheduleCameraViewportSync();
     broadcastViewportControlsState();
   } catch (error) {
-    logError('Failed to restore editor state after opening project', error);
+    if (current()) {
+      logError('Failed to restore editor state after opening project', error);
+    }
   }
 };
 
@@ -2014,7 +2154,7 @@ onMounted(async () => {
   // Subscribe to proactive DeepSeek reviews and the world-scoped assistant context.
   unsubscribeNodeGraphReview = subscribeNodeGraphReviews(handleNodeGraphReview);
   unsubscribeCabbageContext = subscribeCabbageAssistantContext(
-    (snapshot) => cabbageAssistant.hydrateContext(snapshot),
+    cabbageAssistant.hydrateContext,
     { projectScopeId: currentProjectReviewScopeId, emitCurrent: true }
   );
   unsubscribeCabbagePreWarnings = subscribeCabbagePreWarnings(
@@ -2113,10 +2253,12 @@ provideCreativePanelState(() => ({
   selectMainRenderMode, selectMainVisionDenoiser, toggleMainVisionAccumulation,
   toggleMainVisionDenoise, toggleMainVisionStablePlanes, setCameraSpeedFromPanel,
   setSceneLightEnabled: async enabled => {
+    if (!viewCurrent() || !environmentArchiveSession.value) return false;
     sceneLightSettings.enabled = Boolean(enabled);
     return updateSceneLight();
   },
   setSceneLightDirection: async (axis, value) => {
+    if (!viewCurrent() || !environmentArchiveSession.value) return false;
     if (!['x', 'y', 'z'].includes(axis) || !Number.isFinite(value)) return false;
     sceneLightSettings.direction[axis] = value;
     return updateSceneLight(axis);

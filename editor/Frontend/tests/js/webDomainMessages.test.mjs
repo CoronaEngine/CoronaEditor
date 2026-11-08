@@ -4,8 +4,11 @@ import assert from 'node:assert/strict';
 import { registerHooks } from 'node:module';
 import { readFileSync } from 'node:fs';
 import { setTimeout as delay } from 'node:timers/promises';
-import { getWebMessages } from '../../src/api/webMessages.js';
+import { createWebMessages, getWebMessages } from '../../src/api/webMessages.js';
 import { memoryStorage } from './windowSessionFixtures.mjs';
+import { createPinia } from 'pinia';
+import { useCabbageAssistantStore } from '../../src/stores/cabbageAssistantStore.js';
+import { worldModeState } from '../../src/services/worldModeService.js';
 
 registerHooks({
   resolve(specifier, context, next) {
@@ -91,6 +94,221 @@ test('assistant context uses the main document as owner without storage fallback
   assert.equal(ownerSnapshots.at(-1)?.activeTasks[0]?.taskKey, 'peer-task');
   assert.equal(peerSnapshots.at(-1)?.activeTasks[0]?.taskKey, 'peer-task');
   assert.equal(peerStorageWrites, 0);
+});
+
+test('assistant subscription retirement rejects an in-flight initial snapshot', async t => {
+  const { dock, mainMessages, dockMessages } = surfaces(t);
+  const projectScopeId = 'retired-scope';
+  let release;
+  let entered;
+  const blocked = new Promise(resolve => { release = resolve; });
+  const started = new Promise(resolve => { entered = resolve; });
+  t.after(release);
+  t.after(mainMessages.handle('cabbage-assistant-context.read', async () => {
+    entered();
+    await blocked;
+    return { projectScopeId, updatedAt: 100, activeTasks: [{ taskKey: 'retired-task' }] };
+  }));
+  globalThis.window = dock;
+  const context = await import(`../../src/services/cabbageAssistantContextService.js?retirement=${crypto.randomUUID()}`);
+  const received = [];
+  const stop = context.subscribeCabbageAssistantContext(value => received.push(value), { projectScopeId });
+  t.after(stop);
+  await Promise.race([started, delay(1000).then(() => assert.fail('initial read did not reach the owner'))]);
+  stop();
+  stop();
+  release();
+  // A second reply on the same channel drains the earlier initialization reply.
+  await dockMessages.request('main', 'cabbage-assistant-context.read', { projectScopeId });
+  assert.deepEqual(received, []);
+  assert.equal(context.readCabbageAssistantContext(projectScopeId), null);
+});
+
+async function contextBarrier(t, sender, receiver, snapshot) {
+  const topic = `context-barrier-${crypto.randomUUID()}`;
+  const arrived = new Promise(resolve => t.after(receiver.on(topic, resolve)));
+  if (snapshot) await sender.emit('cabbage-assistant-context', snapshot);
+  await sender.emit(topic, true);
+  await Promise.race([arrived, delay(1000).then(() => assert.fail('context channel barrier timed out'))]);
+}
+
+test('persisted assistant context is accepted after a fresh startup snapshot', async t => {
+  const { main } = surfaces(t);
+  globalThis.window = main;
+  const previous = { ...worldModeState };
+  Object.assign(worldModeState, { activeProjectPath: 'D:/worlds/World', revision: 1 });
+  t.after(() => Object.assign(worldModeState, previous));
+  const context = await import(`../../src/services/cabbageAssistantContextService.js?startup-clock=${crypto.randomUUID()}`);
+  const { aiService } = await import('../../src/services/aiService.js');
+  const persisted = { worldId: 'World', updatedAt: 1, activeTasks: [
+    { taskKey: 'saved-task', title: 'Persisted task', status: 'active', type: 'goal' },
+  ] };
+  t.mock.method(aiService, 'loadCabbageContext', async () => ({ success: true, context: persisted }));
+  const store = useCabbageAssistantStore(createPinia());
+  t.after(context.subscribeCabbageAssistantContext(snapshot => store.hydrateContext(snapshot)));
+  const startup = context.publishCabbageAssistantContext({ worldId: 'World', activeTasks: [] });
+  const loaded = await context.loadCurrentWorld();
+  assert.equal(store.activeTasks[0]?.taskKey, 'saved-task', 'fresh UI startup cannot suppress the persisted world context');
+  assert.ok(loaded.updatedAt > startup.updatedAt, 'publication clock advances independently of stored business time');
+  assert.equal(persisted.updatedAt, 1, 'reading must not mutate the persisted context');
+});
+
+test('world load retains live graph context and valid selection while replacing saved tasks', async t => {
+  const { main } = surfaces(t);
+  globalThis.window = main;
+  const previous = { ...worldModeState };
+  Object.assign(worldModeState, { activeProjectPath: 'D:/worlds/World', revision: 1 });
+  t.after(() => Object.assign(worldModeState, previous));
+  const context = await import(`../../src/services/cabbageAssistantContextService.js?startup-metadata=${crypto.randomUUID()}`);
+  const { aiService } = await import('../../src/services/aiService.js');
+  const task = { taskKey: 'saved-task', title: 'Previous task', status: 'active', type: 'goal' };
+  context.publishCabbageAssistantContext({ worldId: 'World', activeTasks: [task], selectedTaskKey: task.taskKey,
+    graphRevision: 'unsaved-graph', graphExcerpt: { nodes: ['start'] }, projectContext: { actor: 'Probe' } });
+  t.mock.method(aiService, 'loadCabbageContext', async () => ({ success: true,
+    context: { worldId: 'World', updatedAt: 1, activeTasks: [{ ...task, title: 'Loaded task' }] } }));
+  const snapshot = await context.loadCurrentWorld();
+  assert.equal(snapshot.activeTasks[0].title, 'Loaded task');
+  assert.equal(snapshot.selectedTaskKey, task.taskKey);
+  assert.equal(snapshot.graphRevision, 'unsaved-graph');
+  assert.deepEqual(snapshot.graphExcerpt, { nodes: ['start'] });
+  assert.deepEqual(snapshot.projectContext, { actor: 'Probe' });
+});
+
+test('a delayed backend load cannot replace a newer backend context', async t => {
+  const { main } = surfaces(t);
+  globalThis.window = main;
+  const previous = { ...worldModeState };
+  Object.assign(worldModeState, { activeProjectPath: 'D:/worlds/World', revision: 1 });
+  t.after(() => Object.assign(worldModeState, previous));
+  const context = await import(`../../src/services/cabbageAssistantContextService.js?backend-order=${crypto.randomUUID()}`);
+  const { aiService } = await import('../../src/services/aiService.js');
+  let release;
+  let calls = 0;
+  const old = new Promise(resolve => { release = resolve; });
+  t.mock.method(aiService, 'loadCabbageContext', () => ++calls === 1 ? old : Promise.resolve({ success: true,
+    context: { worldId: 'World', updatedAt: 200, activeTasks: [{ taskKey: 'new-task', type: 'goal', status: 'active' }] } }));
+  const store = useCabbageAssistantStore(createPinia());
+  t.after(context.subscribeCabbageAssistantContext(snapshot => store.hydrateContext(snapshot)));
+  const pending = context.loadCurrentWorld();
+  await context.loadCurrentWorld();
+  release({ success: true, context: { worldId: 'World', updatedAt: 100,
+    activeTasks: [{ taskKey: 'old-task', type: 'goal', status: 'active' }] } });
+  const settled = await pending;
+  assert.equal(store.activeTasks[0].taskKey, 'new-task');
+  assert.equal(settled.activeTasks[0].taskKey, 'new-task');
+  assert.equal(context.readCabbageAssistantContext().activeTasks[0].taskKey, 'new-task');
+});
+
+test('reopening the same project resets backend ordering and rejects the previous session load', async t => {
+  const { main } = surfaces(t);
+  globalThis.window = main;
+  const previous = { ...worldModeState };
+  Object.assign(worldModeState, { activeProjectPath: 'D:/worlds/World', revision: 1 });
+  t.after(() => Object.assign(worldModeState, previous));
+  const context = await import(`../../src/services/cabbageAssistantContextService.js?backend-session=${crypto.randomUUID()}`);
+  const { aiService } = await import('../../src/services/aiService.js');
+  const response = (taskKey, updatedAt) => ({ success: true, context: { worldId: 'World', updatedAt,
+    activeTasks: [{ taskKey, type: 'goal', status: 'active' }] } });
+  let release;
+  let calls = 0;
+  const previousLoad = new Promise(resolve => { release = resolve; });
+  t.mock.method(aiService, 'loadCabbageContext', () => {
+    calls++;
+    return calls === 1 ? Promise.resolve(response('previous', 200))
+      : calls === 2 ? previousLoad : Promise.resolve(response('reopened', 100));
+  });
+  await context.loadCurrentWorld();
+  const retired = context.loadCurrentWorld();
+  worldModeState.revision++;
+  const reopened = await context.loadCurrentWorld();
+  assert.equal(reopened.activeTasks[0].taskKey, 'reopened');
+  release(response('retired', 300));
+  assert.equal(await retired, null);
+  assert.equal(context.readCabbageAssistantContext().activeTasks[0].taskKey, 'reopened');
+});
+
+test('assistant preserves reactive task fields and nested context in published DTOs', async t => {
+  const { dock, mainMessages, dockMessages } = surfaces(t);
+  globalThis.window = dock;
+  const context = await import(`../../src/services/cabbageAssistantContextService.js?reactive=${crypto.randomUUID()}`);
+  const source = reactive({ projectScopeId: 'world', selectedTaskKey: 'task',
+    activeTasks: [{ taskKey: 'task', type: 'tutorial', status: 'active', title: 'Task title',
+      details: { bytes: new Uint8Array([7, 255]) } }],
+    projectContext: { selection: reactive({ actor: 'Probe' }) },
+    chatMessages: [{ id: 'message', content: 'Keep this text', role: 'user' }],
+  });
+  const received = [];
+  t.after(mainMessages.on('cabbage-assistant-context', value => received.push(value)));
+  const snapshot = context.publishCabbageAssistantContext(source);
+  assert.equal(snapshot.activeTasks[0].type, 'tutorial');
+  assert.equal(snapshot.activeTasks[0].status, 'active');
+  assert.equal(snapshot.activeTasks[0].title, 'Task title');
+  assert.deepEqual(snapshot.activeTasks[0].details.bytes, new Uint8Array([7, 255]));
+  assert.deepEqual(snapshot.projectContext, { selection: { actor: 'Probe' } });
+  assert.equal(snapshot.chatMessages[0].content, 'Keep this text');
+  source.activeTasks[0].title = 'Changed after publication';
+  await contextBarrier(t, dockMessages, mainMessages);
+  assert.equal(received[0].activeTasks[0].title, 'Task title');
+});
+
+test('assistant timestamps are scoped to the current project', async t => {
+  const { dock, mainMessages, dockMessages } = surfaces(t);
+  globalThis.window = dock;
+  const context = await import(`../../src/services/cabbageAssistantContextService.js?project-clock=${crypto.randomUUID()}`);
+  let scope = 'first';
+  const received = [];
+  t.after(context.subscribeCabbageAssistantContext(value => received.push(value), {
+    projectScopeId: () => scope, emitCurrent: false,
+  }));
+  await contextBarrier(t, mainMessages, dockMessages, { projectScopeId: scope, updatedAt: 200, activeTasks: [{ taskKey: 'first' }] });
+  scope = 'second';
+  await contextBarrier(t, mainMessages, dockMessages, { projectScopeId: scope, updatedAt: 100, activeTasks: [{ taskKey: 'second' }] });
+  await contextBarrier(t, mainMessages, dockMessages, { projectScopeId: 'first', updatedAt: 300, activeTasks: [{ taskKey: 'wrong-world' }] });
+  await contextBarrier(t, mainMessages, dockMessages, { projectScopeId: scope, updatedAt: 90, activeTasks: [{ taskKey: 'stale-second' }] });
+  assert.deepEqual(received.map(value => value.activeTasks[0].taskKey), ['first', 'second']);
+  assert.equal(context.readCabbageAssistantContext(scope)?.activeTasks[0]?.taskKey, 'second');
+});
+
+test('assistant accepts a replacement owner without inheriting its predecessor clock', async t => {
+  const { main, dock, mainMessages, dockMessages } = surfaces(t);
+  globalThis.window = dock;
+  const context = await import(`../../src/services/cabbageAssistantContextService.js?owner-clock=${crypto.randomUUID()}`);
+  const received = [];
+  const store = useCabbageAssistantStore(createPinia());
+  t.after(context.subscribeCabbageAssistantContext((value, origin) => {
+    received.push(value);
+    store.hydrateContext(value, origin);
+  }, { projectScopeId: 'world', emitCurrent: false }));
+  await contextBarrier(t, mainMessages, dockMessages, { projectScopeId: 'world', updatedAt: 200, activeTasks: [{ taskKey: 'old-owner' }] });
+  const replacement = createWebMessages({ scope: main.sessionStorage.getItem('corona.editorUi.owner'), role: 'main' });
+  t.after(() => replacement.dispose());
+  await contextBarrier(t, replacement, dockMessages, { projectScopeId: 'world', updatedAt: 100, activeTasks: [{ taskKey: 'new-owner' }] });
+  await mainMessages.emit('cabbage-assistant-context', { projectScopeId: 'world', updatedAt: 900, activeTasks: [{ taskKey: 'retired-owner' }] });
+  await contextBarrier(t, replacement, dockMessages);
+  assert.deepEqual(received.map(value => value.activeTasks[0].taskKey), ['old-owner', 'new-owner']);
+  assert.equal(store.activeTasks[0].taskKey, 'new-owner', 'the actual consumer must accept the new owner clock');
+  assert.equal(store.contextUpdatedAt, 100);
+});
+
+test('remounted assistant queries the replacement owner instead of hydrating retired cache', async t => {
+  const { main, dock, mainMessages, dockMessages } = surfaces(t);
+  globalThis.window = dock;
+  const context = await import(`../../src/services/cabbageAssistantContextService.js?owner-cache=${crypto.randomUUID()}`);
+  const stop = context.subscribeCabbageAssistantContext(() => {}, { projectScopeId: 'world', emitCurrent: false });
+  t.after(stop);
+  await contextBarrier(t, mainMessages, dockMessages, { projectScopeId: 'world', updatedAt: 200, activeTasks: [{ taskKey: 'old-owner' }] });
+  stop();
+  const replacement = createWebMessages({ scope: main.sessionStorage.getItem('corona.editorUi.owner'), role: 'main' });
+  t.after(() => replacement.dispose());
+  replacement.handle('cabbage-assistant-context.read', () => ({
+    projectScopeId: 'world', updatedAt: 100, activeTasks: [{ taskKey: 'new-owner' }],
+  }));
+  await contextBarrier(t, replacement, dockMessages);
+  assert.equal(context.readCabbageAssistantContext('world'), null, 'retired owner cache cannot seed a remount');
+  const received = [];
+  t.after(context.subscribeCabbageAssistantContext(value => received.push(value), { projectScopeId: 'world' }));
+  await dockMessages.request('main', 'cabbage-assistant-context.read', { projectScopeId: 'world' });
+  assert.deepEqual(received.map(value => value.activeTasks[0].taskKey), ['new-owner']);
 });
 
 test('node graph review reaches the shared topic without losing typed data', async t => {

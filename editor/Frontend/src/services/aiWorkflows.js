@@ -23,23 +23,31 @@ import policy from './aiPolicy.json' with { type: 'json' };
 
 const jobs = new Map();
 const keyFor = (path) => path.replaceAll('\\', '/').replace(/\/+$/, '').toLowerCase();
+function captureProject(payload = {}) {
+  return { projectPath: projectIdentity(payload), projectRevision: worldModeState.revision };
+}
+function jobBelongsToCurrentWorld(job) {
+  return job.revision === worldModeState.revision && keyFor(job.project) === keyFor(activeProjectPath());
+}
+function jobIsCurrent(job) {
+  return !job.controller.signal.aborted && jobBelongsToCurrentWorld(job);
+}
 function assertJob(job) {
-  projectIdentity({ projectPath: job.project });
-  if (job.controller.signal.aborted || job.revision !== worldModeState.revision)
-    throw new Error('当前任务已取消');
+  if (!jobIsCurrent(job)) throw new Error('当前任务已取消');
 }
 watch(
-  () => worldModeState.revision,
+  [() => worldModeState.revision, () => keyFor(activeProjectPath())],
   () => {
     for (const job of jobs.values())
-      if (job.status === 'pending') {
+      if (job.status === 'pending' && !jobBelongsToCurrentWorld(job)) {
         job.controller.abort();
         job.status = 'cancelled';
       }
   },
   { flush: 'sync' }
 );
-function startJob(operation, taskId = crypto.randomUUID()) {
+function startJob(operation, taskId = crypto.randomUUID(), origin = captureProject()) {
+  projectIdentity(origin);
   for (const [key, job] of jobs)
     if (job.status !== 'pending' && (Date.now() - job.updatedAt > 600000 || jobs.size >= 128))
       jobs.delete(key);
@@ -48,8 +56,8 @@ function startJob(operation, taskId = crypto.randomUUID()) {
     taskId,
     status: 'pending',
     controller: new AbortController(),
-    project: activeProjectPath(),
-    revision: worldModeState.revision,
+    project: origin.projectPath,
+    revision: origin.projectRevision,
     updatedAt: Date.now(),
   };
   jobs.set(taskId, job);
@@ -64,7 +72,7 @@ function startJob(operation, taskId = crypto.randomUUID()) {
       job.status = 'completed';
     })
     .catch((error) => {
-      if (job.controller.signal.aborted || job.revision !== worldModeState.revision) {
+      if (!jobIsCurrent(job)) {
         job.status = 'cancelled';
         return;
       }
@@ -98,10 +106,11 @@ function cancel(taskId) {
 }
 
 async function load(payload = {}) {
-  const path = projectIdentity(payload);
-  const loaded = await contextTransaction(path, () => ({}));
+  const origin = captureProject(payload), path = origin.projectPath;
+  const loaded = await contextTransaction(path, () => ({}), { revision: origin.projectRevision });
+  projectIdentity(origin);
   const metadata = await editorApi.projectSettings.getActiveProjectInfo();
-  projectIdentity({ projectPath: path });
+  projectIdentity(origin);
   const prompt = String(metadata?.world_prompt || metadata?.prompt || '').trim();
   if (
     prompt &&
@@ -110,23 +119,24 @@ async function load(payload = {}) {
       loaded.context.worldGoal.status !== 'ready')
   ) {
     const planned = await startGoal({
-      projectPath: path,
+      ...origin,
       prompt,
       mode: 'creative',
     });
+    projectIdentity(origin);
     return { ...loaded, goalPlan: planned };
   }
   return loaded;
 }
 
 async function startGoal(payload = {}) {
-  const path = projectIdentity(payload),
+  const origin = captureProject(payload), path = origin.projectPath,
     prompt = String(payload.prompt || '')
       .trim()
       .slice(0, 4000),
     mode = 'creative';
-  if (!prompt)
-    return contextTransaction(path, (context) => {
+  if (!prompt) {
+    const result = await contextTransaction(path, (context) => {
       Object.assign(context.worldGoal, {
         prompt: '',
         mode,
@@ -137,11 +147,16 @@ async function startGoal(payload = {}) {
       context.activeTasks = context.activeTasks.filter((t) => t.type !== 'goal');
       context.goalTaskPlan = { ...policy.defaultContext.goalTaskPlan };
       return { status: 'completed' };
-    });
+    }, { revision: origin.projectRevision });
+    projectIdentity(origin);
+    return result;
+  }
   const transportSessionId=await modelService.sessionId();
+  projectIdentity(origin);
   let generationId = crypto.randomUUID();
   const claim = await contextTransaction(path, (context) => {
     const goal = context.worldGoal;
+    const previous = jobs.get(goal.generationId);
     if (
       goal.prompt === prompt &&
       goal.mode === mode &&
@@ -153,6 +168,7 @@ async function startGoal(payload = {}) {
       goal.prompt === prompt &&
       goal.mode === mode &&
       goal.status === 'generating' && goal.transportSessionId===transportSessionId &&
+      (!previous || jobIsCurrent(previous)) &&
       Date.now() - Number(goal.startedAt || 0) < 70000
     )
       return { status: 'pending', taskId: goal.generationId };
@@ -166,10 +182,12 @@ async function startGoal(payload = {}) {
       transportSessionId,
     };
     return { status: 'pending', taskId: generationId, claimed: true };
-  });
+  }, { revision: origin.projectRevision });
+  projectIdentity(origin);
   if (claim.status === 'completed') return claim;
   if (!claim.claimed) {
-    if (jobs.has(claim.taskId) || !claim.context?.worldGoal.modelTaskId) return claim;
+    const existing = jobs.get(claim.taskId);
+    if ((existing && jobBelongsToCurrentWorld(existing)) || !claim.context?.worldGoal.modelTaskId) return claim;
     generationId = claim.taskId;
   }
   const resumeTaskId = claim.claimed ? '' : claim.context.worldGoal.modelTaskId;
@@ -225,7 +243,7 @@ async function startGoal(payload = {}) {
       );
     } catch (error) {
       // Only the owner may mark its own generation failed; an older result cannot overwrite a new plan.
-      if (keyFor(path) === keyFor(activeProjectPath()))
+      if (jobIsCurrent(job))
         await contextTransaction(path, (context) => {
           if (
             context.worldGoal.generationId === generationId &&
@@ -236,20 +254,23 @@ async function startGoal(payload = {}) {
               generationError: String(error.message),
             });
           return {};
-        }).catch(() => {});
+        }, { signal: job.controller.signal, revision: job.revision }).catch(() => {});
       throw error;
     }
-  }, generationId);
+  }, generationId, origin);
 }
 
 async function goalStatus(taskId) {
-  const local = status(taskId);
-  if (local.success) return local;
-  const loaded = await readContext(activeProjectPath()),
+  const origin = captureProject();
+  const local = jobs.get(taskId);
+  if (local && jobBelongsToCurrentWorld(local)) return status(taskId);
+  const loaded = await readContext(origin.projectPath, { revision: origin.projectRevision }),
     goal = loaded.context.worldGoal;
+  projectIdentity(origin);
   if (goal.generationId !== taskId) return { success: false, error: 'TASK_NOT_FOUND' };
   if (goal.status === 'generating' && goal.modelTaskId) {
-    await startGoal({ projectPath: activeProjectPath(), prompt: goal.prompt, mode: goal.mode });
+    await startGoal({ ...origin, prompt: goal.prompt, mode: goal.mode });
+    projectIdentity(origin);
     const resumed = status(taskId);
     if (resumed.success) return resumed;
   }
@@ -268,16 +289,17 @@ async function goalStatus(taskId) {
 }
 
 async function startScore(payload = {}) {
-  const path = projectIdentity(payload);
+  const origin = captureProject(payload), path = origin.projectPath;
   const existing = [...jobs.values()].find(
-    (j) => j.kind === 'score' && j.project === path && j.status === 'pending'
+    (j) => j.kind === 'score' && jobIsCurrent(j) && j.status === 'pending'
   );
   if (existing) return { success: true, status: 'pending', taskId: existing.taskId };
-  const { context } = await readContext(path),
+  const { context } = await readContext(path, { revision: origin.projectRevision }),
     profile = context.profile,
     metrics = context.metrics;
+  projectIdentity(origin);
   const pending = [...jobs.values()].find(
-    (j) => j.kind === 'score' && j.project === path && j.status === 'pending'
+    (j) => j.kind === 'score' && jobIsCurrent(j) && j.status === 'pending'
   );
   if (pending) return { success: true, status: 'pending', taskId: pending.taskId };
   const reason = scoreEligibility(context, payload.force === true);
@@ -315,7 +337,7 @@ async function startScore(payload = {}) {
       },
       { signal: job.controller.signal, revision: job.revision }
     );
-  });
+  }, undefined, origin);
   jobs.get(started.taskId).kind = 'score';
   return started;
 }

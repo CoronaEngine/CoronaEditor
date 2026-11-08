@@ -4,7 +4,7 @@ const uniqueId = () => `${Date.now()}_${Math.random().toString(36).slice(2)}`;
 
 export function createEditorWindowSession({ state, send, publish, getWorld, getQuery, owner = uniqueId(),
   activities = { begin: () => null, end: () => {}, drain: async () => {} },
-  beforeRetire = () => {},
+  beforeRetire = () => {}, beforeClose = () => {},
   wait = ms => new Promise(resolve => setTimeout(resolve, ms)), timeoutMs = 30_000 }) {
   let queue = Promise.resolve();
   let retirement = null;
@@ -63,6 +63,10 @@ export function createEditorWindowSession({ state, send, publish, getWorld, getQ
       await send({ cmd: 'suspendCameraViews', sceneId: record.sceneId });
     } else if (Number.isInteger(record.tabId)) {
       if (notify) {
+        await beforeClose(record);
+        record = records().find(item => item.id === record.id && item.generation === record.generation
+          && item.tabId === record.tabId);
+        if (!record) return;
         record.status = 'closing'; await save(record);
         await drain(item => item.source === record.id);
         await activities.drain(item => item.source === record.id);
@@ -183,6 +187,9 @@ export function createEditorWindowSession({ state, send, publish, getWorld, getQ
     if (query().get('camera') && !record) return;
     if (record) {
       await drain(item => item.id === record.id);
+      await beforeClose(record);
+      record = ownRecord();
+      if (!record) return;
       record.status = 'closing'; await save(record);
       await activities.drain(item => item.source === record.id);
       record = ownRecord();
@@ -196,7 +203,7 @@ export function createEditorWindowSession({ state, send, publish, getWorld, getQ
   }
   async function closeTab(tabId, panelId) {
     const record = records().find(item => item.tabId === tabId);
-    if (record) return dispose({ ...record, panelId }, true);
+    if (record) return dispose(record, true);
     return send({ cmd: 'closePanelTab', tabId, panelId: '' });
   }
   async function broadcast(event, payload) {

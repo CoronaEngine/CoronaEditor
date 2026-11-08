@@ -33,7 +33,8 @@ function objectDeps(read) {
     selectedSceneName: { value: '' }, selectedActorName: { value: '' },
     viewLifetime: { current: () => true }, ikController: { clear() {}, select() {} },
     actor: { transform: { position: {}, rotation: {}, scale: {} }, mechanics: {}, cameraLock: { position: {} } },
-    aliasDraft: { value: '' }, aliasError: { value: '' }, axes: ['x', 'y', 'z'],
+    aliasDraft: { value: '' }, aliasError: { value: '' }, aliasSaving: { value: false },
+    placeholderRebinding: { value: false }, saving: { value: false }, axes: ['x', 'y', 'z'],
     assignVector: (target, values, fallback) => Object.assign(target, values || fallback),
     readFollowCamera: data => data.follow_camera, normalizeBodyType: value => value || 'dynamic',
     syncViewportTransformBaseline() {}, logError() {}, unwrap: value => value,
@@ -85,6 +86,7 @@ test('main viewport transform baseline uses the scoped property projection', asy
   const calls = [], deps = {
     cameraBindingState: { value: { sceneId: 'scene.ini', archiveSession: 'archive' } },
     viewCurrent: () => true, actorTransformBaselines: new Map(),
+    mainSceneOperation: () => ({ current: () => true, archive: 'archive', sceneId: 'scene.ini' }),
     actorTransformKey: (scene, actor) => `${scene}::${actor}`, normalizeActorTransform: value => value,
     editorApi: { scene: { readActorProperties: async (...args) => {
       calls.push(args); return { archive_session: 'archive', scene: 'scene.ini', geometry: { position: [1, 2, 3] } };
@@ -100,6 +102,7 @@ for (const change of ['archive', 'scene', 'unmount']) {
     const pending = deferred(), deps = {
       cameraBindingState: { value: { sceneId: 'scene.ini', archiveSession: 'archive' } },
       viewCurrent: () => true, actorTransformBaselines: new Map(),
+      mainSceneOperation: () => ({ current: () => true, archive: 'archive', sceneId: 'scene.ini' }),
       actorTransformKey: (scene, actor) => `${scene}::${actor}`, normalizeActorTransform: value => value,
       editorApi: { scene: { readActorProperties: () => pending.promise } },
     };

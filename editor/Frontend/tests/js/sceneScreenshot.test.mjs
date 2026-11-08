@@ -9,7 +9,11 @@ function handler(path, name, deps) {
   const script = descriptor.scriptSetup.content;
   const node = babelParse(script, { sourceType: 'module' }).program.body
     .find(node => node.type === 'VariableDeclaration' && node.declarations.some(item => item.id.name === name));
-  return new Function('deps', `const {${Object.keys(deps).join(',')}} = deps; ${script.slice(node.start, node.end)}; return ${name};`)(deps);
+  const operation = name === 'TakeScreenshot' ? babelParse(script, { sourceType: 'module' }).program.body
+    .find(node => node.type === 'VariableDeclaration' && node.declarations.some(item => item.id.name === 'sceneOperation')) : null;
+  if (operation) deps.viewLifetime = { current: () => true };
+  return new Function('deps', `const {${Object.keys(deps).join(',')}} = deps; ${operation ? script.slice(operation.start, operation.end) : ''}
+    ${script.slice(node.start, node.end)}; return ${name};`)(deps);
 }
 
 test('SceneBar screenshot captures the exact selected camera and archive in a single operation', async () => {

@@ -47,6 +47,26 @@ test('local notification is delivered once as a snapshot and unsubscribe works',
   assert.equal(received.length, 1);
 });
 
+test('the public owner epoch follows replacement while capability announcements retain it', async t => {
+  const { main, dock, scope } = pair(t);
+  main.handle('identity', () => true);
+  await dock.request('main', 'identity', null);
+  assert.equal(typeof main.ownerEpoch, 'string');
+  assert.equal(dock.ownerEpoch, main.ownerEpoch);
+  const previous = dock.ownerEpoch;
+  const replacement = messages.createWebMessages({ scope, role: 'main' });
+  t.after(() => replacement.dispose());
+  const announced = new Promise(resolve => t.after(dock.on('replacement-ready', resolve)));
+  replacement.handle('identity', () => true);
+  await replacement.emit('replacement-ready', true);
+  await announced;
+  assert.equal(dock.ownerEpoch, replacement.ownerEpoch);
+  assert.notEqual(dock.ownerEpoch, previous);
+  replacement.handle('another-capability', () => true);
+  await dock.request('main', 'another-capability', null);
+  assert.equal(dock.ownerEpoch, replacement.ownerEpoch);
+});
+
 test('directed notifications do not reach another dock or the sender', async t => {
   const { main, dock, scope } = pair(t);
   const other = messages.createWebMessages({ scope, documentId: 'other' });

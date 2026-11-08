@@ -23,6 +23,20 @@ from api.editor_api import (
 
 class EditorAggregateApiTest(unittest.TestCase):
 
+    def test_editor_off_releases_python_callback_without_retired_manifest_method(self):
+        callbacks = {41: object()}
+
+        def unregister(token):
+            return callbacks.pop(token, None) is not None
+
+        native = types.SimpleNamespace(unregister_python_script_callback=unregister)
+        with patch.dict(sys.modules, {"CoronaEngine": native}), patch(
+            "api.editor_api._CPP_EDITOR_API_METHODS", {}
+        ):
+            self.assertTrue(CoronaEditorApi.editor.off(41))
+            self.assertFalse(CoronaEditorApi.editor.off(41))
+        self.assertEqual(callbacks, {})
+
     def test_camera_frame_timing_has_no_callable_python_wrapper(self):
         with patch("api.editor_api._CPP_EDITOR_API_METHODS", {}), patch(
             "api.editor_api._CPP_EDITOR_API_EVENTS", {}
@@ -33,14 +47,17 @@ class EditorAggregateApiTest(unittest.TestCase):
     def test_retired_result_events_have_no_python_subscription(self):
         with patch("api.editor_api._CPP_EDITOR_API_METHODS", {}), patch(
             "api.editor_api._CPP_EDITOR_API_EVENTS", {
-                "SceneTools.actorChanged": {"python_wrapper": "events.on_actor_changed"},
+                "LANChat.event": {"python_wrapper": "events.on_lan_chat_event"},
             },
         ):
             events = type(CoronaEditorApi.events)()
             self.assertFalse(hasattr(events, "on_log_batch"))
             self.assertFalse(hasattr(events, "on_mesh_move_result"))
             self.assertFalse(hasattr(events, "on_actor_pick_result"))
-            self.assertTrue(callable(events.on_actor_changed))
+            for retired in ("on_actor_changed", "on_actor_selection_changed",
+                            "on_actor_transform_updated", "on_project_opened"):
+                self.assertFalse(hasattr(events, retired), retired)
+            self.assertTrue(callable(events.on_lan_chat_event))
 
     def test_script_runtime_manifest_lookup_uses_script_channel(self):
         import api.editor_api as editor_api_module

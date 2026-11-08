@@ -440,6 +440,13 @@ const { error: logError, warn: logWarn } = useErrorHandler('SceneBar');
 
 const currentSceneName = ref('');
 const archiveSession = ref('');
+const sceneOperation = () => {
+  const scene = currentSceneName.value, archive = archiveSession.value;
+  return { scene, archive, current: () => viewLifetime.current()
+    && scene === currentSceneName.value && archive === archiveSession.value };
+};
+const visibilityRevisions = new WeakMap();
+let renderBackendSequence = 0;
 let sceneTreeRequestSeq = 0;
 let sceneTreeSettleTimer = null;
 let sceneTreeSettleTimerScene = '';
@@ -602,32 +609,40 @@ const SelectCamera = (cam) => {
 };
 
 const OpenCameraView = async (cam) => {
+  const context = sceneOperation();
+  if (!context.current() || (cam.archive_session && cam.archive_session !== context.archive)) return;
   try {
     await appService.createCameraView({
       ...cam,
-      scene_id: currentSceneName.value,
+      scene_id: context.scene,
     });
+    if (!context.current()) return;
     await OnInitObjTree();
   } catch (e) {
-    logError('Failed to open camera view', e);
+    if (context.current()) logError('Failed to open camera view', e);
   }
 };
 
 const isCameraDeletable = (cam) => cam?.deletable !== false;
 
 const DeleteCamera = async (cam) => {
-  if (sceneCameras.value.length <= 1 || !isCameraDeletable(cam)) return;
-  const scope = { archive_session: archiveSession.value };
+  const context = sceneOperation();
+  if (!context.current() || sceneCameras.value.length <= 1 || !isCameraDeletable(cam)
+      || (cam.archive_session && cam.archive_session !== context.archive)) return;
+  const scope = { archive_session: context.archive };
   try {
     const cameraId = cam.camera_id || cam.id || cam.name;
-    await appService.closeCameraView(currentSceneName.value, cameraId);
+    await appService.closeCameraView(context.scene, cameraId);
+    if (!context.current()) return;
     await new Promise((resolve) => setTimeout(resolve, 0));
-    await editorApi.scene.deleteCamera(currentSceneName.value, cameraId, scope);
+    if (!context.current()) return;
+    await editorApi.scene.deleteCamera(context.scene, cameraId, scope);
+    if (!context.current()) return;
     if (selectedCameraName.value === cam.name) selectedCameraName.value = null;
     if (selectedItem.value === `cam:${cam.name}`) selectedItem.value = null;
     await OnInitObjTree();
   } catch (e) {
-    logError('Failed to delete camera', e);
+    if (context.current()) logError('Failed to delete camera', e);
   }
 };
 
@@ -639,6 +654,8 @@ const getTargetCamera = () => {
 };
 
 const focusActorFromList = async (scene) => {
+  const context = sceneOperation();
+  if (!context.current()) return;
   const focusSeq = ++actorFocusSeq;
   const sceneId = currentSceneName.value;
   const scope = { archive_session: archiveSession.value };
@@ -651,12 +668,12 @@ const focusActorFromList = async (scene) => {
     const result = await editorApi.scene.focusActor(
       sceneId, scene.actor_guid || scene.name, camera.camera_id, scope,
     );
-    if (focusSeq !== actorFocusSeq || scope.archive_session !== archiveSession.value || sceneId !== currentSceneName.value) return;
+    if (!context.current() || focusSeq !== actorFocusSeq) return;
     if (result.archive_session !== scope.archive_session || result.scene !== sceneId) return;
     // Native already applied the pose. Web only synchronizes the matching viewport UI.
     await appService.crossTabBroadcast('camera-pose-applied', result);
   } catch (e) {
-    if (focusSeq === actorFocusSeq) logError('Actor focus failed', e);
+    if (context.current() && focusSeq === actorFocusSeq) logError('Actor focus failed', e);
   }
 };
 
@@ -717,22 +734,29 @@ const handlePlayToggle = async (scene) => {
 };
 
 const ToggleVisible = async (scene) => {
+  const context = sceneOperation();
+  if (!context.current()) return;
+  const revision = (visibilityRevisions.get(scene) || 0) + 1;
+  visibilityRevisions.set(scene, revision);
   const newVisible = scene.visible === false ? true : false;
   scene.visible = newVisible;
   // 音视频资源没有对应 Actor，仅在前端切换可见标记
   if (isMediaItem(scene)) return;
   try {
-    await editorApi.scene.setActorProperties(currentSceneName.value, scene.name, {
-      archive_session: archiveSession.value,
+    await editorApi.scene.setActorProperties(context.scene, scene.actor_guid || scene.name, {
+      archive_session: context.archive,
       visible: newVisible,
     });
   } catch (e) {
+    if (!context.current() || visibilityRevisions.get(scene) !== revision) return;
     scene.visible = !newVisible;
     logError('Failed to toggle visibility', e);
   }
 };
 
 const SaveScene = async () => {
+  const context = sceneOperation();
+  if (!context.current()) return;
   try {
     const unresolvedCount = sceneImages.value.filter(
       (item) => item.load_status && item.load_status !== 'loaded'
@@ -744,30 +768,35 @@ const SaveScene = async () => {
       )
     )
       return;
-    const saved = await editorApi.scene.save(currentSceneName.value, { archive_session: archiveSession.value });
+    const saved = await editorApi.scene.save(context.scene, { archive_session: context.archive });
+    if (!context.current()) return;
     if (saved?.status !== 'saved') throw new Error(saved?.message || "保存场景失败");
     cabbageContextService.notifySceneSaved(saved.filepath);
     if (saved?.unresolved_actor_count > 0) {
       logWarn(`Scene saved with ${saved.unresolved_actor_count} unresolved actors`);
     }
   } catch (e) {
-    logError('Failed to save scene', e);
+    if (context.current()) logError('Failed to save scene', e);
   }
 };
 
 const RebindActorResource = async (scene) => {
+  const context = sceneOperation();
+  if (!context.current()) return;
+  const actorGuid = scene.actor_guid;
   try {
     const selected = await editorApi.scene.selectModelFile(
-      currentSceneName.value, 'model', { archive_session: archiveSession.value },
+      context.scene, 'model', { archive_session: context.archive },
     );
     const path = selected;
-    if (!path) return;
+    if (!context.current() || !path) return;
     const result = await editorApi.scene.rebindActorResource(
-      currentSceneName.value,
-      scene.actor_guid,
+      context.scene,
+      actorGuid,
       path,
-      { archive_session: archiveSession.value }
+      { archive_session: context.archive }
     );
+    if (!context.current()) return;
     const rebound = result;
     if (!rebound?.ok) {
       const message = rebound?.diagnostics?.[0]?.message || '资源重新绑定失败';
@@ -776,7 +805,7 @@ const RebindActorResource = async (scene) => {
     }
     await OnInitObjTree();
   } catch (e) {
-    logError('Failed to rebind actor resource', e);
+    if (context.current()) logError('Failed to rebind actor resource', e);
   }
 };
 
@@ -799,14 +828,16 @@ const getTargetCameraName = () => {
 };
 
 const TakeScreenshot = async () => {
+  const context = sceneOperation();
+  if (!context.current()) return;
   try {
     const camera = getTargetCamera();
     if (!camera?.camera_id) return;
-    await editorApi.scene.captureScreenshot(currentSceneName.value, camera.camera_id, {
-      archive_session: archiveSession.value,
+    await editorApi.scene.captureScreenshot(context.scene, camera.camera_id, {
+      archive_session: context.archive,
     });
   } catch (e) {
-    logError('Failed to take screenshot', e);
+    if (context.current()) logError('Failed to take screenshot', e);
   }
 };
 
@@ -815,6 +846,9 @@ const visionAvailable = ref(false);
 const activeRenderBackend = ref('native');
 
 const RefreshRenderBackendState = async () => {
+  const context = sceneOperation();
+  if (!context.current()) return;
+  const sequence = ++renderBackendSequence;
   try {
     const scene = currentSceneName.value;
     const archive = archiveSession.value;
@@ -824,7 +858,7 @@ const RefreshRenderBackendState = async () => {
       editorApi.scene.readCameras(scene, { archive_session: archive }),
       editorApi.scene.isVisionAvailable(),
     ]);
-    if (!current() || cameraResult.archive_session !== archive || cameraResult.scene !== scene) return;
+    if (!current() || sequence !== renderBackendSequence || cameraResult.archive_session !== archive || cameraResult.scene !== scene) return;
     visionAvailable.value = !!availResult?.available;
     if (!visionAvailable.value) {
       return;
@@ -833,22 +867,26 @@ const RefreshRenderBackendState = async () => {
     const camera = cameraResult.cameras?.find(item => item.camera_id === target?.camera_id);
     if (camera?.render_backend) activeRenderBackend.value = camera.render_backend;
   } catch (e) {
-    logError('Failed to query render backend state', e);
+    if (context.current() && sequence === renderBackendSequence) logError('Failed to query render backend state', e);
   }
 };
 
 const ToggleRenderBackend = async () => {
+  const context = sceneOperation();
+  if (!context.current()) return;
+  const sequence = ++renderBackendSequence;
   const next = activeRenderBackend.value === 'vision' ? 'native' : 'vision';
   try {
     const target = getTargetCamera();
     if (!target?.camera_id || !archiveSession.value) throw new Error('没有可用的活动相机');
-    const payload = await editorApi.scene.setCameraRenderSettings(currentSceneName.value, target.camera_id, {
-      archive_session: archiveSession.value,
+    const payload = await editorApi.scene.setCameraRenderSettings(context.scene, target.camera_id, {
+      archive_session: context.archive,
       render_backend: next,
     });
+    if (!context.current() || sequence !== renderBackendSequence || target.camera_id !== getTargetCamera()?.camera_id) return;
     activeRenderBackend.value = payload.render_backend;
   } catch (e) {
-    logError('Failed to switch render backend', e);
+    if (context.current() && sequence === renderBackendSequence) logError('Failed to switch render backend', e);
   }
 };
 
@@ -861,6 +899,8 @@ const CloseModelDropdown = () => {
 };
 
 const ImportCamera = async () => {
+  const context = sceneOperation();
+  if (!context.current()) return;
   ShowModelDropdown.value = false;
   try {
     const existingNames = new Set(sceneCameras.value.map((camera) => camera.name));
@@ -869,18 +909,20 @@ const ImportCamera = async () => {
     while (existingNames.has(cameraName)) {
       cameraName = `Camera_${suffix++}`;
     }
-    const payload = await editorApi.scene.createCamera(currentSceneName.value, {
-      archive_session: archiveSession.value, name: cameraName,
+    const payload = await editorApi.scene.createCamera(context.scene, {
+      archive_session: context.archive, name: cameraName,
     });
+    if (!context.current()) return;
     if (!payload?.camera) throw new Error(payload?.message || 'Camera creation failed');
     await appService.createCameraView({
       ...payload.camera,
-      scene_id: currentSceneName.value,
+      scene_id: context.scene,
     });
+    if (!context.current()) return;
     selectedCameraName.value = payload.camera.name;
     await OnInitObjTree();
   } catch (e) {
-    logError('Failed to create camera view', e);
+    if (context.current()) logError('Failed to create camera view', e);
   }
 };
 
@@ -959,12 +1001,15 @@ const addMediaToList = async (media) => {
 };
 
 const DeleteActor = async (scene) => {
+  const context = sceneOperation();
+  if (!context.current()) return;
   try {
     const result = await editorApi.scene.deleteActor(
-      currentSceneName.value,
+      context.scene,
       scene.actor_guid || scene.name,
-      { archive_session: archiveSession.value },
+      { archive_session: context.archive },
     );
+    if (!context.current()) return;
     if (result?.actor_guid === scene.actor_guid || result?.old_name === scene.name) {
       if (selectedItem.value === scene.name) selectedItem.value = null;
       if (modelNodeSelection.value?.actorGuid === scene.actor_guid || modelNodeSelection.value?.actorName === scene.name)
@@ -972,6 +1017,7 @@ const DeleteActor = async (scene) => {
     }
     await OnInitObjTree();
   } catch (error) {
+    if (!context.current()) return;
     logError('Delete actor failed', error);
     await OnInitObjTree();
   }

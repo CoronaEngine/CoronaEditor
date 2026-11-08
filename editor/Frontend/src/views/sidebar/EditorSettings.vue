@@ -172,8 +172,10 @@ import { appService } from '@/services/appService.js';
 import { editorApi } from '@/api/editorApi.js';
 import { aiSettings } from '@/services/aiSessionService.js';
 import { viewportControlsService } from '@/services/viewportControlsService.js';
+import { createViewLifetime } from '@/utils/viewLifetime.js';
 
 const { t, locale } = useI18n();
+const viewLifetime = createViewLifetime();
 const confirmHome = ref(false);
 const aiKeyInput = ref('');
 const aiKeyEditing = ref(false);
@@ -231,15 +233,18 @@ function normalizeViewportControls(state = {}) {
 }
 
 function syncViewportControls(state = {}) {
+  if (!viewLifetime.current()) return;
   viewportControlState.value = normalizeViewportControls(state);
 }
 
 function requestViewportControlsState() {
+  if (!viewLifetime.current()) return;
   void viewportControlsService.request({ action: 'getState' }, { signal: viewportRequests.signal })
     .then(syncViewportControls).catch(() => {});
 }
 
 async function updateViewportControls(payload) {
+  if (!viewLifetime.current()) return;
   const { sceneId, cameraId, cameraHandle } = viewportControlState.value;
   const state = await viewportControlsService.request({ ...payload, sceneId, cameraId, cameraHandle },
     { signal: viewportRequests.signal });
@@ -247,21 +252,23 @@ async function updateViewportControls(payload) {
 }
 
 async function setRenderMode() {
-  if (renderApplying.value) return;
+  if (!viewLifetime.current() || renderApplying.value) return;
   renderApplying.value = true;
   renderError.value = false;
   try {
     const mode = viewportControlState.value.renderMode;
     await updateViewportControls({ action: 'selectRenderMode', mode });
   } catch (error) {
+    if (!viewLifetime.current()) return;
     renderError.value = true;
     requestViewportControlsState();
   } finally {
-    renderApplying.value = false;
+    if (viewLifetime.current()) renderApplying.value = false;
   }
 }
 
 async function setViewportUiMode(mode) {
+  if (!viewLifetime.current()) return;
   viewportControlState.value.viewportUiMode = mode;
   updateViewportControls({
     action: 'setViewportUiMode',
@@ -270,6 +277,7 @@ async function setViewportUiMode(mode) {
 }
 
 async function applyCameraSpeed(value) {
+  if (!viewLifetime.current()) return;
   const speed = Math.min(2, Math.max(0.01, Number(value) || defaultViewportControls.cameraSpeed));
   updateViewportControls({
     action: 'setCameraSpeed',
@@ -278,6 +286,7 @@ async function applyCameraSpeed(value) {
 }
 
 function handleCameraSpeedInput() {
+  if (!viewLifetime.current()) return;
   if (speedApplyTimer) window.clearTimeout(speedApplyTimer);
   speedApplyTimer = window.setTimeout(() => {
     speedApplyTimer = null;
@@ -286,7 +295,7 @@ function handleCameraSpeedInput() {
 }
 
 async function setGridEnabled() {
-  if (gridApplying.value || !viewportControlState.value.sceneId) return;
+  if (!viewLifetime.current() || gridApplying.value || !viewportControlState.value.sceneId) return;
   const enabled = Boolean(viewportControlState.value.gridEnabled);
   const sceneId = viewportControlState.value.sceneId;
   gridApplying.value = true;
@@ -297,10 +306,11 @@ async function setGridEnabled() {
       sceneId,
     });
   } catch (error) {
+    if (!viewLifetime.current()) return;
     console.warn('[EditorSettings] failed to update scene grid', error);
     requestViewportControlsState();
   } finally {
-    gridApplying.value = false;
+    if (viewLifetime.current()) gridApplying.value = false;
   }
 }
 
@@ -323,8 +333,10 @@ function normalizeAiKeyStatus(payload) {
 }
 
 async function loadAiKeyStatus() {
+  if (!viewLifetime.current()) return;
   try {
     const response = await aiSettings.get();
+    if (!viewLifetime.current()) return;
     const data = response;
     aiKeyStatus.value = normalizeAiKeyStatus(data);
     if (!aiKeyEditing.value) {
@@ -333,18 +345,19 @@ async function loadAiKeyStatus() {
         : '';
     }
   } catch (error) {
+    if (!viewLifetime.current()) return;
     console.warn('[EditorSettings] failed to read DeepSeek API key status', error);
   }
 }
 
 function beginAiKeyEdit() {
-  if (aiKeyBusy.value || aiKeyEditing.value) return;
+  if (!viewLifetime.current() || aiKeyBusy.value || aiKeyEditing.value) return;
   aiKeyEditing.value = true;
   aiKeyInput.value = '';
 }
 
 function restoreAiKeyMask() {
-  if (aiKeyBusy.value || !aiKeyEditing.value) return;
+  if (!viewLifetime.current() || aiKeyBusy.value || !aiKeyEditing.value) return;
   if (aiKeyInput.value.trim()) return;
   aiKeyEditing.value = false;
   aiKeyInput.value = aiKeyStatus.value.configured
@@ -353,12 +366,14 @@ function restoreAiKeyMask() {
 }
 
 async function saveAiKey() {
+  if (!viewLifetime.current()) return;
   const key = aiKeyInput.value.trim();
   if (!key || aiKeyBusy.value || !aiKeyEditing.value) return;
   aiKeyBusy.value = true;
   aiKeyMessage.value = '';
   try {
     const response = await aiSettings.saveApiKey(key);
+    if (!viewLifetime.current()) return;
     const data = response;
     aiKeyStatus.value = normalizeAiKeyStatus(data);
     aiKeyEditing.value = false;
@@ -368,35 +383,42 @@ async function saveAiKey() {
     aiKeyMessageType.value = 'success';
     aiKeyMessage.value = t('editorSettings.ai.saved');
   } catch (error) {
+    if (!viewLifetime.current()) return;
     aiKeyMessageType.value = 'error';
     aiKeyMessage.value = String(error?.message || t('editorSettings.ai.saveFailed'));
   } finally {
-    aiKeyBusy.value = false;
+    if (viewLifetime.current()) aiKeyBusy.value = false;
   }
 }
 
 function handleLocaleChange(nextLocale) {
+  if (!viewLifetime.current()) return;
   setLocale(nextLocale);
 }
 
 onMounted(() => {
+  if (!viewLifetime.current()) return;
   unsubscribeViewportControls = viewportControlsService.subscribe(onViewportControlsState);
   requestViewportControlsState();
   void loadAiKeyStatus();
 });
 
 onBeforeUnmount(() => {
+  void viewLifetime.dispose();
   unsubscribeViewportControls?.();
+  unsubscribeViewportControls = null;
   viewportRequests.abort();
   if (speedApplyTimer) window.clearTimeout(speedApplyTimer);
   speedApplyTimer = null;
 });
 
 function cancelHome() {
+  if (!viewLifetime.current()) return;
   confirmHome.value = false;
 }
 
 function goHome() {
+  if (!viewLifetime.current()) return;
   confirmHome.value = false;
   void appService.crossTabBroadcast('creative-return-to-launcher', {});
 }

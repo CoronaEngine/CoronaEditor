@@ -47,13 +47,14 @@ test('camera editing uses scoped scene V8 methods and retires sceneTools manifes
   const cameraView = readFileSync(new URL('../../src/views/tools/CameraView.vue', import.meta.url), 'utf8');
   const sceneBar = readFileSync(new URL('../../src/views/sidebar/SceneBar.vue', import.meta.url), 'utf8');
   assert.match(cameraView, /scene\.renameCamera\(sceneId, cameraId, cameraName\.value\.trim\(\), \{\s*archive_session: cameraArchiveSession/);
-  assert.match(sceneBar, /const scope = \{ archive_session: archiveSession\.value \};[\s\S]*?scene\.deleteCamera\(currentSceneName\.value, cameraId, scope\)/);
+  assert.match(sceneBar, /const scope = \{ archive_session: context\.archive \};[\s\S]*?scene\.deleteCamera\(context\.scene, cameraId, scope\)/);
 });
 
 function mainDeps() {
   const calls = [], applied = [], errors = [];
   const identity = { archive_session: 'archive', scene: 'scene.ini' };
   const deps = { viewCurrent: () => true, environmentArchiveSession: { value: 'archive' },
+    currentSceneId: { value: 'scene.ini' }, mainEnvironmentRevision: 0, mainEnvironmentWrites: new Map(),
     sceneCameraBindingRequestRevision: 0, applySceneSnapshot: (...args) => applied.push(args),
     broadcastViewportControlsState() {}, logError: (...args) => errors.push(args),
     editorApi: { scene: {
@@ -138,6 +139,7 @@ test('main viewport cannot start scoped projections without an observed archive'
 test('camera restoration never opens a camera after its archive has retired during render initialization', async () => {
   const pending = deferred(), opened = [];
   const deps = { viewCurrent: () => true, environmentArchiveSession: { value: 'archive' },
+    currentSceneId: { value: 'scene.ini' }, mainEnvironmentRevision: 0, mainEnvironmentWrites: new Map(),
     editorApi: { scene: { readCameras: async () => ({ archive_session: 'archive', scene: 'scene.ini',
       cameras: [{ archive_session: 'archive', camera_id: 'camera', view_open: true }] }) } },
     initializeWorldRenderBackend: () => pending.promise,

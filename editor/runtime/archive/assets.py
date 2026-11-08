@@ -2,11 +2,13 @@
 import configparser
 import hashlib
 import json
+import os
 from io import StringIO
 from pathlib import Path, PurePosixPath, PureWindowsPath
 import shutil
 from tempfile import TemporaryDirectory
 from threading import RLock
+from time import sleep
 
 from .errors import ArchiveParseError
 from .portable import atomic_replace, validate_assets
@@ -58,6 +60,19 @@ def _publish(root, manifest):
                    (json.dumps(manifest, ensure_ascii=False, indent=2) + "\n").encode())
 
 
+def _install_bundle(stage, destination):
+    # A Windows reader of a staged file can briefly deny renaming its parent.
+    # Retry only that atomic operation; persistent failures still roll back.
+    for attempt in range(6):
+        try:
+            stage.rename(destination)
+            return
+        except OSError as error:
+            if os.name != "nt" or getattr(error, "winerror", None) not in (5, 32) or attempt == 5:
+                raise
+            sleep(.01 * 2 ** attempt)
+
+
 def _stage_bundle(root, manifest, category, sources, installed, *, extra_dependencies=()):
     if category not in _categories or not sources:
         raise ValueError("Invalid asset category or empty source list")
@@ -102,7 +117,7 @@ def _stage_bundle(root, manifest, category, sources, installed, *, extra_depende
                     raise ArchiveParseError("bundle_collision", "Existing bundle has different content", path=str(destination))
         else:
             destination.parent.mkdir(parents=True, exist_ok=True)
-            stage.rename(destination)
+            _install_bundle(stage, destination)
             installed.append(destination)
         if not any(b["main"] == main and b["sha256"] == sha for b in manifest["bundles"]):
             manifest["bundles"].append(bundle)

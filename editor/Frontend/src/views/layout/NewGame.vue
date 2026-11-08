@@ -92,6 +92,7 @@ import { notifyWorldError } from '@/services/worldSessionLifecycle.js';
 import { initializeWorldTasks } from '@/services/cabbageAssistantContextService.js';
 import lanchat from '@/stores/lanchat.js';
 import { translateUiText } from '@/i18n/domTranslator.js';
+import { createViewLifetime } from '@/utils/viewLifetime.js';
 
 const router = useRouter();
 
@@ -100,15 +101,18 @@ const creating = ref(false);
 const archiveReady = ref(false);
 const promptRef = ref(null);
 let archiveStatusTimer = null;
-let disposed = false;
+const viewLifetime = createViewLifetime();
+let activationDelayTimer = null;
+let finishActivationDelay = null;
 
 const refreshArchiveReady = async () => {
+  if (!viewLifetime.current()) return;
   try {
     const status = await editorApi.project.getProjectLoadStatus();
-    if (disposed) return;
+    if (!viewLifetime.current()) return;
     archiveReady.value = status?.archive_service_ready === true;
   } catch {
-    if (!disposed) archiveReady.value = false;
+    if (viewLifetime.current()) archiveReady.value = false;
   }
 };
 
@@ -118,10 +122,12 @@ onMounted(() => {
 });
 
 onUnmounted(() => {
-  disposed = true;
+  void viewLifetime.dispose();
   if (archiveStatusTimer !== null) {
     window.clearInterval(archiveStatusTimer);
   }
+  if (activationDelayTimer !== null) window.clearTimeout(activationDelayTimer);
+  finishActivationDelay?.();
 });
 
 // 静态预设的悬浮提示词（点击注入输入框）；top/left 散布，dur/delay 错峰漂浮
@@ -155,32 +161,41 @@ const normalizeProjectPath = (value) => String(value || '')
 
 const activeProjectPathFrom = (response) => String(response?.project_path || '');
 
-const waitForPythonProjectActivation = async (expectedPath, timeoutMs = 7000) => {
+const waitForPythonProjectActivation = async (expectedPath, current, timeoutMs = 7000) => {
   const expected = normalizeProjectPath(expectedPath);
   const deadline = Date.now() + timeoutMs;
-  while (Date.now() < deadline) {
+  while (current() && Date.now() < deadline) {
     try {
-    const response = await editorApi.projectSettings.getActiveProjectInfo();
+      const response = await editorApi.projectSettings.getActiveProjectInfo();
+      if (!current()) return false;
       if (normalizeProjectPath(activeProjectPathFrom(response)) === expected) return true;
     } catch (_) {}
-    await new Promise((resolve) => window.setTimeout(resolve, 200));
+    if (!current()) return false;
+    await new Promise((resolve) => {
+      finishActivationDelay = () => {
+        activationDelayTimer = null;
+        finishActivationDelay = null;
+        resolve();
+      };
+      activationDelayTimer = window.setTimeout(finishActivationDelay, 200);
+    });
   }
   return false;
 };
 
 const handleCreate = async () => {
-  if (creating.value || !archiveReady.value) return;
+  if (!viewLifetime.current() || creating.value || !archiveReady.value) return;
   const prompt = worldPrompt.value.trim(); // 允许为空：无提示词也可创建
 
   creating.value = true;
   try {
     // 后端自动命名 + 存到引擎 data 目录，返回 { name, path }
     const info = await editorApi.project.createWorldProject({ prompt });
-    if (disposed) return;
+    if (!viewLifetime.current()) return;
 
     if (info && info.path) {
       const opened = await projectLauncherService.openProject(info.path, { newProject: true });
-      if (disposed || isProjectOpenSuperseded(opened)) return;
+      if (!viewLifetime.current() || isProjectOpenSuperseded(opened)) return;
       const openResult = opened;
       if (openResult?.status === 'service_initializing') {
         alert('存档服务正在初始化，请稍后重试');
@@ -188,11 +203,11 @@ const handleCreate = async () => {
       }
       if (openResult?.ok) {
         const revision = worldModeState.revision;
-        const current = () => !disposed && worldModeState.status === 'ready' && worldModeState.revision === revision;
+        const current = () => viewLifetime.current() && worldModeState.status === 'ready' && worldModeState.revision === revision;
         // Never send a world description or task request until Python confirms
         // that the newly created world is the active project. Otherwise the old
         // world can receive the new task plan and a stale node request can cross over.
-        const projectReady = await waitForPythonProjectActivation(info.path);
+        const projectReady = await waitForPythonProjectActivation(info.path, current);
         if (!current()) return;
         if (projectReady) {
           try {
@@ -237,12 +252,12 @@ const handleCreate = async () => {
     }
     alert(translateUiText('创建失败'));
   } catch (error) {
-    if (disposed) return;
+    if (!viewLifetime.current()) return;
     console.error('创造世界失败:', error);
     await router.replace('/StartScreen');
     notifyWorldError(error, '创建失败');
   } finally {
-    creating.value = false;
+    if (viewLifetime.current()) creating.value = false;
   }
 };
 </script>

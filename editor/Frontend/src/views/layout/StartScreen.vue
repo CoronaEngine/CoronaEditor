@@ -53,9 +53,12 @@ import gsap from 'gsap';
 import NewGame from './NewGame.vue';
 import RecentGames from './RecentGames.vue';
 import JoinGame from './JoinGame.vue';
+import { createViewLifetime } from '@/utils/viewLifetime.js';
 
 const { t } = useI18n();
 const router = useRouter();
+const viewLifetime = createViewLifetime();
+const animations = gsap.context(() => {});
 const canvasContainer = ref(null);
 const navContainer = ref(null);
 const panelRef = ref(null);
@@ -85,48 +88,54 @@ let animationFrameId = null;
 let resizeTimer = null;
 
 const animateParticles = (id) => {
-  const d = 0.6;
-  switch (id) {
-    case 'panel-new':
-      gsap.to(particleSystem.scale, { x: 1, y: 1, z: 1, duration: d, force3D: true });
-      gsap.to(camera.position, { z: 80, duration: d, ease: 'power2.out', force3D: true });
-      break;
-    case 'panel-continue':
-      gsap.to(particleSystem.scale, { x: 1, y: 1, z: 1, duration: d, force3D: true });
-      gsap.to(camera.position, { z: 42, duration: d, ease: 'power2.inOut', force3D: true });
-      break;
-    case 'panel-multi':
-      gsap.to(particleSystem.scale, { x: 1, y: 1, z: 1, duration: d, force3D: true });
-      gsap.to(camera.position, { z: 65, duration: d, ease: 'power2.out', force3D: true });
-      break;
-    case 'panel-exit':
-      gsap.to(particleSystem.scale, { x: 0.4, y: 0.4, z: 0.4, duration: d, ease: 'power3.inOut', force3D: true });
-      gsap.to(camera.position, { z: 100, duration: d, ease: 'power3.inOut', force3D: true });
-      break;
-  }
+  if (!viewLifetime.current()) return;
+  animations.add(() => {
+    const d = 0.6;
+    switch (id) {
+      case 'panel-new':
+        gsap.to(particleSystem.scale, { x: 1, y: 1, z: 1, duration: d, force3D: true });
+        gsap.to(camera.position, { z: 80, duration: d, ease: 'power2.out', force3D: true });
+        break;
+      case 'panel-continue':
+        gsap.to(particleSystem.scale, { x: 1, y: 1, z: 1, duration: d, force3D: true });
+        gsap.to(camera.position, { z: 42, duration: d, ease: 'power2.inOut', force3D: true });
+        break;
+      case 'panel-multi':
+        gsap.to(particleSystem.scale, { x: 1, y: 1, z: 1, duration: d, force3D: true });
+        gsap.to(camera.position, { z: 65, duration: d, ease: 'power2.out', force3D: true });
+        break;
+      case 'panel-exit':
+        gsap.to(particleSystem.scale, { x: 0.4, y: 0.4, z: 0.4, duration: d, ease: 'power3.inOut', force3D: true });
+        gsap.to(camera.position, { z: 100, duration: d, ease: 'power3.inOut', force3D: true });
+        break;
+    }
+  });
 };
 
 const showAndSlidePanel = async (id, component) => {
+  if (!viewLifetime.current()) return;
   activePage.value = id;
   pageComponent.value = component;
   showPanel.value = true;
   await nextTick();
-  gsap.fromTo(panelRef.value,
+  if (!viewLifetime.current()) return;
+  animations.add(() => gsap.fromTo(panelRef.value,
     { x: '105%' },
     { x: '0%', duration: 0.45, ease: 'power3.out', force3D: true }
-  );
+  ));
 };
 
 const handleNavClick = async (id) => {
+  if (!viewLifetime.current()) return;
   if (id === 'panel-exit') {
     animateParticles(id);
     activeNav.value = id;
     if (!hasMoved.value) {
       hasMoved.value = true;
-      gsap.to(navContainer.value, {
+      animations.add(() => gsap.to(navContainer.value, {
         x: '6vw', xPercent: 0,
         duration: 0.7, ease: 'power3.inOut', force3D: true,
-      });
+      }));
     }
     await showAndSlidePanel('panel-exit', null);
     return;
@@ -142,46 +151,49 @@ const handleNavClick = async (id) => {
 
   if (!hasMoved.value) {
     hasMoved.value = true;
-    gsap.to(navContainer.value, {
+    animations.add(() => gsap.to(navContainer.value, {
       x: '6vw', xPercent: 0,
       duration: 0.7, ease: 'power3.inOut', force3D: true,
-    });
+    }));
   }
 
   await showAndSlidePanel(id, pageMap[id].component);
 };
 
 const handleBack = () => {
-  if (!panelRef.value) return;
-  gsap.to(panelRef.value, {
+  if (!viewLifetime.current() || !panelRef.value) return;
+  animations.add(() => gsap.to(panelRef.value, {
     x: '105%', duration: 0.25, ease: 'power2.in', force3D: true,
     onComplete: () => {
+      if (!viewLifetime.current()) return;
       showPanel.value = false;
       activePage.value = null;
       activeNav.value = null;
       pageComponent.value = null;
 
-      gsap.to(navContainer.value, {
+      animations.add(() => gsap.to(navContainer.value, {
         x: '50vw', xPercent: -50,
         duration: 0.5, ease: 'power3.inOut', force3D: true,
-      });
+      }));
       hasMoved.value = false;
     },
-  });
+  }));
 };
 
 const confirmExit = () => {
-  if (!panelRef.value) return;
-  gsap.to(panelRef.value, {
+  if (!viewLifetime.current() || !panelRef.value) return;
+  animations.add(() => gsap.to(panelRef.value, {
     x: '105%', duration: 0.25, ease: 'power2.in', force3D: true,
     onComplete: () => {
+      if (!viewLifetime.current()) return;
       showPanel.value = false;
       appService.closeProcess();
     },
-  });
+  }));
 };
 
 const initThree = () => {
+  if (!viewLifetime.current()) return;
   const container = canvasContainer.value;
   if (!container) return;
 
@@ -343,8 +355,10 @@ const initThree = () => {
   document.addEventListener("mousemove", onMouseMove);
 
   const onResize = () => {
+    if (!viewLifetime.current()) return;
     clearTimeout(resizeTimer);
     resizeTimer = setTimeout(() => {
+      if (!viewLifetime.current()) return;
       camera.aspect = window.innerWidth / window.innerHeight;
       camera.updateProjectionMatrix();
       renderer.setSize(window.innerWidth, window.innerHeight);
@@ -354,6 +368,7 @@ const initThree = () => {
   window.addEventListener("resize", onResize);
 
   const animate = () => {
+    if (!viewLifetime.current()) return;
     animationFrameId = requestAnimationFrame(animate);
     const elapsed = clock.getElapsedTime();
     starMaterial.uniforms.uTime.value = elapsed;
@@ -374,6 +389,8 @@ const initThree = () => {
     if (animationFrameId) cancelAnimationFrame(animationFrameId);
     starMaterial.dispose();
     starGeometry.dispose();
+    material.dispose();
+    geometry.dispose();
     renderer.dispose();
     if (container.contains(renderer.domElement)) {
       container.removeChild(renderer.domElement);
@@ -383,14 +400,18 @@ const initThree = () => {
 let cleanupThree = null;
 
 onMounted(() => {
+  if (!viewLifetime.current()) return;
   cleanupThree = initThree();
-  gsap.set(navContainer.value, {
+  animations.add(() => gsap.set(navContainer.value, {
     x: '50vw', xPercent: -50, yPercent: -50,
-  });
+  }));
 });
 
 onUnmounted(() => {
+  void viewLifetime.dispose();
+  animations.revert();
   if (cleanupThree) cleanupThree();
+  cleanupThree = null;
 });
 </script>
 

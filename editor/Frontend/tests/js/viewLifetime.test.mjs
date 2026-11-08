@@ -109,7 +109,6 @@ function mountNodeGraphLifecycle(t) {
     stopForPanelClose: async () => {},
     ResizeObserver: class { observe() {} disconnect() {} },
     workspaceRootRef: { value: null },
-    requestCabbageAssistantContext: async () => null,
   };
   scope.viewLifetime = createViewLifetime(() => scope.componentMounted);
   const fallback = new Proxy(scope, { has: () => true,

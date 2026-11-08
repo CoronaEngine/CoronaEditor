@@ -22,6 +22,7 @@
 <script setup>
 import { ref, reactive, onMounted, onUnmounted, nextTick } from 'vue';
 import AIHintBubble from '@/components/ui/AIHintBubble.vue';
+import { createViewLifetime } from '@/utils/viewLifetime.js';
 
 const petImgRef = ref(null);
 const PET_HINT_INTERVAL_MS = 10000;
@@ -34,6 +35,7 @@ const PET_HINTS = [
 ];
 
 const hintState = reactive({ show: false, text: '' });
+const viewLifetime = createViewLifetime();
 let hintIndex = 0;
 let hintTimer = null;
 
@@ -44,14 +46,17 @@ const dismissHint = () => {
 };
 
 const showTimedHint = async () => {
+  if (!viewLifetime.current()) return;
   hintState.show = false;
   hintState.text = PET_HINTS[hintIndex % PET_HINTS.length];
   hintIndex += 1;
   await nextTick();
+  if (!viewLifetime.current()) return;
   hintState.show = true;
 };
 
 const startTimedHints = () => {
+  if (!viewLifetime.current()) return;
   stopTimedHints();
   hintTimer = window.setInterval(showTimedHint, PET_HINT_INTERVAL_MS);
 };
@@ -65,6 +70,7 @@ const stopTimedHints = () => {
 
 onMounted(startTimedHints);
 onUnmounted(() => {
+  void viewLifetime.dispose();
   stopTimedHints();
   dismissHint();
 });

@@ -54,7 +54,8 @@ def test_environment_has_one_scoped_v8_read_and_patch_without_granular_web_alias
     assert [path.relative_to(SOURCE_ROOT).as_posix() for path in sources()
             if retired.search(path.read_text(encoding='utf-8-sig'))] == []
     page = (SOURCE_ROOT / 'views/layout/MainPage.vue').read_text(encoding='utf-8-sig')
-    assert 'archive_session: environmentArchiveSession.value' in page
+    assert 'archive = environmentArchiveSession.value' in page
+    assert 'archive_session: context.archive' in page
     assert 'environmentArchiveSession.value = active.archive_session' in page
 
 

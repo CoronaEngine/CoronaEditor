@@ -323,6 +323,7 @@ import { appService } from '@/services/appService.js';
 import { getNodeGraphSaves } from '@/services/nodeGraphSaves.js';
 import { coronaEventBus } from '@/utils/eventBus.js';
 import { createViewLifetime } from '@/utils/viewLifetime.js';
+import { cloneWebDto } from '@/utils/cloneWebDto.js';
 import { nodeGraphToCode, validateNodeGraph } from '@/blockly/generators/index.js';
 import { generatedNodeGraphRevision, registerGeneratedNodeGraphConsumer } from '@/blockly/node-editor/aiNodeGraphService.js';
 import { actorContextNameKey, actorContextRevision, actorRecordsFromSceneTree, normalizeActorContextName } from '@/blockly/utils/actorContext.js';
@@ -337,7 +338,6 @@ import {
   publishCabbagePreWarning,
   publishCabbageProjectContext,
   readCabbageAssistantContext,
-  requestCabbageAssistantContext,
   subscribeCabbageAssistantContext,
 } from '@/services/cabbageAssistantContextService.js';
 
@@ -1755,14 +1755,12 @@ function refreshEmbeddedWorkspaceStates() {
 function graphSnapshot() {
   refreshEmbeddedWorkspaceStates();
   try {
-    return JSON.parse(
-      JSON.stringify({
-        version: 1,
-        nodes: graph.nodes,
-        edges: graph.edges,
-        globalVariablesWorkspace: graph.globalVariablesWorkspace || {},
-      })
-    );
+    return cloneWebDto({
+      version: 1,
+      nodes: graph.nodes,
+      edges: graph.edges,
+      globalVariablesWorkspace: graph.globalVariablesWorkspace || {},
+    });
   } catch {
     return { version: 1, nodes: [], edges: [], globalVariablesWorkspace: {} };
   }
@@ -3178,13 +3176,10 @@ onMounted(async () => {
   const currentCabbageScopeId = () => reviewScopeId(
     normalizeProjectPath(activeProjectPath.value || readActiveProjectPath()),
   );
-  void requestCabbageAssistantContext(currentCabbageScopeId()).then((cachedCabbageContext) => {
-    if (componentMounted && cachedCabbageContext) cabbageAssistant.hydrateContext(cachedCabbageContext);
-  });
   unsubscribeCabbageContext = subscribeCabbageAssistantContext(
-    (snapshot) => {
+    (snapshot, origin) => {
       if (componentMounted) {
-        cabbageAssistant.hydrateContext(snapshot);
+        cabbageAssistant.hydrateContext(snapshot, origin);
         scheduleTutorialNodeStateObservation();
       }
     },

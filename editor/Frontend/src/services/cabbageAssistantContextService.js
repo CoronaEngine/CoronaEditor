@@ -1,6 +1,8 @@
+import { effectScope, watch } from 'vue';
 import { getWebMessages } from '../api/webMessages.js';
+import { cloneWebDto } from '../utils/cloneWebDto.js';
 import { getWebDocumentIdentity } from '../api/webDocument.js';
-import { worldModeState, editorUiAllowed } from './worldModeService.js';
+import { worldModeState, editorUiAllowed, normalizeProjectPath } from './worldModeService.js';
 import { trackWorldSessionWork } from './worldSessionLifecycle.js';
 import { aiService } from '@/services/aiService.js';
 import { editorApi } from '../api/editorApi.js';
@@ -21,8 +23,10 @@ let contextOwnerHandlerMessages = null;
 let contextOwnerHandlerUnsubscribe = null;
 let contextOwnerStorage = null;
 let latestSnapshot = null;
+let latestSnapshotOwnerEpoch = null;
+let latestBackendClock = null;
 let writeChain = Promise.resolve();
-let activeScoreUpdateTaskId = '';
+let activeScoreUpdate = null;
 const activeGoalPlanPolls = new Map();
 const pendingTransforms = new Map();
 const pendingActorEvents = [];
@@ -49,7 +53,7 @@ function getMessages() {
 }
 
 function clone(value, fallback) {
-  try { return globalThis.structuredClone(value); } catch (_) { return fallback; }
+  try { return cloneWebDto(value); } catch (_) { return fallback; }
 }
 
 function currentProjectPath() {
@@ -134,8 +138,9 @@ function normalizePreWarningEnvelope(value) {
 function publishSnapshot(snapshot, { owner = false } = {}) {
   const normalized = normalizeSnapshot(snapshot);
   if (!normalized) return null;
-  latestSnapshot = normalized;
   const messages = getMessages();
+  latestSnapshot = normalized;
+  latestSnapshotOwnerEpoch = messages.ownerEpoch;
   if (messages.role !== 'main' && !owner) {
     void messages.emit(CONTEXT_MESSAGE_TYPE, normalized).catch(error => console.warn('[CabbageContext]', error.message));
     void messages.emit(CONTEXT_UPDATE_MESSAGE_TYPE, normalized, { target: 'main' })
@@ -163,9 +168,19 @@ function responseContext(response) {
 
 function publishBackendContext(context) {
   const scope = currentScopeId();
-  const current = latestSnapshot?.projectScopeId === scope ? latestSnapshot : null;
+  const ownerEpoch = getMessages().ownerEpoch;
+  const revision = worldModeState.revision;
+  const current = readCabbageAssistantContext(scope);
+  const backendUpdatedAt = Number(context?.updatedAt) || 0;
+  if (latestBackendClock?.scope === scope && latestBackendClock.ownerEpoch === ownerEpoch
+    && latestBackendClock.revision === revision
+    && backendUpdatedAt < latestBackendClock.updatedAt) return current;
+  latestBackendClock = { scope, ownerEpoch, revision, updatedAt: backendUpdatedAt };
   return publishSnapshot({
-    context,
+    // A successful scoped backend read is a new activity snapshot even when
+    // the persisted document has not changed since an earlier application run.
+    context: { ...context, updatedAt: Math.max(Date.now(), backendUpdatedAt,
+      (Number(current?.updatedAt) || 0) + 1) },
     projectScopeId: scope,
     graphRevision: current?.graphRevision || '',
     graphExcerpt: current?.graphExcerpt || {},
@@ -180,13 +195,17 @@ function transformKey(event) {
 }
 
 async function sendEvent(event) {
+  const isCurrent = () => editorUiAllowed() && event.projectRevision === worldModeState.revision
+    && normalizeProjectPath(event.projectPath) === normalizeProjectPath(worldModeState.activeProjectPath);
+  if (!isCurrent()) return null;
   const response = await aiService.recordCabbageEvent({
     ...event,
     worldId: String(event?.worldId || latestSnapshot?.worldId || ''),
     timestamp: Number(event?.timestamp) || Date.now(),
   });
+  if (!isCurrent()) return response;
   const context = responseContext(response);
-  if (context && (!event.projectPath || event.projectPath===currentProjectPath()) && (event.projectRevision==null || event.projectRevision===worldModeState.revision)) publishBackendContext(context);
+  if (context) publishBackendContext(context);
   if (response?.success === true && (
     Array.isArray(response.completedTaskKeys) && response.completedTaskKeys.length
     || ['run_started', 'run_succeeded', 'run_failed', 'node_issue_found', 'node_issue_fixed'].includes(event?.type)
@@ -234,7 +253,7 @@ export function publishCabbageProjectContext(projectContext = {}, projectScopeId
 export function readCabbageAssistantContext(projectScopeId = '') {
   const expectedScope = String(projectScopeId || '');
   const messages = getMessages();
-  let snapshot = latestSnapshot;
+  let snapshot = latestSnapshotOwnerEpoch === messages.ownerEpoch ? latestSnapshot : null;
   if (messages.role === 'main' && (!snapshot || (expectedScope && snapshot.projectScopeId !== expectedScope))) {
     try { snapshot = normalizeSnapshot(JSON.parse(contextOwnerStorage?.getItem(STORAGE_KEY) || 'null')); } catch (_) { snapshot = null; }
   }
@@ -243,7 +262,7 @@ export function readCabbageAssistantContext(projectScopeId = '') {
   return clone(snapshot, null);
 }
 
-export async function requestCabbageAssistantContext(projectScopeId = '') {
+async function requestCabbageAssistantContext(projectScopeId = '') {
   const expectedScope = String(projectScopeId || '');
   if (getMessages().role === 'main') return readCabbageAssistantContext(expectedScope);
   try {
@@ -260,16 +279,23 @@ export async function loadCurrentWorld() {
   cancelPendingTransformEvents();
   const expectedWorldId = currentWorldId();
   const expectedPath=currentProjectPath(),revision=worldModeState.revision;
-  const response = await aiService.loadCabbageContext({ worldId: expectedWorldId,projectPath:expectedPath,projectRevision:revision });
+  const isCurrent = () => revision === worldModeState.revision && expectedPath === currentProjectPath();
+  let response;
+  try {
+    response = await aiService.loadCabbageContext({ worldId: expectedWorldId,projectPath:expectedPath,projectRevision:revision });
+  } catch (error) {
+    if (!isCurrent()) return null;
+    throw error;
+  }
+  if (!isCurrent()) return null;
   if (response?.success !== true || !response?.context) {
     throw createServiceResponseError(response, '加载当前世界的包菜上下文失败');
   }
-  if(revision!==worldModeState.revision || expectedPath!==currentProjectPath())return null;
   const loadedWorldId = String(response.context.worldId || '');
   if (expectedWorldId && loadedWorldId !== expectedWorldId) {
     throw new Error(`后端返回了其他世界的上下文（${loadedWorldId || '未知'}），已拒绝加载`);
   }
-  return publishSnapshot({ context: response.context, projectScopeId: currentScopeId() });
+  return publishBackendContext(response.context);
 }
 
 function goalPlanError(response, fallback) {
@@ -279,35 +305,37 @@ function goalPlanError(response, fallback) {
   );
 }
 
-async function pollGoalPlan(taskId, expectedScopeId = '') {
+async function pollGoalPlan(taskId, expectedScopeId, revision) {
   const deadline = Date.now() + GOAL_PLAN_TIMEOUT_MS;
-  const revision = worldModeState.revision;
-  while (Date.now() < deadline) {
-    if (revision !== worldModeState.revision || !editorUiAllowed()) return null;
-    const response = await aiService.getCabbageGoalPlanStatus(taskId);
-    if (revision !== worldModeState.revision || !editorUiAllowed()) return null;
-    if (response?.success !== true) throw goalPlanError(response);
-    if (response.status === 'completed') {
-      const result = response.result || {};
-      const stillCurrent = !expectedScopeId || currentScopeId() === expectedScopeId;
-      if (result?.context && stillCurrent) publishBackendContext(result.context);
-      // The backend writes the result to the world that started the request. If the
-      // user changed worlds while it was running, do not publish that old context
-      // under the new world's front-end scope.
-      if (!stillCurrent) return null;
-      if (result?.success !== true || !result?.context) throw goalPlanError(response);
-      return readCabbageAssistantContext(expectedScopeId);
+  const isCurrent = () => revision === worldModeState.revision && editorUiAllowed()
+    && currentScopeId() === expectedScopeId;
+  try {
+    while (Date.now() < deadline) {
+      if (!isCurrent()) return null;
+      const response = await aiService.getCabbageGoalPlanStatus(taskId);
+      if (!isCurrent()) return null;
+      if (response?.success !== true) throw goalPlanError(response);
+      if (response.status === 'completed') {
+        const result = response.result || {};
+        if (result?.success !== true || !result?.context) throw goalPlanError(response);
+        publishBackendContext(result.context);
+        return readCabbageAssistantContext(expectedScopeId);
+      }
+      await new Promise((resolve) => window.setTimeout(resolve, GOAL_PLAN_POLL_MS));
     }
-    await new Promise((resolve) => window.setTimeout(resolve, GOAL_PLAN_POLL_MS));
+    if (!isCurrent()) return null;
+    throw new Error('生成当前世界的专属任务超时，请进入世界后稍后重试');
+  } catch (error) {
+    if (!isCurrent()) return null;
+    throw error;
   }
-  throw new Error('生成当前世界的专属任务超时，请进入世界后稍后重试');
 }
 
-function trackGoalPlan(taskId, expectedScopeId = '') {
-  const key = `${String(taskId || '')}:${String(expectedScopeId || '')}`;
+function trackGoalPlan(taskId, expectedScopeId, revision) {
+  const key = `${revision}:${taskId}:${expectedScopeId}`;
   const existing = activeGoalPlanPolls.get(key);
   if (existing) return existing;
-  const pending = pollGoalPlan(taskId, expectedScopeId).finally(() => {
+  const pending = pollGoalPlan(taskId, expectedScopeId, revision).finally(() => {
     if (activeGoalPlanPolls.get(key) === pending) activeGoalPlanPolls.delete(key);
   });
   activeGoalPlanPolls.set(key, pending);
@@ -322,12 +350,20 @@ export function initializeWorldTasks(options = {}) {
 async function initializeWorldTasksNow({ prompt = '', waitForCompletion = true } = {}) {
   const expectedScopeId = currentScopeId();
   const revision = worldModeState.revision;
-  const response = await aiService.startCabbageGoalPlan({
-    worldId: currentWorldId(),
-    prompt: String(prompt || '').trim(),
-    mode: 'creative',
-  });
-  if (revision !== worldModeState.revision || !editorUiAllowed()) return null;
+  const isCurrent = () => revision === worldModeState.revision && editorUiAllowed()
+    && currentScopeId() === expectedScopeId;
+  let response;
+  try {
+    response = await aiService.startCabbageGoalPlan({
+      worldId: currentWorldId(),
+      prompt: String(prompt || '').trim(),
+      mode: 'creative',
+    });
+  } catch (error) {
+    if (!isCurrent()) return null;
+    throw error;
+  }
+  if (!isCurrent()) return null;
   if (response?.success !== true) throw goalPlanError(response);
   if (response.status === 'completed' && response.context) {
     return currentScopeId() === expectedScopeId ? publishBackendContext(response.context) : null;
@@ -335,12 +371,12 @@ async function initializeWorldTasksNow({ prompt = '', waitForCompletion = true }
   const taskId = String(response.taskId || '');
   if (!taskId) throw new Error('世界任务生成请求没有返回任务编号');
   if (!waitForCompletion) {
-    void trackGoalPlan(taskId, expectedScopeId).catch((error) => {
-      console.warn('[CabbageContext] 世界专属任务后台生成失败：', error?.message || error);
+    void trackGoalPlan(taskId, expectedScopeId, revision).catch((error) => {
+      if (isCurrent()) console.warn('[CabbageContext] 世界专属任务后台生成失败：', error?.message || error);
     });
     return { success: true, status: 'pending', taskId };
   }
-  return trackGoalPlan(taskId, expectedScopeId);
+  return trackGoalPlan(taskId, expectedScopeId, revision);
 }
 
 function flushActorEvents(projectPath) {
@@ -408,58 +444,119 @@ export function appendMessage(message = {}) {
   });
 }
 
-async function pollScoreUpdate(taskId) {
-  const scope=currentScopeId(),revision=worldModeState.revision;
-  while (activeScoreUpdateTaskId === taskId) {
-    const response = await aiService.getCabbageProfileScoreStatus(taskId);
-    if(revision!==worldModeState.revision || scope!==currentScopeId()){activeScoreUpdateTaskId='';return null;}
-    if (response?.success !== true){activeScoreUpdateTaskId='';break;}
-    if (response.status === 'completed') {
-      activeScoreUpdateTaskId = '';
-      const result = response.result || {};
-      if (result?.success === true && result?.profile) {
-        const snapshot = readCabbageAssistantContext() || {};
-        publishSnapshot({ ...snapshot, profile: result.profile, updatedAt: Date.now() });
+function scoreUpdateIsCurrent(operation) {
+  return activeScoreUpdate === operation && editorUiAllowed()
+    && operation.revision === worldModeState.revision
+    && operation.projectPath === normalizeProjectPath(worldModeState.activeProjectPath);
+}
+
+function retireScoreUpdate(operation) {
+  if (activeScoreUpdate === operation) activeScoreUpdate = null;
+  operation.lifetime.stop();
+  operation.cancelWait?.();
+}
+
+function publishScoreProfile(operation, profile) {
+  if (!scoreUpdateIsCurrent(operation)) return;
+  const snapshot = readCabbageAssistantContext(operation.scope) || {};
+  publishSnapshot({ ...snapshot, projectScopeId: operation.scope, profile, updatedAt: Date.now() });
+}
+
+async function pollScoreUpdate(operation) {
+  try {
+    while (scoreUpdateIsCurrent(operation)) {
+      const response = await aiService.getCabbageProfileScoreStatus(operation.taskId);
+      if (!scoreUpdateIsCurrent(operation) || response?.success !== true) return;
+      if (response.status === 'completed') {
+        if (response.result?.success === true && response.result.profile) {
+          publishScoreProfile(operation, response.result.profile);
+        }
+        return;
       }
-      return result;
+      await new Promise((resolve) => {
+        const timerWindow = window;
+        const timer = timerWindow.setTimeout(() => {
+          operation.cancelWait = null;
+          resolve();
+        }, PROFILE_POLL_MS);
+        operation.cancelWait = () => {
+          timerWindow.clearTimeout(timer);
+          operation.cancelWait = null;
+          resolve();
+        };
+      });
     }
-    await new Promise((resolve) => window.setTimeout(resolve, PROFILE_POLL_MS));
+  } catch (error) {
+    if (scoreUpdateIsCurrent(operation)) {
+      console.warn('[CabbageContext] profile score update failed', error?.message || error);
+    }
+  } finally {
+    retireScoreUpdate(operation);
   }
-  return null;
 }
 
 export async function requestProfileScoreUpdate(options = {}) {
-  if (activeScoreUpdateTaskId) return { success: true, status: 'pending', taskId: activeScoreUpdateTaskId };
-  const response = await aiService.startCabbageProfileScoreUpdate(options);
-  if (response?.status === 'skipped' && response.profile) {
-    const snapshot = readCabbageAssistantContext() || {};
-    publishSnapshot({ ...snapshot, profile: response.profile, updatedAt: Date.now() });
-    return response;
+  if (!editorUiAllowed()) return null;
+  if (activeScoreUpdate && !scoreUpdateIsCurrent(activeScoreUpdate)) retireScoreUpdate(activeScoreUpdate);
+  if (activeScoreUpdate) {
+    return activeScoreUpdate.taskId
+      ? { success: true, status: 'pending', taskId: activeScoreUpdate.taskId }
+      : activeScoreUpdate.start;
   }
-  if (response?.success === true && response?.taskId) {
-    activeScoreUpdateTaskId = String(response.taskId);
-    void pollScoreUpdate(activeScoreUpdateTaskId).catch((error) => {
-      activeScoreUpdateTaskId = '';
-      console.warn('[CabbageContext] profile score update failed', error?.message || error);
-    });
-  }
-  return response;
+  // Identity belongs to this world operation, even if the backend reuses a task id.
+  const operation = { scope: currentScopeId(), revision: worldModeState.revision,
+    projectPath: normalizeProjectPath(worldModeState.activeProjectPath), taskId: '', lifetime: effectScope(true) };
+  activeScoreUpdate = operation;
+  // A route unmount must not remove the world service's retirement guard.
+  operation.lifetime.run(() => watch(
+    () => [worldModeState.revision, normalizeProjectPath(worldModeState.activeProjectPath), editorUiAllowed()],
+    () => { if (!scoreUpdateIsCurrent(operation)) retireScoreUpdate(operation); },
+    { flush: 'sync' },
+  ));
+  operation.start = (async () => {
+    try {
+      const response = await aiService.startCabbageProfileScoreUpdate(options);
+      if (!scoreUpdateIsCurrent(operation)) return null;
+      if (response?.status === 'skipped' && response.profile) {
+        publishScoreProfile(operation, response.profile);
+      } else if (response?.success === true && response.taskId) {
+        operation.taskId = String(response.taskId);
+        void pollScoreUpdate(operation);
+      }
+      return response;
+    } catch (error) {
+      if (scoreUpdateIsCurrent(operation)) throw error;
+      return null;
+    } finally {
+      if (!operation.taskId) retireScoreUpdate(operation);
+    }
+  })();
+  return operation.start;
 }
 
 export function subscribeCabbageAssistantContext(listener, { projectScopeId = '', emitCurrent = true } = {}) {
+  let disposed = false;
   let latestUpdatedAt = 0;
+  let latestProjectScopeId = null;
+  let latestOwnerEpoch = null;
+  const messages = getMessages();
   const getExpectedScope = () => String(typeof projectScopeId === 'function' ? projectScopeId() : projectScopeId || '');
   const accept = (value) => {
+    if (disposed) return;
     const snapshot = normalizeSnapshot(value);
     if (!snapshot) return;
     const expected = getExpectedScope();
     if (expected && snapshot.projectScopeId !== expected) return;
-    if (snapshot.updatedAt < latestUpdatedAt) return;
+    if (snapshot.projectScopeId === latestProjectScopeId && messages.ownerEpoch === latestOwnerEpoch
+      && snapshot.updatedAt < latestUpdatedAt) return;
+    latestProjectScopeId = snapshot.projectScopeId;
+    latestOwnerEpoch = messages.ownerEpoch;
     latestUpdatedAt = snapshot.updatedAt;
     latestSnapshot = snapshot;
-    listener(clone(snapshot, snapshot));
+    latestSnapshotOwnerEpoch = latestOwnerEpoch;
+    listener(clone(snapshot, snapshot), { ownerEpoch: latestOwnerEpoch });
   };
-  const unsubscribe = getMessages().on(CONTEXT_MESSAGE_TYPE, accept);
+  const unsubscribe = messages.on(CONTEXT_MESSAGE_TYPE, accept);
   if (emitCurrent) {
     const current = readCabbageAssistantContext(getExpectedScope());
     if (current) accept(current);
@@ -467,7 +564,11 @@ export function subscribeCabbageAssistantContext(listener, { projectScopeId = ''
       void requestCabbageAssistantContext(getExpectedScope()).then(accept);
     }
   }
-  return unsubscribe;
+  return () => {
+    if (disposed) return;
+    disposed = true;
+    unsubscribe();
+  };
 }
 
 // Repeated-issue warnings are intentionally transient. They travel between the

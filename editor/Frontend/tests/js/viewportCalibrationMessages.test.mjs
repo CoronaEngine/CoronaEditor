@@ -80,6 +80,16 @@ test('stale calibration versions and other owners cannot replace the active valu
   assert.equal(peer.read().pe, 23);
 });
 
+test('a peer announcement cannot replace the authoritative calibration snapshot', async t => {
+  const { main, peer, peerMessages, stored } = await setup(t);
+  await peer.hydrate();
+  await peerMessages.emit('viewportUi.calibrationChanged', {
+    owner: main.owner, revision: 100, calibration: { ...stored, pe: 50 },
+  });
+  assert.deepEqual(peer.read(), stored);
+  assert.deepEqual(main.read(), stored);
+});
+
 test('concurrent updates have one owner version order and disposed listeners receive no more values', async t => {
   const { peer, main, stored } = await setup(t);
   await peer.hydrate();
@@ -95,4 +105,52 @@ test('concurrent updates have one owner version order and disposed listeners rec
   assert.equal(observed.length, count);
   peer.dispose();
   await assert.rejects(peer.set(stored), error => error.code === 'CONTEXT_CHANGED');
+});
+
+test('a surviving Dock accepts a replacement main owner with a fresh revision sequence', async t => {
+  const { main, peer, mainMessages, peerMessages, stored } = await setup(t);
+  await peer.hydrate();
+  await peer.set({ ...stored, pe: 22 });
+  await peer.set({ ...stored, pe: 23 });
+  const { createViewportCalibrationService } = await import(moduleUrl);
+  const replacementMessages = createWebMessages({ scope: main.owner, role: 'main' });
+  const replacement = createViewportCalibrationService(replacementMessages, { owner: main.owner, main: true,
+    store: { get: () => ({ ...stored, pe: 30 }) } });
+  t.after(() => { replacement.dispose(); replacementMessages.dispose(); });
+  const announced = new Promise(resolve => t.after(peerMessages.on('replacement-ready', resolve)));
+  await replacementMessages.emit('replacement-ready', true);
+  await announced;
+  assert.equal(peer.read().pe, 30, 'replacement startup state must supersede the retired revision sequence');
+  assert.equal((await peer.hydrate()).pe, 30);
+  await peer.set({ ...stored, pe: 31 });
+  assert.equal(replacement.read().pe, 31);
+  assert.equal(peer.read().pe, 31);
+  await mainMessages.emit('viewportUi.calibrationChanged', {
+    owner: main.owner, revision: 1000, calibration: { ...stored, pe: 50 },
+  });
+  // Both messages use the same real channel; this barrier drains the stale event.
+  const drained = new Promise(resolve => t.after(peerMessages.on('old-main-drained', resolve)));
+  // A retired main's topics are rejected, so send the barrier from the active one.
+  await replacementMessages.emit('old-main-drained', true);
+  await drained;
+  assert.equal(peer.read().pe, 31);
+});
+
+test('remounting the main view retains its live document calibration without rereading storage', async t => {
+  const { main, peer, mainMessages, stored } = await setup(t);
+  await peer.hydrate();
+  await peer.set({ ...stored, pe: 27 });
+  main.dispose();
+  const { createViewportCalibrationService } = await import(moduleUrl);
+  let storageReads = 0;
+  const remounted = createViewportCalibrationService(mainMessages, { owner: main.owner, main: true,
+    store: { get: () => { storageReads++; return stored; } } });
+  t.after(() => remounted.dispose());
+  assert.equal(storageReads, 0, 'storage is only a document startup seed');
+  assert.equal(remounted.read().pe, 27);
+  await peer.hydrate();
+  assert.equal(peer.read().pe, 27);
+  await peer.set({ ...stored, pe: 28 });
+  assert.equal(remounted.read().pe, 28);
+  assert.equal(peer.read().pe, 28);
 });

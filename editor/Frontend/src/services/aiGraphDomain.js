@@ -4,9 +4,9 @@ import contractText from './aiBlockContract.xml?raw';
 import { completeModel, parseModelJson } from './aiModelService.js';
 import { validateGeneratedNodeGraphResult } from '../blockly/node-editor/aiNodeGraphService.js';
 import { generationRequirements } from './aiGraphRequirements.js';
+import { cloneWebDto as clone } from '../utils/cloneWebDto.js';
 export { generationRequirements } from './aiGraphRequirements.js';
 
-const clone = (value) => JSON.parse(JSON.stringify(value));
 const actorKey = (name) =>
   String(name || '')
     .normalize('NFKC')

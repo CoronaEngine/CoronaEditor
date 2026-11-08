@@ -102,3 +102,28 @@ test('reopening waits until the old native tab has closed', async () => {
   assert.equal(hosts.closed('Object', 1), false);
   assert.equal(hosts.closed('Object', 2), true);
 });
+
+for (const reopenDuringClose of [false, true]) {
+  test(`failed graph closure retains the same host for explicit retry (reopenDuringClose=${reopenDuringClose})`, async () => {
+    let rejectClose, attempts = 0;
+    const opened = [], focused = [], errors = [];
+    const hosts = createNativePanelHosts({
+      open: async panel => ({ tab_id: opened.push(panel.id) }),
+      close: () => ++attempts === 1 ? new Promise((resolve, reject) => { rejectClose = reject; }) : Promise.resolve(),
+      focus: async id => focused.push(id), onError: (error, id) => errors.push([error.message, id]),
+    });
+    const wanted = [{ id: 'NodeGraphPanel' }];
+    hosts.reconcile(wanted); await tick();
+    hosts.reconcile([]); await tick();
+    if (reopenDuringClose) hosts.reconcile(wanted);
+    rejectClose(new Error('graph save failed')); await tick();
+    hosts.reconcile(wanted); await tick();
+    assert.deepEqual(opened, ['NodeGraphPanel'], 'the failed native close left the original document alive');
+    assert.deepEqual(errors.map(([message]) => message), ['graph save failed']);
+    assert.equal(await hosts.focusPanel('NodeGraphPanel'), true);
+    assert.deepEqual(focused, [1]);
+    hosts.reconcile([]); await tick();
+    assert.equal(attempts, 2, 'a new close intent explicitly retries the same host');
+    assert.equal(hosts.closed('NodeGraphPanel', 1), false, 'successful close retired the original host');
+  });
+}

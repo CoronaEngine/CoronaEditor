@@ -1,13 +1,13 @@
 import { editorApi } from '../api/editorApi.js';
 import policy from './aiPolicy.json' with { type: 'json' };
 import { worldModeState } from './worldModeService.js';
+import { cloneWebDto as clone } from '../utils/cloneWebDto.js';
 
 export function roundScore(value) {
   const floor = Math.floor(value);
   return value - floor === 0.5 ? floor + (floor % 2) : Math.round(value);
 }
 
-const clone = (value) => JSON.parse(JSON.stringify(value));
 const documentName = 'CabbageAssistant/context.json';
 const normalizePath = (value) =>
   String(value || '')
@@ -167,10 +167,13 @@ async function documentScope(projectPath) {
   return { project_path: projectPath, archive_session: scene.archive_session, document: documentName };
 }
 
-export async function readContext(projectPath) {
-  projectIdentity({ projectPath });
-  const read = await editorApi.projectSettings.readProjectDocument(await documentScope(projectPath));
-  projectIdentity({ projectPath });
+export async function readContext(projectPath, { revision = worldModeState.revision } = {}) {
+  const origin = { projectPath, projectRevision: revision };
+  projectIdentity(origin);
+  const request = await documentScope(projectPath);
+  projectIdentity(origin);
+  const read = await editorApi.projectSettings.readProjectDocument(request);
+  projectIdentity(origin);
   if (!read?.success) throw new Error(read?.error || '读取助手状态失败');
   return { success: true, status: 'ok', context: normalizeContext(read.content, projectPath) };
 }
@@ -222,15 +225,6 @@ function tutorialProgress(context, event) {
   const session = context.tutorialSession;
   if (event.type === 'tutorial_completion_notice_dismissed') {
     session.completionNoticeExpiresAt = 0;
-    return [];
-  }
-  if (event.type === 'tutorial_baseline_captured' && event.success) {
-    try {
-      session.baseline = {
-        ...session.baseline,
-        ...JSON.parse(event.details?.baselineJson || '{}'),
-      };
-    } catch {}
     return [];
   }
   if (!event.success || session.status !== 'active') return [];
@@ -569,8 +563,8 @@ export function applyEvent(context, payload) {
     ...clone(payload),
     timestamp: Number(payload.timestamp) || Date.now(),
     success: payload.success !== false,
-    details: payload.details || {},
   };
+  event.details ||= {};
   context.recentOperationEvents.push(event);
   context.recentOperationEvents = context.recentOperationEvents.slice(-200);
   const metric = policy.metricsByEvent[event.type];

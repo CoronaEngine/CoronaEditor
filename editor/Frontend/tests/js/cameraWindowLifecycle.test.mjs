@@ -14,7 +14,12 @@ function handler(file, name, deps) {
   const node = babelParse(source, { sourceType: 'module' }).program.body.find(node =>
     node.type === 'VariableDeclaration' && node.declarations.some(item => item.id.name === name));
   assert.ok(node, `${file}.${name}`);
-  return new Function('deps', `const {${Object.keys(deps).join(',')}} = deps; ${source.slice(node.start, node.end)}; return ${name};`)(deps);
+  const operation = file === 'sidebar/SceneBar' && ['OpenCameraView', 'ImportCamera'].includes(name)
+    ? babelParse(source, { sourceType: 'module' }).program.body.find(node =>
+      node.type === 'VariableDeclaration' && node.declarations.some(item => item.id.name === 'sceneOperation')) : null;
+  if (operation) deps.viewLifetime = { current: () => true };
+  return new Function('deps', `const {${Object.keys(deps).join(',')}} = deps; ${operation ? source.slice(operation.start, operation.end) : ''}
+    ${source.slice(node.start, node.end)}; return ${name};`)(deps);
 }
 
 test('SceneBar camera list preserves archive identity through the application window service', async t => {
@@ -51,7 +56,7 @@ test('SceneBar camera list preserves archive identity through the application wi
     name: 'Camera', view_x: 0, view_y: 0, view_width: 640, view_height: 480 });
   applyCameraList([observed]);
   const open = handler('sidebar/SceneBar', 'OpenCameraView', {
-    currentSceneName: ref('scene.ini'), appService,
+    currentSceneName: ref('scene.ini'), archiveSession: ref('observed-archive'), appService,
     OnInitObjTree: async () => calls.push('refresh'), logError: (...args) => errors.push(args),
   });
   await open(sceneCameras.value[0]);
@@ -64,7 +69,7 @@ test('opening an existing camera sends only one window operation with the observ
   const calls = [], errors = [];
   const camera = { camera_id: 'camera', archive_session: 'archive', name: 'Camera', view_width: 640 };
   const open = handler('sidebar/SceneBar', 'OpenCameraView', {
-    currentSceneName: ref('scene'),
+    currentSceneName: ref('scene'), archiveSession: ref('archive'),
     editorApi: { sceneTools: { openCameraView: async () => { throw new Error('retired state mutation'); } } },
     appService: { createCameraView: async value => { calls.push(value); return { tab_id: 7 }; } },
     OnInitObjTree: async () => calls.push('refresh'), logError: (...args) => errors.push(args),
@@ -78,7 +83,7 @@ test('failed camera creation preserves the observed camera and reports failure w
   const calls = [], camera = Object.freeze({ camera_id: 'camera', archive_session: 'archive', view_open: false });
   const failure = new Error('CREATE_FAILED');
   const open = handler('sidebar/SceneBar', 'OpenCameraView', {
-    currentSceneName: ref('scene'), editorApi: { sceneTools: {} },
+    currentSceneName: ref('scene'), archiveSession: ref('archive'), editorApi: { sceneTools: {} },
     appService: { createCameraView: async () => { throw failure; } },
     OnInitObjTree: async () => calls.push('refresh'), logError: (_message, error) => calls.push(error),
   });

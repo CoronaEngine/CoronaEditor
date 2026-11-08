@@ -353,6 +353,16 @@ const aliasSaving = ref(false);
 const aliasError = ref('');
 const placeholderRebinding = ref(false);
 let loadSequence = 0;
+let renderSpaceRevision = 0;
+let bodyTypeRevision = 0;
+// Selection identity and view retirement have different responsibilities.
+function actorOperation() {
+  const scene = selectedSceneName.value, name = selectedActorName.value;
+  const guid = actor.actorGuid, session = archiveSession.value, sequence = loadSequence;
+  return { scene, name, guid, session, current: () => viewLifetime.current() && sequence === loadSequence
+    && scene === selectedSceneName.value && session === archiveSession.value
+    && (guid ? guid === actor.actorGuid : name === selectedActorName.value) };
+}
 const updateTimers = new Map();
 const pendingTransformUpdates = new Map();
 let transformFrameId = null;
@@ -439,6 +449,9 @@ function vectorChanged(previous, next) {
 async function loadActor(sceneName, actorName, session, actorGuid) {
   if (!sceneName || !actorName || !session || !viewLifetime.current()) return;
   const sequence = ++loadSequence;
+  saving.value = false;
+  aliasSaving.value = false;
+  placeholderRebinding.value = false;
   loading.value = true;
   archiveSession.value = session;
   selectedSceneName.value = sceneName;
@@ -495,6 +508,8 @@ function resetAlias() {
 }
 
 async function commitAlias() {
+  if (!viewLifetime.current()) return;
+  const operation = actorOperation();
   const nextName = aliasDraft.value.trim();
   const currentName = selectedActorName.value;
   const currentScene = selectedSceneName.value;
@@ -510,20 +525,21 @@ async function commitAlias() {
       currentScene,
       actor.actorGuid || currentName,
       nextName,
-      { archive_session: archiveSession.value },
+      { archive_session: operation.session },
     );
-    if (selectedActorName.value !== currentName || selectedSceneName.value !== currentScene) return;
+    if (!operation.current()) return;
     const savedName = String(result?.new_name || nextName);
     selectedActorName.value = savedName;
     actor.name = savedName;
     aliasDraft.value = savedName;
     void ikController.select(currentScene, actor.actorGuid || savedName, { archive_session: archiveSession.value });
   } catch (error) {
+    if (!operation.current()) return;
     aliasError.value = error?.message || '修改名称失败';
     aliasDraft.value = actor.name;
     logError('修改对象名称失败', error);
   } finally {
-    aliasSaving.value = false;
+    if (operation.current()) aliasSaving.value = false;
   }
 }
 
@@ -534,18 +550,20 @@ function vectorFor(operation) {
 }
 
 function schedule(key, callback, delay = 120) {
+  if (!viewLifetime.current()) return;
   clearTimeout(updateTimers.get(key));
   updateTimers.set(key, window.setTimeout(() => {
     updateTimers.delete(key);
-    callback();
+    if (viewLifetime.current()) callback();
   }, delay));
 }
 
 function flushTransformUpdates() {
+  if (transformFrameId !== null) window.cancelAnimationFrame(transformFrameId);
   transformFrameId = null;
   const updates = Array.from(pendingTransformUpdates.values());
   pendingTransformUpdates.clear();
-  if (!selectedSceneName.value || !selectedActorName.value || updates.length === 0) return;
+  if (!viewLifetime.current() || !selectedSceneName.value || !selectedActorName.value || updates.length === 0) return;
 
   transformFlushPromise = Promise.all(
     updates.map((update) => {
@@ -560,17 +578,20 @@ function flushTransformUpdates() {
         { [key]: update.vector, archive_session: update.session },
       );
     }),
-  ).catch((error) => {
-    logError('更新对象变换失败', error);
+  );
+  // Observe background failures without converting a failed write into a successful save prerequisite.
+  void transformFlushPromise.catch((error) => {
+    if (updates.some(update => update.context.current())) logError('更新对象变换失败', error);
   });
 }
 
 function scheduleTransform(operation) {
-  if (!selectedActorName.value || !['SetPosition', 'SetRotation', 'SetScale'].includes(operation)) return;
+  if (!viewLifetime.current() || !selectedActorName.value || !['SetPosition', 'SetRotation', 'SetScale'].includes(operation)) return;
   pendingTransformUpdates.set(operation, {
     operation,
     vector: vectorFor(operation),
     sceneName: selectedSceneName.value, actorName: selectedActorName.value, session: archiveSession.value,
+    context: actorOperation(),
   });
   if (transformFrameId === null) {
     transformFrameId = window.requestAnimationFrame(flushTransformUpdates);
@@ -578,15 +599,25 @@ function scheduleTransform(operation) {
 }
 
 async function applyTransform(operation, axis = '') {
-  if (!selectedActorName.value) return;
+  if (!viewLifetime.current() || !selectedActorName.value) return;
+  const context = actorOperation();
+  const details = {
+    sceneName: context.scene, actorName: context.name, actorType: actor.type || 'model',
+    axis: String(axis || '').toLowerCase(),
+    value: axis ? Number(actor.transform[operation === 'SetPosition' ? 'position' : operation === 'SetRotation' ? 'rotation' : 'scale']?.[axis]) : null,
+    source: 'property_panel',
+  };
   // The native transform update emitted by this Dock is an echo, not a second viewport edit.
   syncViewportTransformBaseline();
   scheduleTransform(operation);
   clearTimeout(updateTimers.get(`save:${operation}`));
   updateTimers.delete(`save:${operation}`);
   schedule(`save:${operation}`, async () => {
+    if (!context.current()) return;
     try {
+      if (pendingTransformUpdates.size) flushTransformUpdates();
       await transformFlushPromise;
+      if (!context.current()) return;
       const eventType = operation === 'SetPosition'
         ? 'transform_position'
         : operation === 'SetRotation'
@@ -596,23 +627,17 @@ async function applyTransform(operation, axis = '') {
         type: eventType,
         category: 'scene',
         success: true,
-        details: {
-          sceneName: selectedSceneName.value,
-          actorName: selectedActorName.value,
-          actorType: actor.type || 'model',
-          axis: String(axis || '').toLowerCase(),
-          value: axis ? Number(actor.transform[operation === 'SetPosition' ? 'position' : operation === 'SetRotation' ? 'rotation' : 'scale']?.[axis]) : null,
-          source: 'property_panel',
-        },
+        details,
       }, { onSceneSave: true });
     } catch (error) {
-      logError('保存对象变换失败', error);
+      if (context.current()) logError('保存对象变换失败', error);
     }
   }, 180);
 }
 
 async function setRenderSpace(enabled) {
-  if (!selectedActorName.value || actor.followCamera === enabled) return;
+  if (!viewLifetime.current() || !selectedActorName.value || actor.followCamera === enabled) return;
+  const context = actorOperation(), revision = ++renderSpaceRevision;
   const previous = actor.followCamera;
   actor.followCamera = enabled;
   try {
@@ -622,50 +647,56 @@ async function setRenderSpace(enabled) {
       { archive_session: archiveSession.value, follow_camera: Boolean(enabled) },
     );
   } catch (error) {
+    if (!context.current() || revision !== renderSpaceRevision) return;
     actor.followCamera = previous;
     logError('更新对象渲染空间失败', error);
   }
 }
 
 async function selectModelFile() {
-  if (!selectedActorName.value) return;
+  if (!viewLifetime.current() || !selectedActorName.value) return;
+  const operation = actorOperation();
   try {
     const path = await editorApi.scene.selectModelFile(
-      selectedSceneName.value, 'model', { archive_session: archiveSession.value },
+      operation.scene, 'model', { archive_session: operation.session },
     );
-    if (path) actor.modelPath = String(path);
+    if (operation.current() && path) actor.modelPath = String(path);
   } catch (error) {
-    logError('选择模型资源失败', error);
+    if (operation.current()) logError('选择模型资源失败', error);
   }
 }
 
 async function rebindPlaceholderResource() {
-  if (!selectedActorName.value || !actor.actorGuid || placeholderRebinding.value) return;
+  if (!viewLifetime.current() || !selectedActorName.value || !actor.actorGuid || placeholderRebinding.value) return;
+  const operation = actorOperation();
   placeholderRebinding.value = true;
   try {
     const path = await editorApi.scene.selectModelFile(
-      selectedSceneName.value, 'model', { archive_session: archiveSession.value },
+      operation.scene, 'model', { archive_session: operation.session },
     );
-    if (!path) return;
+    if (!operation.current() || !path) return;
     const result = await editorApi.scene.rebindActorResource(
-      selectedSceneName.value,
-      actor.actorGuid,
+      operation.scene,
+      operation.guid,
       path,
-      { archive_session: archiveSession.value }
+      { archive_session: operation.session }
     );
+    if (!operation.current()) return;
     if (!result || result.status === 'error' || result.ok === false) {
       throw new Error(result?.message || '重新绑定资源失败');
     }
-    await loadActor(selectedSceneName.value, selectedActorName.value, archiveSession.value, actor.actorGuid);
-  } catch (error) {
-    logError('重新绑定占位资源失败', error);
-  } finally {
     placeholderRebinding.value = false;
+    await loadActor(operation.scene, operation.name, operation.session, operation.guid);
+  } catch (error) {
+    if (operation.current()) logError('重新绑定占位资源失败', error);
+  } finally {
+    if (operation.current()) placeholderRebinding.value = false;
   }
 }
 
 async function setBodyType(type) {
-  if (!selectedActorName.value) return;
+  if (!viewLifetime.current() || !selectedActorName.value) return;
+  const context = actorOperation(), revision = ++bodyTypeRevision;
   const previous = actor.mechanics.bodyType;
   const next = normalizeBodyType(type);
   actor.mechanics.bodyType = next;
@@ -675,6 +706,7 @@ async function setBodyType(type) {
       selectedActorName.value,
       { archive_session: archiveSession.value, mechanics: { body_type: next } },
     );
+    if (!context.current() || revision !== bodyTypeRevision) return;
     void cabbageContextService.recordEvent({
       type: 'physics_changed',
       category: 'physics',
@@ -688,13 +720,15 @@ async function setBodyType(type) {
       },
     });
   } catch (error) {
+    if (!context.current() || revision !== bodyTypeRevision) return;
     actor.mechanics.bodyType = previous;
     logError('更新物体类型失败', error);
   }
 }
 
 async function updateMechanic(operation, value) {
-  if (!selectedActorName.value) return;
+  if (!viewLifetime.current() || !selectedActorName.value) return;
+  const context = actorOperation();
   const fieldByOperation = {
     SetMass: 'mass',
     SetRestitution: 'restitution',
@@ -711,6 +745,7 @@ async function updateMechanic(operation, value) {
       selectedActorName.value,
       { archive_session: archiveSession.value, mechanics: { [field]: value } },
     );
+    if (!context.current()) return;
     void cabbageContextService.recordEvent({
       type: 'physics_changed',
       category: 'physics',
@@ -724,12 +759,13 @@ async function updateMechanic(operation, value) {
       },
     });
   } catch (error) {
-    logError('更新对象物理属性失败', error);
+    if (context.current()) logError('更新对象物理属性失败', error);
   }
 }
 
 async function updateLocks(operation, values) {
-  if (!selectedActorName.value) return;
+  if (!viewLifetime.current() || !selectedActorName.value) return;
+  const context = actorOperation();
   const field = operation === 'SetLinearLock' ? 'linear_lock' : operation === 'SetAngularLock' ? 'angular_lock' : null;
   if (!field) {
     logError('更新对象轴锁失败', new Error(`Unsupported lock operation: ${operation}`));
@@ -741,6 +777,7 @@ async function updateLocks(operation, values) {
       selectedActorName.value,
       { archive_session: archiveSession.value, mechanics: { [field]: values.map((value) => Boolean(value)) } },
     );
+    if (!context.current()) return;
     void cabbageContextService.recordEvent({
       type: 'physics_changed',
       category: 'physics',
@@ -752,11 +789,13 @@ async function updateLocks(operation, values) {
       },
     });
   } catch (error) {
-    logError('更新对象轴锁失败', error);
+    if (context.current()) logError('更新对象轴锁失败', error);
   }
 }
 
 async function updateCameraLock() {
+  if (!viewLifetime.current() || !selectedActorName.value) return;
+  const context = actorOperation();
   try {
     await editorApi.scene.setActorProperties(
       selectedSceneName.value,
@@ -764,11 +803,13 @@ async function updateCameraLock() {
       { archive_session: archiveSession.value, camera_lock: { enabled: actor.cameraLock.enabled } },
     );
   } catch (error) {
-    logError('更新摄像机跟随失败', error);
+    if (context.current()) logError('更新摄像机跟随失败', error);
   }
 }
 
 async function updateCameraLockOffset() {
+  if (!viewLifetime.current() || !selectedActorName.value) return;
+  const context = actorOperation();
   const value = actor.cameraLock.position;
   const toFinite = (input, fallback) => {
     const number = Number(input);
@@ -791,27 +832,26 @@ async function updateCameraLockOffset() {
       },
     );
   } catch (error) {
-    logError('更新摄像机偏移失败', error);
+    if (context.current()) logError('更新摄像机偏移失败', error);
   }
 }
 
 async function saveActor() {
-  if (!selectedActorName.value || saving.value) return;
+  if (!viewLifetime.current() || !selectedActorName.value || saving.value) return;
+  const context = actorOperation();
   saving.value = true;
-  const [sceneName, actorName, session] = [selectedSceneName.value, selectedActorName.value, archiveSession.value];
+  const { scene: sceneName, session } = context;
   try {
-    if (transformFrameId !== null) {
-      window.cancelAnimationFrame(transformFrameId);
-      flushTransformUpdates();
-    }
+    if (pendingTransformUpdates.size) flushTransformUpdates();
     await transformFlushPromise;
     const saved = await editorApi.scene.save(sceneName, { archive_session: session, actors_only: true });
+    if (!context.current()) return;
     if (saved?.status === 'read_only') throw new Error(saved.message || '保存对象失败');
     cabbageContextService.notifySceneSaved(saved?.filepath);
   } catch (error) {
-    logError('保存对象失败', error);
+    if (context.current()) logError('保存对象失败', error);
   } finally {
-    saving.value = false;
+    if (context.current()) saving.value = false;
   }
 }
 
@@ -825,6 +865,9 @@ function handleSelection(payload = {}) {
   if (modelNodeSelection.value && modelNodeSelection.value.actorName !== actorName) { modelNodeSelection.value = null; coronaEventBus.modelNodeSelection = null; }
   if (type === 'scene' || !actorName) {
     loadSequence += 1;
+    saving.value = false;
+    aliasSaving.value = false;
+    placeholderRebinding.value = false;
     loading.value = false;
     ikController.clear();
     archiveSession.value = '';

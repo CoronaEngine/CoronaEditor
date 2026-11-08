@@ -92,6 +92,7 @@
 <script setup>
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 import { editorApi } from '@/api/editorApi.js';
+import { createViewLifetime } from '@/utils/viewLifetime.js';
 import {
   flattenLoadedNodes,
   MODEL_NODE_DISPLAY_MAX_SKIP,
@@ -101,6 +102,7 @@ import {
 
 const props = defineProps({ active: Boolean, sceneName: String, actor: Object, selection: Object });
 const emit = defineEmits(['select']);
+const viewLifetime = createViewLifetime();
 
 const pageSize = 100;
 const rowHeight = 28;
@@ -127,6 +129,9 @@ let mutationChain = Promise.resolve();
 const actorName = computed(() => props.actor?.name || '');
 const actorGuid = computed(() => props.actor?.actor_guid || '');
 const archiveSession = computed(() => props.actor?.archive_session || '');
+const actorIdentity = () => ({ archive_session: archiveSession.value, scene: props.sceneName, actor_guid: actorGuid.value });
+const isCurrentActor = (identity) => viewLifetime.current() && identity.archive_session === archiveSession.value
+  && identity.scene === props.sceneName && identity.actor_guid === actorGuid.value;
 const actorVersion = ref(Number(props.actor?.actor_version || 1));
 const nodeCount = computed(() => Number(props.actor?.model_node_count || 0));
 const rootKey = computed(() => String(displayRoot.value));
@@ -147,20 +152,21 @@ const isSelected = (node) =>
   props.selection?.actorName === actorName.value;
 
 const persistNodePatch = (node, patch) => {
+  if (!viewLifetime.current()) return Promise.resolve(null);
   const identity = {
-    archive_session: archiveSession.value,
-    scene: props.sceneName,
-    actor_guid: actorGuid.value,
+    ...actorIdentity(),
     node_index: Number(node.node_index),
   };
   const operation = mutationChain.then(async () => {
-    if (identity.archive_session !== archiveSession.value || identity.scene !== props.sceneName || identity.actor_guid !== actorGuid.value) {
+    if (!viewLifetime.current()) return null;
+    if (!isCurrentActor(identity)) {
       throw new Error('Model node edit belongs to an inactive Actor');
     }
     const data = await editorApi.scene.setModelNodeState({
       ...identity,
       expected_actor_version: actorVersion.value,
     }, patch);
+    if (!isCurrentActor(identity)) return null;
     actorVersion.value = Number(data.actor_version || actorVersion.value);
     return data;
   });
@@ -169,7 +175,8 @@ const persistNodePatch = (node, patch) => {
 };
 
 const loadPage = async (parentIndex, offset = 0) => {
-  if (!actorName.value) return null;
+  if (!viewLifetime.current() || !actorName.value) return null;
+  const identity = actorIdentity();
   const key = pageKey(parentIndex);
   if (pages.value[key]?.loading) return null;
   const token = ++request;
@@ -183,7 +190,7 @@ const loadPage = async (parentIndex, offset = 0) => {
       offset,
       limit: pageSize,
     });
-    if (token !== request) return null;
+    if (token !== request || !isCurrentActor(identity)) return null;
     const previous = pages.value[key]?.items || [];
     const incoming = Array.isArray(data.nodes) ? data.nodes : [];
     const page = {
@@ -196,20 +203,24 @@ const loadPage = async (parentIndex, offset = 0) => {
     pages.value = { ...pages.value, [key]: page };
     return page;
   } catch {
-    if (token === request) {
+    if (token === request && isCurrentActor(identity)) {
       pages.value = { ...pages.value, [key]: { ...(pages.value[key] || {}), loading: false } };
     }
     return null;
   } finally {
-    if (token === request) loading.value = false;
+    if (token === request && isCurrentActor(identity)) loading.value = false;
   }
 };
 
 // Walks past the importer's synthetic containers so the model's nodes are the top level.
 const loadDisplayRoot = async () => {
+  if (!viewLifetime.current()) return;
+  const identity = actorIdentity();
   let parent = -1;
   for (let depth = 0; depth <= MODEL_NODE_DISPLAY_MAX_SKIP; depth += 1) {
+    const token = request + 1;
     const page = await loadPage(parent, 0);
+    if (!isCurrentActor(identity) || token !== request) return;
     if (!page) break;
     const next = resolveModelNodeDisplayParent(page, depth);
     if (next < 0) break;
@@ -219,6 +230,7 @@ const loadDisplayRoot = async () => {
 };
 
 const reset = () => {
+  if (!viewLifetime.current()) return;
   request += 1;
   pages.value = {};
   expanded.value = new Set();
@@ -227,19 +239,21 @@ const reset = () => {
 };
 
 const refresh = async () => {
+  if (!viewLifetime.current()) return;
   reset();
   if (!detailOpen.value || !props.active || !actorName.value) return;
   await loadDisplayRoot();
 };
 
 const toggleDetail = () => {
+  if (!viewLifetime.current()) return;
   detailOpen.value = !detailOpen.value;
   if (detailOpen.value) void refresh();
   else reset();
 };
 
 const applyNode = (node) => {
-  if (!node) return;
+  if (!viewLifetime.current() || !node) return;
   const next = {};
   for (const [key, page] of Object.entries(pages.value)) {
     next[key] = {
@@ -253,6 +267,8 @@ const applyNode = (node) => {
 };
 
 const toggleExpanded = async (node) => {
+  if (!viewLifetime.current()) return;
+  const identity = actorIdentity();
   const index = Number(node.node_index);
   const next = new Set(expanded.value);
   if (next.has(index)) {
@@ -261,7 +277,7 @@ const toggleExpanded = async (node) => {
     next.add(index);
     if (!pages.value[pageKey(index)]) await loadPage(index);
   }
-  expanded.value = next;
+  if (isCurrentActor(identity)) expanded.value = next;
 };
 
 const loadMore = (parentKeyValue) => {
@@ -269,26 +285,34 @@ const loadMore = (parentKeyValue) => {
   return loadPage(Number(parentKeyValue), Number(page?.next_offset || 0));
 };
 
-const select = (node) =>
+const select = (node) => {
+  if (!viewLifetime.current()) return;
   emit('select', {
     actorName: actorName.value,
     nodeIndex: Number(node.node_index),
     node_index: Number(node.node_index),
   });
+};
 
 const toggleVisibility = async (node) => {
+  const identity = actorIdentity();
   const data = await persistNodePatch(node, { visible: !node.visible });
+  if (!data || !isCurrentActor(identity)) return;
   const updated = data.nodes?.[0] || node; applyNode(updated); select(updated);
 };
 
 const save = async (key) => {
+  if (!viewLifetime.current()) return;
+  const identity = actorIdentity();
   const node = selectedNode.value;
   if (!node) return;
   const data = await persistNodePatch(node, { [key]: [...node[key]] });
+  if (!data || !isCurrentActor(identity)) return;
   applyNode(data.nodes?.[0] || node);
 };
 
 const onScroll = (event) => {
+  if (!viewLifetime.current()) return;
   scrollTop.value = event.target.scrollTop;
   viewportHeight.value = event.target.clientHeight;
 };
@@ -296,6 +320,7 @@ const onScroll = (event) => {
 watch(
   () => [props.active, props.sceneName, actorName.value, actorGuid.value, archiveSession.value, props.actor?.actor_version],
   () => {
+    if (!viewLifetime.current()) return;
     actorVersion.value = Number(props.actor?.actor_version || 1);
     void refresh();
   },
@@ -306,7 +331,7 @@ watch(
 watch(
   () => [props.selection?.actorName, props.selection?.nodeIndex],
   () => {
-    if (!props.active || detailOpen.value) return;
+    if (!viewLifetime.current() || !props.active || detailOpen.value) return;
     if (props.selection?.actorName !== actorName.value) return;
     detailOpen.value = true;
     void refresh();
@@ -315,8 +340,10 @@ watch(
 
 onMounted(async () => {
   await nextTick();
+  if (!viewLifetime.current()) return;
   if (scrollElement.value && typeof ResizeObserver !== 'undefined') {
     resizeObserver = new ResizeObserver(() => {
+      if (!viewLifetime.current()) return;
       viewportHeight.value = scrollElement.value?.clientHeight || 280;
     });
     resizeObserver.observe(scrollElement.value);
@@ -324,8 +351,10 @@ onMounted(async () => {
 });
 
 onUnmounted(() => {
+  void viewLifetime.dispose();
   request += 1;
   resizeObserver?.disconnect();
+  resizeObserver = null;
 });
 </script>
 

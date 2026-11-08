@@ -18,7 +18,7 @@ const openChat = () => {
   void appService.crossTabBroadcast('creative-panel-open', { panelId: 'CabbageChatPanel' }).catch(() => {});
 };
 onMounted(() => {
-  unsubscribe = subscribeCabbageAssistantContext(snapshot => assistant.hydrateContext(snapshot), { projectScopeId, emitCurrent: true });
+  unsubscribe = subscribeCabbageAssistantContext(assistant.hydrateContext, { projectScopeId, emitCurrent: true });
   unsubscribeWarnings = subscribeCabbagePreWarnings(warning => assistant.showPreWarning(warning), { projectScopeId });
   window.addEventListener('cabbage-chat-focus-request', openChat);
 });

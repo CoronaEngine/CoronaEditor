@@ -6,8 +6,8 @@
         ref="bubbleRef"
         class="fixed z-[9999] flex items-start gap-2"
         :style="bubbleStyle"
-        @mouseenter="isHovering = true; cancelAutoHide"
-        @mouseleave="isHovering = false; startAutoHide"
+        @mouseenter="isHovering = true; cancelAutoHide()"
+        @mouseleave="isHovering = false; startAutoHide()"
       >
         <!-- Cabbage avatar -->
         <div class="flex-shrink-0 w-8 h-8 rounded-full bg-green-400 border-2 border-green-600 overflow-hidden shadow-md">
@@ -45,7 +45,8 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue';
+import { ref, computed, onUnmounted, watch, nextTick } from 'vue';
+import { createViewLifetime } from '@/utils/viewLifetime.js';
 
 const props = defineProps({
   show: { type: Boolean, default: false },
@@ -64,6 +65,11 @@ const progressPercent = ref(100);
 let hideTimer = null;
 let progressTimer = null;
 let progressStart = 0;
+let closeTimer = null;
+let showVersion = 0;
+let autoHideVersion = 0;
+const viewLifetime = createViewLifetime();
+const currentHint = version => viewLifetime.current() && props.show && version === showVersion;
 
 const bubbleStyle = computed(() => {
   const pos = calcPosition();
@@ -92,24 +98,31 @@ const calcPosition = () => {
 };
 
 const startAutoHide = () => {
-  if (dismissRequested.value) return;
+  if (!viewLifetime.current() || !props.show || !visible.value || dismissRequested.value || isHovering.value) return;
   cancelAutoHide();
+  const version = showVersion;
+  const timerVersion = autoHideVersion;
+  const current = () => currentHint(version) && timerVersion === autoHideVersion
+    && !dismissRequested.value && !isHovering.value;
 
   progressStart = Date.now();
   progressPercent.value = 100;
 
   progressTimer = setInterval(() => {
+    if (!current()) return;
     const elapsed = Date.now() - progressStart;
     const remaining = Math.max(0, 100 - (elapsed / props.autoHideMs) * 100);
     progressPercent.value = remaining;
   }, 50);
 
   hideTimer = setTimeout(() => {
+    if (!current()) return;
     dismiss();
   }, props.autoHideMs);
 };
 
 const cancelAutoHide = () => {
+  autoHideVersion++;
   if (hideTimer) {
     clearTimeout(hideTimer);
     hideTimer = null;
@@ -120,24 +133,42 @@ const cancelAutoHide = () => {
   }
 };
 
+const cancelClose = () => {
+  if (closeTimer !== null) clearTimeout(closeTimer);
+  closeTimer = null;
+};
+
 const dismiss = () => {
+  if (!viewLifetime.current() || !props.show || dismissRequested.value) return;
+  const version = showVersion;
   dismissRequested.value = true;
   cancelAutoHide();
   visible.value = false;
   // Emit close after leave transition completes (200ms)
-  setTimeout(() => emit('close'), 220);
+  closeTimer = setTimeout(() => {
+    if (!currentHint(version) || !dismissRequested.value) return;
+    closeTimer = null;
+    emit('close');
+  }, 220);
 };
 
 // Watch for show changes
 watch(
-  () => props.show,
-  (val) => {
+  () => [props.show, props.hintText],
+  ([val]) => {
+    const version = ++showVersion;
+    cancelAutoHide();
+    cancelClose();
+    if (!viewLifetime.current()) return;
     if (val) {
       dismissRequested.value = false;
       nextTick(() => {
+        if (!currentHint(version) || dismissRequested.value) return;
         visible.value = true;
         startAutoHide();
       });
+    } else {
+      visible.value = false;
     }
   },
   { immediate: true }
@@ -153,15 +184,10 @@ watch(
   }
 );
 
-onMounted(() => {
-  if (props.show) {
-    visible.value = true;
-    startAutoHide();
-  }
-});
-
 onUnmounted(() => {
+  void viewLifetime.dispose();
   cancelAutoHide();
+  cancelClose();
 });
 </script>
 

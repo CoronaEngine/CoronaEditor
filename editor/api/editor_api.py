@@ -460,28 +460,14 @@ class _EditorApi(_DynamicApiNamespace):
 
     @staticmethod
     def off(callback_token):
-        return _invoke_typed_cpp_api("EditorApi.unregister_callback", "editor.unregister_callback", [callback_token])
+        import CoronaEngine
+
+        return CoronaEngine.unregister_python_script_callback(callback_token)
 
 
 class _EventsApi(_DynamicApiNamespace):
     def __init__(self):
         super().__init__("events")
-
-    @staticmethod
-    def on_actor_changed(callback):
-        return _register_manifest_editor_api_event_callback("events.on_actor_changed", callback)
-
-    @staticmethod
-    def on_actor_selection_changed(callback):
-        return _register_manifest_editor_api_event_callback("events.on_actor_selection_changed", callback)
-
-    @staticmethod
-    def on_actor_transform_updated(callback):
-        return _register_manifest_editor_api_event_callback("events.on_actor_transform_updated", callback)
-
-    @staticmethod
-    def on_project_opened(callback):
-        return _register_manifest_editor_api_event_callback("events.on_project_opened", callback)
 
     @staticmethod
     def on_lan_chat_event(callback):

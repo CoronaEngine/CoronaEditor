@@ -41,12 +41,16 @@ app.directive('click-outside', {
     // 缓存到 el 上,unmounted 时移除
     el.__clickOutsideHandler__ = handler;
     // 延迟一帧再绑定,避免与触发打开的 click 事件重叠导致立即关闭
-    setTimeout(() => {
+    el.__clickOutsideTimer__ = setTimeout(() => {
+      if (el.__clickOutsideHandler__ !== handler) return;
+      el.__clickOutsideTimer__ = null;
       document.addEventListener('mousedown', handler, true);
       document.addEventListener('touchstart', handler, true);
     }, 0);
   },
   unmounted(el) {
+    clearTimeout(el.__clickOutsideTimer__);
+    el.__clickOutsideTimer__ = null;
     const handler = el.__clickOutsideHandler__;
     if (handler) {
       document.removeEventListener('mousedown', handler, true);

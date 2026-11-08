@@ -30,7 +30,7 @@ const state = reactive({
   role: ROLE.NONE, // none / host / guest
   mode: 'multi', // multi / single
   inRoom: false,
-  connection: 'idle', // idle / connecting / syncing / connected / reconnecting
+  connection: 'idle', // idle / connecting / syncing / connected
   room: '', // 房间号
   ip: '', // 房主显示用：本机 IP；加入方：房主 IP
   port: 27960,
@@ -784,25 +784,6 @@ function handleEvent(event) {
         applyHistorySnapshot(event.history, true);
       }
       break;
-    case 'reconnecting':
-      // 连接断开，正在自动重连：保留消息，仅切换状态供 UI 提示
-      state.connection = 'reconnecting';
-      state.error = '';
-      break;
-    case 'reconnected':
-      // 重连成功：用服务器最新状态校正成员/历史与最终昵称
-      state.connection = 'connected';
-      state.error = '';
-      if (event.you) state.nickname = event.you;
-      applyMemberSnapshot({
-        ...event,
-        members: event.members || state.members,
-        member_details: event.member_details || state.memberDetails,
-      });
-      if (Array.isArray(event.history)) {
-        applyHistorySnapshot(event.history, true);
-      }
-      break;
     case 'room_closed':
       _resetRoom();
       state.error = 'ROOM_CLOSED';
@@ -817,10 +798,6 @@ function handleEvent(event) {
       ) {
         resetAfterJoinFailure(event.code);
         break;
-      }
-      if (event.code === 'RECONNECT_FAILED' || event.code === 'RECONNECT_REJECTED') {
-        state.connection = 'idle';
-        state.inRoom = false;
       }
       break;
     default:

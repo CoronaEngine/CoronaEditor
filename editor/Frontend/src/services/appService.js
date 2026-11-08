@@ -55,6 +55,7 @@ function session() {
       activities: createWindowSessionActivities(messages),
       send: sendWindowCommand,
       beforeRetire: () => flushActiveNodeGraphs(surface),
+      beforeClose: record => record.panelId === 'NodeGraphPanel' ? flushActiveNodeGraphs(surface) : undefined,
       publish: (topic, payload) => messages.emit(topic, payload),
       getWorld: () => worldModeState,
       getQuery: () => query,

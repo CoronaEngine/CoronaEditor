@@ -4,20 +4,26 @@ export function createNativePanelHosts({ open, close, focus = async () => {}, on
   const hosts = new Map();
   const closing = new Map();
   let disposed = false;
-  function retire(id, tabId) {
-    const pending = Promise.resolve().then(() => close(tabId, id)).catch(onError).finally(() => {
+  let latestPanels = [];
+  function retire(id, host) {
+    if (closing.has(id)) return closing.get(id);
+    const pending = Promise.resolve().then(() => close(host.tabId, id)).then(() => {
+      if (hosts.get(id) === host) hosts.delete(id);
+      if (!disposed && host.wanted) reconcile(latestPanels);
+    }).catch(onError).finally(() => {
       if (closing.get(id) === pending) closing.delete(id);
     });
     closing.set(id, pending);
     return pending;
   }
   function reconcile(panels) {
+    latestPanels = panels;
     const wanted = new Map(panels.map(panel => [panel.id, panel]));
     for (const [id, host] of hosts) {
+      const wasWanted = host.wanted;
       host.wanted = wanted.has(id);
-      if (!host.wanted && host.tabId !== undefined) {
-        hosts.delete(id);
-        void retire(id, host.tabId);
+      if (!host.wanted && wasWanted && host.tabId !== undefined) {
+        void retire(id, host);
       }
     }
     if (disposed) return;
@@ -35,8 +41,7 @@ export function createNativePanelHosts({ open, close, focus = async () => {}, on
         if (!Number.isInteger(tabId)) throw new Error(`Missing tab_id for ${id}`);
         host.tabId = tabId;
         if (disposed || !host.wanted) {
-          hosts.delete(id);
-          await retire(id, tabId);
+          await retire(id, host);
         }
       }).catch(error => {
         if (hosts.get(id) !== host) return;
@@ -47,7 +52,7 @@ export function createNativePanelHosts({ open, close, focus = async () => {}, on
   }
   function closed(id, tabId) {
     const host = hosts.get(id);
-    if (!Number.isInteger(tabId) || !host || host.tabId !== tabId) return false;
+    if (!Number.isInteger(tabId) || !host || host.tabId !== tabId || closing.has(id)) return false;
     hosts.delete(id);
     return true;
   }

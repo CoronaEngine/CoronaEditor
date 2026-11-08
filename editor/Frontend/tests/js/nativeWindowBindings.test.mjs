@@ -2,6 +2,8 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { getWebMessages } from '../../src/api/webMessages.js';
 import { memoryStorage } from './windowSessionFixtures.mjs';
+import { PLUGIN_MANIFEST } from '../../src/config/pluginManifest.js';
+import { getNodeGraphSaves } from '../../src/services/nodeGraphSaves.js';
 
 globalThis.window = {};
 const { appService } = await import('../../src/services/appService.js');
@@ -71,6 +73,33 @@ test('window session invokes native focus and close without old commands or a le
   assert.equal(await appService.focusPanelTab(7), true);
   assert.equal(await appService.closePanelTab(7, 'ignored-panel-name'), true);
   assert.deepEqual(calls, [['focus', 7], ['close', 7]]);
+});
+
+test('closing the registered node panel uses the graph save barrier and retains failed state', async t => {
+  const { native } = nativeWindow(t);
+  const oldWorld = { ...worldModeState };
+  t.after(() => { Object.assign(worldModeState, oldWorld); });
+  Object.assign(worldModeState, { status: 'ready', mode: 'creative', revision: 1 });
+  window.localStorage = memoryStorage(); window.sessionStorage = memoryStorage(); window.location = { hash: '#/' };
+  let nextTab = 0, saves = 0, fail = true;
+  const closed = [];
+  native.createPanel = async () => ({ tab_id: ++nextTab });
+  native.closeTab = async id => closed.push(id);
+  await appService.setEditorUiEnabled(true);
+  t.mock.method(editorApi.scene, 'readActive', async () => ({ archive_session: 'graph-archive' }));
+  getNodeGraphSaves().register({ getSession: () => 'graph-archive', flush: () => { saves++; return !fail; } });
+  const graph = PLUGIN_MANIFEST.find(panel => panel.routePath === '/NodeGraph');
+  const node = await appService.openNativePanel({ panelId: graph.id, routePath: graph.routePath });
+  await assert.rejects(appService.closePanelTab(node.tab_id, ''), { code: 'GRAPH_SAVE_FAILED' });
+  assert.deepEqual(closed, []);
+  const other = await appService.openNativePanel({ panelId: 'Object', routePath: '/Object' });
+  await appService.closePanelTab(other.tab_id, '');
+  assert.deepEqual(closed, [other.tab_id], 'another panel must not wait for an unrelated graph save');
+  assert.equal(saves, 1);
+  fail = false;
+  await appService.closePanelTab(node.tab_id, '');
+  assert.equal(saves, 2);
+  assert.deepEqual(closed, [other.tab_id, node.tab_id]);
 });
 
 test('panel creation and docking use typed V8 operations without legacy completion fences', async t => {
