@@ -16,24 +16,32 @@ import { createWindowSessionState } from './windowSessionState.js';
 import { flushActiveNodeGraphs } from './nodeGraphSaves.js';
 
 const windowSessions = new WeakMap();
+// Closed 1:1 mapping from the window session's intent vocabulary to the named
+// facade bindings. Not a general command router: unknown cmds are rejected.
+const windowCommandOps = {
+  closeThisTab: () => editorApi.window.close(),
+  closePanelTab: parameters => editorApi.window.closeTab(parameters.tabId),
+  focusPanelTab: parameters => editorApi.window.focusTab(parameters.tabId),
+  createPanelTab: parameters => editorApi.window.createPanel(parameters),
+  detachPanel: parameters => editorApi.window.detachPanel(parameters),
+  redockPanel: parameters => editorApi.window.redockPanel(parameters),
+  suspendCameraViews: parameters => editorApi.window.suspendCameraViews(parameters.sceneId),
+  closeCameraView: parameters => editorApi.window.closeCameraView(parameters.sceneId, parameters.cameraId),
+  toggleMaximizeThisCameraView: parameters =>
+    editorApi.window.toggleCameraMaximized(parameters.sceneId, parameters.cameraId),
+  cycleThisCameraViewWindowMode: parameters =>
+    editorApi.window.cycleCameraWindowMode(parameters.sceneId, parameters.cameraId),
+  toggleBorderlessThisCameraView: parameters =>
+    editorApi.window.toggleCameraBorderless(parameters.sceneId, parameters.cameraId),
+  resizeThisCameraView: parameters =>
+    editorApi.window.resizeCameraView(parameters.width, parameters.height, parameters.sceneId, parameters.cameraId),
+  createCameraView: parameters => editorApi.window.createCameraView(parameters),
+};
 function sendWindowCommand(command) {
+  const op = windowCommandOps[command.cmd];
+  if (!op) throw Object.assign(new Error(`Unknown window operation: ${command.cmd}`), { code: 'INVALID_OPERATION' });
   const { cmd, ...parameters } = command;
-  switch (cmd) {
-    case 'closeThisTab': return window.corona.window.close();
-    case 'closePanelTab': return window.corona.window.closeTab(command.tabId);
-    case 'focusPanelTab': return window.corona.window.focusTab(command.tabId);
-    case 'createPanelTab': return window.corona.window.createPanel(parameters);
-    case 'detachPanel': return window.corona.window.detachPanel(parameters);
-    case 'redockPanel': return window.corona.window.redockPanel(parameters);
-    case 'suspendCameraViews': return window.corona.window.suspendCameraViews(command.sceneId);
-    case 'closeCameraView': return window.corona.window.closeCameraView(command.sceneId, command.cameraId);
-    case 'toggleMaximizeThisCameraView': return window.corona.window.toggleCameraMaximized(command.sceneId, command.cameraId);
-    case 'cycleThisCameraViewWindowMode': return window.corona.window.cycleCameraWindowMode(command.sceneId, command.cameraId);
-    case 'toggleBorderlessThisCameraView': return window.corona.window.toggleCameraBorderless(command.sceneId, command.cameraId);
-    case 'resizeThisCameraView': return window.corona.window.resizeCameraView(command.width, command.height, command.sceneId, command.cameraId);
-    case 'createCameraView': return window.corona.window.createCameraView(parameters);
-    default: throw Object.assign(new Error(`Unknown window operation: ${cmd}`), { code: 'INVALID_OPERATION' });
-  }
+  return op(parameters);
 }
 function session() {
   let controller = windowSessions.get(window);
@@ -71,13 +79,13 @@ export const appService = {
   focusPanelTab: tabId => openEditorWindow({ cmd: 'focusPanelTab', tabId }),
   readEditorUiPolicy: async () => { await session().hydrate(); return session().policy(); },
   setEditorUiEnabled: enabled => session().prepare(enabled),
-  getCurrentWindow: () => window.corona.window.getCurrent(),
-  onWindowClosed: callback => window.corona.window.onClosed(callback),
-  onWindowCloseRequested: callback => window.corona.window.onCloseRequested(callback),
+  getCurrentWindow: () => editorApi.window.getCurrent(),
+  onWindowClosed: callback => editorApi.window.onClosed(callback),
+  onWindowCloseRequested: callback => editorApi.window.onCloseRequested(callback),
   setDragRegions: (_routePath, x, y, w, h) =>
-    window.corona.window.setDragRegions([{ x, y, w, h }]),
+    editorApi.window.setDragRegions([{ x, y, w, h }]),
   setCurrentTabDragRegions: (regions) =>
-    window.corona.window.setDragRegions(Array.isArray(regions) ? regions : []),
+    editorApi.window.setDragRegions(Array.isArray(regions) ? regions : []),
   openNativePanel: options => openEditorWindow({ cmd: 'createPanelTab', ...options }),
   closeThisTab: (panelId) => session().closeThis(panelId),
   closePanelTab: (tabId, panelId) =>
@@ -93,7 +101,7 @@ export const appService = {
   toggleBorderlessThisCameraView: (sceneId = '', cameraId = '') =>
     openEditorWindow({ cmd: 'toggleBorderlessThisCameraView', sceneId, cameraId }),
   toggleMainWindowBorderless: () =>
-    window.corona.window.toggleMainBorderless(),
+    editorApi.window.toggleMainBorderless(),
   resizeThisCameraView: (width, height, sceneId = '', cameraId = '') =>
     openEditorWindow({ cmd: 'resizeThisCameraView', width, height, sceneId, cameraId }),
   createCameraView: (camera) =>
@@ -110,7 +118,7 @@ export const appService = {
     }),
   closeCameraView: (sceneId, cameraId) =>
     openEditorWindow({ cmd: 'closeCameraView', sceneId, cameraId }),
-  suspendCameraViews: (sceneId) => window.corona.window.suspendCameraViews(sceneId),
+  suspendCameraViews: (sceneId) => editorApi.window.suspendCameraViews(sceneId),
   crossTabBroadcast: (event, payload) =>
     session().broadcast(event, payload),
   closeProcess: () => editorApi.app.closeProcess(),

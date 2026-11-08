@@ -56,11 +56,11 @@ watch(() => [worldModeState.status, worldModeState.revision, route.path, route.m
   if (worldModeState.status === 'ready') lastReadyProjectKey = projectKey;
   preparedRevision.value = -1;
   try {
-    if (!isStandalonePanel.value && typeof window.corona?.window?.suspendCameraViews === 'function') {
+    if (!isStandalonePanel.value && editorApi.window.canSuspendCameraViews()) {
       const enabled = editorUiAllowed() && !isLauncherRoute.value;
       if (!enabled && !refreshingCurrentProject) dockStore.clearSession();
       await appService.setEditorUiEnabled(enabled);
-    } else if (isStandalonePanel.value && typeof window.corona?.window?.suspendCameraViews === 'function') {
+    } else if (isStandalonePanel.value && editorApi.window.canSuspendCameraViews()) {
       const policy = await appService.readEditorUiPolicy();
       if (!viewLifetime.current() || preparation !== preparationRevision || revision !== worldModeState.revision) return;
       if (!policy?.enabled) { await appService.closeThisTab(''); return; }
@@ -181,7 +181,7 @@ function onGlobalKeyUp(event) {
 }
 
 onMounted(() => {
-  if (window.corona) stopNativeCloseRequested = appService.onWindowCloseRequested(closeNativePanel);
+  if (editorApi.window.hasWindowBindings()) stopNativeCloseRequested = appService.onWindowCloseRequested(closeNativePanel);
   coronaEventBus.on('creative-return-to-launcher', returnToLauncher);
   stopProjectChanged = subscribeProjectChanged(({ projectPath }) => void refreshWorldMode(projectPath));
   stopWindowPolicyChanged = getWebMessages().on(WINDOW_SESSION_POLICY_EVENT, () => {

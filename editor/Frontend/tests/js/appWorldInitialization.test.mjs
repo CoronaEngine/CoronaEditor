@@ -57,6 +57,7 @@ for (const first of ['guard', 'observer']) {
       '@/api/editorApi.js': { editorApi: {
         scene: { observe: async (_topic, handler) => { observer = handler; return 1; } },
         off: async () => {},
+        window: { hasWindowBindings: () => false, canSuspendCameraViews: () => false },
       } },
       '@/utils/eventBus.js': { coronaEventBus: { on: noop, off: noop } },
       '@/utils/viewLifetime.js': { createViewLifetime },
@@ -122,6 +123,7 @@ function mountLifecycleApp(t, role = 'peer') {
     '@/api/editorApi.js': { editorApi: {
       scene: { observe: (_topic, callback) => { projectCallback = callback; return projectRegistration.promise; } },
       off: async token => { removed.push(token); },
+      window: { hasWindowBindings: () => true, canSuspendCameraViews: () => true },
     } },
     '@/api/webDocument.js': { getWebDocumentIdentity: () => ({ role }) },
     '@/api/webMessages.js': { getWebMessages: () => ({ on: () => noop }) },

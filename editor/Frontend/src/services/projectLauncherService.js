@@ -73,7 +73,7 @@ export const projectLauncherService = {
       if (!current()) return superseded();
       try {
         await nextTick();
-        if (typeof window.corona?.window?.suspendCameraViews === 'function') {
+        if (editorApi.window.canSuspendCameraViews()) {
           await appService.setEditorUiEnabled(false);
         }
         await drainWorldSession();

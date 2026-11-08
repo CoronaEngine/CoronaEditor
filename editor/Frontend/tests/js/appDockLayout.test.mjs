@@ -79,7 +79,9 @@ async function renderApp({ path = '/', standalone = false, mode = 'creative' } =
       editorUiAllowed, worldModeState, worldModeService: { opening: false },
     },
     '@/components/ui/CabbageGuidanceOverlay.vue': { default: empty },
-    '@/api/editorApi.js': { editorApi: {} },
+    '@/api/editorApi.js': { editorApi: {
+      window: { hasWindowBindings: () => false, canSuspendCameraViews: () => false },
+    } },
     '@/services/projectLauncherService.js': { cancelPendingProjectOpen: noop },
     '@/services/projectMessages.js': { subscribeProjectChanged: () => noop },
     '@/services/worldSessionLifecycle.js': { notifyWorldError: assert.fail },
