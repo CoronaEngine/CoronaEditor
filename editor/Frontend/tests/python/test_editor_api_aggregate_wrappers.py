@@ -52,10 +52,7 @@ class EditorApiAggregateWrapperTests(unittest.TestCase):
 
     def test_frontend_exposes_only_consumed_network_and_lan_chat_aggregates(self):
         for method in ('getSessionInfo', 'setProjectRoot', 'startSession', 'stopSession',
-                       'clearDiscoveredPeers', 'getDiscoveredPeers', 'searchLan', 'connectToPeer',
-                       'startRoom', 'startLocalRoom', 'stopRoom', 'stopLocalRoom', 'joinRoom',
-                       'leaveRoom', 'sendMessage', 'listHistoryRooms', 'loadHistoryRoom',
-                       'getLocalIp', 'addAgent', 'removeAgent'):
+                       'clearDiscoveredPeers', 'getDiscoveredPeers', 'searchLan', 'connectToPeer'):
             self.assertIn(f'{method}:', self.api_source)
         for method in ('lockObject', 'broadcastIntent', 'sendAgentReply',
                        'sendSystemMessageToHost', 'pollAgentTrigger', 'pollSyncEvent'):

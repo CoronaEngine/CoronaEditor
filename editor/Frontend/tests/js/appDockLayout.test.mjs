@@ -80,7 +80,6 @@ async function renderApp({ path = '/', standalone = false, mode = 'creative' } =
     },
     '@/components/ui/CabbageGuidanceOverlay.vue': { default: empty },
     '@/api/editorApi.js': { editorApi: {} },
-    '@/stores/lanchat.js': { default: { finishWorldSession: asyncNoop } },
     '@/services/projectLauncherService.js': { cancelPendingProjectOpen: noop },
     '@/services/projectMessages.js': { subscribeProjectChanged: () => noop },
     '@/services/worldSessionLifecycle.js': { notifyWorldError: assert.fail },

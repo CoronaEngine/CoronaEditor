@@ -1,3 +1,4 @@
+// Project replacement retires the native network session as well as Web surfaces.
 import { memoryStorage } from './windowSessionFixtures.mjs';
 import { getWebMessages, createWebMessages } from '../../src/api/webMessages.js';
 import { createWindowSessionState } from '../../src/services/windowSessionState.js';
@@ -7,6 +8,8 @@ import test from 'node:test';
 import { setImmediate } from 'node:timers/promises';
 import { watch, nextTick } from 'vue';
 import { editorApi } from '../../src/api/editorApi.js';
+
+test.beforeEach(t => t.mock.method(editorApi.network, 'stopSession', async () => ({ ok: true })));
 import { appService } from '../../src/services/appService.js';
 import { projectLauncherService } from '../../src/services/projectLauncherService.js';
 import { worldModeService, worldModeState } from '../../src/services/worldModeService.js';

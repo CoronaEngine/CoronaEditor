@@ -8,7 +8,6 @@ import { editorApi } from '../../src/api/editorApi.js';
 import * as launcher from '../../src/services/projectLauncherService.js';
 import * as worldMode from '../../src/services/worldModeService.js';
 import * as lifecycle from '../../src/services/worldSessionLifecycle.js';
-import lanchat from '../../src/stores/lanchat.js';
 import { createViewLifetime } from '../../src/utils/viewLifetime.js';
 
 // Compile the real creation page rather than duplicating its orchestration here.
@@ -35,7 +34,7 @@ const deferred = () => {
   return { promise, resolve };
 };
 
-async function mountCreationPage(t, { stopResult = idle() } = {}) {
+async function mountCreationPage(t, { stopResult = idle(), networkError } = {}) {
   const calls = [], alerts = [], saves = [], mounted = [], unmounted = [];
   let activePath = 'creative-world';
   let route = '/NewGame';
@@ -65,6 +64,12 @@ async function mountCreationPage(t, { stopResult = idle() } = {}) {
     calls.push(['create', payload]);
     return { name: `创造世界_${++sequence}`, path: `creative-world-${sequence}` };
   });
+  const networkStops = [];
+  t.mock.method(editorApi.network, 'stopSession', async () => {
+    networkStops.push(activePath);
+    if (networkError) throw networkError;
+    return { ok: true };
+  });
   t.mock.method(editorApi.scripts, 'getStatus', async () => ({ runId: 'current', snapshotCaptured: true }));
   t.mock.method(editorApi.scripts, 'stop', async (id, restore) => {
     calls.push(['script', restore]);
@@ -75,8 +80,6 @@ async function mountCreationPage(t, { stopResult = idle() } = {}) {
     activePath = path;
     return { ok: true, path };
   });
-  t.mock.method(lanchat, 'openRoom', async () => {});
-  t.mock.method(lanchat, 'setWorkspaceMode', () => {});
   worldMode.worldModeService.invalidate();
   await worldMode.worldModeService.resolve(activePath, { force: true });
   const router = {
@@ -91,7 +94,6 @@ async function mountCreationPage(t, { stopResult = idle() } = {}) {
     '@/services/projectLauncherService.js': launcher,
     '@/services/worldSessionLifecycle.js': lifecycle,
     '@/services/cabbageAssistantContextService.js': { initializeWorldTasks: async () => {} },
-    '@/stores/lanchat.js': { default: lanchat },
     '@/i18n/domTranslator.js': { translateUiText: text => text },
     '@/utils/viewLifetime.js': { createViewLifetime },
   });
@@ -100,7 +102,7 @@ async function mountCreationPage(t, { stopResult = idle() } = {}) {
   await page.refreshArchiveReady();
   assert.match(descriptor.template.content, /@click="handleCreate"/);
   return {
-    page, calls, alerts, saves,
+    page, calls, alerts, saves, networkStops,
     setStopResult: result => { scriptResult = result; },
     activePath: () => activePath,
     route: () => route,
@@ -123,6 +125,23 @@ test('home offers project creation without a separate story world entry', () => 
   assert.equal(worldMode.LAUNCHER_ROUTES.has('/Story'), false);
   const routerSource = fs.readFileSync(new URL('../../src/router/index.js', import.meta.url), 'utf8');
   assert.doesNotMatch(routerSource, /StoryWorld|WorldEntry|path: '\/Story'/);
+});
+
+test('creation stops native networking before replacing the old project', async t => {
+  const h = await mountCreationPage(t);
+  await h.page.handleCreate();
+  assert.deepEqual(h.networkStops, ['creative-world']);
+  assert.equal(h.activePath(), 'creative-world-1');
+  assert.equal(h.route(), '/');
+});
+
+test('network cleanup failure prevents project replacement', async t => {
+  const h = await mountCreationPage(t, { networkError: new Error('native stop failed') });
+  await h.page.handleCreate();
+  assert.deepEqual(h.networkStops, ['creative-world']);
+  assert.equal(h.calls.some(([name]) => name === 'open'), false);
+  assert.equal(h.activePath(), 'creative-world');
+  assert.equal(h.alerts.length, 1);
 });
 
 test('creation keeps the old world on real failures and the button can retry', async t => {

@@ -360,7 +360,6 @@ const EXPLICIT_DOM_TEXT_TRANSLATIONS = {
   偏移: 'Offset',
   删除: 'Delete',
   清空: 'Clear',
-  局域网聊天: 'LAN Chat',
   手动连接: 'Manual Connect',
   网格: 'Grid',
   '浏览...': 'Browse...',

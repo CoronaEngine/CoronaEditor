@@ -24,21 +24,6 @@ const editorApiStatic = {
     renameItem: request => window.corona.files.renameItem(request),
     openFile: request => window.corona.files.openFile(request),
   },
-  lanChat: {
-    onEvent: callback => window.corona.lanChat.onEvent(callback),
-    startRoom: payload => window.corona.lanChat.startRoom(payload),
-    startLocalRoom: payload => window.corona.lanChat.startLocalRoom(payload),
-    stopRoom: () => window.corona.lanChat.stopRoom(),
-    stopLocalRoom: () => window.corona.lanChat.stopLocalRoom(),
-    joinRoom: payload => window.corona.lanChat.joinRoom(payload),
-    listHistoryRooms: () => window.corona.lanChat.listHistoryRooms(),
-    loadHistoryRoom: room => window.corona.lanChat.loadHistoryRoom(room),
-    leaveRoom: () => window.corona.lanChat.leaveRoom(),
-    sendMessage: (text, options = {}) => window.corona.lanChat.sendMessage(text, options),
-    getLocalIp: () => window.corona.lanChat.getLocalIp(),
-    addAgent: payload => window.corona.lanChat.addAgent(payload),
-    removeAgent: agentId => window.corona.lanChat.removeAgent(agentId),
-  },
   network: {
     startSession: (instanceName, projectId, port = 27960, role = 'host') =>
       window.corona.network.startSession(instanceName, projectId, port, role),
@@ -153,4 +138,3 @@ export const editorApi = editorApiStatic;
 
 // 快捷访问
 // LAN transport belongs to C++ NetworkSystem; Web calls native V8 contracts.
-// LANChat events use the named V8 subscription and its native disposer.

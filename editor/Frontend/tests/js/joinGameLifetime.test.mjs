@@ -24,8 +24,7 @@ function mount(t, overrides = {}) {
     'projectLauncherService', 'isProjectOpenSuperseded', 'setTimeout', 'clearTimeout', 'setInterval', 'clearInterval', compiled)(
     ref, fn => { mounted = fn; }, fn => { unmounted = fn; }, createViewLifetime,
     () => ({ push: path => routes.push(path) }),
-    { network: { ...network, ...overrides.network }, project: overrides.project,
-      lanChat: { getLocalIp: async () => ({ ip: '127.0.0.1' }), ...overrides.lanChat } },
+    { network: { ...network, getSessionInfo: async () => ({ local_ip: '127.0.0.1' }), ...overrides.network }, project: overrides.project },
     overrides.launcher || {}, result => result?.status === 'superseded',
     callback => { timers.set(++sequence, callback); return sequence; }, id => timers.delete(id),
     callback => { intervals.set(++sequence, callback); return sequence; }, id => intervals.delete(id));
@@ -76,9 +75,9 @@ for (const outcome of ['success', 'failure']) {
 
 test('JoinGame ignores a local address received after retirement', async t => {
   const pending = deferred();
-  const page = mount(t, { lanChat: { getLocalIp: () => pending.promise } });
+  const page = mount(t, { network: { getSessionInfo: () => pending.promise } });
   const loading = page.state.loadLocalIp(); page.dispose();
-  pending.resolve({ ip: '192.0.2.1' }); await loading;
+  pending.resolve({ local_ip: '192.0.2.1' }); await loading;
   assert.equal(page.state.localIp.value, '--');
 });
 

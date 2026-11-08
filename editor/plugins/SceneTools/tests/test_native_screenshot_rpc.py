@@ -83,7 +83,7 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
                 "aiService.js",
                 "projectLauncherService.js",
             },
-            "stores": {"lanchat.js"},
+            "stores": set(),
             "views/layout": {"JoinGame.vue"},
         }.items():
             source_paths.extend(frontend_root / directory / name for name in sorted(names))
@@ -134,7 +134,6 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
             "project_settings": "ProjectSettings",
             "scene_tools": "SceneTools",
             "network": "Network",
-            "lanchat": "LANChat",
         }
         methods = set()
         for register_name, module_name in module_map.items():
@@ -283,7 +282,6 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
         self._assert_named_v8_frontend()
         binding = (self._engine_root() / "src/systems/ui/cef/cef_v8_binding.cpp").read_text(encoding="utf-8")
         for snippet in (
-            'lan_chat->SetValue("onEvent"',
             'window->SetValue("onClosed"',
             '"INVALID_ARGUMENT: Expected exactly one event callback"',
             '"PERMISSION_DENIED: Event binding belongs to another context"',
@@ -525,7 +523,7 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
     def test_named_facade_preserves_network_audio_defaults_and_explicit_scope(self):
         source = (self._repo_root() / "editor/Frontend/src/api/editorApi.js").read_text(encoding="utf-8")
         self.assertIn("startSession: (instanceName, projectId, port = 27960, role = 'host')", source)
-        self.assertIn("sendMessage: (text, options = {})", source)
+        self.assertNotIn("lanChat:", source)
         self.assertIn("playResource: (resourceId, loop = false)", source)
         self.assertIn("window.corona.scene.renameActor(sceneName, actor, name, scope)", source)
         self.assertIn("window.corona.scene.deleteActor(sceneName, actor, scope)", source)
@@ -658,10 +656,7 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
         self.assertIn('_invoke_manifest_cpp_api("scene.select_actor", [scene_name, actor_type, actor_name])', api_source)
         self.assertIn('_invoke_manifest_cpp_api("main.scene_save", args)', api_source)
         self.assertIn("class _EventsApi", api_source)
-        self.assertIn(
-            'return _register_manifest_editor_api_event_callback("events.on_lan_chat_event", callback)',
-            api_source,
-        )
+        self.assertNotIn("def on_lan_chat_event", api_source)
         for retired in ("on_actor_changed", "on_actor_selection_changed",
                         "on_actor_transform_updated", "on_project_opened"):
             self.assertNotIn(f"def {retired}(", api_source)
@@ -777,7 +772,7 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
         self.assertNotIn("ProjectLauncher.projectOpened", source)
         events = source.split("constexpr auto kEditorApiEvents =", 1)[1].split("\n});", 1)[0]
         declarations = [line for line in events.splitlines() if 'EditorApiValueType::' in line]
-        self.assertEqual(len(declarations), 9)
+        self.assertEqual(len(declarations), 8)
         for declaration in declarations:
             self.assertIn("~caller_mask(EditorApiCaller::Cef)", declaration)
             self.assertIn(', "", "events.', declaration)
@@ -943,7 +938,6 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
 
     def test_frontend_events_use_named_native_and_local_scene_subscriptions(self):
         source = (self._repo_root() / "editor/Frontend/src/api/editorApi.js").read_text(encoding="utf-8")
-        self.assertIn("onEvent: callback => window.corona.lanChat.onEvent(callback)", source)
         self.assertIn("observe: async (kind, callback) => sceneReader.observe(kind, callback)", source)
         self.assertIn("off: callbackToken => sceneReader.off(callbackToken)", source)
         for retired in ("register_manifest_editor_api_callback", "window.corona.editor.on",
@@ -1155,36 +1149,8 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
                 self.assertNotIn(f"event === '{legacy}'", bus)
                 self.assertNotIn(f'"{legacy}": ("events.{wrapper}"', host)
 
-    def test_lanchat_event_is_owned_v8_value_and_retains_python_contract(self):
-        source = self._editor_api_source()
-        self.assertIn('{"LANChat.event", EditorApiValueType::Object, all_callers() & ~caller_mask(EditorApiCaller::Cef), "", "events.on_lan_chat_event"}', source)
-        python = (self._repo_root() / "editor/api/editor_api.py").read_text(encoding="utf-8")
-        self.assertIn('return _register_manifest_editor_api_event_callback("events.on_lan_chat_event", callback)', python)
-        emit = re.search(r"void emit_lanchat_event\(const Corona::Network::LanChatEvent& event\).*?\n\}", self._handler_source(), re.S)
-        self.assertIsNotNone(emit)
-        self.assertIn("notify_corona_lanchat_event(snapshot)", emit.group(0))
-        for retired in (".dump()", "json::parse", "__coronaEmit", "emit_editor_api_event"):
-            self.assertNotIn(retired, emit.group(0))
-        frontend = self._frontend_bridge_source()
-        self.assertIn("window.corona.lanChat.onEvent(callback)", frontend)
-        self.assertNotIn("events.onLanChatEvent", frontend)
 
 
-    def test_lanchat_frontend_consumer_uses_cpp_defined_event_wrapper(self):
-        app_source = (
-            self._repo_root()
-            / "editor"
-            / "Frontend"
-            / "src"
-            / "App.vue"
-        ).read_text(encoding="utf-8")
-
-        self.assertIn("callback => editorApi.lanChat.onEvent(callback), onLanChatEvent, stop => stop()", app_source)
-        self.assertIn("lanchat.handleEvent(payload)", app_source)
-        self.assertIn("if (!isStandalonePanel.value)", app_source)
-        self.assertIn("viewLifetime.dispose()", app_source)
-        self.assertNotIn("coronaEventBus.on('lanchat-event'", app_source)
-        self.assertNotIn("coronaEventBus.off('lanchat-event'", app_source)
 
     def test_web_pick_uses_owned_v8_results_without_legacy_events_or_json_broker(self):
         root = self._engine_root()
@@ -1641,7 +1607,7 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
 
     def test_file_manager_apis_use_named_v8_with_explicit_scope(self):
         source = self._frontend_bridge_source()
-        section = source.split('  files: {', 1)[1].split('  lanChat:', 1)[0]
+        section = source.split('  files: {', 1)[1].split('  network:', 1)[0]
         for method in ('getFileTree', 'createFolder', 'createActorTemplate', 'deleteItem', 'renameItem', 'openFile'):
             self.assertIn(f'{method}: request => window.corona.files.{method}(request)', section)
         self.assertNotIn('call_manifest_editor_api(', section)
@@ -1720,37 +1686,6 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
 
 
 
-    def test_lanchat_editor_apis_have_explicit_schema(self):
-        source = self._editor_api_source()
-
-        expected = {
-            "LANChat.add_agent": ("kObjectPayloadParam", "EditorApiValueType::Object"),
-            "LANChat.get_history": ("kNoParams", "EditorApiValueType::Object"),
-            "LANChat.get_local_ip": ("kNoParams", "EditorApiValueType::Object"),
-            "LANChat.join_room": ("kObjectPayloadParam", "EditorApiValueType::Object"),
-            "LANChat.leave_room": ("kNoParams", "EditorApiValueType::Object"),
-            "LANChat.list_agents": ("kNoParams", "EditorApiValueType::Object"),
-            "LANChat.list_history_rooms": ("kNoParams", "EditorApiValueType::Object"),
-            "LANChat.load_history_room": ("kObjectPayloadParam", "EditorApiValueType::Object"),
-            "LANChat.remove_agent": ("kObjectPayloadParam", "EditorApiValueType::Object"),
-            "LANChat.send_message": ("kObjectPayloadParam", "EditorApiValueType::Object"),
-            "LANChat.start_local_room": ("kObjectPayloadParam", "EditorApiValueType::Object"),
-            "LANChat.start_room": ("kObjectPayloadParam", "EditorApiValueType::Object"),
-            "LANChat.stop_local_room": ("kNoParams", "EditorApiValueType::Object"),
-            "LANChat.stop_room": ("kNoParams", "EditorApiValueType::Object"),
-        }
-        for api_name, (params_name, return_type) in expected.items():
-            module, method = api_name.split(".", 1)
-            with self.subTest(api_name=api_name):
-                plain_schema = f"EDITOR_API_METHOD_SCHEMA({module}, {method}, {params_name}, {return_type})"
-                wrapped_schema_prefix = (
-                    f"EDITOR_API_METHOD_SCHEMA_WRAPPED({module}, {method}, {params_name}, "
-                )
-                self.assertTrue(
-                    plain_schema in source
-                    or (any(prefix in source for prefix in (wrapped_schema_prefix, wrapped_schema_prefix.replace("WRAPPED(", "WRAPPED_CALLERS("))) and return_type in source),
-                    f"{api_name} must keep an explicit C++ schema",
-                )
 
 
 
@@ -2574,7 +2509,7 @@ class NativeSceneToolsRpcTests(unittest.TestCase):
         self.assertIn(':disabled="creating || !archiveReady"', new_game)
         self.assertIn("waitForPythonProjectActivation", new_game)
         self.assertIn("openResult?.status === 'service_initializing'", new_game)
-        self.assertIn("lanchat.openRoom", new_game)
+        self.assertNotIn("lanchat", new_game)
         self.assertIn("selectedProject && archiveReady", recent_games)
         self.assertIn("@click=\"openSelectedProject\"", recent_games)
         self.assertIn("bg-[#d8b86c]", recent_games)

@@ -56,7 +56,7 @@ for (const first of ['guard', 'observer']) {
       '@/services/appService.js': { appService: {} },
       '@/api/editorApi.js': { editorApi: {
         scene: { observe: async (_topic, handler) => { observer = handler; return 1; } },
-        lanChat: { onEvent: () => () => {} }, off: async () => {},
+        off: async () => {},
       } },
       '@/utils/eventBus.js': { coronaEventBus: { on: noop, off: noop } },
       '@/utils/viewLifetime.js': { createViewLifetime },
@@ -103,9 +103,9 @@ for (const first of ['guard', 'observer']) {
 }
 
 function mountLifecycleApp(t, role = 'peer') {
-  const policy = deferred(), projectRegistration = deferred(), chatRegistration = deferred();
-  const mounted = [], unmounted = [], removed = [], closed = [], chats = [];
-  let projectCallback, chatCallback;
+  const policy = deferred(), projectRegistration = deferred();
+  const mounted = [], unmounted = [], removed = [], closed = [];
+  let projectCallback;
   const noop = () => {};
   const modules = Object.fromEntries(imports.map(node => [node.source.value, {}]));
   const state = Vue.shallowReactive({ status: 'ready', revision: 1, projectPath: 'D:/world', mode: 'creative' });
@@ -115,14 +115,12 @@ function mountLifecycleApp(t, role = 'peer') {
     '@/services/worldModeService.js': { ...worldMode, worldModeState: state,
       worldModeService: { opening: false, resolve: async () => {} }, editorUiAllowed: () => true },
     '@/stores/dockStore.js': { useDockStore: () => ({ clearSession: noop }) },
-    '@/stores/lanchat.js': { default: { handleEvent: value => chats.push(value) } },
     '@/services/appService.js': { appService: {
       setEditorUiEnabled: async () => {}, readEditorUiPolicy: () => policy.promise,
       closeThisTab: async () => { closed.push(true); }, onWindowCloseRequested: () => noop,
     } },
     '@/api/editorApi.js': { editorApi: {
       scene: { observe: (_topic, callback) => { projectCallback = callback; return projectRegistration.promise; } },
-      lanChat: { onEvent: callback => { chatCallback = callback; return chatRegistration.promise; } },
       off: async token => { removed.push(token); },
     } },
     '@/api/webDocument.js': { getWebDocumentIdentity: () => ({ role }) },
@@ -140,8 +138,8 @@ function mountLifecycleApp(t, role = 'peer') {
   let retired = false;
   const retire = () => { if (!retired) { retired = true; unmounted.forEach(hook => hook()); scope.stop(); } };
   t.after(retire);
-  return { policy, projectRegistration, chatRegistration, removed, closed, chats, retire,
-    project: value => projectCallback(value), chat: value => chatCallback(value) };
+  return { policy, projectRegistration, removed, closed, retire,
+    project: value => projectCallback(value) };
 }
 
 test('a late disabled-window policy cannot close a surface after App disposal', async t => {
@@ -154,14 +152,11 @@ test('a late disabled-window policy cannot close a surface after App disposal', 
   assert.deepEqual(app.removed, [-7], 'a late subscription is removed exactly once');
 });
 
-test('late project and LAN callbacks are fenced while native registration is pending', async t => {
+test('late project callbacks are fenced while native registration is pending', async t => {
   const app = mountLifecycleApp(t, 'main');
   app.retire();
-  app.chat({ text: 'queued native event' });
   app.project({ path: 'D:/retired', archive_session: 'old' });
   app.projectRegistration.resolve(-7);
-  app.chatRegistration.resolve(() => app.removed.push(9));
   await new Promise(resolve => setImmediate(resolve));
-  assert.deepEqual(app.chats, []);
-  assert.deepEqual(app.removed.sort((left, right) => left - right), [-7, 9]);
+  assert.deepEqual(app.removed.sort((left, right) => left - right), [-7]);
 });

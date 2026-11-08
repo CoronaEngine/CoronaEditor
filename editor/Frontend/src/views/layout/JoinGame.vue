@@ -415,10 +415,10 @@ const goHome = () => {
 const loadLocalIp = async () => {
   if (!viewLifetime.current()) return;
   try {
-    const result = await editorApi.lanChat.getLocalIp();
+    const result = await editorApi.network.getSessionInfo();
     if (!viewLifetime.current()) return;
-    if (result?.ip) {
-      localIp.value = result.ip;
+    if (result?.local_ip) {
+      localIp.value = result.local_ip;
     }
   } catch (_) {
     if (viewLifetime.current()) localIp.value = '--';

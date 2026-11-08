@@ -47,7 +47,6 @@ export default {
     NodeGraphPanel: 'Nodes',
     CabbageChatPanel: 'AI Creative Assistant',
     EditorSettings: 'Pause Menu',
-    Network: 'LAN Chat',
   },
   dock: {
     close: 'Close',

@@ -19,13 +19,6 @@ function createFakeCefHost() {
     pending,
     callbacks,
     corona: {
-      lanChat: {
-        onEvent(callback) {
-          callbacks.set(42, { callback });
-          requests.push({ api: 'corona.lanChat.onEvent' });
-          return () => callbacks.delete(42);
-        },
-      },
       project: {
         openProject(...args) {
           const api = 'corona.project.openProject';
@@ -67,18 +60,14 @@ async function loadEditorApi() {
 test('retired log subscription is absent before and after loading native events', async () => {
   const { editorApi } = await loadEditorApi();
   assert.equal(editorApi.events?.onLogBatch, undefined);
-  const stop = editorApi.lanChat.onEvent(() => {});
   assert.equal(editorApi.events?.onLogBatch, undefined);
-  stop();
   assert.equal(editorApi.events?.onExtension, undefined, 'native discovery cannot add implicit capabilities');
 });
 
 test('orphan mesh movement subscription is absent before and after loading native events', async () => {
   const { editorApi } = await loadEditorApi();
   assert.equal(editorApi.events?.onMeshMoveResult, undefined);
-  const stop = editorApi.lanChat.onEvent(() => {});
   assert.equal(editorApi.events?.onMeshMoveResult, undefined);
-  stop();
 });
 
 test('model node operations are not exposed through the manifest transport', async () => {
@@ -120,19 +109,6 @@ test('editor API calls pass structured values through the typed V8 binding', asy
   const call = host.requests.find((request) => request.api === 'corona.project.openProject');
   assert.deepEqual(call.args, ['C:/Projects/Kitchen/Kitchen.corona', options]);
   assert.equal(host.cefQuery, undefined);
-});
-
-test('LANChat direct subscription needs no manifest and releases its native callback', async () => {
-  const { editorApi, host } = await loadEditorApi();
-  const seen = [];
-  assert.equal(editorApi.events?.onLanChatEvent, undefined);
-  const stop = editorApi.lanChat.onEvent(payload => seen.push(payload));
-  host.emit(42, { n: 1 });
-  assert.deepEqual(seen, [{ n: 1 }]);
-  stop(); stop();
-  host.emit(42, { n: 2 });
-  assert.deepEqual(seen, [{ n: 1 }]);
-  assert.deepEqual(host.requests, [{ api: 'corona.lanChat.onEvent' }]);
 });
 
 const PICKER_CASES = [

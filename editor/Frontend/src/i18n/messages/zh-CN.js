@@ -47,7 +47,6 @@ export default {
     NodeGraphPanel: '节点',
     CabbageChatPanel: 'AI 创作助手',
     EditorSettings: '暂停菜单',
-    Network: '局域网聊天',
   },
   dock: {
     close: '关闭',

@@ -24,7 +24,7 @@ function mount(t, overrides = {}) {
   };
   const component = new Function('ref', 'onMounted', 'onUnmounted', 'createViewLifetime', 'useRouter',
     'editorApi', 'worldModeState', 'projectLauncherService', 'isProjectOpenSuperseded', 'cancelPendingProjectOpen',
-    'notifyWorldError', 'initializeWorldTasks', 'lanchat', 'translateUiText', 'window', 'alert', compiled)(
+    'notifyWorldError', 'initializeWorldTasks', 'translateUiText', 'window', 'alert', compiled)(
     ref, fn => { mounted = fn; }, fn => { unmounted = fn; }, createViewLifetime,
     () => ({ push: path => routes.push(path), replace: path => routes.push(path) }),
     { project: { getProjectLoadStatus: invoke('status', { archive_service_ready: true }),
@@ -32,7 +32,6 @@ function mount(t, overrides = {}) {
     projectSettings: { getActiveProjectInfo: invoke('activation', { project_path: 'fixture' }), ...overrides.settings } },
     world, { openProject: overrides.open || invoke('open', { ok: true }) }, result => result?.status === 'superseded',
     () => {}, error => alerts.push(error), overrides.tasks || invoke('tasks', {}),
-    { state: { inRoom: false }, setWorkspaceMode() {}, openRoom: invoke('room', {}), ...overrides.chat },
     text => text, surface, message => alerts.push(message));
   const state = component.setup({}, { expose() {} });
   const dispose = () => unmounted();
@@ -83,13 +82,13 @@ test('NewGame activation reply after retirement cannot schedule another read or 
   assert.deepEqual(page.routes, []);
 });
 
-for (const stage of ['create', 'open', 'tasks', 'room']) {
+for (const stage of ['create', 'open', 'tasks']) {
   for (const outcome of ['success', 'failure']) {
     test(`NewGame ${stage} ${outcome} after retirement cannot update busy state or navigate`, async t => {
       const pending = deferred();
       const page = mount(t, stage === 'create' ? { project: { createWorldProject: () => pending.promise } }
         : stage === 'open' ? { open: () => pending.promise }
-          : stage === 'tasks' ? { tasks: () => pending.promise } : { chat: { openRoom: () => pending.promise } });
+          : { tasks: () => pending.promise });
       await page.ready();
       const creating = page.state.handleCreate(); await setImmediate();
       page.dispose();
@@ -104,10 +103,10 @@ for (const stage of ['create', 'open', 'tasks', 'room']) {
   }
 }
 
-test('NewGame current creation keeps task and room setup and retires its status interval', async t => {
+test('NewGame current creation keeps task setup and retires its status interval', async t => {
   const page = mount(t); page.start(); await page.ready();
   await page.state.handleCreate();
-  assert.deepEqual(page.calls.slice(-5), ['create', 'open', 'activation', 'tasks', 'room']);
+  assert.deepEqual(page.calls.slice(-4), ['create', 'open', 'activation', 'tasks']);
   assert.deepEqual(page.routes, ['/']);
   assert.equal(page.state.creating.value, false);
   assert.equal(page.intervals.size, 1);

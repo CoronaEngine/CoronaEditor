@@ -112,7 +112,7 @@ test('unused lanChat Web methods and forwarding wrappers are absent', () => {
     'sendAgentReply', 'sendSystemMessage', 'sendSystemMessageToHost',
     'sendSystemMessageToUser',
   ]) {
-    assert.equal(editorApi.lanChat[method], undefined, method);
+    assert.equal(editorApi.lanChat, undefined);
     for (const file of sources) {
       assert.doesNotMatch(fs.readFileSync(path.join(sourceRoot, file), 'utf8'),
         new RegExp(`\\b${method}\\b`), `${method}: ${file}`);

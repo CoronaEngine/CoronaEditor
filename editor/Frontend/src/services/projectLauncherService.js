@@ -5,7 +5,6 @@ import { appService } from './appService.js';
 import { editorApi } from '../api/editorApi.js';
 import { worldModeService, worldModeState } from './worldModeService.js';
 import { drainWorldSession, withWorldTimeout } from './worldSessionLifecycle.js';
-import lanchat from '../stores/lanchat.js';
 import { publishProjectChanged } from './projectMessages.js';
 
 let projectOpenQueue = Promise.resolve();
@@ -78,7 +77,7 @@ export const projectLauncherService = {
           await appService.setEditorUiEnabled(false);
         }
         await drainWorldSession();
-        await withWorldTimeout(lanchat.finishWorldSession(), '关闭旧世界聊天室');
+        await withWorldTimeout(editorApi.network.stopSession(), '关闭旧世界网络会话');
         if (runtimeCleanupRequired) {
           await withWorldTimeout(stopWorldRuntimeBeforeOpen(), '停止旧世界运行');
           runtimeCleanupRequired = false;

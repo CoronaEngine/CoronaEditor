@@ -10,7 +10,6 @@ import { getWebMessages } from '@/api/webMessages.js';
 import { getWebDocumentIdentity } from '@/api/webDocument.js';
 import { WINDOW_SESSION_POLICY_EVENT } from '@/services/windowSessionState.js';
 import { LAUNCHER_ROUTES, normalizeProjectPath, editorUiAllowed, worldModeService, worldModeState } from '@/services/worldModeService.js';
-import lanchat from '@/stores/lanchat.js';
 import { cancelPendingProjectOpen } from '@/services/projectLauncherService.js';
 import { notifyWorldError } from '@/services/worldSessionLifecycle.js';
 import { coronaEventBus } from '@/utils/eventBus.js';
@@ -181,21 +180,6 @@ function onGlobalKeyUp(event) {
   consumeNativeGameplayDomEvent(event);
 }
 
-function onLanChatEvent(payload) {
-  if (editorUiAllowed()) lanchat.handleEvent(payload);
-}
-
-async function registerLanChatEvent() {
-  try {
-    await viewLifetime.subscribe(
-      callback => editorApi.lanChat.onEvent(callback), onLanChatEvent, stop => stop());
-  } catch (error) {
-    if (viewLifetime.current()) {
-      console.warn('[App] failed to subscribe to LANChat events', error);
-    }
-  }
-}
-
 onMounted(() => {
   if (window.corona) stopNativeCloseRequested = appService.onWindowCloseRequested(closeNativePanel);
   coronaEventBus.on('creative-return-to-launcher', returnToLauncher);
@@ -208,9 +192,6 @@ onMounted(() => {
     observedProjectSession = payload.archive_session;
     void refreshWorldMode(payload.path, reopened);
   }, token => editorApi.off(token)).catch((error) => console.warn('[App] project mode subscription failed', error));
-  if (!isStandalonePanel.value) {
-    void registerLanChatEvent();
-  }
 
   gcTimer = setInterval(() => {
     if (typeof window.gc === 'function') {

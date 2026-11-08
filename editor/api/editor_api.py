@@ -1,6 +1,5 @@
 import json
 
-from .lan_chat_adapters import _LanChatQueueAdapter, _LanChatTransportAdapter
 from script_runtime.manifest_adapter import ScriptRuntimeEditorApi
 from script_runtime.native_engine_adapter import get_script_runtime_adapter
 from runtime.project_context import (
@@ -469,9 +468,6 @@ class _EventsApi(_DynamicApiNamespace):
     def __init__(self):
         super().__init__("events")
 
-    @staticmethod
-    def on_lan_chat_event(callback):
-        return _register_manifest_editor_api_event_callback("events.on_lan_chat_event", callback)
 
     @staticmethod
     def on_network_actor_ownership_claimed(callback):
@@ -504,107 +500,6 @@ class _EventsApi(_DynamicApiNamespace):
     @staticmethod
     def on_network_sync_pause_requested(callback):
         return _register_manifest_editor_api_event_callback("events.on_network_sync_pause_requested", callback)
-
-
-class _LanChatApi(_DynamicApiNamespace):
-    """Manifest-backed LANChat aggregate for editor Python callers."""
-
-    def __init__(self):
-        super().__init__("lan_chat")
-
-    @staticmethod
-    def start_room(payload):
-        return _invoke_manifest_cpp_api("lan_chat.start_room", [payload])
-
-    @staticmethod
-    def start_local_room(payload):
-        return _invoke_manifest_cpp_api("lan_chat.start_local_room", [payload])
-
-    @staticmethod
-    def stop_room():
-        return _invoke_manifest_cpp_api("lan_chat.stop_room", [])
-
-    @staticmethod
-    def stop_local_room():
-        return _invoke_manifest_cpp_api("lan_chat.stop_local_room", [])
-
-    @staticmethod
-    def get_history():
-        return _invoke_manifest_cpp_api("lan_chat.get_history", [])
-
-    @staticmethod
-    def list_history_rooms():
-        return _invoke_manifest_cpp_api("lan_chat.list_history_rooms", [])
-
-    @staticmethod
-    def load_history_room(payload):
-        return _invoke_manifest_cpp_api("lan_chat.load_history_room", [payload])
-
-    @staticmethod
-    def join_room(payload):
-        return _invoke_manifest_cpp_api("lan_chat.join_room", [payload])
-
-    @staticmethod
-    def leave_room():
-        return _invoke_manifest_cpp_api("lan_chat.leave_room", [])
-
-    @staticmethod
-    def send_message(payload):
-        return _invoke_manifest_cpp_api("lan_chat.send_message", [payload])
-
-    @staticmethod
-    def send_agent_reply(payload):
-        return _invoke_manifest_cpp_api("lan_chat.send_agent_reply", [payload])
-
-    @staticmethod
-    def send_system_message(payload):
-        return _invoke_manifest_cpp_api("lan_chat.send_system_message", [payload])
-
-    @staticmethod
-    def send_system_message_to_host(payload):
-        return _invoke_manifest_cpp_api(
-            "lan_chat.send_system_message_to_host", [payload]
-        )
-
-    @staticmethod
-    def send_system_message_to_user(payload):
-        return _invoke_manifest_cpp_api(
-            "lan_chat.send_system_message_to_user", [payload]
-        )
-
-    @staticmethod
-    def poll_agent_trigger():
-        return _invoke_manifest_cpp_api("lan_chat.poll_agent_trigger", [])
-
-    @staticmethod
-    def poll_coordinator_sync_message():
-        return _invoke_manifest_cpp_api(
-            "lan_chat.poll_coordinator_sync_message", []
-        )
-
-    @staticmethod
-    def poll_room_event():
-        return _invoke_manifest_cpp_api("lan_chat.poll_room_event", [])
-
-    @staticmethod
-    def poll_sync_event():
-        return _invoke_manifest_cpp_api("lan_chat.poll_sync_event", [])
-
-    @staticmethod
-    def add_agent(payload):
-        return _invoke_manifest_cpp_api("lan_chat.add_agent", [payload])
-
-    @staticmethod
-    def remove_agent(payload):
-        return _invoke_manifest_cpp_api("lan_chat.remove_agent", [payload])
-
-    @staticmethod
-    def list_agents():
-        return _invoke_manifest_cpp_api("lan_chat.list_agents", [])
-
-    @staticmethod
-    def get_local_ip():
-        return _invoke_manifest_cpp_api("lan_chat.get_local_ip", [])
 
 
 class _NetworkApi(_DynamicApiNamespace):
@@ -651,36 +546,6 @@ def get_network_adapter(native_engine=None):
         return None
     if callable(getattr(native_engine, "_invoke_cpp_editor_api", None)):
         return CoronaEditorApi.network
-    return None
-
-
-def get_lan_chat_adapter(native_engine=None):
-    """Return the public LANChat contract for an embedded native host."""
-    native_engine = _resolve_native_engine(native_engine)
-    if native_engine is None:
-        return None
-    if callable(getattr(native_engine, "_invoke_cpp_editor_api", None)):
-        return CoronaEditorApi.lan_chat
-    return None
-
-
-def get_lan_chat_transport_adapter(native_engine=None):
-    """Return the reliable LANChat transport adapter for an embedded host."""
-    native_engine = _resolve_native_engine(native_engine)
-    if native_engine is None:
-        return None
-    if callable(getattr(native_engine, "_invoke_cpp_editor_api", None)):
-        return _LanChatTransportAdapter(CoronaEditorApi.lan_chat)
-    return None
-
-
-def get_lan_chat_queue_adapter(native_engine=None):
-    """Return the LANChat queue adapter for an embedded host."""
-    native_engine = _resolve_native_engine(native_engine)
-    if native_engine is None:
-        return None
-    if callable(getattr(native_engine, "_invoke_cpp_editor_api", None)):
-        return _LanChatQueueAdapter(CoronaEditorApi.lan_chat)
     return None
 
 
@@ -1085,7 +950,6 @@ class _MainApi(_DynamicApiNamespace):
 class CoronaEditorApi(metaclass=_CoronaEditorApiMeta):
     editor = _EditorApi()
     events = _EventsApi()
-    lan_chat = _LanChatApi()
     project = _ProjectApi()
     files = _FilesApi()
     project_settings = _ProjectSettingsApi()

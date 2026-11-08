@@ -90,7 +90,6 @@ import { worldModeState } from '@/services/worldModeService.js';
 import { projectLauncherService, isProjectOpenSuperseded, cancelPendingProjectOpen } from '@/services/projectLauncherService.js';
 import { notifyWorldError } from '@/services/worldSessionLifecycle.js';
 import { initializeWorldTasks } from '@/services/cabbageAssistantContextService.js';
-import lanchat from '@/stores/lanchat.js';
 import { translateUiText } from '@/i18n/domTranslator.js';
 import { createViewLifetime } from '@/utils/viewLifetime.js';
 
@@ -227,25 +226,6 @@ const handleCreate = async () => {
           console.warn('Python project activation is still pending; skipped the creation-page task request to protect the previous world.');
         }
         if (!current()) return;
-        try {
-          if (lanchat.state.inRoom) {
-            if (lanchat.state.role === 'host') {
-              await lanchat.closeRoom();
-            } else {
-              await lanchat.leaveRoom();
-            }
-          }
-          if (!current()) return;
-          lanchat.setWorkspaceMode('multiplayer_multi_agent');
-          await lanchat.openRoom({
-            room: 'world-default',
-            password: '',
-            port: 27960,
-            mode: 'multi',
-          });
-        } catch (roomError) {
-          console.warn('Default AI conversation room initialization failed:', roomError);
-        }
         if (current()) router.push('/');
         return;
       }

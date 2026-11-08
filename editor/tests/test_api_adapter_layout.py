@@ -11,10 +11,11 @@ def test_editor_api_is_the_only_python_manifest_factory():
     assert "runtime.legacy_" not in source
 
 
-def test_lan_chat_manifest_adapters_live_in_api_module():
+def test_lan_chat_manifest_adapters_are_removed():
     adapter = EDITOR_ROOT / "api" / "lan_chat_adapters.py"
-    assert adapter.is_file()
-    assert "LANChat" in adapter.read_text(encoding="utf-8")
+    assert not adapter.exists()
+    source = (EDITOR_ROOT / "api/editor_api.py").read_text(encoding="utf-8")
+    assert "lan_chat" not in source
 
 
 def test_project_context_has_the_canonical_active_path_resolver():

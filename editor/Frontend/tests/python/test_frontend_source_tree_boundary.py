@@ -104,7 +104,7 @@ def test_reusable_components_do_not_import_page_views():
 def test_join_game_loads_local_ip_without_starting_a_session():
     source = (SRC_ROOT / "views" / "layout" / "JoinGame.vue").read_text(encoding="utf-8")
 
-    assert "editorApi.lanChat.getLocalIp()" in source
+    assert "editorApi.network.getSessionInfo()" in source
     assert "loadLocalIp" in source
 
 

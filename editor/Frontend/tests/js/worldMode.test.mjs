@@ -1,3 +1,4 @@
+// Project replacement retires the native network session as well as Web surfaces.
 import { getWebMessages } from '../../src/api/webMessages.js';
 import { memoryStorage } from './windowSessionFixtures.mjs';
 import { setImmediate } from 'node:timers';
@@ -5,6 +6,8 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createWorldModeController, createWorldModeRouteGuard, normalizeWorldMode, normalizeProjectPath, requireProjectInfo, worldModeService } from '../../src/services/worldModeService.js';
 import { editorApi } from '../../src/api/editorApi.js';
+
+test.beforeEach(t => t.mock.method(editorApi.network, 'stopSession', async () => ({ ok: true })));
 import { appService } from '../../src/services/appService.js';
 import { projectLauncherService, resolveOpenedProjectScene, stopWorldRuntimeBeforeOpen } from '../../src/services/projectLauncherService.js';
 

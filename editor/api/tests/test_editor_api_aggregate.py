@@ -8,9 +8,6 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from api.editor_api import (
     CoronaEditorApi,
-    get_lan_chat_adapter,
-    get_lan_chat_queue_adapter,
-    get_lan_chat_transport_adapter,
     get_network_adapter,
     get_scene_adapter,
     get_scene_tools_adapter,
@@ -47,7 +44,7 @@ class EditorAggregateApiTest(unittest.TestCase):
     def test_retired_result_events_have_no_python_subscription(self):
         with patch("api.editor_api._CPP_EDITOR_API_METHODS", {}), patch(
             "api.editor_api._CPP_EDITOR_API_EVENTS", {
-                "LANChat.event": {"python_wrapper": "events.on_lan_chat_event"},
+                "Network.peer_connected": {"python_wrapper": "events.on_network_peer_connected"},
             },
         ):
             events = type(CoronaEditorApi.events)()
@@ -57,7 +54,7 @@ class EditorAggregateApiTest(unittest.TestCase):
             for retired in ("on_actor_changed", "on_actor_selection_changed",
                             "on_actor_transform_updated", "on_project_opened"):
                 self.assertFalse(hasattr(events, retired), retired)
-            self.assertTrue(callable(events.on_lan_chat_event))
+            self.assertTrue(callable(events.on_network_peer_connected))
 
     def test_script_runtime_manifest_lookup_uses_script_channel(self):
         import api.editor_api as editor_api_module
@@ -682,52 +679,14 @@ class EditorAggregateApiTest(unittest.TestCase):
         self.assertEqual(result["role"], "client")
         invoke.assert_called_once_with("network.get_session_info", [])
 
-    def test_lan_chat_contract_preserves_object_payload_boundary(self):
-        payload = {
-            "text": "hello",
-            "message_kind": "chat",
-            "source_user_id": "alice",
-        }
-        with patch(
-            "api.editor_api._invoke_manifest_cpp_api",
-            return_value={"ok": True, "message_id": "m1"},
-        ) as invoke:
-            result = CoronaEditorApi.lan_chat.send_message(payload)
 
-        self.assertEqual(result["message_id"], "m1")
-        invoke.assert_called_once_with("lan_chat.send_message", [payload])
 
-    def test_lan_chat_reliable_transport_uses_object_payload_boundary(self):
-        payload = {
-            "agent_id": "agent-1",
-            "agent_name": "Builder",
-            "text": "done",
-            "message_kind": "progress",
-        }
-        with patch(
-            "api.editor_api._invoke_manifest_cpp_api",
-            return_value={"ok": True, "message_id": "m2", "seq": 4},
-        ) as invoke:
-            result = CoronaEditorApi.lan_chat.send_agent_reply(payload)
-
-        self.assertEqual(result["seq"], 4)
-        invoke.assert_called_once_with("lan_chat.send_agent_reply", [payload])
-
-    def test_lan_chat_queue_adapter_preserves_empty_poll_result(self):
-        self.assertIsNone(get_lan_chat_queue_adapter(object()))
-        return
 
     def test_legacy_network_injection_is_adapted_without_changing_business_surface(self):
         self.assertIsNone(get_network_adapter(object()))
         return
 
-    def test_lan_chat_roster_uses_aggregate_adapter(self):
-        self.assertIsNone(get_lan_chat_adapter(object()))
-        return
 
-    def test_legacy_lan_chat_transport_preserves_specialized_reply_arguments(self):
-        self.assertIsNone(get_lan_chat_transport_adapter(object()))
-        return
 
 
 if __name__ == "__main__":
