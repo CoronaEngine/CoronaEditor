@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
+import { setImmediate } from 'node:timers';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -158,7 +159,7 @@ test('pointercancel result clears the active drag once', async () => {
     })(),
   });
 
-  const downRequest = controller.pointer(
+  controller.pointer(
     { clientX: 10, clientY: 10, button: 0, buttons: 1 },
     'pointerdown'
   );
@@ -186,7 +187,7 @@ test('coalesces active drag moves to one animation frame', async () => {
     makeRequestId: () => `request-${++request}`,
     scheduleFrame: (callback) => frames.push(callback),
   });
-  const down = controller.pointer(
+  controller.pointer(
     { clientX: 10, clientY: 10, button: 0, buttons: 1 },
     'pointerdown'
   );
