@@ -100,10 +100,13 @@ function mountNodeGraphLifecycle(t) {
     isFullscreen: { value: false }, isProjectTarget: { value: false },
     window: { addEventListener: noop, removeEventListener: noop, clearTimeout: noop, cancelAnimationFrame: noop },
     getNodeGraphSaves: () => ({ register: () => ({ retire: async () => {} }) }),
-    editorApi: { scene: { observe: (kind, callback) => {
-      callbacks[kind] = callback;
-      return kind === 'selection' ? Promise.resolve(-7) : tree.promise;
-    } }, off: async token => { removed.push(token); } },
+    getObserverRuntime: () => ({
+      observe: (kind, callback) => {
+        callbacks[kind] = callback;
+        return kind === 'selection' ? Promise.resolve(-7) : tree.promise;
+      },
+      off: async token => { removed.push(token); },
+    }),
     onNodeGraphActorChanged: () => delivered.push('selection'),
     onNodeGraphSceneTreeChanged: () => delivered.push('tree'),
     refreshSceneActorOptions: () => actors.promise,

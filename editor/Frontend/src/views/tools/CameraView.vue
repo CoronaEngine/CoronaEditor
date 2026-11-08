@@ -179,6 +179,7 @@ import RelaxSettings from '@/components/ui/RelaxSettings.vue';
 import { nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import { editorApi } from '@/api/editorApi.js';
+import { getObserverRuntime } from '@/api/observerRuntime.js';
 import { getWebMessages } from '@/api/webMessages.js';
 import { getWebDocumentIdentity } from '@/api/webDocument.js';
 import { createViewportCalibrationService } from '@/services/viewportCalibrationService.js';
@@ -1223,7 +1224,8 @@ onMounted(async () => {
     await refreshCameraViewActorPickIndex().catch(() => false);
     if (!viewLifetime.current()) return;
     await viewLifetime.subscribe(
-      callback => editorApi.scene.observe('selection', callback), syncViewportGizmoSelection, editorApi.off);
+      callback => getObserverRuntime().observe('selection', callback), syncViewportGizmoSelection,
+      token => getObserverRuntime().off(token));
     if (!viewLifetime.current()) return;
     syncViewportUiMode();
     await syncWindowSize(true);

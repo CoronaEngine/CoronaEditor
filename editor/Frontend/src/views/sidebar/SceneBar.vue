@@ -427,6 +427,7 @@ import { useRoute } from 'vue-router';
 import ModelNodeHierarchy from '@/components/ui/ModelNodeHierarchy.vue';
 import { pickedNodeIdentity } from '@/utils/modelHierarchy.js';
 import { editorApi } from '@/api/editorApi.js';
+import { getObserverRuntime } from '@/api/observerRuntime.js';
 import { appService } from '@/services/appService.js';
 import { DEFAULT_SCENE_NAME } from '@/utils/constants.js';
 import { resolveOpenedProjectScene } from '@/services/projectLauncherService.js';
@@ -1085,13 +1086,13 @@ onMounted(async () => {
   await RefreshRenderBackendState();
   if (!viewLifetime.current()) return;
   // 后端对象变化：项目打开/物体变化时重新加载场景树
-  await viewLifetime.subscribe(callback => editorApi.scene.observe('selection', callback), onActorChangeEvent, editorApi.off);
+  await viewLifetime.subscribe(callback => getObserverRuntime().observe('selection', callback), onActorChangeEvent, token => getObserverRuntime().off(token));
   if (!viewLifetime.current()) return;
-  await viewLifetime.subscribe(callback => editorApi.scene.observe('tree', callback), onSceneTreeChangedEvent, editorApi.off);
+  await viewLifetime.subscribe(callback => getObserverRuntime().observe('tree', callback), onSceneTreeChangedEvent, token => getObserverRuntime().off(token));
   if (!viewLifetime.current()) return;
-  await viewLifetime.subscribe(callback => editorApi.scene.observe('project', callback), onProjectOpenedEvent, editorApi.off);
+  await viewLifetime.subscribe(callback => getObserverRuntime().observe('project', callback), onProjectOpenedEvent, token => getObserverRuntime().off(token));
   if (!viewLifetime.current()) return;
-  await viewLifetime.subscribe(callback => editorApi.scene.observe('selection', callback), handleModelNodePick, editorApi.off);
+  await viewLifetime.subscribe(callback => getObserverRuntime().observe('selection', callback), handleModelNodePick, token => getObserverRuntime().off(token));
 });
 
 // 项目打开时刷新当前场景树；actor 选择只更新详情面板，不重建树，避免点击闪烁。

@@ -101,7 +101,12 @@ test('pagehide pauses and pageshow resumes exactly one query chain', async t => 
 test('dispose is idempotent, cancels the chain and drops late results', async t => {
   const h = host();
   installHost(t, h);
-  const { state, query } = trackingQuery();
+  let finish;
+  const state = { calls: 0 };
+  const query = async () => {
+    state.calls++;
+    return new Promise(resolve => { finish = resolve; });
+  };
   const runtime = createObserverRuntime({ query, intervalMs: 4 });
   const received = [];
   runtime.observe('project', value => received.push(value));
@@ -113,7 +118,7 @@ test('dispose is idempotent, cancels the chain and drops late results', async t 
   await delay(25);
   assert.equal(state.calls, callsAtDispose);
   assert.deepEqual(h.listeners.size, 0);
-  state.active = { archive_session: 'B' };
+  finish({ archive_session: 'B' });
   await delay(10);
   assert.deepEqual(received, []);
 });

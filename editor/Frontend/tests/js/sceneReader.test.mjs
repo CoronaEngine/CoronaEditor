@@ -71,7 +71,7 @@ test('scene reader deduplicates typed snapshots without JSON serialization', asy
   assert.equal(readerSource.includes('JSON.stringify'), false);
 });
 
-test('the production reader samples transforms through the direct scene V8 binding', async t => {
+test('the production observer chain samples transforms through the direct scene V8 binding', async t => {
   const previousWindow = globalThis.window, previousDocument = globalThis.document;
   let directReads = 0, manifestReads = 0;
   globalThis.document = { hidden: false };
@@ -87,11 +87,14 @@ test('the production reader samples transforms through the direct scene V8 bindi
     editor: { invoke: async () => { manifestReads++; throw new Error('unexpected manifest path'); } },
   } };
   t.mock.method(console, 'warn', () => {});
-  const { sceneReader } = await import('../../src/api/editorApi.js');
+  const { getObserverRuntime, startObserverRuntime } = await import('../../src/api/observerRuntime.js');
+  const runtime = getObserverRuntime();
+  startObserverRuntime();
   const received = [];
-  const token = sceneReader.observe('transform', value => received.push(value));
+  const token = runtime.observe('transform', value => received.push(value));
   t.after(() => {
-    sceneReader.off(token);
+    runtime.off(token);
+    runtime.dispose();
     globalThis.window = previousWindow;
     globalThis.document = previousDocument;
   });

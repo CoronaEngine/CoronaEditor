@@ -136,6 +136,7 @@ export function mountMainPage(t, visionMode = 'path_tracing', { nativeCursor = f
       }),
     },
     '@/api/editorApi.js': { editorApi: api },
+    '@/api/observerRuntime.js': { getObserverRuntime: () => ({ observe: asyncNoop, off: asyncNoop }) },
     '@/api/webMessages.js': { getWebMessages: () => messages },
     '@/api/webDocument.js': { getWebDocumentIdentity: () => ({ owner: 'main-owner' }) },
     '@/services/viewportCalibrationService.js': viewportCalibration,

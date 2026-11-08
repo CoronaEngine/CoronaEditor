@@ -4,6 +4,7 @@ import path from 'node:path';
 import test from 'node:test';
 import { editorApi } from '../../src/api/editorApi.js';
 import * as apiModule from '../../src/api/editorApi.js';
+import { getObserverRuntime } from '../../src/api/observerRuntime.js';
 
 const sourceRoot = path.resolve(import.meta.dirname, '../../src');
 const retired = ['sceneService', 'fileService', 'projectService', 'projectSettingsService', 'scriptingService', 'networkService', 'lanChatService'];
@@ -33,7 +34,7 @@ test('generic discovery and Bridge exports are retired', () => {
 test('scene listener cleanup never falls back to a native callback token', async () => {
   const previous = globalThis.window;
   globalThis.window = { corona: new Proxy({}, { get() { throw Error('native cleanup forbidden'); } }) };
-  try { await editorApi.off(42); } finally { globalThis.window = previous; }
+  try { await getObserverRuntime().off(42); } finally { globalThis.window = previous; }
 });
 
 test('unused Network event wrappers cannot acquire Web consumers', () => {

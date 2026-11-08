@@ -2,6 +2,7 @@ import { createApp } from 'vue';
 import { createPinia } from 'pinia';
 import App from './App.vue';
 import { initializeAiSession } from './services/aiSessionService.js';
+import { getObserverRuntime, startObserverRuntime } from './api/observerRuntime.js';
 import Router from './router/index.js';
 import { i18n, setupLocaleSync } from './i18n/index.js';
 import { setupDomTranslation } from './i18n/domTranslator.js';
@@ -14,6 +15,17 @@ import './style.css';
 // `tests/python/test_frontend_panel_lazy_loading.py` pins this.
 
 initializeAiSession();
+// Explicit bootstrap: the observer runtime owns the unique scene read chain
+// and its DOM listeners (visibilitychange/pagehide/pageshow). Importing the
+// facade or the runtime registers nothing until this start.
+startObserverRuntime();
+
+// Instrumentation handle. The packaged integration smokes (scene pull / view
+// lifetime) patch observe/off here to hold native replies; it is the same
+// singleton every view uses, and constructing it has no listener side effects.
+// The window handle is required because minification drops unused entry exports.
+export const observerRuntime = getObserverRuntime();
+if (typeof window !== 'undefined') window.__coronaObserverRuntime = observerRuntime;
 
 const app = createApp(App);
 app.use(createPinia());

@@ -319,6 +319,7 @@ import { readScriptProject, startScriptFile } from '@/services/scriptFileService
 import BlocklyToolboxPalette from '@/blockly/components/BlocklyToolboxPalette.vue';
 import { useErrorHandler } from '@/composables/useErrorHandler.js';
 import { editorApi } from '@/api/editorApi.js';
+import { getObserverRuntime } from '@/api/observerRuntime.js';
 import { appService } from '@/services/appService.js';
 import { getNodeGraphSaves } from '@/services/nodeGraphSaves.js';
 import { coronaEventBus } from '@/utils/eventBus.js';
@@ -3201,14 +3202,14 @@ onMounted(async () => {
   // first graph paint. Some native bridge shutdown/startup transitions can make an
   // event registration noticeably slower than loading the saved graph itself.
   viewLifetime.subscribe(
-    callback => editorApi.scene.observe('selection', callback),
+    callback => getObserverRuntime().observe('selection', callback),
     onNodeGraphActorChanged,
-    token => editorApi.off(token),
+    token => getObserverRuntime().off(token),
   ).catch(error => logError('Failed to subscribe to actor changes', error));
   viewLifetime.subscribe(
-    callback => editorApi.scene.observe('tree', callback),
+    callback => getObserverRuntime().observe('tree', callback),
     onNodeGraphSceneTreeChanged,
-    token => editorApi.off(token),
+    token => getObserverRuntime().off(token),
   ).catch(error => logError('Failed to subscribe to scene tree changes', error));
 
   // Actor choices are needed by object-reference dropdowns, so finish the first scan

@@ -107,6 +107,7 @@ import {
   visionDenoisers, visionDenoiserFromCamera,
 } from '@/utils/visionRenderModes.js';
 import { editorApi } from '@/api/editorApi.js';
+import { getObserverRuntime } from '@/api/observerRuntime.js';
 import { getWebMessages } from '@/api/webMessages.js';
 import { getWebDocumentIdentity } from '@/api/webDocument.js';
 import { createViewportCalibrationService } from '@/services/viewportCalibrationService.js';
@@ -158,7 +159,7 @@ const worldRevision = worldModeState.revision;
 const viewLifetime = createViewLifetime(() => worldModeState.revision === worldRevision);
 const viewCurrent = viewLifetime.current;
 const subscribeWhileCurrent = (register, handler) => viewLifetime.subscribe(register, handler,
-  token => editorApi.off(token));
+  token => getObserverRuntime().off(token));
 
 const { t: translate } = useI18n();
 const dockStore = useDockStore();
@@ -2137,12 +2138,12 @@ onMounted(async () => {
   coronaEventBus.on('camera-pose-applied', onCameraPoseApplied);
   coronaEventBus.on('node-graph-panel-open-request', handleNodeGraphPanelOpenRequest);
   if (!viewCurrent()) return;
-  await subscribeWhileCurrent(callback => editorApi.scene.observe('project', callback), onProjectOpenedEvent);
+  await subscribeWhileCurrent(callback => getObserverRuntime().observe('project', callback), onProjectOpenedEvent);
   if (!viewCurrent()) return;
   if (!viewCurrent()) return;
-  await subscribeWhileCurrent(callback => editorApi.scene.observe('selection', callback), handleActorSelectionForObjectDock);
+  await subscribeWhileCurrent(callback => getObserverRuntime().observe('selection', callback), handleActorSelectionForObjectDock);
   if (!viewCurrent()) return;
-  await subscribeWhileCurrent(callback => editorApi.scene.observe('transform', callback), handleActorTransformForCabbage);
+  await subscribeWhileCurrent(callback => getObserverRuntime().observe('transform', callback), handleActorTransformForCabbage);
   if (!viewCurrent()) return;
     if (!viewCurrent()) return;
   coronaEventBus.on('model-node-selection', handleModelNodeGizmoSelection);

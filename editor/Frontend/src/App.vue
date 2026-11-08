@@ -5,6 +5,7 @@ import { useDockStore } from '@/stores/dockStore.js';
 import NativeDockLayout from '@/components/dock/NativeDockLayout.vue';
 import CabbageGuidanceOverlay from '@/components/ui/CabbageGuidanceOverlay.vue';
 import { editorApi } from '@/api/editorApi.js';
+import { getObserverRuntime } from '@/api/observerRuntime.js';
 import { appService } from '@/services/appService.js';
 import { getWebMessages } from '@/api/webMessages.js';
 import { getWebDocumentIdentity } from '@/api/webDocument.js';
@@ -187,11 +188,11 @@ onMounted(() => {
   stopWindowPolicyChanged = getWebMessages().on(WINDOW_SESSION_POLICY_EVENT, () => {
     if (isStandalonePanel.value) windowPolicyRevision.value++;
   });
-  void viewLifetime.subscribe(callback => editorApi.scene.observe('project', callback), (payload) => {
+  void viewLifetime.subscribe(callback => getObserverRuntime().observe('project', callback), (payload) => {
     const reopened = Boolean(observedProjectSession) && observedProjectSession !== payload.archive_session;
     observedProjectSession = payload.archive_session;
     void refreshWorldMode(payload.path, reopened);
-  }, token => editorApi.off(token)).catch((error) => console.warn('[App] project mode subscription failed', error));
+  }, token => getObserverRuntime().off(token)).catch((error) => console.warn('[App] project mode subscription failed', error));
 
   gcTimer = setInterval(() => {
     if (typeof window.gc === 'function') {

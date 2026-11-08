@@ -1,18 +1,8 @@
-import { createSceneReader } from './sceneReader.js';
-// Public editor contracts call named native V8 bindings.
-
-export const sceneReader = createSceneReader(async (method, payload) => {
-  return method === 'readActive' ? editorApi.scene.readActive()
-    : editorApi.scene.readTransforms(payload.archive_session, payload.actors);
-});
-if (typeof document !== 'undefined') document.addEventListener?.('visibilitychange', () => sceneReader.visibilityChanged());
-if (typeof window !== 'undefined') {
-  window.addEventListener?.('pagehide', () => sceneReader.pause());
-  window.addEventListener?.('pageshow', () => sceneReader.resume());
-}
+// Public editor contracts call named native V8 bindings. The facade is
+// import-clean: the scene read chain and its DOM listeners belong to the
+// observer runtime (observerRuntime.js), started from main.js.
 
 const editorApiStatic = {
-  off: callbackToken => sceneReader.off(callbackToken),
   app: {
     closeProcess: () => window.corona.app.closeProcess(),
   },
@@ -60,7 +50,6 @@ const editorApiStatic = {
         : window.corona.scene.selectActor(sceneName, actorType, actorName),
     createCamera: (sceneName, options) => window.corona.scene.createCamera(sceneName, options),
     isVisionAvailable: () => window.corona.scene.isVisionAvailable(),
-    observe: async (kind, callback) => sceneReader.observe(kind, callback),
     readActive: () => window.corona.scene.readActive(),
     selectModelFile: (sceneName, fileType = 'model', scope) =>
       window.corona.scene.selectModelFile(sceneName, { ...(scope || {}), file_type: fileType }),

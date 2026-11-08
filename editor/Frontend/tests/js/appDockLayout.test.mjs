@@ -82,6 +82,7 @@ async function renderApp({ path = '/', standalone = false, mode = 'creative' } =
     '@/api/editorApi.js': { editorApi: {
       window: { hasWindowBindings: () => false, canSuspendCameraViews: () => false },
     } },
+    '@/api/observerRuntime.js': { getObserverRuntime: () => ({ observe: async () => 0, off: async () => {} }) },
     '@/services/projectLauncherService.js': { cancelPendingProjectOpen: noop },
     '@/services/projectMessages.js': { subscribeProjectChanged: () => noop },
     '@/services/worldSessionLifecycle.js': { notifyWorldError: assert.fail },

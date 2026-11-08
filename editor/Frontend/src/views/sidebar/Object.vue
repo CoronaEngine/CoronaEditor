@@ -282,6 +282,7 @@ import { coronaEventBus } from '@/utils/eventBus.js';
 import IkBoneSelect from '@/components/ui/IkBoneSelect.vue';
 import { useErrorHandler } from '@/composables/useErrorHandler.js';
 import { editorApi } from '@/api/editorApi.js';
+import { getObserverRuntime } from '@/api/observerRuntime.js';
 import { DEFAULT_SCENE_NAME } from '@/utils/constants.js';
 import { cabbageContextService } from '@/services/cabbageAssistantContextService.js';
 import { createIkEditorController, createIkEditorState, makeIkFoot, isAutomaticIkFoot, ikFootStatus, ikBoneOptions, ikBoneError } from '@/utils/ikEditorController.js';
@@ -932,9 +933,9 @@ function handleGuidancePrepare(event) {
 onMounted(async () => {
   coronaEventBus.on('model-node-selection', handleModelNodeSelection);
   // Each window reads the current native selection on its first sample.
-  await viewLifetime.subscribe(callback => editorApi.scene.observe('selection', callback), handleSelection, editorApi.off);
+  await viewLifetime.subscribe(callback => getObserverRuntime().observe('selection', callback), handleSelection, token => getObserverRuntime().off(token));
   if (!viewLifetime.current()) return;
-  await viewLifetime.subscribe(callback => editorApi.scene.observe('transform', callback), handleTransform, editorApi.off);
+  await viewLifetime.subscribe(callback => getObserverRuntime().observe('transform', callback), handleTransform, token => getObserverRuntime().off(token));
   if (!viewLifetime.current()) return;
   window.addEventListener('cabbage-guidance-prepare', handleGuidancePrepare);
 });

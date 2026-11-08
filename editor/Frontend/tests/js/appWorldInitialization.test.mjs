@@ -55,10 +55,12 @@ for (const first of ['guard', 'observer']) {
       '@/stores/dockStore.js': { useDockStore: () => ({ clearSession: noop }) },
       '@/services/appService.js': { appService: {} },
       '@/api/editorApi.js': { editorApi: {
-        scene: { observe: async (_topic, handler) => { observer = handler; return 1; } },
-        off: async () => {},
         window: { hasWindowBindings: () => false, canSuspendCameraViews: () => false },
       } },
+      '@/api/observerRuntime.js': { getObserverRuntime: () => ({
+        observe: async (_kind, handler) => { observer = handler; return 1; },
+        off: async () => {},
+      }) },
       '@/utils/eventBus.js': { coronaEventBus: { on: noop, off: noop } },
       '@/utils/viewLifetime.js': { createViewLifetime },
       '@/services/worldSessionLifecycle.js': { notifyWorldError: error => errors.push(error) },
@@ -121,10 +123,12 @@ function mountLifecycleApp(t, role = 'peer') {
       closeThisTab: async () => { closed.push(true); }, onWindowCloseRequested: () => noop,
     } },
     '@/api/editorApi.js': { editorApi: {
-      scene: { observe: (_topic, callback) => { projectCallback = callback; return projectRegistration.promise; } },
-      off: async token => { removed.push(token); },
       window: { hasWindowBindings: () => true, canSuspendCameraViews: () => true },
     } },
+    '@/api/observerRuntime.js': { getObserverRuntime: () => ({
+      observe: (_kind, callback) => { projectCallback = callback; return projectRegistration.promise; },
+      off: async token => { removed.push(token); },
+    }) },
     '@/api/webDocument.js': { getWebDocumentIdentity: () => ({ role }) },
     '@/api/webMessages.js': { getWebMessages: () => ({ on: () => noop }) },
     '@/services/windowSessionState.js': { WINDOW_SESSION_POLICY_EVENT: 'windowSession.policyChanged' },
