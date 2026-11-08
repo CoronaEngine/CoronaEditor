@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync } from 'node:fs';
+import { setImmediate } from 'node:timers';
 import { setTimeout as delay } from 'node:timers/promises';
 
 const moduleUrl = new URL('../../src/api/webMessages.js', import.meta.url);
@@ -251,14 +252,24 @@ test('handler readiness waits for registration, then sends the operation exactly
 });
 
 test('readiness and execution deadlines are separate and missing owners fail explicitly', async t => {
-  const { main, dock } = pair(t);
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  const { main, dock } = controlledDiscovery(t);
   const request = main.requestHandler('late.slow', null,
     { waitForHandler: true, readyTimeoutMs: 400, timeoutMs: 100 });
-  await delay(120);
-  dock.handle('late.slow', async () => { await delay(40); return 'saved'; });
+  await new Promise(setImmediate);
+  t.mock.timers.tick(320); // Execution will finish after the original readiness deadline.
+  dock.handle('late.slow', () => new Promise(resolve => setTimeout(() => resolve('saved'), 40)));
+  await new Promise(setImmediate);
+  t.mock.timers.tick(50); // Finish discovery and start the execution deadline.
+  await new Promise(setImmediate);
+  t.mock.timers.tick(40);
+  await new Promise(setImmediate);
   assert.equal(await request, 'saved');
-  await assert.rejects(main.requestHandler('absent', null,
+  const missing = assert.rejects(main.requestHandler('absent', null,
     { waitForHandler: true, readyTimeoutMs: 80, timeoutMs: 500 }), { code: 'METHOD_NOT_FOUND' });
+  await new Promise(setImmediate);
+  t.mock.timers.tick(80);
+  await missing;
 });
 
 test('discovery does not route to a crashed document advertised by an earlier request', async t => {
@@ -313,15 +324,21 @@ test('replacement owner rejects late events and announcements from the retired m
 });
 
 test('owner replacement removes stale discovery candidates before routing the operation', async t => {
-  const { main, dock, scope } = pair(t);
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  const { main, dock, scope, factory } = controlledDiscovery(t);
   let oldCalls = 0;
   main.handle('apply', () => { oldCalls++; return 'old'; });
-  await delay(20);
+  await new Promise(setImmediate);
   const request = dock.requestHandler('apply');
-  await delay(15);
-  const replacement = messages.createWebMessages({ scope, role: 'main' });
+  await new Promise(setImmediate); // Receive the old owner's discovery candidate.
+  t.mock.timers.tick(15);
+  assert.equal(oldCalls, 0);
+  const replacement = messages.createWebMessages({ scope, role: 'main', channelFactory: factory });
   t.after(() => replacement.dispose());
   replacement.handle('apply', () => 'new');
+  await new Promise(setImmediate);
+  assert.equal(dock.ownerEpoch, replacement.ownerEpoch);
+  t.mock.timers.tick(50);
   assert.equal(await request, 'new');
   assert.equal(oldCalls, 0);
 });
@@ -420,8 +437,8 @@ function controlledDiscovery(t) {
     channels.add(channel);
     return channel;
   };
-  const { main, dock } = pair(t, { channelFactory: factory });
-  return { main, dock, hold: () => { hold = true; }, release: () => { hold = false; held.splice(0).forEach(fn => fn()); } };
+  const { main, dock, scope } = pair(t, { channelFactory: factory });
+  return { main, dock, scope, factory, hold: () => { hold = true; }, release: () => { hold = false; held.splice(0).forEach(fn => fn()); } };
 }
 
 test('requestAll waits for every known participant to confirm discovery before any side effect', async t => {
