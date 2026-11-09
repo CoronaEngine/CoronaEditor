@@ -1,6 +1,9 @@
-﻿# Corona Engine Editor
+# Corona Engine Editor
 
 `editor` 是嵌入引擎进程的编辑器运行时和 UI 工程，不是独立 Web 后端。
+
+> **Python 运行时源码已迁至引擎仓库**：`CoronaEngine/embedded_python/`（构建时由引擎打包进 `CabbageEditor/`）；
+> 本仓库只保留 Frontend、assets 与文档。
 
 Python 负责存档解析和 Blockly/Scratch 生成文件的执行；C++ 持有场景、Actor、资源、
 变换和 revision 的权威状态；Vue 负责页面、输入和结果展示。跨层业务只能调用同一份
@@ -23,11 +26,7 @@ C++ manifest 聚合契约，Vue/Python 只做薄适配，不直接暴露 `camera
 |---|---|
 | `Frontend` | Vue 页面、输入交互、JS manifest adapter |
 | `Frontend/src/story` | Web 单主世界剧情玩法与会话状态 |
-| `api` | Python 对 C++ manifest 的唯一公共契约 adapter |
-| `config` | 路径、活动项目和应用配置 |
-| `runtime` | 嵌入式 Python host、服务注册和生命周期 |
-| `script_runtime` | Blockly 生成文件的执行、输入与停止恢复 |
-| `plugins` | ProjectArchive 存档服务及原生项目模板 |
+| （Python 层） | 已迁至引擎仓库 `CoronaEngine/embedded_python/`（api/config/runtime/script_runtime/plugins） |
 | `data` | native 项目运行时数据，不是 Python 业务 owner |
 
 项目的 `Scripts/files` 保存 Web 提交的工作区文档和按摘要标识的 .py；旧 backend、CoronaCore、CoronaPlugin、
