@@ -1,4 +1,4 @@
-# Corona Engine Editor
+﻿# Corona Engine Editor
 
 `editor` 是嵌入引擎进程的编辑器运行时和 UI 工程，不是独立 Web 后端。
 
