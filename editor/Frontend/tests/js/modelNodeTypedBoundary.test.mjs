@@ -23,10 +23,11 @@ test('model node operations use the typed scene surface with archive and actor i
 
 test('model node manifest routes are unavailable to CEF callers', () => {
   const routes = manifest.split('\n').filter(line =>
-    line.includes('"sceneTools.getModelNodes"') || line.includes('"sceneTools.setModelNodeState"'));
+    line.includes('(SceneTools, get_model_nodes,') || line.includes('(SceneTools, set_model_node_state,'));
   assert.equal(routes.length, 2);
   for (const route of routes) {
     assert.match(route, /WRAPPED_CALLERS/);
     assert.doesNotMatch(route, /caller_mask\(EditorApiCaller::Cef\)/);
+    assert.doesNotMatch(route, /js_wrapper/, 'the retired Web wrapper column must not return');
   }
 });
