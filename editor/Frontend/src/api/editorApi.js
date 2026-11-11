@@ -2,16 +2,36 @@
 // import-clean: the scene read chain and its DOM listeners belong to the
 // observer runtime (observerRuntime.js), started from main.js.
 
+import { withAutosave } from '../services/autosave.js';
+
+/** Call one Python service through the single transport entry and parse it here. */
+const bridgeCall = async (service, method, args = []) => {
+  const raw = await window.corona.bridge.call(JSON.stringify({ service, function: method, args }));
+  return typeof raw === 'string' ? JSON.parse(raw) : raw;
+};
+
+/** Project file operations are owned by the Python archive service. */
+const fileOp = (op, request, args) => bridgeCall('ProjectArchive', 'file_manager', [{
+  archive_session: request.archive_session,
+  project_path: request.project_path,
+  op,
+  args,
+}]);
+
 const editorApiStatic = {
   app: {
     closeProcess: () => window.corona.app.closeProcess(),
   },
   files: {
-    getFileTree: request => window.corona.files.getFileTree(request),
-    createFolder: request => window.corona.files.createFolder(request),
-    createActorTemplate: request => window.corona.files.createActorTemplate(request),
-    deleteItem: request => window.corona.files.deleteItem(request),
-    renameItem: request => window.corona.files.renameItem(request),
+    getFileTree: async request => ({
+      ...await fileOp('get_file_tree', request, [request.path ?? '']),
+      project_path: request.project_path,
+    }),
+    createFolder: request => fileOp('create_folder', request, [request.path, request.name]),
+    createActorTemplate: request => fileOp('create_file', request, [request.path, request.name, 'actor']),
+    deleteItem: request => fileOp('delete_item', request, [request.path]),
+    renameItem: request => fileOp('rename_item', request, [request.path, request.name]),
+    // Opening a scene reloads the native scene, so this route stays in C++.
     openFile: request => window.corona.files.openFile(request),
   },
   network: {
@@ -28,7 +48,13 @@ const editorApiStatic = {
   project: {
     createMultiplayerProject: request => window.corona.project.createMultiplayerProject(request),
     createWorldProject: request => window.corona.project.createWorldProject(request),
-    getAppVersion: () => window.corona.project.getAppVersion(),
+    // The version lives in the editor ini, which the archive service owns; the facade asks it
+    // through the bridge instead of keeping a native route that only forwarded the answer.
+    getAppVersion: async () => {
+      const settings = await bridgeCall('ProjectArchive', 'editor_settings',
+        [{ section: 'General', key: 'version', fallback: '1.2.0' }]);
+      return settings?.value ?? '1.2.0';
+    },
     getProjectLoadStatus: () => window.corona.project.getProjectLoadStatus(),
     getRecentProjects: () => window.corona.project.getRecentProjects(),
     openProject: (projectPath, options = {}) =>
@@ -119,26 +145,48 @@ const editorApiStatic = {
     dispatch: (sceneName, cameraId, event) => window.corona.input.dispatch(sceneName, cameraId, event),
   },
   scripts: {
-    getStatus: () => window.corona.scripts.getStatus(),
-    runFile: (request) => window.corona.scripts.runFile(request),
-    getRun: (requestId) => window.corona.scripts.getRun(requestId),
+    // The Python file host owns compilation, revision checks and run state.
+    getStatus: () => bridgeCall('FileScripts', 'get_script_status', []),
+    runFile: request => bridgeCall('FileScripts', 'run_file', [request]),
+    getRun: requestId => bridgeCall('FileScripts', 'get_file_run', [{ requestId }]),
     stop: (runId, restoreState = true, requestId) =>
-      window.corona.scripts.stop(runId, restoreState, requestId),
+      bridgeCall('FileScripts', 'stop_file', [{ runId, requestId, restore_state: restoreState }]),
   },
   projectFiles: {
-    save: request => window.corona.projectFiles.save(request),
-    load: request => window.corona.projectFiles.load(request),
+    save: request => bridgeCall('ProjectFiles', 'save', [request]),
+    load: request => bridgeCall('ProjectFiles', 'load', [request]),
   },
   projectSettings: {
-    readProjectDocument: request => window.corona.projectSettings.readProjectDocument(request),
-    commitProjectDocument: request => window.corona.projectSettings.commitProjectDocument(request),
-    getActiveProjectInfo: () => window.corona.projectSettings.getActiveProjectInfo(),
+    // Documents are owned by the Python archive service.
+    readProjectDocument: request => bridgeCall('ProjectArchive', 'read_document',
+      [{ ...request, revision_only: true }]),
+    commitProjectDocument: request => bridgeCall('ProjectArchive', 'commit_document',
+      [{ ...request, revision_only: true }]),
+    // The projection is composed here from the scene primitive plus archive metadata.
+    getActiveProjectInfo: async () => {
+      const active = await window.corona.scene.readActive();
+      if (active.read_only) {
+        return { name: active.name, mode: 'creative', project_path: active.project_path,
+          read_only: true, source_path: active.project_path, archive_session: active.archive_session };
+      }
+      const info = await bridgeCall('ProjectArchive', 'project_info', [{ path: active.project_path }]);
+      return { ...info, archive_session: active.archive_session, read_only: false };
+    },
+    // Saving metadata refreshes the native scene cache, so this route stays in C++.
     saveActiveProjectInfo: settings => window.corona.projectSettings.saveActiveProjectInfo(settings),
+  },
+  // Single Web -> Python entry point. The envelope is built here and parsed by
+  // Python; C++ only carries it, so JS owns its own request schema.
+  bridge: {
+    call: (service, method, args = []) =>
+      window.corona.bridge.call(JSON.stringify({ service, function: method, args })),
   },
 
 };
 
-export const editorApi = editorApiStatic;
+// Autosave is a renderer decision: the native bindings are read-only V8 properties, so the
+// facade is where a dirty mark can be attached. `editorApi.autosave` exposes flush/state.
+export const editorApi = withAutosave(editorApiStatic);
 
 // 快捷访问
 // LAN transport belongs to C++ NetworkSystem; Web calls native V8 contracts.

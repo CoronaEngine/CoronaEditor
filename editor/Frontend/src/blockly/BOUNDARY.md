@@ -11,11 +11,13 @@
 | `blocks/` | active schema | 注册自定义积木定义、字段和 UI 约束 | Blockly schema 迁移到新的图编辑器且旧 workspace 已完成兼容读取 |
 | `generators/` | active compiler adapter | 将可见 Blockly workspace 编译为受限 Script Runtime Python，并组装 `CoronaEngine.*` 运行时调用 | 新编译器完整替代、生成脚本回归和旧 workspace 回归通过 |
 | `components/` | active UI | 工作区 UI、Blockly workspace、工具箱、节点图和编辑器交互 | 新 UI 完整替代并完成工作区保存/运行回归 |
-| `composables/` | active UI state adapter | 为 Blockly UI 提供可复用的 Actor/目标上下文行为 | 由明确的 context owner 吸收并完成跨窗口回归 |
 | `configs/` | active presentation config | 工具箱、主题、分类和 workspace 配置 | 新编辑器配置 owner 吸收后删除 |
 | `i18n/` | active presentation data | Blockly 自定义积木和界面文案映射 | 文案全部归统一 i18n catalog 且完成渲染回归 |
 | `node-editor/aiNodeGraphService.js` | active internal adapter | 校验内部 AI 节点图结果、生成/应用请求，并通过 `BroadcastChannel` 协调 detached Dock | 节点图 adapter 被独立且等价的 UI integration owner 替代 |
 | `utils/` | active helper | Actor context 规范化和节点图保存重试策略 | 对应 context/save owner 吸收并完成回归 |
+
+Actor 选择继续由现有场景选择契约和各视图自身状态处理；不再使用
+`localStorage` 双写的 `useActorContext`。`localStorage` 不作为页面间活动状态通道。
 
 ## 依赖方向
 
@@ -37,3 +39,6 @@
 Frontend Node 单元测试验证。删除或移动目录前必须覆盖 Blockly workspace 序列化、
 生成代码、节点图保存/运行、detached Dock 和旧项目兼容回归；仅凭仓内 import 搜索
 不到调用方不能直接删除。
+
+
+2026-11-07 ProjectFiles迁移：save/load仅使用corona.projectFiles具名V8；scope与四段identity数组、document/workspace均为owned结构化值，targetArchive不编码JSON key、不解包data envelope。Python存储owner保留原key目录/落盘JSON/原子发布，独立Python opaque key契约保留，旧CEF manifest/handler已删。NodeGraph最终bridgeResult已删。真实packaged UI运行/保存/关闭恢复/重开通过。

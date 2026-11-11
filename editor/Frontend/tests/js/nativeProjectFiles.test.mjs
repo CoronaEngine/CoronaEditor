@@ -3,18 +3,21 @@ import test from 'node:test';
 import { editorApi } from '../../src/api/editorApi.js';
 import { saveBlocklyTarget, loadBlocklyTarget } from '../../src/blockly/targetArchive.js';
 
-test('project document facades use named V8 bindings and direct records', async t => {
+test('project document facades call the Python bridge and parse its records', async t => {
   const calls = [];
   const record = { status: 'saved', document: { workspace: { nested: [null, false, 1.5, '世界'] } } };
-  globalThis.window = { corona: { projectFiles: {
-    save: request => { calls.push(['save', request]); return Promise.resolve(record); },
-    load: request => { calls.push(['load', request]); return Promise.resolve(record); },
-  } } };
+  globalThis.window = { corona: { bridge: { call: envelope => {
+    calls.push(JSON.parse(envelope));
+    return Promise.resolve(JSON.stringify(record));
+  } } } };
   t.after(() => { delete globalThis.window; });
   const scope = { archive_session: 'first', project_path: '/world', identity: ['node_graph', 'project', '', ''] };
-  assert.equal(await editorApi.projectFiles.save(scope), record);
-  assert.equal(await editorApi.projectFiles.load(scope), record);
-  assert.deepEqual(calls, [['save', scope], ['load', scope]]);
+  assert.deepEqual(await editorApi.projectFiles.save(scope), record);
+  assert.deepEqual(await editorApi.projectFiles.load(scope), record);
+  assert.deepEqual(calls, [
+    { service: 'ProjectFiles', function: 'save', args: [scope] },
+    { service: 'ProjectFiles', function: 'load', args: [scope] },
+  ]);
 });
 
 test('target archives pass identity values and workspace objects with JSON disabled', async t => {
