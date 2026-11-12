@@ -50,6 +50,36 @@ test('a page reply older than the applied edit cannot undo it', async t => {
     'the stale reply must be merged with the confirmed edit, not replace it');
 });
 
+test('an unchanged node keeps its object identity across page replies', async t => {
+  const page = mount(t, { read: async () => ({ nodes: [node], actor_version: 2 }) });
+  await page.state.loadPage(-1);
+  const first = page.state.pages.value['-1'].items[0];
+  await page.state.loadPage(-1);
+  assert.equal(page.state.pages.value['-1'].items[0], first,
+    'a read that changed nothing must not rebuild the row');
+});
+
+test('an overlapping later page is merged by node index', async t => {
+  const second = { ...node, node_index: 1, name: 'second' };
+  let reads = 0;
+  const page = mount(t, { read: async (_, request) => (reads++ === 0
+    ? { nodes: [node], actor_version: 2, has_more: true, next_offset: 1 }
+    : { nodes: request.offset === 1 ? [second] : [node, second], actor_version: 2 }) });
+  await page.state.loadPage(-1);
+  await page.state.loadPage(-1, 1);
+  assert.deepEqual(page.state.pages.value['-1'].items.map(item => item.node_index), [0, 1]);
+});
+
+test('a page reply that drops a node removes it', async t => {
+  let reads = 0;
+  const page = mount(t, { read: async () => (reads++ === 0
+    ? { nodes: [node], actor_version: 2 }
+    : { nodes: [], actor_version: 2 }) });
+  await page.state.loadPage(-1);
+  await page.state.loadPage(-1);
+  assert.deepEqual(page.state.pages.value['-1'].items, []);
+});
+
 test('a version conflict reloads the node page and retries once', async t => {
   let writes = 0;
   const page = mount(t, {

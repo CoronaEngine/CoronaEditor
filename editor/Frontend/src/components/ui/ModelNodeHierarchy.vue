@@ -190,6 +190,33 @@ const persistNodePatch = (node, patch) => {
   return operation;
 };
 
+const sameTriple = (left, right) =>
+  Array.isArray(left) && Array.isArray(right) && left.length === right.length &&
+  left.every((value, index) => value === right[index]);
+
+// Only the fields a row renders; identity of the node object is what keeps Vue from
+// rebuilding every row when a periodic read repeats the same page.
+const sameNode = (left, right) =>
+  left.node_index === right.node_index && left.parent_index === right.parent_index &&
+  left.name === right.name && left.visible === right.visible &&
+  left.effective_visible === right.effective_visible && left.editable === right.editable &&
+  left.child_count === right.child_count &&
+  sameTriple(left.position, right.position) && sameTriple(left.rotation, right.rotation) &&
+  sameTriple(left.scale, right.scale);
+
+// The reply is authoritative for the range it covers: an offset-0 read replaces the list,
+// a later-page read extends it. Unchanged nodes keep their previous object so a read that
+// changed nothing does not re-render the list, and an overlapping page cannot duplicate a
+// node.
+const mergeNodes = (previous, incoming, offset) => {
+  const byIndex = new Map(previous.map((item) => [Number(item.node_index), item]));
+  const merged = incoming.map((item) => {
+    const old = byIndex.get(Number(item.node_index));
+    return old && sameNode(old, item) ? old : item;
+  });
+  return offset ? [...previous.slice(0, Math.min(offset, previous.length)), ...merged] : merged;
+};
+
 const loadPage = async (parentIndex, offset = 0) => {
   if (!viewLifetime.current() || !actorName.value) return null;
   const identity = actorIdentity();
@@ -220,7 +247,7 @@ const loadPage = async (parentIndex, offset = 0) => {
         : item;
     });
     const page = {
-      items: offset ? [...previous, ...incoming] : incoming,
+      items: mergeNodes(previous, incoming, offset),
       has_more: data.has_more === true,
       next_offset: Number(data.next_offset || 0),
       loading: false,
