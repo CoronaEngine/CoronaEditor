@@ -19,11 +19,13 @@ function nativeSurface(t) {
   t.mock.method(editorApi.scripts, 'getStatus', async () => ({ status: 'idle' }));
   const sent = [], barriers = [];
   const surface = {
-    corona: { window: { suspendCameraViews: sceneId => new Promise((resolve, reject) => barriers.push({ sceneId, resolve, reject })) } },
+    // The plural close is the retirement fence, so it is the one that waits for a reply.
+    // Closing a single panel resolves immediately and is only recorded.
+    corona: { window: { close: identity => (identity && 'sceneId' in identity)
+      ? new Promise((resolve, reject) => barriers.push({ sceneId: identity.sceneId, resolve, reject }))
+      : (sent.push(['close', identity]), Promise.resolve(true)) } },
     localStorage: memoryStorage(), sessionStorage: memoryStorage(), location: { hash: '#/' }, dispatchEvent() {} };
-  for (const method of ['setWindowPresentation', 'resizeCameraView', 'closeCameraView']) {
-    surface.corona.window[method] = async (...args) => { sent.push([method, ...args]); return true; };
-  }
+  surface.corona.window.setWindowPresentation = async (...args) => { sent.push(['setWindowPresentation', ...args]); return true; };
   const previous = globalThis.window;
   globalThis.window = surface;
   t.after(() => { getWebMessages(surface).dispose(); globalThis.window = previous; });

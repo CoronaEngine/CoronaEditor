@@ -73,7 +73,7 @@ export const projectLauncherService = {
       if (!current()) return superseded();
       try {
         await nextTick();
-        if (editorApi.window.canSuspendCameraViews()) {
+        if (editorApi.window.canCloseSceneViews()) {
           await appService.setEditorUiEnabled(false);
         }
         await drainWorldSession();

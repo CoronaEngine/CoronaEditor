@@ -8,8 +8,7 @@ import { test } from 'node:test';
 // the shape to pin.
 
 const WINDOW_METHODS = [
-  'getCurrent', 'close', 'focusTab', 'createPanel',
-  'setWindowPresentation', 'suspendCameraViews', 'resizeCameraView',
+  'getCurrent', 'close', 'focus', 'createPanel', 'setWindowPresentation',
 ];
 const WINDOW_EVENTS = ['onClosed', 'onCloseRequested'];
 
@@ -26,19 +25,25 @@ test('the facade exposes a window namespace with every named binding', async () 
   }
 });
 
-test('window wrapper passes options and arguments through unchanged', async t => {
+test('window wrapper passes each identity through unchanged', async t => {
   const calls = [];
   const native = {
     createPanel: async options => { calls.push(['createPanel', options]); return { tab_id: 1 }; },
-    resizeCameraView: async (...args) => { calls.push(['resizeCameraView', ...args]); return true; },
+    close: async identity => { calls.push(['close', identity]); return { closed: 1 }; },
+    focus: async identity => { calls.push(['focus', identity]); return true; },
   };
   withNativeWindow(t, native);
   const { editorApi } = await import(`../../src/api/editorApi.js?window-passthrough=${Date.now()}`);
   const options = { panelId: 'inspector', routePath: '/Inspector' };
   assert.deepEqual(await editorApi.window.createPanel(options), { tab_id: 1 });
   assert.equal(calls[0][1], options);
-  await editorApi.window.resizeCameraView(800, 600, 'scene', 'camera');
-  assert.deepEqual(calls[1], ['resizeCameraView', 800, 600, 'scene', 'camera']);
+  await editorApi.window.close({ panelId: 'inspector' });
+  assert.deepEqual(calls[1], ['close', { panelId: 'inspector' }]);
+  await editorApi.window.focus({ panelId: 'inspector' });
+  assert.deepEqual(calls[2], ['focus', { panelId: 'inspector' }]);
+  // No argument is how the facade says "this window"; it must not send undefined.
+  await editorApi.window.close();
+  assert.deepEqual(calls[3], ['close', undefined]);
 });
 
 test('window wrapper propagates native errors unchanged', async t => {
@@ -63,13 +68,13 @@ test('window event subscriptions return the native unsubscribe function', async 
   assert.deepEqual(seen, [closed, requested]);
 });
 
-test('the facade centralizes suspend-camera capability probing', async t => {
+test('the facade centralizes scene-view close capability probing', async t => {
   withNativeWindow(t, {});
   const absent = await import(`../../src/api/editorApi.js?window-probe=${Date.now()}`);
-  assert.equal(absent.editorApi.window.canSuspendCameraViews(), false);
-  withNativeWindow(t, { suspendCameraViews: () => {} });
+  assert.equal(absent.editorApi.window.canCloseSceneViews(), false);
+  withNativeWindow(t, { close: () => {} });
   const present = await import(`../../src/api/editorApi.js?window-probe2=${Date.now()}`);
-  assert.equal(present.editorApi.window.canSuspendCameraViews(), true);
+  assert.equal(present.editorApi.window.canCloseSceneViews(), true);
 });
 
 test('the facade exposes the native window presence probe', async t => {

@@ -17,7 +17,7 @@ function nativeWindow(t) {
   const snapshot = { browserId: '18446744073709551615', frameId: 'frame', dockState: 'docked' };
   const native = {
     getCurrent: () => Promise.resolve(snapshot),
-    suspendCameraViews: () => Promise.resolve({ closed: 0 }),
+    close: () => Promise.resolve({ closed: 0 }),
   };
   globalThis.window = { corona: { window: native },
     coronaBridge: { dockCommand: () => { throw new Error('legacy Dock transport is forbidden'); } },
@@ -41,8 +41,8 @@ test('application window reads call the native V8 function without JSON', async 
 test('window service preserves native errors without retrying legacy transport', async t => {
   const { native } = nativeWindow(t);
   const failure = Object.assign(new Error('window closed'), { code: 'WINDOW_CLOSED' });
-  native.focusTab = () => Promise.reject(failure);
-  await assert.rejects(editorApi.window.focusTab(3), error => error === failure);
+  native.focus = () => Promise.reject(failure);
+  await assert.rejects(editorApi.window.focus({ panelId: 'Object' }), error => error === failure);
 });
 
 test('window subscriptions reference the native callbacks and return their unsubscribe functions', t => {
@@ -61,13 +61,13 @@ test('window session invokes native focus and close without old commands or a le
   t.after(() => { Object.assign(worldModeState, oldWorld); });
   Object.assign(worldModeState, { status: 'ready', mode: 'creative', revision: 1 });
   window.localStorage = memoryStorage(); window.sessionStorage = memoryStorage(); window.location = { hash: '#/' };
-  native.focusTab = async id => { calls.push(['focus', id]); return true; };
+  native.focus = async identity => { calls.push(['focus', identity.panelId]); return true; };
   native.close = async identity => { calls.push(['close', identity]); return true; };
   await appService.setEditorUiEnabled(true);
   calls.length = 0;
-  assert.equal(await appService.focusPanelTab(7), true);
+  assert.equal(await appService.focusPanelTab('SceneTools'), true);
   assert.equal(await appService.closePanelTab('Object'), true);
-  assert.deepEqual(calls, [['focus', 7], ['close', { panelId: 'Object' }]]);
+  assert.deepEqual(calls, [['focus', 'SceneTools'], ['close', { panelId: 'Object' }]]);
 });
 
 test('closing the registered node panel uses the graph save barrier and retains failed state', async t => {
@@ -79,7 +79,7 @@ test('closing the registered node panel uses the graph save barrier and retains 
   let nextTab = 0, saves = 0, fail = true;
   const closed = [];
   native.createPanel = async () => ({ tab_id: ++nextTab });
-  native.close = async identity => closed.push(identity.panelId);
+  native.close = async identity => { if (identity.panelId) closed.push(identity.panelId); return { closed: 1 }; };
   await appService.setEditorUiEnabled(true);
   t.mock.method(editorApi.scene, 'readActive', async () => ({ archive_session: 'graph-archive' }));
   getNodeGraphSaves().register({ getSession: () => 'graph-archive', flush: () => { saves++; return !fail; } });
@@ -131,18 +131,18 @@ test('camera suspension and startup retirement await the native V8 barrier', asy
   t.after(() => { Object.assign(worldModeState, oldWorld); });
   Object.assign(worldModeState, { status: 'ready', mode: 'creative', revision: 1 });
   window.localStorage = memoryStorage(); window.sessionStorage = memoryStorage(); window.location = { hash: '#/' };
-  native.suspendCameraViews = async sceneId => { calls.push(sceneId); return { closed: 0 }; };
+  native.close = async identity => { calls.push(identity.sceneId); return { closed: 0 }; };
   await appService.setEditorUiEnabled(true);
   assert.ok(calls.length > 0);
-  assert.ok(calls.every(sceneId => sceneId === ''));
+  assert.ok(calls.every(sceneId => sceneId === ''), 'the retirement fence closes no view');
   native.close = async identity => {
     assert.deepEqual(identity, { sceneId: 'scene-opaque-id', cameraId: 'camera-opaque-id' });
     return true;
   };
   assert.equal(await appService.closeCameraView('scene-opaque-id', 'camera-opaque-id'), true);
   let complete;
-  native.suspendCameraViews = sceneId => {
-    assert.equal(sceneId, 'scene-opaque-id');
+  native.close = identity => {
+    assert.deepEqual(identity, { sceneId: 'scene-opaque-id' });
     return new Promise(resolve => { complete = resolve; });
   };
   const stringify = JSON.stringify, parse = JSON.parse;
@@ -165,19 +165,17 @@ test('camera presentation and main borderless name the state instead of a toggle
   t.after(() => { Object.assign(worldModeState, oldWorld); });
   Object.assign(worldModeState, { status: 'ready', mode: 'creative', revision: 1 });
   window.localStorage = memoryStorage(); window.sessionStorage = memoryStorage(); window.location = { hash: '#/' };
-  for (const method of ['setWindowPresentation', 'resizeCameraView']) {
-    native[method] = async (...args) => { calls.push([method, ...args]); return true; };
-  }
+  native.setWindowPresentation = async identity => { calls.push(identity); return true; };
   await appService.setEditorUiEnabled(true);
   assert.equal(await appService.cycleThisCameraViewWindowMode('scene', 'camera'), true);
   assert.equal(await appService.setThisCameraViewPresentation('borderless', 'scene', 'camera'), true);
   assert.equal(await appService.resizeThisCameraView(800, 600, 'scene', 'camera'), true);
   assert.equal(await appService.toggleMainWindowBorderless(), true);
   assert.deepEqual(calls, [
-    ['setWindowPresentation', { sceneId: 'scene', cameraId: 'camera', mode: 'toggle' }],
-    ['setWindowPresentation', { sceneId: 'scene', cameraId: 'camera', mode: 'borderless' }],
-    ['resizeCameraView', 800, 600, 'scene', 'camera'],
-    ['setWindowPresentation', { target: 'main', mode: 'toggle' }],
+    { sceneId: 'scene', cameraId: 'camera', mode: 'toggle' },
+    { sceneId: 'scene', cameraId: 'camera', mode: 'borderless' },
+    { sceneId: 'scene', cameraId: 'camera', width: 800, height: 600 },
+    { target: 'main', mode: 'toggle' },
   ]);
 });
 

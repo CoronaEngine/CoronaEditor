@@ -62,7 +62,7 @@ export function createNativePanelHosts({ open, close, focus = async () => {}, on
     if (!host) return false;
     await host.pending;
     if (disposed || hosts.get(id) !== host || !host.wanted || host.tabId === undefined) return false;
-    await focus(host.tabId);
+    await focus(id);
     return true;
   }
   return { reconcile, closed, dispose, focusPanel };

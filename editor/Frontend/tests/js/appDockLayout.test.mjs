@@ -52,7 +52,7 @@ async function renderApp({ path = '/', standalone = false, mode = 'creative' } =
   for (const id of ['SceneControls', 'SceneTools', 'EditorSettings', 'NodeGraphPanel']) store.openPanel(id);
   const opened = [];
 
-  const window = { corona: { window: { suspendCameraViews() {} } } };
+  const window = { corona: { window: { close() {} } } };
   const noop = () => {};
   const asyncNoop = async () => {};
   const appService = {
@@ -80,7 +80,7 @@ async function renderApp({ path = '/', standalone = false, mode = 'creative' } =
     },
     '@/components/ui/CabbageGuidanceOverlay.vue': { default: empty },
     '@/api/editorApi.js': { editorApi: {
-      window: { hasWindowBindings: () => false, canSuspendCameraViews: () => false },
+      window: { hasWindowBindings: () => false, canCloseSceneViews: () => false },
     } },
     '@/api/observerRuntime.js': { getObserverRuntime: () => ({ observe: async () => 0, off: async () => {} }) },
     '@/services/projectLauncherService.js': { cancelPendingProjectOpen: noop },

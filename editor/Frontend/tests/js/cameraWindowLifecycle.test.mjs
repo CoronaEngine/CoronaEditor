@@ -30,7 +30,7 @@ test('SceneBar camera list preserves archive identity through the application wi
   globalThis.window = {
     localStorage: memoryStorage(), sessionStorage: memoryStorage(), location: { hash: '#/' },
     corona: { window: {
-      suspendCameraViews: async () => ({ closed: 0 }),
+      close: async () => ({ closed: 0 }),
       createPanel: async options => {
         assert.equal(options.kind, 'camera');
         assert.equal(options.archiveSession, 'observed-archive');

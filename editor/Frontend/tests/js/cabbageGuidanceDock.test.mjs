@@ -34,7 +34,7 @@ async function fixture(t, panelId = 'MainPage') {
   const window = Object.assign(new EventTarget(), {
     localStorage: memoryStorage(), sessionStorage: memoryStorage(),
     location: { hash: '#/' },
-    corona: { window: { suspendCameraViews: async () => ({ closed: 0 }) } },
+    corona: { window: { close: async () => ({ closed: 0 }) } },
     innerWidth: 1536, innerHeight: 825,
     setTimeout, clearTimeout, setInterval, clearInterval,
   });

@@ -55,7 +55,7 @@ for (const first of ['guard', 'observer']) {
       '@/stores/dockStore.js': { useDockStore: () => ({ clearSession: noop }) },
       '@/services/appService.js': { appService: {} },
       '@/api/editorApi.js': { editorApi: {
-        window: { hasWindowBindings: () => false, canSuspendCameraViews: () => false },
+        window: { hasWindowBindings: () => false, canCloseSceneViews: () => false },
       } },
       '@/api/observerRuntime.js': { getObserverRuntime: () => ({
         observe: async (_kind, handler) => { observer = handler; return 1; },
@@ -123,7 +123,7 @@ function mountLifecycleApp(t, role = 'peer') {
       closeThisTab: async () => { closed.push(true); }, onWindowCloseRequested: () => noop,
     } },
     '@/api/editorApi.js': { editorApi: {
-      window: { hasWindowBindings: () => true, canSuspendCameraViews: () => true },
+      window: { hasWindowBindings: () => true, canCloseSceneViews: () => true },
     } },
     '@/api/observerRuntime.js': { getObserverRuntime: () => ({
       observe: (_kind, callback) => { projectCallback = callback; return projectRegistration.promise; },
@@ -137,7 +137,7 @@ function mountLifecycleApp(t, role = 'peer') {
     '@/utils/eventBus.js': { coronaEventBus: { on: noop, off: noop } },
     '@/utils/viewLifetime.js': { createViewLifetime },
   });
-  const host = { corona: { window: { suspendCameraViews: noop } }, addEventListener: noop, removeEventListener: noop };
+  const host = { corona: { window: { close: noop } }, addEventListener: noop, removeEventListener: noop };
   const scope = Vue.effectScope();
   scope.run(() => makeApp(modules, host, host, () => 1, noop).setup({}, { expose: noop }));
   mounted.forEach(hook => hook());

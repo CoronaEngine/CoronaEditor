@@ -24,17 +24,20 @@ const windowSessions = new WeakMap();
 const windowCommandOps = {
   closeThisTab: () => editorApi.window.close(),
   closePanelTab: parameters => editorApi.window.close({ panelId: parameters.panelId }),
-  focusPanelTab: parameters => editorApi.window.focusTab(parameters.tabId),
+  focusPanelTab: parameters => editorApi.window.focus({ panelId: parameters.panelId }),
   createPanelTab: parameters => editorApi.window.createPanel(parameters),
-  suspendCameraViews: parameters => editorApi.window.suspendCameraViews(parameters.sceneId),
+  // The plural form of close: every camera view of that scene, and the two-turn fence.
+  suspendCameraViews: parameters => editorApi.window.close({ sceneId: parameters.sceneId }),
   closeCameraView: parameters =>
     editorApi.window.close({ sceneId: parameters.sceneId, cameraId: parameters.cameraId }),
   cycleThisCameraViewWindowMode: parameters => editorApi.window.setWindowPresentation({
     sceneId: parameters.sceneId, cameraId: parameters.cameraId, mode: 'toggle' }),
   setThisCameraViewPresentation: parameters => editorApi.window.setWindowPresentation({
     sceneId: parameters.sceneId, cameraId: parameters.cameraId, mode: parameters.mode }),
-  resizeThisCameraView: parameters =>
-    editorApi.window.resizeCameraView(parameters.width, parameters.height, parameters.sceneId, parameters.cameraId),
+  // A size is a presentation too, so it rides the same entry as the modes.
+  resizeThisCameraView: parameters => editorApi.window.setWindowPresentation({
+    sceneId: parameters.sceneId, cameraId: parameters.cameraId,
+    width: parameters.width, height: parameters.height }),
   createCameraView: parameters => editorApi.window.createPanel({ ...parameters, kind: 'camera' }),
 };
 function sendWindowCommand(command) {
@@ -76,7 +79,7 @@ export const isCurrentWindowEvent = payload => editorUiAllowed() && session().ac
 const openEditorWindow = command => session().open(command);
 
 export const appService = {
-  focusPanelTab: tabId => openEditorWindow({ cmd: 'focusPanelTab', tabId }),
+  focusPanelTab: panelId => openEditorWindow({ cmd: 'focusPanelTab', panelId }),
   readEditorUiPolicy: async () => { await session().hydrate(); return session().policy(); },
   setEditorUiEnabled: enabled => session().prepare(enabled),
   getCurrentWindow: () => editorApi.window.getCurrent(),
@@ -112,7 +115,7 @@ export const appService = {
     }),
   closeCameraView: (sceneId, cameraId) =>
     openEditorWindow({ cmd: 'closeCameraView', sceneId, cameraId }),
-  suspendCameraViews: (sceneId) => editorApi.window.suspendCameraViews(sceneId),
+  suspendCameraViews: (sceneId) => editorApi.window.close({ sceneId }),
   crossTabBroadcast: (event, payload) =>
     session().broadcast(event, payload),
   closeProcess: () => editorApi.app.closeProcess(),

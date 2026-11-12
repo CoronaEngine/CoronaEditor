@@ -115,15 +115,12 @@ const editorApiStatic = {
     // One verb for "close a window"; the identity decides which. No argument = this one.
     close: identity => identity === undefined ? window.corona.window.close()
       : window.corona.window.close(identity),
-    focusTab: tabId => window.corona.window.focusTab(tabId),
+    focus: options => window.corona.window.focus(options),
     createPanel: options => window.corona.window.createPanel(options),
     setWindowPresentation: options => window.corona.window.setWindowPresentation(options),
-    suspendCameraViews: sceneId => window.corona.window.suspendCameraViews(sceneId),
-    resizeCameraView: (width, height, sceneId, cameraId) =>
-      window.corona.window.resizeCameraView(width, height, sceneId, cameraId),
     onClosed: callback => window.corona.window.onClosed(callback),
     onCloseRequested: callback => window.corona.window.onCloseRequested(callback),
-    canSuspendCameraViews: () => typeof window.corona?.window?.suspendCameraViews === 'function',
+    canCloseSceneViews: () => typeof window.corona?.window?.close === 'function',
     hasWindowBindings: () => Boolean(window.corona?.window),
   },
   viewport: {

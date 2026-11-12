@@ -159,8 +159,7 @@ test('late native panel completion is closed after switching between editable pr
   const closed = [];
   const previousWindow = globalThis.window;
   globalThis.window = { localStorage: memoryStorage(), corona: { window: {
-    close: async identity => { closed.push(identity.panelId); return true; },
-    suspendCameraViews: async () => ({ closed: 0 }),
+    close: async identity => { if (identity.panelId) closed.push(identity.panelId); return { closed: identity.panelId ? 1 : 0 }; },
   } } };
   t.after(() => { getWebMessages(globalThis.window).dispose(); globalThis.window = previousWindow; });
   t.mock.method(editorApi.projectSettings, 'getActiveProjectInfo', async () => info('creative', 'creative'));
