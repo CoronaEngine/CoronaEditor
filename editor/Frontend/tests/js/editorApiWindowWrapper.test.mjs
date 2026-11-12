@@ -28,14 +28,14 @@ test('the facade exposes a window namespace with every named binding', async () 
 test('window wrapper passes each identity through unchanged', async t => {
   const calls = [];
   const native = {
-    createPanel: async options => { calls.push(['createPanel', options]); return { tab_id: 1 }; },
+    createPanel: async options => { calls.push(['createPanel', options]); return { window_token: 1 }; },
     close: async identity => { calls.push(['close', identity]); return { closed: 1 }; },
     focus: async identity => { calls.push(['focus', identity]); return true; },
   };
   withNativeWindow(t, native);
   const { editorApi } = await import(`../../src/api/editorApi.js?window-passthrough=${Date.now()}`);
   const options = { panelId: 'inspector', routePath: '/Inspector' };
-  assert.deepEqual(await editorApi.window.createPanel(options), { tab_id: 1 });
+  assert.deepEqual(await editorApi.window.createPanel(options), { window_token: 1 });
   assert.equal(calls[0][1], options);
   await editorApi.window.close({ panelId: 'inspector' });
   assert.deepEqual(calls[1], ['close', { panelId: 'inspector' }]);

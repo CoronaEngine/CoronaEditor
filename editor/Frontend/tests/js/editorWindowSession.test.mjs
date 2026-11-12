@@ -53,10 +53,10 @@ function harness(overrides = {}) {
       while ([...activities.values()].some(predicate || (() => true))) await setImmediate();
     },
   };
-  let tabId = 0;
+  let windowToken = 0;
   const send = async command => {
     commands.push(command);
-    return command.cmd.startsWith('create') ? { tab_id: ++tabId } : {};
+    return command.cmd.startsWith('create') ? { window_token: ++windowToken } : {};
   };
   const sharedState = makeState();
   sharedState.main = true;
@@ -77,9 +77,9 @@ const camera = { cmd: 'createCameraView', sceneId: 'scene.ini', cameraId: 'camer
   routePath: '/CameraView?scene=scene.ini&camera=camera1' };
 
 test('window sessions reject retired envelope replies instead of recording a ready tab', async () => {
-  const h = harness({ send: async command => command.cmd.startsWith('create') ? { data: { tab_id: 9 } } : {} });
+  const h = harness({ send: async command => command.cmd.startsWith('create') ? { data: { window_token: 9 } } : {} });
   await h.main.prepare(true);
-  await assert.rejects(h.main.open(panel), /tab_id/);
+  await assert.rejects(h.main.open(panel), /window_token/);
   assert.equal(h.main.policy().records.some(record => record.status === 'ready'), false);
 });
 
@@ -93,7 +93,7 @@ test('main policy is Web-owned; standalone windows inherit immutable session tok
   await assert.rejects(child.prepare(false), /主窗口/);
   await child.broadcast('panel-redock-request', { panelId: 'Object' });
   const payload = h.events.at(-1).payload;
-  assert.equal(payload.tabId, result.tab_id);
+  assert.equal(payload.windowToken, result.window_token);
   assert.equal(h.main.accepts(payload), true);
   assert.equal(h.main.accepts({ panelId: 'Object' }), false);
   h.world.revision++;
@@ -133,7 +133,7 @@ test('retirement waits for late creation, disposes old tab, and fences before a 
   const retirement = main.prepare(false).then(() => { retired = true; });
   await setImmediate();
   assert.equal(retired, false);
-  pending.resolve({ tab_id: 17 });
+  pending.resolve({ window_token: 17 });
   await rejected; await retirement;
   const closeIndex = h.commands.findIndex(command => command.cmd === 'closePanelTab' && command.panelId === panel.panelId);
   assert.ok(closeIndex >= 0);
@@ -148,7 +148,7 @@ test('completed camera creation returns its tab and retirement never writes came
   const h = harness();
   h.options.send = async command => {
     h.commands.push(command);
-    return command.cmd === 'createCameraView' ? { tab_id: 27, existing: false } : {};
+    return command.cmd === 'createCameraView' ? { window_token: 27, existing: false } : {};
   };
   const main = createEditorWindowSession(h.options);
   await main.prepare(true);
@@ -385,7 +385,7 @@ test('a completed native operation needs no legacy queue barrier', async () => {
   const main = createEditorWindowSession(h.options);
   await main.prepare(true);
   h.commands.length = 0;
-  await main.open({ cmd: 'focusPanelTab', tabId: 7 });
+  await main.open({ cmd: 'focusPanelTab', panelId: 'SceneTools' });
   assert.deepEqual(h.commands.map(command => command.cmd), ['focusPanelTab']);
   assert.equal(h.storage.length, 1);
 });

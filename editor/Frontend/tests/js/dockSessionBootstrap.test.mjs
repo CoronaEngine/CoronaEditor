@@ -16,7 +16,7 @@ for (const storedOwner of [null, 'another-surface-owner']) {
     const mainMessages = getWebMessages(main);
     const mainState = createWindowSessionState(mainMessages, { owner, main: true });
     mainMessages.setGeneration(() => mainState.read().generation);
-    const record = { owner, id: 'dock-1', generation, status: 'ready', kind: 'panel', tabId: 2 };
+    const record = { owner, id: 'dock-1', generation, status: 'ready', kind: 'panel', windowToken: 2 };
     mainState.write({ owner, generation, revision: 1, enabled: true, records: [record] });
 
     let nativeCloses = 0;

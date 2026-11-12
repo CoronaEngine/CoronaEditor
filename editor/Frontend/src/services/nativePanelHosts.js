@@ -7,7 +7,7 @@ export function createNativePanelHosts({ open, close, focus = async () => {}, on
   let latestPanels = [];
   function retire(id, host) {
     if (closing.has(id)) return closing.get(id);
-    const pending = Promise.resolve().then(() => close(host.tabId, id)).then(() => {
+    const pending = Promise.resolve().then(() => close(host.windowToken, id)).then(() => {
       if (hosts.get(id) === host) hosts.delete(id);
       if (!disposed && host.wanted) reconcile(latestPanels);
     }).catch(onError).finally(() => {
@@ -22,7 +22,7 @@ export function createNativePanelHosts({ open, close, focus = async () => {}, on
     for (const [id, host] of hosts) {
       const wasWanted = host.wanted;
       host.wanted = wanted.has(id);
-      if (!host.wanted && wasWanted && host.tabId !== undefined) {
+      if (!host.wanted && wasWanted && host.windowToken !== undefined) {
         void retire(id, host);
       }
     }
@@ -37,9 +37,9 @@ export function createNativePanelHosts({ open, close, focus = async () => {}, on
           return;
         }
         const result = await open(panel);
-        const tabId = result?.tab_id;
-        if (!Number.isInteger(tabId)) throw new Error(`Missing tab_id for ${id}`);
-        host.tabId = tabId;
+        const windowToken = result?.window_token;
+        if (!Number.isInteger(windowToken)) throw new Error(`Missing window_token for ${id}`);
+        host.windowToken = windowToken;
         if (disposed || !host.wanted) {
           await retire(id, host);
         }
@@ -50,9 +50,9 @@ export function createNativePanelHosts({ open, close, focus = async () => {}, on
       });
     }
   }
-  function closed(id, tabId) {
+  function closed(id, windowToken) {
     const host = hosts.get(id);
-    if (!Number.isInteger(tabId) || !host || host.tabId !== tabId || closing.has(id)) return false;
+    if (!Number.isInteger(windowToken) || !host || host.windowToken !== windowToken || closing.has(id)) return false;
     hosts.delete(id);
     return true;
   }
@@ -61,7 +61,7 @@ export function createNativePanelHosts({ open, close, focus = async () => {}, on
     const host = hosts.get(id);
     if (!host) return false;
     await host.pending;
-    if (disposed || hosts.get(id) !== host || !host.wanted || host.tabId === undefined) return false;
+    if (disposed || hosts.get(id) !== host || !host.wanted || host.windowToken === undefined) return false;
     await focus(id);
     return true;
   }

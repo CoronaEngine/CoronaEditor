@@ -40,7 +40,7 @@ test('SceneBar camera list preserves archive identity through the application wi
         assert.equal(options.x, 0); assert.equal(options.y, 0);
         assert.equal('handle' in options, false);
         calls.push(options);
-        return { tab_id: 7 };
+        return { window_token: 7 };
       },
     } },
   };
@@ -72,7 +72,7 @@ test('opening an existing camera sends only one window operation with the observ
   const open = handler('sidebar/SceneBar', 'OpenCameraView', {
     currentSceneName: ref('scene'), archiveSession: ref('archive'),
     editorApi: { sceneTools: { openCameraView: async () => { throw new Error('retired state mutation'); } } },
-    appService: { createCameraView: async value => { calls.push(value); return { tab_id: 7 }; } },
+    appService: { createCameraView: async value => { calls.push(value); return { window_token: 7 }; } },
     OnInitObjTree: async () => calls.push('refresh'), logError: (...args) => errors.push(args),
   });
   await open(camera);

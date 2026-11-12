@@ -172,7 +172,7 @@ test('late native panel completion is closed after switching between editable pr
   const pending = appService.openNativePanel(nativePanel);
   worldModeService.invalidate('story');
   await worldModeService.resolve('creative', { force: true });
-  request.resolve({ tab_id: 7 });
+  request.resolve({ window_token: 7 });
   await assert.rejects(pending, /世界已切换/);
   assert.deepEqual(closed, ['Object']);
   assert.ok(commands.every(command => command.cmd !== 'closePanelTab'));

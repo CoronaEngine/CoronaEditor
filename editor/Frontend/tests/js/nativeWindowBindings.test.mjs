@@ -75,7 +75,7 @@ test('closing the registered node panel uses the graph save barrier and retains 
   window.localStorage = memoryStorage(); window.sessionStorage = memoryStorage(); window.location = { hash: '#/' };
   let nextTab = 0, saves = 0, fail = true;
   const closed = [];
-  native.createPanel = async () => ({ tab_id: ++nextTab });
+  native.createPanel = async () => ({ window_token: ++nextTab });
   native.close = async identity => { if (identity.panelId) closed.push(identity.panelId); return { closed: 1 }; };
   await appService.setEditorUiEnabled(true);
   t.mock.method(editorApi.scene, 'readActive', async () => ({ archive_session: 'graph-archive' }));
@@ -101,11 +101,11 @@ test('panel creation uses a typed V8 operation and carries no placement', async 
   t.after(() => { Object.assign(worldModeState, oldWorld); });
   Object.assign(worldModeState, { status: 'ready', mode: 'creative', revision: 1 });
   window.localStorage = memoryStorage(); window.sessionStorage = memoryStorage(); window.location = { hash: '#/' };
-  native.createPanel = async options => { calls.push(options); return { tab_id: 12, panel_id: options.panelId }; };
+  native.createPanel = async options => { calls.push(options); return { window_token: 12, panel_id: options.panelId }; };
   await appService.setEditorUiEnabled(true);
   calls.length = 0;
   assert.deepEqual(await appService.openNativePanel({ panelId: 'inspector', routePath: '/Inspector', width: 420 }),
-    { tab_id: 12, panel_id: 'inspector' });
+    { window_token: 12, panel_id: 'inspector' });
   assert.equal(calls[0].panelId, 'inspector');
   assert.equal(calls[0].width, 420);
   assert.match(calls[0].routePath, /uiSession=.*uiWindow=.*uiOwner=/);
@@ -183,13 +183,13 @@ test('camera windows use archive and camera identity without reading a Web numer
   Object.assign(worldModeState, { status: 'ready', mode: 'creative', revision: 1 });
   window.localStorage = memoryStorage(); window.sessionStorage = memoryStorage(); window.location = { hash: '#/' };
   const calls = [];
-  native.createPanel = async options => { calls.push(options); return { tab_id: 31, panel_id: '', existing: false }; };
+  native.createPanel = async options => { calls.push(options); return { window_token: 31, panel_id: '', existing: false }; };
   await appService.setEditorUiEnabled(true);
   const camera = { archive_session: 'archive-opaque-18446744073709551615', scene_id: 'scene.ini', camera_id: 'camera-main',
     view_x: 0, view_y: 0, view_width: 800, view_height: 600,
     get handle() { throw new Error('Web must not read or convert the camera handle'); },
   };
-  assert.deepEqual(await appService.createCameraView(camera), { tab_id: 31, panel_id: '', existing: false });
+  assert.deepEqual(await appService.createCameraView(camera), { window_token: 31, panel_id: '', existing: false });
   assert.equal(calls.length, 1);
   assert.equal(calls[0].kind, 'camera', 'the camera window is the panel kind, not a second method');
   assert.equal(calls[0].archiveSession, camera.archive_session);

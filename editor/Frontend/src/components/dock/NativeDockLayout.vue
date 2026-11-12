@@ -15,7 +15,7 @@ const hosts = createNativePanelHosts({
     panelId: panel.id, routePath: panel.routePath, title: t(panel.displayNameKey),
     width: panel.defaultWidth, height: panel.defaultHeight,
   }),
-  close: (tabId, id) => appService.closePanelTab(id),
+  close: (windowToken, id) => appService.closePanelTab(id),
   focus: id => appService.focusPanelTab(id),
   onError: (error, id) => { console.error('[NativeDock]', error); if (id) store.closePanel(id); },
 });
@@ -23,7 +23,7 @@ const stop = watch(() => PLUGIN_MANIFEST.filter(panel => store.panels[panel.id].
   panels => hosts.reconcile(panels), { immediate: true });
 function closed(payload) {
   if (!payload?.panelId) return;
-  if (hosts.closed(payload.panelId, payload.tabId)) store.closePanel(payload.panelId);
+  if (hosts.closed(payload.panelId, payload.windowToken)) store.closePanel(payload.panelId);
 }
 const stopClosed = appService.onWindowClosed(closed);
 const focusPanel = id => { void hosts.focusPanel(id).catch(error => console.error('[NativeDock] focus failed', error)); };

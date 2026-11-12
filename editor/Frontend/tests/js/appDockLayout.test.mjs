@@ -57,7 +57,7 @@ async function renderApp({ path = '/', standalone = false, mode = 'creative' } =
   const asyncNoop = async () => {};
   const appService = {
     onWindowClosed: () => noop,
-    openNativePanel: async options => ({ tab_id: opened.push(options) }),
+    openNativePanel: async options => ({ window_token: opened.push(options) }),
     setEditorUiEnabled: asyncNoop,
     readEditorUiPolicy: async () => ({ enabled: true }),
   };

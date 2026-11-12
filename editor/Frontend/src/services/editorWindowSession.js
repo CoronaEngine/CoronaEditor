@@ -61,11 +61,11 @@ export function createEditorWindowSession({ state, send, publish, getWorld, getQ
     } else if (record.kind === 'camera') {
       await fence();
       await send({ cmd: 'suspendCameraViews', sceneId: record.sceneId });
-    } else if (Number.isInteger(record.tabId)) {
+    } else if (Number.isInteger(record.windowToken)) {
       if (notify) {
         await beforeClose(record);
         record = records().find(item => item.id === record.id && item.generation === record.generation
-          && item.tabId === record.tabId);
+          && item.windowToken === record.windowToken);
         if (!record) return;
         record.status = 'closing'; await save(record);
         await drain(item => item.source === record.id);
@@ -138,16 +138,16 @@ export function createEditorWindowSession({ state, send, publish, getWorld, getQ
     const request = { ...command };
     if (record.kind !== 'operation') request.routePath = taggedRoute(command.routePath, current.generation, id, current.owner);
     const finish = async result => {
-      record.tabId = result?.tab_id;
+      record.windowToken = result?.window_token;
       record.status = 'settling';
       if (record.kind !== 'operation') await save(record);
       if (record.kind === 'operation') {
         if (!policy().enabled || policy().generation !== current.generation) throw new Error('世界已切换，已丢弃旧窗口请求');
         return;
       }
-      if (record.kind !== 'operation' && !Number.isInteger(record.tabId)) {
+      if (record.kind !== 'operation' && !Number.isInteger(record.windowToken)) {
         record.status = 'uncertain'; await save(record);
-        throw new Error('窗口创建结果缺少 tab_id，已取消切换世界');
+        throw new Error('窗口创建结果缺少 window_token，已取消切换世界');
       }
       if (!policy().enabled || policy().generation !== current.generation || !worldAllowed()) {
         await dispose(record);
@@ -210,7 +210,7 @@ export function createEditorWindowSession({ state, send, publish, getWorld, getQ
     const current = requirePolicy();
     const record = ownRecord();
     return publish(event, {
-      ...payload, uiGeneration: current.generation, ...(record?.tabId !== undefined ? { tabId: record.tabId } : {}),
+      ...payload, uiGeneration: current.generation, ...(record?.windowToken !== undefined ? { windowToken: record.windowToken } : {}),
     });
   }
   function accepts(payload) {
