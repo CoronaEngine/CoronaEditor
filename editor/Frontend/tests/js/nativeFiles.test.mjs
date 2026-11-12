@@ -33,3 +33,20 @@ test('file operations reach the Python archive service through the bridge', asyn
   }
   for (const retired of ['getProjectInfo', 'getFiles', 'createFile']) assert.equal(editorApi.files[retired], undefined);
 });
+
+test('file operation refusals surface as rejections with the service code', async t => {
+  const previous = globalThis.window;
+  t.after(() => { globalThis.window = previous; });
+  const request = { archive_session: 'lease', project_path: 'P:/世界', path: 'scene.ini' };
+  globalThis.window = { corona: {
+    bridge: { call: () => Promise.resolve(JSON.stringify({
+      status: 'error', code: 'PERMISSION_DENIED', message: 'Cannot change the archive root or scene.ini' })) },
+    project: { openDocument: () => Promise.resolve({ ok: true }) },
+  } };
+  await assert.rejects(editorApi.files.deleteItem(request), error => {
+    assert.equal(error.code, 'PERMISSION_DENIED');
+    assert.equal(error.message, 'Cannot change the archive root or scene.ini');
+    return true;
+  });
+  await assert.rejects(editorApi.files.getFileTree(request), error => error.code === 'PERMISSION_DENIED');
+});

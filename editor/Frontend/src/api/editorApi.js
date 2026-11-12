@@ -10,13 +10,27 @@ const bridgeCall = async (service, method, args = []) => {
   return typeof raw === 'string' ? JSON.parse(raw) : raw;
 };
 
-/** Project file operations are owned by the Python archive service. */
-const fileOp = (op, request, args) => bridgeCall('ProjectArchive', 'file_manager', [{
-  archive_session: request.archive_session,
-  project_path: request.project_path,
-  op,
-  args,
-}]);
+/** Project file operations are owned by the Python archive service.
+ *
+ * The service answers one of its success shapes (true, a tree entry, a list of
+ * entries, {status:'success'}) and {status:'error', code, message} when it
+ * refuses. Refusals are raised here so every caller's try/catch sees them and
+ * can branch on error.code instead of matching translated message text.
+ */
+const fileOp = async (op, request, args) => {
+  const reply = await bridgeCall('ProjectArchive', 'file_manager', [{
+    archive_session: request.archive_session,
+    project_path: request.project_path,
+    op,
+    args,
+  }]);
+  if (reply && typeof reply === 'object' && !Array.isArray(reply) && reply.status === 'error') {
+    const error = new Error(reply.message || 'Project file operation failed');
+    error.code = reply.code || 'FILE_OPERATION_FAILED';
+    throw error;
+  }
+  return reply;
+};
 
 const editorApiStatic = {
   app: {
