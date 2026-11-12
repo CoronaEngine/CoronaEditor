@@ -82,7 +82,6 @@ export const appService = {
   focusPanelTab: panelId => openEditorWindow({ cmd: 'focusPanelTab', panelId }),
   readEditorUiPolicy: async () => { await session().hydrate(); return session().policy(); },
   setEditorUiEnabled: enabled => session().prepare(enabled),
-  getCurrentWindow: () => editorApi.window.getCurrent(),
   onWindowClosed: callback => editorApi.window.onClosed(callback),
   onWindowCloseRequested: callback => editorApi.window.onCloseRequested(callback),
   openNativePanel: options => openEditorWindow({ cmd: 'createPanelTab', ...options }),

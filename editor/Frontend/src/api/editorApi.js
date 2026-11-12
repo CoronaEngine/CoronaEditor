@@ -113,7 +113,6 @@ const editorApiStatic = {
     setEnvironment: (sceneName, patch) => window.corona.scene.setEnvironment(sceneName, patch),
   },
   window: {
-    getCurrent: () => window.corona.window.getCurrent(),
     // One verb for "close a window"; the identity decides which. No argument = this one.
     close: identity => identity === undefined ? window.corona.window.close()
       : window.corona.window.close(identity),

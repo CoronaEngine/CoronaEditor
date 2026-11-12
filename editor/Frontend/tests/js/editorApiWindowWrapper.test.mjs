@@ -8,7 +8,7 @@ import { test } from 'node:test';
 // the shape to pin.
 
 const WINDOW_METHODS = [
-  'getCurrent', 'close', 'focus', 'createPanel', 'setWindowPresentation',
+  'close', 'focus', 'createPanel', 'setWindowPresentation',
 ];
 const WINDOW_EVENTS = ['onClosed', 'onCloseRequested'];
 

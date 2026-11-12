@@ -14,9 +14,7 @@ function nativeWindow(t) {
   t.mock.method(editorApi.scene, 'readActive', async () => ({ archive_session: '' }));
   const previous = globalThis.window;
   const calls = [];
-  const snapshot = { browserId: '18446744073709551615', frameId: 'frame', dockState: 'docked' };
   const native = {
-    getCurrent: () => Promise.resolve(snapshot),
     close: () => Promise.resolve({ closed: 0 }),
   };
   globalThis.window = { corona: { window: native },
@@ -24,7 +22,7 @@ function nativeWindow(t) {
     cefQuery: () => { throw new Error('legacy query transport is forbidden'); },
   };
   t.after(() => { getWebMessages(globalThis.window).dispose(); globalThis.window = previous; });
-  return { calls, snapshot, native };
+  return { calls, native };
 }
 
 test('application window reads call the native V8 function without JSON', async t => {
@@ -32,7 +30,6 @@ test('application window reads call the native V8 function without JSON', async 
   const stringify = JSON.stringify, parse = JSON.parse;
   t.after(() => { JSON.stringify = stringify; JSON.parse = parse; });
   JSON.stringify = JSON.parse = () => { throw new Error('JSON transport is forbidden'); };
-  assert.equal(await appService.getCurrentWindow(), snapshot);
   // ImGui owns window dragging, so the facade no longer declares drag regions.
   assert.equal(appService.setDragRegions, undefined);
   assert.equal(appService.setCurrentTabDragRegions, undefined);
