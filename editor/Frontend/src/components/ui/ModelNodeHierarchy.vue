@@ -168,6 +168,10 @@ const persistNodePatch = (node, patch) => {
     }, patch);
     if (!isCurrentActor(identity)) return null;
     actorVersion.value = Number(data.actor_version || actorVersion.value);
+    // Any read that started before this write would describe the old node, and the page
+    // map is replaced wholesale, so retire those reads now instead of letting one land
+    // after the patch and undo it.
+    request += 1;
     return data;
   });
   mutationChain = operation.catch(() => {});
@@ -190,7 +194,9 @@ const loadPage = async (parentIndex, offset = 0) => {
       offset,
       limit: pageSize,
     });
-    if (token !== request || !isCurrentActor(identity)) return null;
+    const replyVersion = Number(data.actor_version);
+    const stale = Number.isFinite(replyVersion) && replyVersion > 0 && replyVersion < actorVersion.value;
+    if (token !== request || stale || !isCurrentActor(identity)) return null;
     const previous = pages.value[key]?.items || [];
     const incoming = Array.isArray(data.nodes) ? data.nodes : [];
     const page = {
@@ -295,6 +301,7 @@ const select = (node) => {
 };
 
 const toggleVisibility = async (node) => {
+  if (!viewLifetime.current()) return;
   const identity = actorIdentity();
   const data = await persistNodePatch(node, { visible: !node.visible });
   if (!data || !isCurrentActor(identity)) return;

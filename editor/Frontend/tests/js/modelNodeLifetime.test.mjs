@@ -39,6 +39,35 @@ function mount(t, overrides = {}) {
   return { state, props, calls, events, observers, dispose: () => unmounted(), start: () => mounted() };
 }
 
+test('a page reply older than the applied edit is discarded', async t => {
+  const pendingRead = deferred();
+  const page = mount(t, { read: () => pendingRead.promise });
+  page.state.actorVersion.value = 5;
+  pendingRead.resolve({ nodes: [node], actor_version: 1 });
+  await setImmediate();
+  assert.equal(page.state.pages.value['-1'], undefined,
+    'a reply describing the pre-edit state must not replace the list');
+});
+
+test('a page read in flight when a write lands cannot undo the patched row', async t => {
+  let reads = 0;
+  const pendingRead = deferred();
+  const page = mount(t, {
+    read: () => (++reads === 1
+      ? Promise.resolve({ nodes: [node], actor_version: 2 })
+      : pendingRead.promise),
+    write: async (_, patch) => ({ nodes: [{ ...node, ...patch }], actor_version: 3 }),
+  });
+  await setImmediate();
+  const refresh = page.state.loadMore('-1');
+  const data = await page.state.persistNodePatch(node, { visible: false });
+  page.state.applyNode(data.nodes[0]);
+  pendingRead.resolve({ nodes: [node], actor_version: 2 });
+  await refresh;
+  assert.equal(page.state.pages.value['-1'].items[0].visible, false,
+    'the read that started before the write is stale');
+});
+
 test('model node edit queued before retirement never reaches native state', async t => {
   const page = mount(t);
   const editing = page.state.persistNodePatch(node, { visible: false });
