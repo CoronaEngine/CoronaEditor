@@ -122,8 +122,10 @@ const editorApiStatic = {
     setWindowPresentation: options => window.corona.window.setWindowPresentation(options),
     onClosed: callback => window.corona.window.onClosed(callback),
     onCloseRequested: callback => window.corona.window.onCloseRequested(callback),
-    canCloseSceneViews: () => typeof window.corona?.window?.close === 'function',
-    hasWindowBindings: () => Boolean(window.corona?.window),
+    // One probe for "the native window surface is here": the app only uses it to decide
+    // whether it may retire windows and subscribe to close requests.
+    hasWindowBindings: () => typeof window.corona?.window?.close === 'function'
+      && typeof window.corona?.window?.onCloseRequested === 'function',
   },
   viewport: {
     pick: (sceneName, cameraId, options) => window.corona.viewport.pick(sceneName, cameraId, options),

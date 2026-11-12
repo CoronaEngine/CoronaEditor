@@ -68,20 +68,15 @@ test('window event subscriptions return the native unsubscribe function', async 
   assert.deepEqual(seen, [closed, requested]);
 });
 
-test('the facade centralizes scene-view close capability probing', async t => {
-  withNativeWindow(t, {});
-  const absent = await import(`../../src/api/editorApi.js?window-probe=${Date.now()}`);
-  assert.equal(absent.editorApi.window.canCloseSceneViews(), false);
-  withNativeWindow(t, { close: () => {} });
-  const present = await import(`../../src/api/editorApi.js?window-probe2=${Date.now()}`);
-  assert.equal(present.editorApi.window.canCloseSceneViews(), true);
-});
-
-test('the facade exposes the native window presence probe', async t => {
+test('the facade exposes one native window presence probe', async t => {
   withNativeWindow(t, undefined);
   const absent = await import(`../../src/api/editorApi.js?window-presence=${Date.now()}`);
   assert.equal(absent.editorApi.window.hasWindowBindings(), false);
-  withNativeWindow(t, { getCurrent: () => {} });
-  const present = await import(`../../src/api/editorApi.js?window-presence2=${Date.now()}`);
+  // Both halves matter: retiring windows needs close, subscribing needs onCloseRequested.
+  withNativeWindow(t, { close: () => {} });
+  const half = await import(`../../src/api/editorApi.js?window-presence2=${Date.now()}`);
+  assert.equal(half.editorApi.window.hasWindowBindings(), false);
+  withNativeWindow(t, { close: () => {}, onCloseRequested: () => {} });
+  const present = await import(`../../src/api/editorApi.js?window-presence3=${Date.now()}`);
   assert.equal(present.editorApi.window.hasWindowBindings(), true);
 });

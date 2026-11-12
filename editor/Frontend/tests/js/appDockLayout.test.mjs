@@ -80,7 +80,7 @@ async function renderApp({ path = '/', standalone = false, mode = 'creative' } =
     },
     '@/components/ui/CabbageGuidanceOverlay.vue': { default: empty },
     '@/api/editorApi.js': { editorApi: {
-      window: { hasWindowBindings: () => false, canCloseSceneViews: () => false },
+      window: { hasWindowBindings: () => false },
     } },
     '@/api/observerRuntime.js': { getObserverRuntime: () => ({ observe: async () => 0, off: async () => {} }) },
     '@/services/projectLauncherService.js': { cancelPendingProjectOpen: noop },
@@ -113,10 +113,13 @@ test('each requested creative panel gets a native window, including center and f
   const h = await renderApp();
   t.after(h.dispose);
   assert.doesNotMatch(h.html, /data-dock-zone=|global-center-overlay|standalone-resize-handle/);
-  assert.deepEqual(h.opened.map(({ panelId, dockingPos, nativeDocked }) => [panelId, dockingPos, nativeDocked]), [
-    ['SceneControls', 'left', true], ['SceneTools', 'right', true],
-    ['NodeGraphPanel', 'center', false], ['EditorSettings', 'center', true],
-  ]);
+  assert.deepEqual(h.opened.map(({ panelId }) => panelId),
+    ['SceneControls', 'SceneTools', 'NodeGraphPanel', 'EditorSettings']);
+  // ImGui owns panel placement now: no request may carry a dock slot or a detach flag.
+  for (const options of h.opened) {
+    assert.equal('dockingPos' in options, false, `${options.panelId} must not request a dock slot`);
+    assert.equal('nativeDocked' in options, false, `${options.panelId} must not request a detach state`);
+  }
 });
 
 test('a standalone panel renders its route without hosting more windows', async t => {

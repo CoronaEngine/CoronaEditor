@@ -57,11 +57,11 @@ watch(() => [worldModeState.status, worldModeState.revision, route.path, route.m
   if (worldModeState.status === 'ready') lastReadyProjectKey = projectKey;
   preparedRevision.value = -1;
   try {
-    if (!isStandalonePanel.value && editorApi.window.canCloseSceneViews()) {
+    if (!isStandalonePanel.value && editorApi.window.hasWindowBindings()) {
       const enabled = editorUiAllowed() && !isLauncherRoute.value;
       if (!enabled && !refreshingCurrentProject) dockStore.clearSession();
       await appService.setEditorUiEnabled(enabled);
-    } else if (isStandalonePanel.value && editorApi.window.canCloseSceneViews()) {
+    } else if (isStandalonePanel.value && editorApi.window.hasWindowBindings()) {
       const policy = await appService.readEditorUiPolicy();
       if (!viewLifetime.current() || preparation !== preparationRevision || revision !== worldModeState.revision) return;
       if (!policy?.enabled) { await appService.closeThisTab(''); return; }

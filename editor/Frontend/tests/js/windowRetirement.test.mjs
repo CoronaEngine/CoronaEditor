@@ -23,7 +23,8 @@ function nativeSurface(t) {
     // Closing a single panel resolves immediately and is only recorded.
     corona: { window: { close: identity => (identity && 'sceneId' in identity)
       ? new Promise((resolve, reject) => barriers.push({ sceneId: identity.sceneId, resolve, reject }))
-      : (sent.push(['close', identity]), Promise.resolve(true)) } },
+      : (sent.push(['close', identity]), Promise.resolve(true)),
+      onCloseRequested: () => () => {} } },
     localStorage: memoryStorage(), sessionStorage: memoryStorage(), location: { hash: '#/' }, dispatchEvent() {} };
   surface.corona.window.setWindowPresentation = async (...args) => { sent.push(['setWindowPresentation', ...args]); return true; };
   const previous = globalThis.window;

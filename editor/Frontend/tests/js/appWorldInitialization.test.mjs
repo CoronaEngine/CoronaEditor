@@ -55,7 +55,7 @@ for (const first of ['guard', 'observer']) {
       '@/stores/dockStore.js': { useDockStore: () => ({ clearSession: noop }) },
       '@/services/appService.js': { appService: {} },
       '@/api/editorApi.js': { editorApi: {
-        window: { hasWindowBindings: () => false, canCloseSceneViews: () => false },
+        window: { hasWindowBindings: () => false },
       } },
       '@/api/observerRuntime.js': { getObserverRuntime: () => ({
         observe: async (_kind, handler) => { observer = handler; return 1; },
@@ -123,7 +123,7 @@ function mountLifecycleApp(t, role = 'peer') {
       closeThisTab: async () => { closed.push(true); }, onWindowCloseRequested: () => noop,
     } },
     '@/api/editorApi.js': { editorApi: {
-      window: { hasWindowBindings: () => true, canCloseSceneViews: () => true },
+      window: { hasWindowBindings: () => true },
     } },
     '@/api/observerRuntime.js': { getObserverRuntime: () => ({
       observe: (_kind, callback) => { projectCallback = callback; return projectRegistration.promise; },
