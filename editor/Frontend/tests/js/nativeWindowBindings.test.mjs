@@ -102,30 +102,28 @@ test('closing the registered node panel uses the graph save barrier and retains 
   assert.deepEqual(closed, [other.tab_id, node.tab_id]);
 });
 
-test('panel creation and docking use typed V8 operations without legacy completion fences', async t => {
+test('panel creation uses a typed V8 operation and carries no placement', async t => {
   const { native } = nativeWindow(t);
   const calls = [];
   const oldWorld = { ...worldModeState };
   t.after(() => { Object.assign(worldModeState, oldWorld); });
   Object.assign(worldModeState, { status: 'ready', mode: 'creative', revision: 1 });
   window.localStorage = memoryStorage(); window.sessionStorage = memoryStorage(); window.location = { hash: '#/' };
-  native.createPanel = async options => { calls.push(['create', options]); return { tab_id: 12, panel_id: options.panelId }; };
-  native.setPanelPlacement = async options => { calls.push(['placement', options]); return !options.detached; };
+  native.createPanel = async options => { calls.push(options); return { tab_id: 12, panel_id: options.panelId }; };
   await appService.setEditorUiEnabled(true);
   calls.length = 0;
   assert.deepEqual(await appService.openNativePanel({ panelId: 'inspector', routePath: '/Inspector', width: 420 }),
     { tab_id: 12, panel_id: 'inspector' });
-  assert.equal(calls[0][0], 'create');
-  assert.equal(calls[0][1].panelId, 'inspector');
-  assert.equal(calls[0][1].width, 420);
-  assert.match(calls[0][1].routePath, /uiSession=.*uiWindow=.*uiOwner=/);
-  assert.equal('cmd' in calls[0][1], false, 'native options must not carry legacy command tags');
-  assert.equal(await appService.detachPanel({ tabId: 12, maximized: true }), false);
-  assert.equal(await appService.redockPanel({ tabId: 12 }), true);
-  assert.deepEqual(calls.slice(1), [
-    ['placement', { tabId: 12, maximized: true, detached: true }],
-    ['placement', { tabId: 12, detached: false }],
-  ]);
+  assert.equal(calls[0].panelId, 'inspector');
+  assert.equal(calls[0].width, 420);
+  assert.match(calls[0].routePath, /uiSession=.*uiWindow=.*uiOwner=/);
+  assert.equal('cmd' in calls[0], false, 'native options must not carry legacy command tags');
+  // ImGui owns where a panel sits: there is no placement request to send.
+  assert.equal('dockingPos' in calls[0], false);
+  assert.equal('nativeDocked' in calls[0], false);
+  assert.equal('detached' in calls[0], false);
+  assert.equal(appService.detachPanel, undefined);
+  assert.equal(appService.redockPanel, undefined);
   const failure = Object.assign(new Error('retired'), { code: 'CONTEXT_CHANGED' });
   native.createPanel = () => Promise.reject(failure);
   await assert.rejects(appService.openNativePanel({ panelId: 'other' }), error => error === failure);

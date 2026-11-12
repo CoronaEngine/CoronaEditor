@@ -19,15 +19,13 @@ const windowSessions = new WeakMap();
 // Closed 1:1 mapping from the window session's intent vocabulary to the named
 // facade bindings. Not a general command router: unknown cmds are rejected.
 // Native merged its duplicated window verbs, so the intents below express *what*
-// they want (a kind of panel, a placement, a window state) rather than the verb
-// that used to encode it.
+// they want (a kind of panel, a window state) rather than the verb that used to
+// encode it. Placement is ImGui's: the user docks a panel, not the Web layer.
 const windowCommandOps = {
   closeThisTab: () => editorApi.window.close(),
   closePanelTab: parameters => editorApi.window.closeTab(parameters.tabId),
   focusPanelTab: parameters => editorApi.window.focusTab(parameters.tabId),
   createPanelTab: parameters => editorApi.window.createPanel(parameters),
-  detachPanel: parameters => editorApi.window.setPanelPlacement({ ...parameters, detached: true }),
-  redockPanel: parameters => editorApi.window.setPanelPlacement({ ...parameters, detached: false }),
   suspendCameraViews: parameters => editorApi.window.suspendCameraViews(parameters.sceneId),
   closeCameraView: parameters => editorApi.window.closeCameraView(parameters.sceneId, parameters.cameraId),
   cycleThisCameraViewWindowMode: parameters => editorApi.window.setWindowPresentation({
@@ -91,8 +89,6 @@ export const appService = {
   closeThisTab: (panelId) => session().closeThis(panelId),
   closePanelTab: (tabId, panelId) =>
     session().closeTab(tabId, panelId),
-  detachPanel: (opts = {}) => openEditorWindow({ cmd: 'detachPanel', ...opts }),
-  redockPanel: (opts = {}) => openEditorWindow({ cmd: 'redockPanel', ...opts }),
   // Keep all camera controls in the window session so retired surfaces cannot
   // apply their operations against the next creative world.
   cycleThisCameraViewWindowMode: (sceneId = '', cameraId = '') =>

@@ -14,7 +14,6 @@ const hosts = createNativePanelHosts({
   open: panel => appService.openNativePanel({
     panelId: panel.id, routePath: panel.routePath, title: t(panel.displayNameKey),
     width: panel.defaultWidth, height: panel.defaultHeight,
-    dockingPos: panel.defaultDock, nativeDocked: !panel.floating,
   }),
   close: (tabId, id) => appService.closePanelTab(tabId, id),
   focus: tabId => appService.focusPanelTab(tabId),

@@ -1,9 +1,8 @@
 <template>
-  <Teleport to="body" :disabled="!isFullscreen">
   <div
     ref="workspaceRootRef"
     class="node-graph-workspace"
-    :class="{ fullscreen: isFullscreen, compact: isCompactLayout, narrow: isNarrowLayout }"
+    :class="{ compact: isCompactLayout, narrow: isNarrowLayout }"
     :style="layoutStyle"
   >
     <div class="ng-toolbar">
@@ -308,7 +307,6 @@
       {{ externalDrag.label }}
     </div>
   </Teleport>
-  </Teleport>
 </template>
 
 <script setup>
@@ -358,8 +356,6 @@ const NODE_WIDTH = 170,
   CANVAS_WORLD_HEIGHT = 3200,
   CANVAS_OVERSCROLL = 180,
   SAVE_DELAY = 300;
-const isFullscreen = ref(false);
-const fullscreenTransitionBusy = ref(false);
 const mode = ref('select'),
   selectedKind = ref(''),
   selectedId = ref(''),
@@ -433,57 +429,6 @@ const layoutStyle = computed(() => ({
   '--inspector-width': `${layout.inspectorWidth}px`,
   '--variables-height': `${effectiveVariablesHeight.value}px`,
 }));
-async function toggleFullscreen() {
-  if (fullscreenTransitionBusy.value) return;
-  const next = !isFullscreen.value;
-  fullscreenTransitionBusy.value = true;
-
-  // The Object panel runs in an independent CEF surface. A CSS overlay cannot grow beyond
-  // that surface, so detach the whole panel first and let the node editor fill the
-  // resulting native window. Explicit desired-state commands avoid reversing a
-  // still-pending detach transition.
-  const screenWidth = Number(window.screen?.availWidth || window.screen?.width || 1368);
-  const screenHeight = Number(window.screen?.availHeight || window.screen?.height || 768);
-  // SDL expects physical pixels while the browser exposes screen dimensions in CSS pixels.
-  // Scale the requested detached window geometry so fullscreen stays fullscreen on high-DPI
-  // displays instead of shrinking to roughly 1 / devicePixelRatio of the desktop.
-  const deviceScale = Math.max(1, Number(window.devicePixelRatio || 1));
-  const marginX = 16;
-  const marginTop = 16;
-  const marginBottom = 56;
-  const availableWidth = Math.max(1100, Math.round((screenWidth - marginX * 2) * deviceScale));
-  const availableHeight = Math.max(700, Math.round((screenHeight - marginTop - marginBottom) * deviceScale));
-  try {
-    if (next) {
-      await appService.detachPanel({
-        x: Math.round(marginX * deviceScale),
-        y: Math.round(marginTop * deviceScale),
-        width: availableWidth,
-        height: availableHeight,
-        maximized: true,
-      });
-    } else {
-      await appService.redockPanel();
-    }
-    isFullscreen.value = next;
-  } catch (error) {
-    logError(next ? '全屏编辑节点图失败' : '退出全屏编辑失败', error);
-  } finally {
-    window.setTimeout(() => {
-      fullscreenTransitionBusy.value = false;
-      nextTick(() => {
-        updateCanvasSize();
-        resizeEmbeddedWorkspaces();
-      });
-    }, 180);
-  }
-}
-function handleFullscreenKey(event) {
-  if (event.key === 'Escape' && isFullscreen.value) {
-    event.preventDefault();
-    toggleFullscreen();
-  }
-}
 const zoomText = computed(() => `${Math.round(viewport.scale * 100)}%`);
 const dragGhostStyle = computed(() => ({
   left: `${externalDrag.clientX + 14}px`,
@@ -3247,7 +3192,6 @@ onMounted(async () => {
     });
     requestNodeGraphReview(500);
   }
-  window.addEventListener('keydown', handleFullscreenKey);
 });
 onBeforeUnmount(() => {
   viewLifetime.dispose();
@@ -3265,11 +3209,6 @@ onBeforeUnmount(() => {
   stopNodeGraphReview = null;
   unregisterAiNodeGraphConsumer?.();
   unregisterAiNodeGraphConsumer = null;
-  window.removeEventListener('keydown', handleFullscreenKey);
-  if (isFullscreen.value) {
-    appService.redockPanel().catch(() => {});
-    isFullscreen.value = false;
-  }
   if (saveTimer) clearTimeout(saveTimer);
   saveTimer = null;
   if (preWarningTimer) window.clearTimeout(preWarningTimer);
@@ -3309,23 +3248,7 @@ onBeforeUnmount(() => {
   border: 1px solid #1b241d;
   border-radius: 12px;
 }
-.node-graph-workspace.fullscreen {
-  position: fixed;
-  inset: 12px;
-  z-index: 2147483000;
-  width: auto;
-  height: auto;
-  min-height: 0;
-  border-radius: 10px;
-  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.72);
-}
-.node-graph-workspace.fullscreen::before {
-  content: '';
-  position: fixed;
-  inset: 0;
-  z-index: -1;
-  background: rgba(8, 8, 6, 0.86);
-}
+
 .ng-toolbar {
   position: relative;
   min-height: 42px;

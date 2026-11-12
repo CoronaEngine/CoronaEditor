@@ -117,7 +117,6 @@ const editorApiStatic = {
     closeTab: tabId => window.corona.window.closeTab(tabId),
     focusTab: tabId => window.corona.window.focusTab(tabId),
     createPanel: options => window.corona.window.createPanel(options),
-    setPanelPlacement: options => window.corona.window.setPanelPlacement(options),
     setWindowPresentation: options => window.corona.window.setWindowPresentation(options),
     suspendCameraViews: sceneId => window.corona.window.suspendCameraViews(sceneId),
     closeCameraView: (sceneId, cameraId) => window.corona.window.closeCameraView(sceneId, cameraId),
