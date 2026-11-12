@@ -151,21 +151,37 @@ const isSelected = (node) =>
   Number(node.node_index) === Number(props.selection?.nodeIndex) &&
   props.selection?.actorName === actorName.value;
 
+const conflictCodes = new Set(['ACTOR_VERSION_CONFLICT', 'CONFLICT']);
+const writeNodeState = (identity, patch) =>
+  editorApi.scene.setModelNodeState({ ...identity, expected_actor_version: actorVersion.value }, patch);
+
 const persistNodePatch = (node, patch) => {
   if (!viewLifetime.current()) return Promise.resolve(null);
   const identity = {
     ...actorIdentity(),
     node_index: Number(node.node_index),
   };
+  const reloadNodePage = async () => {
+    const parent = Number(node?.parent_index);
+    await loadPage(Number.isFinite(parent) ? parent : displayRoot.value);
+  };
   const operation = mutationChain.then(async () => {
     if (!viewLifetime.current()) return null;
     if (!isCurrentActor(identity)) {
       throw new Error('Model node edit belongs to an inactive Actor');
     }
-    const data = await editorApi.scene.setModelNodeState({
-      ...identity,
-      expected_actor_version: actorVersion.value,
-    }, patch);
+    let data;
+    try {
+      data = await writeNodeState(identity, patch);
+    } catch (error) {
+      if (!conflictCodes.has(error?.code)) throw error;
+      // Another writer moved the Actor version on. Reload the page that owns the node so
+      // the retry starts from the current version, then try exactly once more; the reply
+      // still reports a conflict if the other writer is faster again.
+      await reloadNodePage();
+      if (!viewLifetime.current() || !isCurrentActor(identity)) return null;
+      data = await writeNodeState(identity, patch);
+    }
     if (!isCurrentActor(identity)) return null;
     actorVersion.value = Number(data.actor_version || actorVersion.value);
     return data;
@@ -310,9 +326,15 @@ const select = (node) => {
 const toggleVisibility = async (node) => {
   if (!viewLifetime.current()) return;
   const identity = actorIdentity();
-  const data = await persistNodePatch(node, { visible: !node.visible });
-  if (!data || !isCurrentActor(identity)) return;
-  const updated = data.nodes?.[0] || node; applyNode(updated); select(updated);
+  try {
+    const data = await persistNodePatch(node, { visible: !node.visible });
+    if (!data || !isCurrentActor(identity)) return;
+    const updated = data.nodes?.[0] || node; applyNode(updated); select(updated);
+  } catch {
+    // The retry lost as well: re-read the page so the row shows the authoritative state
+    // instead of the value this view hoped for.
+    if (isCurrentActor(identity)) await loadPage(Number(node?.parent_index ?? displayRoot.value));
+  }
 };
 
 const save = async (key) => {
@@ -320,9 +342,13 @@ const save = async (key) => {
   const identity = actorIdentity();
   const node = selectedNode.value;
   if (!node) return;
-  const data = await persistNodePatch(node, { [key]: [...node[key]] });
-  if (!data || !isCurrentActor(identity)) return;
-  applyNode(data.nodes?.[0] || node);
+  try {
+    const data = await persistNodePatch(node, { [key]: [...node[key]] });
+    if (!data || !isCurrentActor(identity)) return;
+    applyNode(data.nodes?.[0] || node);
+  } catch {
+    if (isCurrentActor(identity)) await loadPage(Number(node?.parent_index ?? displayRoot.value));
+  }
 };
 
 const onScroll = (event) => {

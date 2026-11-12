@@ -50,6 +50,32 @@ test('a page reply older than the applied edit cannot undo it', async t => {
     'the stale reply must be merged with the confirmed edit, not replace it');
 });
 
+test('a version conflict reloads the node page and retries once', async t => {
+  let writes = 0;
+  const page = mount(t, {
+    read: async () => ({ nodes: [{ ...node, visible: false }], actor_version: 4 }),
+    write: async (identity) => {
+      writes += 1;
+      if (writes === 1) throw Object.assign(new Error('Actor moved on'), { code: 'ACTOR_VERSION_CONFLICT' });
+      assert.equal(identity.expected_actor_version, 4, 'the retry uses the reloaded version');
+      return { nodes: [{ ...node, visible: true }], actor_version: 5 };
+    },
+  });
+  await page.state.persistNodePatch(node, { visible: true });
+  assert.equal(writes, 2);
+  assert.equal(page.state.actorVersion.value, 5);
+});
+
+test('a non-conflict rejection is reported without a retry', async t => {
+  let writes = 0;
+  const page = mount(t, { write: async () => {
+    writes += 1;
+    throw Object.assign(new Error('read only'), { code: 'READ_ONLY' });
+  } });
+  await assert.rejects(page.state.persistNodePatch(node, { visible: false }), /read only/);
+  assert.equal(writes, 1);
+});
+
 test('a page read in flight when a write lands cannot undo the patched row', async t => {
   let reads = 0;
   const pendingRead = deferred();
