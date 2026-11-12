@@ -21,7 +21,7 @@ function nativeSurface(t) {
   const surface = {
     corona: { window: { suspendCameraViews: sceneId => new Promise((resolve, reject) => barriers.push({ sceneId, resolve, reject })) } },
     localStorage: memoryStorage(), sessionStorage: memoryStorage(), location: { hash: '#/' }, dispatchEvent() {} };
-  for (const method of ['toggleCameraMaximized', 'cycleCameraWindowMode', 'toggleCameraBorderless', 'resizeCameraView', 'closeCameraView']) {
+  for (const method of ['setWindowPresentation', 'resizeCameraView', 'closeCameraView']) {
     surface.corona.window[method] = async (...args) => { sent.push([method, ...args]); return true; };
   }
   const previous = globalThis.window;
@@ -95,8 +95,8 @@ test('retired camera surfaces cannot queue controls against the next creative wo
     records: [{ owner: 'main', id: 'camera', generation: 'new', status: 'ready', kind: 'camera' }],
   });
   t.after(() => { mainState.dispose(); mainMessages.dispose(); });
-  for (const method of ['toggleMaximizeThisCameraView', 'cycleThisCameraViewWindowMode',
-    'toggleBorderlessThisCameraView', 'resizeThisCameraView', 'closeCameraView']) {
+  for (const method of ['cycleThisCameraViewWindowMode', 'setThisCameraViewPresentation',
+    'resizeThisCameraView', 'closeCameraView']) {
     await assert.rejects(appService[method](), /不允许|CONTEXT_CHANGED/);
   }
   assert.equal(sent.length, 0);

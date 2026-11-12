@@ -1,15 +1,15 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-// WNC-004: editorApi.window named wrapper + centralized capability probe.
-// Every window binding from the frozen 86-entry contract (WNC-001 record)
-// must be reachable through the facade with passthrough semantics.
+// editorApi.window named wrapper + centralized capability probe.
+// Every native window binding must be reachable through the facade with
+// passthrough semantics. Native merged its duplicated verbs (panel kind,
+// panel placement, window presentation), so that is the shape to pin.
 
 const WINDOW_METHODS = [
   'getCurrent', 'setDragRegions', 'close', 'closeTab', 'focusTab', 'createPanel',
-  'createCameraView', 'detachPanel', 'redockPanel', 'suspendCameraViews',
-  'closeCameraView', 'toggleCameraMaximized', 'cycleCameraWindowMode',
-  'toggleCameraBorderless', 'resizeCameraView', 'toggleMainBorderless',
+  'setPanelPlacement', 'setWindowPresentation', 'suspendCameraViews',
+  'closeCameraView', 'resizeCameraView',
 ];
 const WINDOW_EVENTS = ['onClosed', 'onCloseRequested'];
 

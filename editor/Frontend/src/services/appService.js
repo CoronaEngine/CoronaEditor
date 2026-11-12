@@ -18,24 +18,25 @@ import { flushActiveNodeGraphs } from './nodeGraphSaves.js';
 const windowSessions = new WeakMap();
 // Closed 1:1 mapping from the window session's intent vocabulary to the named
 // facade bindings. Not a general command router: unknown cmds are rejected.
+// Native merged its duplicated window verbs, so the intents below express *what*
+// they want (a kind of panel, a placement, a window state) rather than the verb
+// that used to encode it.
 const windowCommandOps = {
   closeThisTab: () => editorApi.window.close(),
   closePanelTab: parameters => editorApi.window.closeTab(parameters.tabId),
   focusPanelTab: parameters => editorApi.window.focusTab(parameters.tabId),
   createPanelTab: parameters => editorApi.window.createPanel(parameters),
-  detachPanel: parameters => editorApi.window.detachPanel(parameters),
-  redockPanel: parameters => editorApi.window.redockPanel(parameters),
+  detachPanel: parameters => editorApi.window.setPanelPlacement({ ...parameters, detached: true }),
+  redockPanel: parameters => editorApi.window.setPanelPlacement({ ...parameters, detached: false }),
   suspendCameraViews: parameters => editorApi.window.suspendCameraViews(parameters.sceneId),
   closeCameraView: parameters => editorApi.window.closeCameraView(parameters.sceneId, parameters.cameraId),
-  toggleMaximizeThisCameraView: parameters =>
-    editorApi.window.toggleCameraMaximized(parameters.sceneId, parameters.cameraId),
-  cycleThisCameraViewWindowMode: parameters =>
-    editorApi.window.cycleCameraWindowMode(parameters.sceneId, parameters.cameraId),
-  toggleBorderlessThisCameraView: parameters =>
-    editorApi.window.toggleCameraBorderless(parameters.sceneId, parameters.cameraId),
+  cycleThisCameraViewWindowMode: parameters => editorApi.window.setWindowPresentation({
+    sceneId: parameters.sceneId, cameraId: parameters.cameraId, mode: 'toggle' }),
+  setThisCameraViewPresentation: parameters => editorApi.window.setWindowPresentation({
+    sceneId: parameters.sceneId, cameraId: parameters.cameraId, mode: parameters.mode }),
   resizeThisCameraView: parameters =>
     editorApi.window.resizeCameraView(parameters.width, parameters.height, parameters.sceneId, parameters.cameraId),
-  createCameraView: parameters => editorApi.window.createCameraView(parameters),
+  createCameraView: parameters => editorApi.window.createPanel({ ...parameters, kind: 'camera' }),
 };
 function sendWindowCommand(command) {
   const op = windowCommandOps[command.cmd];
@@ -92,16 +93,16 @@ export const appService = {
     session().closeTab(tabId, panelId),
   detachPanel: (opts = {}) => openEditorWindow({ cmd: 'detachPanel', ...opts }),
   redockPanel: (opts = {}) => openEditorWindow({ cmd: 'redockPanel', ...opts }),
-  toggleMaximizeThisCameraView: (sceneId = '', cameraId = '') =>
-    openEditorWindow({ cmd: 'toggleMaximizeThisCameraView', sceneId, cameraId }),
-  cycleThisCameraViewWindowMode: (sceneId = '', cameraId = '') =>
-    openEditorWindow({ cmd: 'cycleThisCameraViewWindowMode', sceneId, cameraId }),
   // Keep all camera controls in the window session so retired surfaces cannot
   // apply their operations against the next creative world.
-  toggleBorderlessThisCameraView: (sceneId = '', cameraId = '') =>
-    openEditorWindow({ cmd: 'toggleBorderlessThisCameraView', sceneId, cameraId }),
+  cycleThisCameraViewWindowMode: (sceneId = '', cameraId = '') =>
+    openEditorWindow({ cmd: 'cycleThisCameraViewWindowMode', sceneId, cameraId }),
+  // The camera view tracks its own borderless state, so it can ask for the state
+  // it wants instead of flipping an unknown one.
+  setThisCameraViewPresentation: (mode, sceneId = '', cameraId = '') =>
+    openEditorWindow({ cmd: 'setThisCameraViewPresentation', mode, sceneId, cameraId }),
   toggleMainWindowBorderless: () =>
-    editorApi.window.toggleMainBorderless(),
+    editorApi.window.setWindowPresentation({ target: 'main', mode: 'toggle' }),
   resizeThisCameraView: (width, height, sceneId = '', cameraId = '') =>
     openEditorWindow({ cmd: 'resizeThisCameraView', width, height, sceneId, cameraId }),
   createCameraView: (camera) =>

@@ -110,8 +110,7 @@ test('panel creation and docking use typed V8 operations without legacy completi
   Object.assign(worldModeState, { status: 'ready', mode: 'creative', revision: 1 });
   window.localStorage = memoryStorage(); window.sessionStorage = memoryStorage(); window.location = { hash: '#/' };
   native.createPanel = async options => { calls.push(['create', options]); return { tab_id: 12, panel_id: options.panelId }; };
-  native.detachPanel = async options => { calls.push(['detach', options]); return true; };
-  native.redockPanel = async options => { calls.push(['redock', options]); return false; };
+  native.setPanelPlacement = async options => { calls.push(['placement', options]); return !options.detached; };
   await appService.setEditorUiEnabled(true);
   calls.length = 0;
   assert.deepEqual(await appService.openNativePanel({ panelId: 'inspector', routePath: '/Inspector', width: 420 }),
@@ -121,9 +120,12 @@ test('panel creation and docking use typed V8 operations without legacy completi
   assert.equal(calls[0][1].width, 420);
   assert.match(calls[0][1].routePath, /uiSession=.*uiWindow=.*uiOwner=/);
   assert.equal('cmd' in calls[0][1], false, 'native options must not carry legacy command tags');
-  assert.equal(await appService.detachPanel({ tabId: 12, maximized: true }), true);
-  assert.equal(await appService.redockPanel({ tabId: 12 }), false);
-  assert.deepEqual(calls.slice(1), [['detach', { tabId: 12, maximized: true }], ['redock', { tabId: 12 }]]);
+  assert.equal(await appService.detachPanel({ tabId: 12, maximized: true }), false);
+  assert.equal(await appService.redockPanel({ tabId: 12 }), true);
+  assert.deepEqual(calls.slice(1), [
+    ['placement', { tabId: 12, maximized: true, detached: true }],
+    ['placement', { tabId: 12, detached: false }],
+  ]);
   const failure = Object.assign(new Error('retired'), { code: 'CONTEXT_CHANGED' });
   native.createPanel = () => Promise.reject(failure);
   await assert.rejects(appService.openNativePanel({ panelId: 'other' }), error => error === failure);
@@ -163,26 +165,26 @@ test('camera suspension and startup retirement await the native V8 barrier', asy
   assert.equal(await pending, result);
 });
 
-test('camera geometry and main borderless controls use direct V8 without queue fences', async t => {
+test('camera presentation and main borderless name the state instead of a toggle', async t => {
   const { native } = nativeWindow(t);
   const calls = [];
   const oldWorld = { ...worldModeState };
   t.after(() => { Object.assign(worldModeState, oldWorld); });
   Object.assign(worldModeState, { status: 'ready', mode: 'creative', revision: 1 });
   window.localStorage = memoryStorage(); window.sessionStorage = memoryStorage(); window.location = { hash: '#/' };
-  for (const method of ['toggleCameraMaximized', 'cycleCameraWindowMode', 'toggleCameraBorderless', 'resizeCameraView', 'toggleMainBorderless']) {
+  for (const method of ['setWindowPresentation', 'resizeCameraView']) {
     native[method] = async (...args) => { calls.push([method, ...args]); return true; };
   }
   await appService.setEditorUiEnabled(true);
-  assert.equal(await appService.toggleMaximizeThisCameraView('scene', 'camera'), true);
   assert.equal(await appService.cycleThisCameraViewWindowMode('scene', 'camera'), true);
-  assert.equal(await appService.toggleBorderlessThisCameraView('scene', 'camera'), true);
+  assert.equal(await appService.setThisCameraViewPresentation('borderless', 'scene', 'camera'), true);
   assert.equal(await appService.resizeThisCameraView(800, 600, 'scene', 'camera'), true);
   assert.equal(await appService.toggleMainWindowBorderless(), true);
   assert.deepEqual(calls, [
-    ['toggleCameraMaximized', 'scene', 'camera'], ['cycleCameraWindowMode', 'scene', 'camera'],
-    ['toggleCameraBorderless', 'scene', 'camera'], ['resizeCameraView', 800, 600, 'scene', 'camera'],
-    ['toggleMainBorderless'],
+    ['setWindowPresentation', { sceneId: 'scene', cameraId: 'camera', mode: 'toggle' }],
+    ['setWindowPresentation', { sceneId: 'scene', cameraId: 'camera', mode: 'borderless' }],
+    ['resizeCameraView', 800, 600, 'scene', 'camera'],
+    ['setWindowPresentation', { target: 'main', mode: 'toggle' }],
   ]);
 });
 
@@ -193,14 +195,15 @@ test('camera windows use archive and camera identity without reading a Web numer
   Object.assign(worldModeState, { status: 'ready', mode: 'creative', revision: 1 });
   window.localStorage = memoryStorage(); window.sessionStorage = memoryStorage(); window.location = { hash: '#/' };
   const calls = [];
-  native.createCameraView = async options => { calls.push(options); return { tab_id: 31, existing: false }; };
+  native.createPanel = async options => { calls.push(options); return { tab_id: 31, panel_id: '', existing: false }; };
   await appService.setEditorUiEnabled(true);
   const camera = { archive_session: 'archive-opaque-18446744073709551615', scene_id: 'scene.ini', camera_id: 'camera-main',
     view_x: 0, view_y: 0, view_width: 800, view_height: 600,
     get handle() { throw new Error('Web must not read or convert the camera handle'); },
   };
-  assert.deepEqual(await appService.createCameraView(camera), { tab_id: 31, existing: false });
+  assert.deepEqual(await appService.createCameraView(camera), { tab_id: 31, panel_id: '', existing: false });
   assert.equal(calls.length, 1);
+  assert.equal(calls[0].kind, 'camera', 'the camera window is the panel kind, not a second method');
   assert.equal(calls[0].archiveSession, camera.archive_session);
   assert.equal(calls[0].sceneId, camera.scene_id);
   assert.equal(calls[0].cameraId, camera.camera_id);
@@ -209,6 +212,6 @@ test('camera windows use archive and camera identity without reading a Web numer
   assert.equal('cmd' in calls[0], false);
   assert.match(calls[0].routePath, /uiSession=.*uiWindow=.*uiOwner=/);
   const failure = Object.assign(new Error('retired scene'), { code: 'PROJECT_CONTEXT_CHANGED' });
-  native.createCameraView = async () => { throw failure; };
+  native.createPanel = async () => { throw failure; };
   await assert.rejects(appService.createCameraView(camera), error => error === failure);
 });

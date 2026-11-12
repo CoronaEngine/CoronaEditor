@@ -761,18 +761,8 @@ const takeScreenshot = async () => {
   }
 };
 
-const toggleMaximize = async () => {
-  await appService.toggleMaximizeThisCameraView(sceneId, cameraId).catch((error) => {
-    errorText.value = error.message;
-  });
-};
-
 const cycleWindowMode = async () => {
-  await appService.cycleThisCameraViewWindowMode(sceneId, cameraId).catch(async (error) => {
-    if (appService.toggleMaximizeThisCameraView) {
-      await toggleMaximize();
-      return;
-    }
+  await appService.cycleThisCameraViewWindowMode(sceneId, cameraId).catch((error) => {
     errorText.value = error.message;
   });
 };
@@ -781,7 +771,8 @@ const toggleBorderlessFullscreen = async () => {
   if (borderlessTogglePending) return;
   borderlessTogglePending = true;
   try {
-    await appService.toggleBorderlessThisCameraView(sceneId, cameraId);
+    await appService.setThisCameraViewPresentation(
+      borderlessFullscreen.value ? 'windowed' : 'borderless', sceneId, cameraId);
     borderlessFullscreen.value = !borderlessFullscreen.value;
     await nextTick();
     await syncDragRegions({ force: true });

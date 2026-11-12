@@ -31,7 +31,8 @@ test('SceneBar camera list preserves archive identity through the application wi
     localStorage: memoryStorage(), sessionStorage: memoryStorage(), location: { hash: '#/' },
     corona: { window: {
       suspendCameraViews: async () => ({ closed: 0 }),
-      createCameraView: async options => {
+      createPanel: async options => {
+        assert.equal(options.kind, 'camera');
         assert.equal(options.archiveSession, 'observed-archive');
         assert.equal(new URLSearchParams(options.routePath.split('?')[1]).get('archive'), 'observed-archive');
         assert.equal(options.sceneId, 'scene.ini');

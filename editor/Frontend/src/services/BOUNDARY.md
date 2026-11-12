@@ -23,9 +23,12 @@
 `projectSettingsService.js` 已删除。页面使用 `editorApi` 的明确领域方法，不恢复同义转发门面。
 
 `appService.js` 是 Dock、CameraView 窗口和进程操作的 canonical service owner。
-窗口快照、拖动区域、面板创建/关闭/聚焦、detach/redock、相机窗口控制/关闭、
+窗口快照、拖动区域、面板创建/关闭/聚焦、面板放置、窗口呈现、相机窗口关闭、
 suspend 屏障及关闭请求/完成事件直接引用 `window.corona.window`。
-createCameraView 直接传入 archiveSession/sceneId/cameraId，由原生解析句柄和租约；所有窗口方法均无旧 Bridge 回退，DockCommand 已删除。
+窗口方法按意图合并：`createPanel` 用 `kind:'camera'` 打开相机窗口（archiveSession/sceneId/cameraId
+由原生解析句柄和租约），`setPanelPlacement` 用 `detached` 分离/停靠，`setWindowPresentation`
+用 `mode` 描述窗口状态而不是开关。窗口会话里的 createCameraView/detachPanel/redockPanel 是本层
+意图名，不是原生方法名；所有窗口方法均无旧 Bridge 回退，DockCommand 已删除。
 
 ### 世界界面会话
 
