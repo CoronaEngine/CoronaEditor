@@ -1,6 +1,6 @@
 <template>
   <div class="camera-overlay" :class="{ borderless: borderlessFullscreen }" @contextmenu.prevent>
-    <header v-if="!borderlessFullscreen" ref="toolbarRef" class="toolbar camera-drag-region">
+    <header v-if="!borderlessFullscreen" class="toolbar">
       <div class="drag-handle" aria-label="Move camera window">::</div>
       <input
         v-model="cameraName"
@@ -185,7 +185,6 @@ import { getWebDocumentIdentity } from '@/api/webDocument.js';
 import { createViewportCalibrationService } from '@/services/viewportCalibrationService.js';
 import { appService } from '@/services/appService.js';
 import { createViewLifetime } from '@/utils/viewLifetime.js';
-import { buildDragRegions, dragRegionsSignature } from '@/utils/cameraDragRegions.js';
 import { pickedNodeIdentity } from '@/utils/modelHierarchy.js';
 import { coronaEventBus } from '@/utils/eventBus.js';
 import { readAppliedCameraPose } from '@/utils/viewportCameraController.js';
@@ -234,7 +233,6 @@ const viewportUiMode = ref('flat2d');
 const visionAvailable = ref(false);
 const errorText = ref('');
 const nodeGraphInputLocked = ref(false);
-const toolbarRef = ref(null);
 const inputLayerRef = ref(null);
 const backendMenuOpen = ref(false);
 const visionModeMenuOpen = ref(false);
@@ -721,8 +719,6 @@ const saveSettings = async () => {
 let resizeTimer = 0;
 let lastSyncedWidth = 0;
 let lastSyncedHeight = 0;
-let dragRegionFrame = 0;
-let lastDragRegionSignature = '';
 
 const syncWindowSize = async (force = false) => {
   if (!camera.value) return;
@@ -775,7 +771,6 @@ const toggleBorderlessFullscreen = async () => {
       borderlessFullscreen.value ? 'windowed' : 'borderless', sceneId, cameraId);
     borderlessFullscreen.value = !borderlessFullscreen.value;
     await nextTick();
-    await syncDragRegions({ force: true });
   } catch (error) {
     errorText.value = error.message;
   } finally {
@@ -1159,40 +1154,6 @@ const updateLook = (event) => {
   publishPose();
 };
 
-const pushDragRegions = async (regions, force = false) => {
-  const signature = dragRegionsSignature(regions);
-  if (!force && signature === lastDragRegionSignature) return;
-  lastDragRegionSignature = signature;
-  await appService.setCurrentTabDragRegions(regions).catch(() => {});
-};
-
-const syncDragRegions = async ({ force = false } = {}) => {
-  if (borderlessFullscreen.value) {
-    await pushDragRegions([{ x: 0, y: 0, w: 0, h: 0 }], force);
-    return;
-  }
-  await nextTick();
-  const toolbar = toolbarRef.value;
-  const toolbarRect = toolbar?.getBoundingClientRect?.();
-  if (!toolbarRect) return;
-  const noDragRects = Array.from(toolbar.querySelectorAll('.no-drag'))
-    .map((element) => element.getBoundingClientRect());
-  const regions = buildDragRegions({ toolbarRect, noDragRects, padding: 2 });
-  await pushDragRegions(regions, force);
-};
-
-const scheduleDragRegionSync = () => {
-  if (dragRegionFrame) return;
-  dragRegionFrame = window.requestAnimationFrame(() => {
-    dragRegionFrame = 0;
-    syncDragRegions().catch(() => {});
-  });
-};
-
-watch(() => backend.value === 'vision' && visionRenderMode.value !== 'ssat' &&
-  visionDenoiser.value === 'reblur' && !visionDenoiserBusy.value,
-scheduleDragRegionSync, { flush: 'post' });
-
 const pollScriptInputLock = async () => {
   if (!viewLifetime.current()) return;
   try {
@@ -1208,7 +1169,6 @@ const pollScriptInputLock = async () => {
 onMounted(async () => {
   document.documentElement.style.background = 'transparent';
   document.body.style.background = 'transparent';
-  await syncDragRegions({ force: true });
   if (!viewLifetime.current()) return;
   try {
     if (!await loadCamera() || !viewLifetime.current()) return;
@@ -1225,7 +1185,6 @@ onMounted(async () => {
   }
   if (!viewLifetime.current()) return;
   window.addEventListener('resize', scheduleWindowSizeSync);
-  window.addEventListener('resize', scheduleDragRegionSync);
   window.addEventListener('keydown', onKeyDown);
   window.addEventListener('keyup', onKeyUp);
   stopViewportUiCalibrationMessages = viewportCalibration.subscribe(syncViewportUiCalibration);
@@ -1247,7 +1206,6 @@ onBeforeUnmount(() => {
   cancelAnimationFrame(animationFrame);
   if (posePublishTimer) window.clearTimeout(posePublishTimer);
   posePublishTimer = 0;
-  if (dragRegionFrame) window.cancelAnimationFrame(dragRegionFrame);
   if (scratchMouseMoveFrame) window.cancelAnimationFrame(scratchMouseMoveFrame);
   scratchMouseMoveFrame = 0;
   pendingScratchMouseMove = null;
@@ -1260,7 +1218,6 @@ onBeforeUnmount(() => {
   window.clearTimeout(resizeTimer);
   window.clearInterval(scriptInputTimer);
   window.removeEventListener('resize', scheduleWindowSizeSync);
-  window.removeEventListener('resize', scheduleDragRegionSync);
   window.removeEventListener('keydown', onKeyDown);
   window.removeEventListener('keyup', onKeyUp);
   stopViewportUiCalibrationMessages?.();

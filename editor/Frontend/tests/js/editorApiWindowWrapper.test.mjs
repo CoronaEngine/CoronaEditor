@@ -7,7 +7,7 @@ import { test } from 'node:test';
 // presentation) and leaves panel placement to ImGui, so that is the shape to pin.
 
 const WINDOW_METHODS = [
-  'getCurrent', 'setDragRegions', 'close', 'closeTab', 'focusTab', 'createPanel',
+  'getCurrent', 'close', 'closeTab', 'focusTab', 'createPanel',
   'setWindowPresentation', 'suspendCameraViews', 'closeCameraView', 'resizeCameraView',
 ];
 const WINDOW_EVENTS = ['onClosed', 'onCloseRequested'];
@@ -30,7 +30,6 @@ test('window wrapper passes options and arguments through unchanged', async t =>
   const native = {
     createPanel: async options => { calls.push(['createPanel', options]); return { tab_id: 1 }; },
     resizeCameraView: async (...args) => { calls.push(['resizeCameraView', ...args]); return true; },
-    setDragRegions: async regions => { calls.push(['setDragRegions', regions]); return {}; },
   };
   withNativeWindow(t, native);
   const { editorApi } = await import(`../../src/api/editorApi.js?window-passthrough=${Date.now()}`);
@@ -39,9 +38,6 @@ test('window wrapper passes options and arguments through unchanged', async t =>
   assert.equal(calls[0][1], options);
   await editorApi.window.resizeCameraView(800, 600, 'scene', 'camera');
   assert.deepEqual(calls[1], ['resizeCameraView', 800, 600, 'scene', 'camera']);
-  const regions = [{ x: 1, y: 2, w: 30, h: 10 }];
-  await editorApi.window.setDragRegions(regions);
-  assert.equal(calls[2][1], regions);
 });
 
 test('window wrapper propagates native errors unchanged', async t => {

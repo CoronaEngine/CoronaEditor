@@ -112,7 +112,6 @@ const editorApiStatic = {
   },
   window: {
     getCurrent: () => window.corona.window.getCurrent(),
-    setDragRegions: regions => window.corona.window.setDragRegions(regions),
     close: () => window.corona.window.close(),
     closeTab: tabId => window.corona.window.closeTab(tabId),
     focusTab: tabId => window.corona.window.focusTab(tabId),

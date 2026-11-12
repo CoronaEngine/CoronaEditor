@@ -81,10 +81,6 @@ export const appService = {
   getCurrentWindow: () => editorApi.window.getCurrent(),
   onWindowClosed: callback => editorApi.window.onClosed(callback),
   onWindowCloseRequested: callback => editorApi.window.onCloseRequested(callback),
-  setDragRegions: (_routePath, x, y, w, h) =>
-    editorApi.window.setDragRegions([{ x, y, w, h }]),
-  setCurrentTabDragRegions: (regions) =>
-    editorApi.window.setDragRegions(Array.isArray(regions) ? regions : []),
   openNativePanel: options => openEditorWindow({ cmd: 'createPanelTab', ...options }),
   closeThisTab: (panelId) => session().closeThis(panelId),
   closePanelTab: (tabId, panelId) =>

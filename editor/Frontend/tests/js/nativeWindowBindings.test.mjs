@@ -14,10 +14,9 @@ function nativeWindow(t) {
   t.mock.method(editorApi.scene, 'readActive', async () => ({ archive_session: '' }));
   const previous = globalThis.window;
   const calls = [];
-  const snapshot = { browserId: '18446744073709551615', frameId: 'frame', dragRegions: [] };
+  const snapshot = { browserId: '18446744073709551615', frameId: 'frame', dockState: 'docked' };
   const native = {
     getCurrent: () => Promise.resolve(snapshot),
-    setDragRegions: regions => { calls.push(regions); return Promise.resolve(snapshot); },
     suspendCameraViews: () => Promise.resolve({ closed: 0 }),
   };
   globalThis.window = { corona: { window: native },
@@ -28,26 +27,22 @@ function nativeWindow(t) {
   return { calls, snapshot, native };
 }
 
-test('application window reads and drag updates call native V8 functions without JSON', async t => {
-  const { calls, snapshot } = nativeWindow(t);
+test('application window reads call the native V8 function without JSON', async t => {
+  const { snapshot } = nativeWindow(t);
   const stringify = JSON.stringify, parse = JSON.parse;
   t.after(() => { JSON.stringify = stringify; JSON.parse = parse; });
   JSON.stringify = JSON.parse = () => { throw new Error('JSON transport is forbidden'); };
   assert.equal(await appService.getCurrentWindow(), snapshot);
-  const regions = [{ x: 2, y: 3, w: 40, h: 12 }];
-  assert.equal(await appService.setCurrentTabDragRegions(regions), snapshot);
-  assert.equal(calls[0], regions);
-  await appService.setDragRegions('/ignored', 1, 2, 30, 10);
-  assert.deepEqual(calls[1], [{ x: 1, y: 2, w: 30, h: 10 }]);
-  await appService.setCurrentTabDragRegions(undefined);
-  assert.deepEqual(calls[2], []);
+  // ImGui owns window dragging, so the facade no longer declares drag regions.
+  assert.equal(appService.setDragRegions, undefined);
+  assert.equal(appService.setCurrentTabDragRegions, undefined);
 });
 
 test('window service preserves native errors without retrying legacy transport', async t => {
   const { native } = nativeWindow(t);
   const failure = Object.assign(new Error('window closed'), { code: 'WINDOW_CLOSED' });
-  native.setDragRegions = () => Promise.reject(failure);
-  await assert.rejects(appService.setCurrentTabDragRegions([]), error => error === failure);
+  native.focusTab = () => Promise.reject(failure);
+  await assert.rejects(editorApi.window.focusTab(3), error => error === failure);
 });
 
 test('window subscriptions reference the native callbacks and return their unsubscribe functions', t => {

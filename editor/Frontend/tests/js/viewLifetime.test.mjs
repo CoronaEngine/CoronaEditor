@@ -20,8 +20,8 @@ test('CameraView does not resume native initialization after unmount during its 
   const scope = {
     document: { documentElement: { style: {} }, body: { style: {} } },
     viewLifetime: { current: () => active, subscribe: async () => -1 },
-    syncDragRegions: () => pending.promise,
-    loadCamera: async () => { loads++; }, refreshCameraViewActorPickIndex: async () => true,
+    loadCamera: () => { loads++; return pending.promise; },
+    refreshCameraViewActorPickIndex: async () => true,
     editorApi: { scene: { observe: async () => -1 } },
     window: { addEventListener: () => { listeners++; }, setInterval: () => { timers++; } },
     webMessages: { on: () => noop }, coronaEventBus: { on: () => { listeners++; } },
@@ -33,7 +33,7 @@ test('CameraView does not resume native initialization after unmount during its 
   active = false;
   pending.resolve();
   await starting;
-  assert.equal(loads, 0);
+  assert.equal(loads, 1);
   assert.equal(listeners, 0);
   assert.equal(timers, 0);
 });

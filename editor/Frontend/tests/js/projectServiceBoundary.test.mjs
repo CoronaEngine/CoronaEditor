@@ -24,11 +24,14 @@ test('Vue production code does not import the compatibility project service', ()
   assert.deepEqual(violations, []);
 });
 
-test('Dock drag-region methods belong to appService', () => {
+test('Dock placement and drag regions are not appService concerns', () => {
   const appService = fs.readFileSync(path.join(sourceRoot, 'services/appService.js'), 'utf8');
 
-  assert.match(appService, /setDragRegions:/);
-  assert.match(appService, /setCurrentTabDragRegions:/);
+  // ImGui owns the dock, so the Web layer has nothing to place or to declare draggable.
+  assert.doesNotMatch(appService, /setDragRegions:/);
+  assert.doesNotMatch(appService, /setCurrentTabDragRegions:/);
+  assert.doesNotMatch(appService, /detachPanel:/);
+  assert.doesNotMatch(appService, /redockPanel:/);
   assert.equal(fs.existsSync(path.join(sourceRoot, 'compat/appService.js')), false);
 });
 
