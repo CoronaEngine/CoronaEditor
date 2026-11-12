@@ -39,14 +39,15 @@ function mount(t, overrides = {}) {
   return { state, props, calls, events, observers, dispose: () => unmounted(), start: () => mounted() };
 }
 
-test('a page reply older than the applied edit is discarded', async t => {
-  const pendingRead = deferred();
-  const page = mount(t, { read: () => pendingRead.promise });
-  page.state.actorVersion.value = 5;
-  pendingRead.resolve({ nodes: [node], actor_version: 1 });
-  await setImmediate();
-  assert.equal(page.state.pages.value['-1'], undefined,
-    'a reply describing the pre-edit state must not replace the list');
+test('a page reply older than the applied edit cannot undo it', async t => {
+  const page = mount(t, { read: async () => ({ nodes: [node], actor_version: 2 }) });
+  await page.state.loadPage(-1);
+  const data = await page.state.persistNodePatch(node, { visible: false });
+  page.state.applyNode(data.nodes[0]);
+  // A reply that predates the edit arrives late: the confirmed row wins.
+  await page.state.loadPage(-1);
+  assert.equal(page.state.pages.value['-1'].items[0].visible, false,
+    'the stale reply must be merged with the confirmed edit, not replace it');
 });
 
 test('a page read in flight when a write lands cannot undo the patched row', async t => {

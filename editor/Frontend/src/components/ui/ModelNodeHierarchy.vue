@@ -168,10 +168,6 @@ const persistNodePatch = (node, patch) => {
     }, patch);
     if (!isCurrentActor(identity)) return null;
     actorVersion.value = Number(data.actor_version || actorVersion.value);
-    // Any read that started before this write would describe the old node, and the page
-    // map is replaced wholesale, so retire those reads now instead of letting one land
-    // after the patch and undo it.
-    request += 1;
     return data;
   });
   mutationChain = operation.catch(() => {});
@@ -194,11 +190,19 @@ const loadPage = async (parentIndex, offset = 0) => {
       offset,
       limit: pageSize,
     });
+    if (token !== request || !isCurrentActor(identity)) return null;
     const replyVersion = Number(data.actor_version);
-    const stale = Number.isFinite(replyVersion) && replyVersion > 0 && replyVersion < actorVersion.value;
-    if (token !== request || stale || !isCurrentActor(identity)) return null;
     const previous = pages.value[key]?.items || [];
-    const incoming = Array.isArray(data.nodes) ? data.nodes : [];
+    const raw = Array.isArray(data.nodes) ? data.nodes : [];
+    // A read that started before an edit answers with the pre-edit node, and the list is
+    // replaced wholesale. Re-apply confirmed edits that are newer than this reply so the
+    // click is not undone by a reply that was already in flight.
+    const incoming = raw.map((item) => {
+      const confirmed = confirmedNodes.value.get(Number(item.node_index));
+      return confirmed && Number.isFinite(replyVersion) && confirmed.version > replyVersion
+        ? { ...item, ...confirmed.node }
+        : item;
+    });
     const page = {
       items: offset ? [...previous, ...incoming] : incoming,
       has_more: data.has_more === true,
@@ -239,6 +243,7 @@ const reset = () => {
   if (!viewLifetime.current()) return;
   request += 1;
   pages.value = {};
+  confirmedNodes.value = new Map();
   expanded.value = new Set();
   displayRoot.value = -1;
   scrollTop.value = 0;
@@ -258,8 +263,10 @@ const toggleDetail = () => {
   else reset();
 };
 
+const confirmedNodes = ref(new Map());
 const applyNode = (node) => {
   if (!viewLifetime.current() || !node) return;
+  confirmedNodes.value.set(Number(node.node_index), { node, version: actorVersion.value });
   const next = {};
   for (const [key, page] of Object.entries(pages.value)) {
     next[key] = {
