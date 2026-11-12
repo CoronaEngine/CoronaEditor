@@ -15,7 +15,7 @@ const hosts = createNativePanelHosts({
     panelId: panel.id, routePath: panel.routePath, title: t(panel.displayNameKey),
     width: panel.defaultWidth, height: panel.defaultHeight,
   }),
-  close: (tabId, id) => appService.closePanelTab(tabId, id),
+  close: (tabId, id) => appService.closePanelTab(id),
   focus: tabId => appService.focusPanelTab(tabId),
   onError: (error, id) => { console.error('[NativeDock]', error); if (id) store.closePanel(id); },
 });

@@ -159,7 +159,7 @@ test('late native panel completion is closed after switching between editable pr
   const closed = [];
   const previousWindow = globalThis.window;
   globalThis.window = { localStorage: memoryStorage(), corona: { window: {
-    closeTab: async tabId => { closed.push(tabId); return true; },
+    close: async identity => { closed.push(identity.panelId); return true; },
     suspendCameraViews: async () => ({ closed: 0 }),
   } } };
   t.after(() => { getWebMessages(globalThis.window).dispose(); globalThis.window = previousWindow; });
@@ -169,13 +169,13 @@ test('late native panel completion is closed after switching between editable pr
   window.corona.window.createPanel = () => request.promise;
   await appService.setEditorUiEnabled(true);
   commands.length = 0;
-  const nativePanel = { panelId: 'Object', routePath: '/Object', width: 400, height: 600, dockingPos: 'right', nativeDocked: true };
+  const nativePanel = { panelId: 'Object', routePath: '/Object', width: 400, height: 600 };
   const pending = appService.openNativePanel(nativePanel);
   worldModeService.invalidate('story');
   await worldModeService.resolve('creative', { force: true });
   request.resolve({ tab_id: 7 });
   await assert.rejects(pending, /世界已切换/);
-  assert.deepEqual(closed, [7]);
+  assert.deepEqual(closed, ['Object']);
   assert.ok(commands.every(command => command.cmd !== 'closePanelTab'));
   worldModeService.invalidate();
   await assert.rejects(appService.openNativePanel(nativePanel), /不允许/);

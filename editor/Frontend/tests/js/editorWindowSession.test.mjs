@@ -99,7 +99,7 @@ test('main policy is Web-owned; standalone windows inherit immutable session tok
   h.world.revision++;
   await h.main.prepare(false);
   assert.equal(child.policy().enabled, false);
-  assert.ok(h.commands.some(command => command.cmd === 'closePanelTab' && command.tabId === result.tab_id));
+  assert.ok(h.commands.some(command => command.cmd === 'closePanelTab' && command.panelId === panel.panelId));
   await h.main.prepare(true);
   assert.equal(h.main.accepts(payload), false);
   await assert.rejects(child.open(panel), /不允许/);
@@ -135,7 +135,7 @@ test('retirement waits for late creation, disposes old tab, and fences before a 
   assert.equal(retired, false);
   pending.resolve({ tab_id: 17 });
   await rejected; await retirement;
-  const closeIndex = h.commands.findIndex(command => command.cmd === 'closePanelTab' && command.tabId === 17);
+  const closeIndex = h.commands.findIndex(command => command.cmd === 'closePanelTab' && command.panelId === panel.panelId);
   assert.ok(closeIndex >= 0);
   assert.equal(h.commands.at(-1).cmd, 'suspendCameraViews');
   assert.equal(h.commands.at(-1).sceneId, '');
@@ -178,10 +178,10 @@ test('camera opened by a secondary window is retired by the main owner', async (
 test('a close command does not publish an optimistic native completion', async () => {
   const h = harness();
   await h.main.prepare(true);
-  const { tab_id } = await h.main.open(panel);
-  await h.main.closeTab(tab_id, panel.panelId);
+  await h.main.open(panel);
+  await h.main.closeTab(panel.panelId);
   const close = h.commands.find(command => command.cmd === 'closePanelTab');
-  assert.equal(close.panelId, '');
+  assert.equal(close.panelId, panel.panelId);
   assert.equal(h.commands.at(-1).cmd, 'closePanelTab');
   assert.ok(h.commands.every(command => command.cmd !== 'broadcast'));
   assert.deepEqual(h.events, []);
@@ -278,9 +278,9 @@ for (const initiatedByMain of [false, true]) {
     const pending = deferred();
     const h = harness({ beforeClose: () => pending.promise });
     await h.main.prepare(true);
-    const { tab_id } = await h.main.open(panel);
+    await h.main.open(panel);
     const child = h.child(h.commands.find(command => command.cmd === panel.cmd));
-    const closing = initiatedByMain ? h.main.closeTab(tab_id, '') : child.closeThis('');
+    const closing = initiatedByMain ? h.main.closeTab(panel.panelId) : child.closeThis('');
     await setImmediate();
     await h.main.prepare(false);
     h.commands.length = 0;
@@ -298,10 +298,10 @@ for (const initiatedByMain of [false, true]) {
       return save;
     } });
     await h.main.prepare(true);
-    const { tab_id } = await h.main.open({ ...panel, panelId: 'NodeGraph' });
+    await h.main.open({ ...panel, panelId: 'NodeGraph' });
     const child = h.child(h.commands.find(command => command.cmd === panel.cmd));
     h.commands.length = 0;
-    const close = () => initiatedByMain ? h.main.closeTab(tab_id, '') : child.closeThis('');
+    const close = () => initiatedByMain ? h.main.closeTab('NodeGraph') : child.closeThis('');
     const closing = close();
     const rejected = assert.rejects(closing, /graph save failed/);
     await setImmediate();
@@ -335,11 +335,11 @@ for (const initiatedByMain of [false, true]) {
     };
     const main = createEditorWindowSession(h.options);
     await main.prepare(true);
-    const { tab_id } = await main.open(panel);
+    await main.open(panel);
     const child = h.child(h.commands.find(command => command.cmd === panel.cmd));
     const toggled = child.open({ cmd: 'togglePanelWindowMode' });
     const rejected = assert.rejects(toggled, /世界已切换/);
-    const closed = initiatedByMain ? main.closeTab(tab_id, panel.panelId) : child.closeThis(panel.panelId);
+    const closed = initiatedByMain ? main.closeTab(panel.panelId) : child.closeThis(panel.panelId);
     await setImmediate();
     assert.ok(h.commands.every(command => !['closePanelTab', 'closeThisTab'].includes(command.cmd)));
     await assert.rejects(child.open(panel), /不允许/);
@@ -354,14 +354,14 @@ for (const initiatedByMain of [false, true]) {
 test('main-page reload retires persisted windows before issuing a fresh generation', async () => {
   const h = harness({ owner: 'main-surface' });
   await h.main.prepare(true);
-  const { tab_id } = await h.main.open(panel);
+  await h.main.open(panel);
   const child = h.child(h.commands.find(command => command.cmd === panel.cmd));
   const previous = h.main.policy().generation;
   const reloaded = createEditorWindowSession(h.options);
   await reloaded.prepare(true);
   assert.notEqual(reloaded.policy().generation, previous);
   assert.equal(child.policy().enabled, false);
-  assert.ok(h.commands.some(command => command.cmd === 'closePanelTab' && command.tabId === tab_id));
+  assert.ok(h.commands.some(command => command.cmd === 'closePanelTab' && command.panelId === panel.panelId));
   assert.equal(h.storage.length, 1);
 });
 
@@ -394,7 +394,7 @@ test('child operations use the Web activity tracker instead of storage records',
   const pending = deferred();
   const h = harness();
   await h.main.prepare(true);
-  const opened = await h.main.open(panel);
+  await h.main.open(panel);
   h.options.send = async command => command.cmd === 'togglePanelWindowMode' ? pending.promise : h.send(command);
   const child = h.child(h.commands.find(command => command.cmd === panel.cmd));
   const operation = child.open({ cmd: 'togglePanelWindowMode' });
@@ -403,7 +403,7 @@ test('child operations use the Web activity tracker instead of storage records',
   h.world.revision++;
   const retirement = h.main.prepare(false);
   await setImmediate();
-  assert.equal(h.commands.some(command => command.cmd === 'closePanelTab' && command.tabId === opened.tab_id), false);
+  assert.equal(h.commands.some(command => command.cmd === 'closePanelTab' && command.panelId === panel.panelId), false);
   pending.resolve({});
   await assert.rejects(operation, /世界已切换/);
   await retirement;

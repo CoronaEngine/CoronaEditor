@@ -71,7 +71,7 @@ export function createEditorWindowSession({ state, send, publish, getWorld, getQ
         await drain(item => item.source === record.id);
         await activities.drain(item => item.source === record.id);
       }
-      await send({ cmd: 'closePanelTab', tabId: record.tabId, panelId: '' });
+      if (record.panelId) await send({ cmd: 'closePanelTab', panelId: record.panelId });
     }
     await forget(record);
   }
@@ -201,10 +201,10 @@ export function createEditorWindowSession({ state, send, publish, getWorld, getQ
     await send({ cmd: 'closeThisTab', panelId: '' });
     if (record) await forget(record);
   }
-  async function closeTab(tabId, panelId) {
-    const record = records().find(item => item.tabId === tabId);
+  async function closeTab(panelId) {
+    const record = records().find(item => item.panelId === panelId);
     if (record) return dispose(record, true);
-    return send({ cmd: 'closePanelTab', tabId, panelId: '' });
+    return send({ cmd: 'closePanelTab', panelId });
   }
   async function broadcast(event, payload) {
     const current = requirePolicy();

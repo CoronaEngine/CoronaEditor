@@ -62,12 +62,12 @@ test('window session invokes native focus and close without old commands or a le
   Object.assign(worldModeState, { status: 'ready', mode: 'creative', revision: 1 });
   window.localStorage = memoryStorage(); window.sessionStorage = memoryStorage(); window.location = { hash: '#/' };
   native.focusTab = async id => { calls.push(['focus', id]); return true; };
-  native.closeTab = async id => { calls.push(['close', id]); return true; };
+  native.close = async identity => { calls.push(['close', identity]); return true; };
   await appService.setEditorUiEnabled(true);
   calls.length = 0;
   assert.equal(await appService.focusPanelTab(7), true);
-  assert.equal(await appService.closePanelTab(7, 'ignored-panel-name'), true);
-  assert.deepEqual(calls, [['focus', 7], ['close', 7]]);
+  assert.equal(await appService.closePanelTab('Object'), true);
+  assert.deepEqual(calls, [['focus', 7], ['close', { panelId: 'Object' }]]);
 });
 
 test('closing the registered node panel uses the graph save barrier and retains failed state', async t => {
@@ -79,22 +79,22 @@ test('closing the registered node panel uses the graph save barrier and retains 
   let nextTab = 0, saves = 0, fail = true;
   const closed = [];
   native.createPanel = async () => ({ tab_id: ++nextTab });
-  native.closeTab = async id => closed.push(id);
+  native.close = async identity => closed.push(identity.panelId);
   await appService.setEditorUiEnabled(true);
   t.mock.method(editorApi.scene, 'readActive', async () => ({ archive_session: 'graph-archive' }));
   getNodeGraphSaves().register({ getSession: () => 'graph-archive', flush: () => { saves++; return !fail; } });
   const graph = PLUGIN_MANIFEST.find(panel => panel.routePath === '/NodeGraph');
-  const node = await appService.openNativePanel({ panelId: graph.id, routePath: graph.routePath });
-  await assert.rejects(appService.closePanelTab(node.tab_id, ''), { code: 'GRAPH_SAVE_FAILED' });
+  await appService.openNativePanel({ panelId: graph.id, routePath: graph.routePath });
+  await assert.rejects(appService.closePanelTab(graph.id), { code: 'GRAPH_SAVE_FAILED' });
   assert.deepEqual(closed, []);
-  const other = await appService.openNativePanel({ panelId: 'Object', routePath: '/Object' });
-  await appService.closePanelTab(other.tab_id, '');
-  assert.deepEqual(closed, [other.tab_id], 'another panel must not wait for an unrelated graph save');
+  await appService.openNativePanel({ panelId: 'Object', routePath: '/Object' });
+  await appService.closePanelTab('Object');
+  assert.deepEqual(closed, ['Object'], 'another panel must not wait for an unrelated graph save');
   assert.equal(saves, 1);
   fail = false;
-  await appService.closePanelTab(node.tab_id, '');
+  await appService.closePanelTab(graph.id);
   assert.equal(saves, 2);
-  assert.deepEqual(closed, [other.tab_id, node.tab_id]);
+  assert.deepEqual(closed, ['Object', graph.id]);
 });
 
 test('panel creation uses a typed V8 operation and carries no placement', async t => {
@@ -135,11 +135,11 @@ test('camera suspension and startup retirement await the native V8 barrier', asy
   await appService.setEditorUiEnabled(true);
   assert.ok(calls.length > 0);
   assert.ok(calls.every(sceneId => sceneId === ''));
-  native.closeCameraView = async (sceneId, cameraId) => {
-    assert.equal(sceneId, 'scene-opaque-id'); assert.equal(cameraId, 'camera-opaque-id');
-    return { closed: true };
+  native.close = async identity => {
+    assert.deepEqual(identity, { sceneId: 'scene-opaque-id', cameraId: 'camera-opaque-id' });
+    return true;
   };
-  assert.deepEqual(await appService.closeCameraView('scene-opaque-id', 'camera-opaque-id'), { closed: true });
+  assert.equal(await appService.closeCameraView('scene-opaque-id', 'camera-opaque-id'), true);
   let complete;
   native.suspendCameraViews = sceneId => {
     assert.equal(sceneId, 'scene-opaque-id');

@@ -4,11 +4,12 @@ import { test } from 'node:test';
 // editorApi.window named wrapper + centralized capability probe.
 // Every native window binding must be reachable through the facade with
 // passthrough semantics. Native merged its duplicated verbs (panel kind, window
-// presentation) and leaves panel placement to ImGui, so that is the shape to pin.
+// presentation, close identity) and leaves panel placement to ImGui, so that is
+// the shape to pin.
 
 const WINDOW_METHODS = [
-  'getCurrent', 'close', 'closeTab', 'focusTab', 'createPanel',
-  'setWindowPresentation', 'suspendCameraViews', 'closeCameraView', 'resizeCameraView',
+  'getCurrent', 'close', 'focusTab', 'createPanel',
+  'setWindowPresentation', 'suspendCameraViews', 'resizeCameraView',
 ];
 const WINDOW_EVENTS = ['onClosed', 'onCloseRequested'];
 

@@ -112,13 +112,13 @@ const editorApiStatic = {
   },
   window: {
     getCurrent: () => window.corona.window.getCurrent(),
-    close: () => window.corona.window.close(),
-    closeTab: tabId => window.corona.window.closeTab(tabId),
+    // One verb for "close a window"; the identity decides which. No argument = this one.
+    close: identity => identity === undefined ? window.corona.window.close()
+      : window.corona.window.close(identity),
     focusTab: tabId => window.corona.window.focusTab(tabId),
     createPanel: options => window.corona.window.createPanel(options),
     setWindowPresentation: options => window.corona.window.setWindowPresentation(options),
     suspendCameraViews: sceneId => window.corona.window.suspendCameraViews(sceneId),
-    closeCameraView: (sceneId, cameraId) => window.corona.window.closeCameraView(sceneId, cameraId),
     resizeCameraView: (width, height, sceneId, cameraId) =>
       window.corona.window.resizeCameraView(width, height, sceneId, cameraId),
     onClosed: callback => window.corona.window.onClosed(callback),

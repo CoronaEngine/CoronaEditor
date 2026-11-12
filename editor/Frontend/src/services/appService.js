@@ -23,11 +23,12 @@ const windowSessions = new WeakMap();
 // encode it. Placement is ImGui's: the user docks a panel, not the Web layer.
 const windowCommandOps = {
   closeThisTab: () => editorApi.window.close(),
-  closePanelTab: parameters => editorApi.window.closeTab(parameters.tabId),
+  closePanelTab: parameters => editorApi.window.close({ panelId: parameters.panelId }),
   focusPanelTab: parameters => editorApi.window.focusTab(parameters.tabId),
   createPanelTab: parameters => editorApi.window.createPanel(parameters),
   suspendCameraViews: parameters => editorApi.window.suspendCameraViews(parameters.sceneId),
-  closeCameraView: parameters => editorApi.window.closeCameraView(parameters.sceneId, parameters.cameraId),
+  closeCameraView: parameters =>
+    editorApi.window.close({ sceneId: parameters.sceneId, cameraId: parameters.cameraId }),
   cycleThisCameraViewWindowMode: parameters => editorApi.window.setWindowPresentation({
     sceneId: parameters.sceneId, cameraId: parameters.cameraId, mode: 'toggle' }),
   setThisCameraViewPresentation: parameters => editorApi.window.setWindowPresentation({
@@ -83,8 +84,8 @@ export const appService = {
   onWindowCloseRequested: callback => editorApi.window.onCloseRequested(callback),
   openNativePanel: options => openEditorWindow({ cmd: 'createPanelTab', ...options }),
   closeThisTab: (panelId) => session().closeThis(panelId),
-  closePanelTab: (tabId, panelId) =>
-    session().closeTab(tabId, panelId),
+  // Panel identity is the stable panel id, not the transient tab id a reply carried.
+  closePanelTab: panelId => session().closeTab(panelId),
   // Keep all camera controls in the window session so retired surfaces cannot
   // apply their operations against the next creative world.
   cycleThisCameraViewWindowMode: (sceneId = '', cameraId = '') =>
