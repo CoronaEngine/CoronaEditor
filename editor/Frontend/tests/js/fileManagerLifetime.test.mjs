@@ -24,7 +24,12 @@ function mount(t, overrides = {}, project = { revision: 1 }) {
   Object.assign(files, overrides.files);
   const component = new Function('ref', 'nextTick', 'onMounted', 'onUnmounted', 'createViewLifetime', 'worldModeState', 'editorApi', 'FileTreeNode', 'translateUiText', compiled)(
     ref, nextTick, fn => { mounted = fn; }, fn => { unmounted = fn; }, createViewLifetime, project,
-    { files, projectSettings: { getActiveProjectInfo: overrides.readInfo || (async () => ({ ...scope, name: 'World' })) } }, {}, value => value);
+    { files,
+      // Opening a document reloads the native scene, so this route lives in `project`,
+      // not in the bridge-backed `files` namespace.
+      project: { openDocument: async request => { calls.push(['openDocument', request]); return { ok: true }; } },
+      projectSettings: { getActiveProjectInfo: overrides.readInfo || (async () => ({ ...scope, name: 'World' })) } },
+    {}, value => value);
   const state = component.setup({}, { expose() {} });
   const ready = mounted();
   return { state, calls, listeners, ready, dispose: () => unmounted?.() };
@@ -63,7 +68,7 @@ test('context open uses the selected item and captured scope', async t => {
   const page = mount(t); await page.ready;
   page.state.contextMenu.value = { scope, item: { path: 'Hero.actor', name: 'Hero.actor', isDirectory: false } };
   await page.state.handleOpenFile();
-  assert.deepEqual(page.calls.at(-1), ['openFile', { ...scope, path: 'Hero.actor', file_type: 'actor' }]);
+  assert.deepEqual(page.calls.at(-1), ['openDocument', { ...scope, path: 'Hero.actor', file_type: 'actor' }]);
 });
 test('project replacement prevents dialog writes and late nextTick menu revival', async t => {
   const project = { revision: 1 }, page = mount(t, {}, project); await page.ready;
