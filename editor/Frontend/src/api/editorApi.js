@@ -31,8 +31,6 @@ const editorApiStatic = {
     createActorTemplate: request => fileOp('create_file', request, [request.path, request.name, 'actor']),
     deleteItem: request => fileOp('delete_item', request, [request.path]),
     renameItem: request => fileOp('rename_item', request, [request.path, request.name]),
-    // Opening a scene reloads the native scene, so this route stays in C++.
-    openFile: request => window.corona.files.openFile(request),
   },
   network: {
     startSession: (instanceName, projectId, port = 27960, role = 'host') =>
@@ -60,16 +58,20 @@ const editorApiStatic = {
     openProject: (projectPath, options = {}) =>
       window.corona.project.openProject(projectPath, options),
     openProjectFile: () => window.corona.project.openProjectFile(),
+    // Opening a project document reloads the native scene, so this route stays in C++.
+    openDocument: request => window.corona.project.openDocument(request),
+    // Active-project metadata is a project write, not a file-manager operation.
+    saveActiveProjectInfo: settings => window.corona.project.saveActiveProjectInfo(settings),
   },
   audio: {
-    playResource: (resourceId, loop = false) => window.corona.audio.playResource(resourceId, loop),
-    stopResource: (resourceId) => window.corona.audio.stopResource(resourceId),
-    playActor: (sceneName, actor, scope, loop = false) =>
-      window.corona.audio.playActor(sceneName, actor, { ...(scope || {}), loop }),
-    stopActor: (sceneName, actor, scope) => window.corona.audio.stopActor(sceneName, actor, scope),
+    // The identity decides what plays: a resource id, or an actor of a scene.
+    play: (identity, options = {}) => window.corona.audio.play({ ...identity, ...options }),
+    stop: identity => window.corona.audio.stop({ ...identity }),
   },
   scene: {
     readScene: request => window.corona.scene.readScene(request),
+    dispatchInput: (sceneName, cameraId, event) =>
+      window.corona.scene.dispatchInput(sceneName, cameraId, event),
     readActorRig: (sceneName, actor, scope) => window.corona.scene.readActorRig(sceneName, actor, scope),
     selectActor: (sceneName, actorType, actorName, context = null) =>
       context ? window.corona.scene.selectActor(sceneName, actorType, actorName, context)
@@ -126,13 +128,11 @@ const editorApiStatic = {
   viewport: {
     pick: (sceneName, cameraId, options) => window.corona.viewport.pick(sceneName, cameraId, options),
     configure: (sceneName, cameraId, patch) => window.corona.viewport.configure(sceneName, cameraId, patch),
-  },
-  gizmo: {
-    setTarget: (sceneId, cameraId, options) => window.corona.gizmo.setTarget(sceneId, cameraId, options),
-    pointer: (sceneId, cameraId, options) => window.corona.gizmo.pointer(sceneId, cameraId, options),
-  },
-  input: {
-    dispatch: (sceneName, cameraId, event) => window.corona.input.dispatch(sceneName, cameraId, event),
+    // The gizmo is a viewport overlay, so it lives with the viewport bindings.
+    setGizmoTarget: (sceneId, cameraId, options) =>
+      window.corona.viewport.setGizmoTarget(sceneId, cameraId, options),
+    setGizmoPointer: (sceneId, cameraId, options) =>
+      window.corona.viewport.setGizmoPointer(sceneId, cameraId, options),
   },
   scripts: {
     // The Python file host owns compilation, revision checks and run state.
@@ -163,7 +163,6 @@ const editorApiStatic = {
       return { ...info, archive_session: active.archive_session, read_only: false };
     },
     // Saving metadata refreshes the native scene cache, so this route stays in C++.
-    saveActiveProjectInfo: settings => window.corona.projectSettings.saveActiveProjectInfo(settings),
   },
   // Single Web -> Python entry point. The envelope is built here and parsed by
   // Python; C++ only carries it, so JS owns its own request schema.

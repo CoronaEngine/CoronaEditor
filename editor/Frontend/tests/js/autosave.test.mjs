@@ -150,7 +150,7 @@ test('only persistent scene methods mark the scene dirty', async () => {
   for (const name of PERSISTENT_SCENE_METHODS) scene[name] = () => calls.push(name);
 
   const api = withAutosave(
-    { scene, files: { openFile: () => { calls.push('openFile'); return 'forwarded'; } } },
+    { scene, files: { getFileTree: () => { calls.push('getFileTree'); return 'forwarded'; } } },
     { now: clock.now, setTimer: clock.setTimer, clearTimer: clock.clearTimer, debounceMs: 1000, notify: () => {} },
   );
 
@@ -164,7 +164,7 @@ test('only persistent scene methods mark the scene dirty', async () => {
 
   api.scene.readScene();
   assert.equal(api.autosave.state().dirty, false, 'reads alone never dirty the scene');
-  assert.equal(api.files.openFile(), 'forwarded', 'other namespaces are forwarded untouched');
+  assert.equal(api.files.getFileTree(), 'forwarded', 'other namespaces are forwarded untouched');
 });
 
 test('a read-only scene is never autosaved', async () => {

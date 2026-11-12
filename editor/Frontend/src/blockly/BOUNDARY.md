@@ -13,7 +13,7 @@
 | `components/` | active UI | 工作区 UI、Blockly workspace、工具箱、节点图和编辑器交互 | 新 UI 完整替代并完成工作区保存/运行回归 |
 | `configs/` | active presentation config | 工具箱、主题、分类和 workspace 配置 | 新编辑器配置 owner 吸收后删除 |
 | `i18n/` | active presentation data | Blockly 自定义积木和界面文案映射 | 文案全部归统一 i18n catalog 且完成渲染回归 |
-| `node-editor/aiNodeGraphService.js` | active internal adapter | 校验内部 AI 节点图结果、生成/应用请求，并通过 `BroadcastChannel` 协调 detached Dock | 节点图 adapter 被独立且等价的 UI integration owner 替代 |
+| `node-editor/aiNodeGraphService.js` | active internal adapter | 校验内部 AI 节点图结果、生成/应用请求，并通过公共 `webMessages` 模块协调 detached Dock | 节点图 adapter 被独立且等价的 UI integration owner 替代 |
 | `utils/` | active helper | Actor context 规范化和节点图保存重试策略 | 对应 context/save owner 吸收并完成回归 |
 
 Actor 选择继续由现有场景选择契约和各视图自身状态处理；不再使用

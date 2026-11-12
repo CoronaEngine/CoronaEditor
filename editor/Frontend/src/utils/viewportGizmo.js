@@ -105,8 +105,8 @@ export const createViewportGizmoController = ({
       const api = getApi?.();
       const current = binding();
       const actorGuid = String(actor.actor_guid || '').trim();
-      if (!api?.gizmo?.setTarget || !current.sceneId || !current.cameraId || !current.archiveSession || !actorGuid) return false;
-      Promise.resolve(api.gizmo.setTarget(String(current.sceneId), String(current.cameraId), {
+      if (!api?.viewport?.setGizmoTarget || !current.sceneId || !current.cameraId || !current.archiveSession || !actorGuid) return false;
+      Promise.resolve(api.viewport.setGizmoTarget(String(current.sceneId), String(current.cameraId), {
         archive_session: String(current.archiveSession), actor_guid: actorGuid,
       })).catch(error => console.warn('[Viewport] Gizmo target failed', error));
       return true;
@@ -115,8 +115,8 @@ export const createViewportGizmoController = ({
     clearTarget() {
       const api = getApi?.();
       const current = binding();
-      if (!api?.gizmo?.setTarget || !current.sceneId || !current.cameraId || !current.archiveSession) return false;
-      Promise.resolve(api.gizmo.setTarget(String(current.sceneId), String(current.cameraId), {
+      if (!api?.viewport?.setGizmoTarget || !current.sceneId || !current.cameraId || !current.archiveSession) return false;
+      Promise.resolve(api.viewport.setGizmoTarget(String(current.sceneId), String(current.cameraId), {
         archive_session: String(current.archiveSession), actor_guid: null,
       })).catch(error => console.warn('[Viewport] Gizmo target clear failed', error));
       dragging = false;
@@ -163,7 +163,7 @@ export const createViewportGizmoController = ({
       const current = binding();
       const renderRect = normalizeRect(getRenderRect?.() || getHitRect?.());
       const hitRect = normalizeRect(getHitRect?.() || renderRect);
-      if (!api?.gizmo?.pointer || !current.sceneId || !current.cameraId || !current.archiveSession || !renderRect) return false;
+      if (!api?.viewport?.setGizmoPointer || !current.sceneId || !current.cameraId || !current.archiveSession || !renderRect) return false;
 
       const clientX = Number(event.clientX ?? lastPointer.clientX);
       const clientY = Number(event.clientY ?? lastPointer.clientY);
@@ -186,7 +186,7 @@ export const createViewportGizmoController = ({
       };
       const requestId = nextRequestId();
       pending.add(requestId);
-      Promise.resolve(api.gizmo.pointer(String(current.sceneId), String(current.cameraId), {
+      Promise.resolve(api.viewport.setGizmoPointer(String(current.sceneId), String(current.cameraId), {
         archive_session: String(current.archiveSession), request_id: requestId, event: nativeEventType,
         x: clientX - renderRect.left, y: clientY - renderRect.top,
         width: renderRect.width, height: renderRect.height,

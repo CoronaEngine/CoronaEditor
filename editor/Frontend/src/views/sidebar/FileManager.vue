@@ -212,7 +212,7 @@ const handleOpenFile = async (node = contextMenu.value.item, captured = contextM
   const file_type = node.name === 'scene.ini' ? 'scene' : node.name.endsWith('.actor') ? 'actor' : '';
   if (!file_type) return;
   try {
-    await editorApi.files.openFile({ ...captured, path: node.path, file_type });
+    await editorApi.project.openDocument({ ...captured, path: node.path, file_type });
   } catch (error) {
     if (owns(captured)) errorMsg.value = String(error);
   }

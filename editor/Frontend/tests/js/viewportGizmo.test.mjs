@@ -76,9 +76,9 @@ test('main viewport pointerdown does not force a focus transition during drag st
 
 test('sets and clears a GUID target through the scoped V8 API', () => {
   const calls = [];
-  const api = { gizmo: {
-    setTarget: (...args) => calls.push(args),
-    pointer: (...args) => calls.push(args),
+  const api = { viewport: {
+    setGizmoTarget: (...args) => calls.push(args),
+    setGizmoPointer: (...args) => calls.push(args),
   } };
   const controller = createViewportGizmoController({
     getApi: () => api,
@@ -94,8 +94,8 @@ test('sets and clears a GUID target through the scoped V8 API', () => {
 
 test('viewport gizmo uses scoped typed V8 operations without numeric native handles or result polling', () => {
   const source = readFileSync(join(frontendRoot, 'src/utils/viewportGizmo.js'), 'utf8');
-  assert.match(source, /api\.gizmo\.setTarget/);
-  assert.match(source, /api\.gizmo\.pointer/);
+  assert.match(source, /api\.viewport\.setGizmoTarget/);
+  assert.match(source, /api\.viewport\.setGizmoPointer/);
   assert.doesNotMatch(source, /cameraHandle|actorHandle|setViewportGizmoTarget|viewportGizmoPointer/);
   assert.doesNotMatch(source, /Number\(.*handle/);
 
@@ -107,7 +107,7 @@ test('viewport gizmo uses scoped typed V8 operations without numeric native hand
 
 test('forwards viewport-local pointer coordinates and tracks the direct Promise result', async () => {
   const calls = [];
-  const api = { gizmo: { setTarget() {}, pointer: (...args) => { calls.push(args); return Promise.resolve({ consumed: true, dragging: true, axis: 'x' }); } } };
+  const api = { viewport: { setGizmoTarget() {}, setGizmoPointer: (...args) => { calls.push(args); return Promise.resolve({ consumed: true, dragging: true, axis: 'x' }); } } };
   const controller = createViewportGizmoController({
     getApi: () => api,
     getCameraBinding: () => ({ sceneId: 'Scene/default.scene', cameraId: 'camera/main', archiveSession: 'session-1' }),
@@ -132,7 +132,7 @@ test('forwards viewport-local pointer coordinates and tracks the direct Promise 
 test('drag end is reported once for persistence', async () => {
   const ended = [];
   const controller = createViewportGizmoController({
-    getApi: () => ({ gizmo: { setTarget() {}, pointer: () => Promise.resolve({ consumed: true, dragging: true, ended: true }) } }),
+    getApi: () => ({ viewport: { setGizmoTarget() {}, setGizmoPointer: () => Promise.resolve({ consumed: true, dragging: true, ended: true }) } }),
     getCameraBinding: () => ({ sceneId: 'Scene/default.scene', cameraId: 'camera/main', archiveSession: 'session-1' }),
     getHitRect: () => ({ left: 0, top: 0, width: 100, height: 100 }),
     getRenderRect: () => ({ left: 0, top: 0, width: 100, height: 100 }),
@@ -148,7 +148,7 @@ test('pointercancel result clears the active drag once', async () => {
   const calls = [];
   const cancelled = [];
   const controller = createViewportGizmoController({
-    getApi: () => ({ gizmo: { setTarget() {}, pointer: (...args) => { calls.push(args); const cancel = args[2].event === 'pointercancel'; return Promise.resolve(cancel ? { consumed: true, dragging: false, cancelled: true, axis: 'x' } : { consumed: true, dragging: true, axis: 'x' }); } } }),
+    getApi: () => ({ viewport: { setGizmoTarget() {}, setGizmoPointer: (...args) => { calls.push(args); const cancel = args[2].event === 'pointercancel'; return Promise.resolve(cancel ? { consumed: true, dragging: false, cancelled: true, axis: 'x' } : { consumed: true, dragging: true, axis: 'x' }); } } }),
     getCameraBinding: () => ({ sceneId: 'Scene/default.scene', cameraId: 'camera/main', archiveSession: 'session-1' }),
     getHitRect: () => ({ left: 0, top: 0, width: 100, height: 100 }),
     getRenderRect: () => ({ left: 0, top: 0, width: 100, height: 100 }),
@@ -180,7 +180,7 @@ test('coalesces active drag moves to one animation frame', async () => {
   const frames = [];
   let request = 0;
   const controller = createViewportGizmoController({
-    getApi: () => ({ gizmo: { setTarget() {}, pointer: (...args) => { calls.push(args); return Promise.resolve({ consumed: true, dragging: true, axis: 'x' }); } } }),
+    getApi: () => ({ viewport: { setGizmoTarget() {}, setGizmoPointer: (...args) => { calls.push(args); return Promise.resolve({ consumed: true, dragging: true, axis: 'x' }); } } }),
     getCameraBinding: () => ({ sceneId: 'Scene/default.scene', cameraId: 'camera/main', archiveSession: 'session-1' }),
     getHitRect: () => ({ left: 0, top: 0, width: 100, height: 100 }),
     getRenderRect: () => ({ left: 0, top: 0, width: 100, height: 100 }),

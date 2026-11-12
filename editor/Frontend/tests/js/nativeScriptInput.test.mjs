@@ -4,12 +4,12 @@ import { readFile } from 'node:fs/promises';
 
 test('input facade calls the one native V8 binding without the legacy routes', async t => {
   const calls = [];
-  globalThis.window = { corona: { input: { dispatch: (...args) => { calls.push(args); return Promise.resolve({ status: 'queued' }); } } },
+  globalThis.window = { corona: { scene: { dispatchInput: (...args) => { calls.push(args); return Promise.resolve({ status: 'queued' }); } } },
     cefQuery: () => { throw Error('legacy transport'); } };
   t.after(() => { delete globalThis.window; });
   const { editorApi } = await import(`../../src/api/editorApi.js?input=${Date.now()}`);
   const event = { archive_session: 'world', type: 'keyDown', code: 'KeyJ', key: 'd', modifiers: '' };
-  assert.deepEqual(await editorApi.input.dispatch('scene.ini', 'main-camera', event), { status: 'queued' });
+  assert.deepEqual(await editorApi.scene.dispatchInput('scene.ini', 'main-camera', event), { status: 'queued' });
   assert.deepEqual(calls, [['scene.ini', 'main-camera', event]]);
   for (const name of ['sendKeyEvent', 'sendKeyUpEvent', 'sendMouseEvent']) assert.equal(name in editorApi.scripts, false);
 });
@@ -18,7 +18,7 @@ test('pointer input uses scoped native event objects with viewport coordinates a
   const { createScriptInputSender } = await import('../../src/utils/scriptInput.js');
   const calls = [];
   let scope = { sceneId: 'scene.ini', cameraId: 'camera-a', archiveSession: 'world' };
-  const sender = createScriptInputSender({ api: { input: { dispatch: async (...args) => { calls.push(args); return { status: 'queued' }; } } },
+  const sender = createScriptInputSender({ api: { scene: { dispatchInput: async (...args) => { calls.push(args); return { status: 'queued' }; } } },
     getBinding: () => scope, getRenderRect: () => ({ left: 10, top: 20, width: 400, height: 200 }) });
   assert.deepEqual(await sender('click', { clientX: 35, clientY: 60, button: 0 }, 'Picked'), { status: 'queued' });
   assert.deepEqual(calls[0], ['scene.ini', 'camera-a', { archive_session: 'world', type: 'mouse',
@@ -41,7 +41,7 @@ test('deferred mouse input keeps its original coordinates and cannot cross archi
   let scope = { sceneId: 'scene.ini', cameraId: 'a', archiveSession: 'one' };
   let rect = { left: 10, top: 20, width: 400, height: 200 };
   const calls = [];
-  const sender = createScriptInputSender({ api: { input: { dispatch: async (...args) => calls.push(args) } },
+  const sender = createScriptInputSender({ api: { scene: { dispatchInput: async (...args) => calls.push(args) } },
     getBinding: () => scope, getRenderRect: () => rect });
   const pending = sender.capture('click', { clientX: 20, clientY: 30, button: 0 });
   rect = { left: 100, top: 200, width: 600, height: 300 };
