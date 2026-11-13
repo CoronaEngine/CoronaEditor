@@ -19,7 +19,7 @@ async function accessTarget(payload, save) {
   const result = save
     ? await editorApi.projectFiles.save({ ...scope, code, document: { target, workspace } })
     : await editorApi.projectFiles.load(scope);
-  if (result?.status === 'error') return result;
+  // A refusal rejects (the bridge raises it with error.code); success shapes are records.
   return { status: result.status, workspace: result.document?.workspace || {},
     target: { ...(result.document?.target || target), code_path: result.code_path,
       workspace_path: result.document_path, revision: result.revision }, project_path };

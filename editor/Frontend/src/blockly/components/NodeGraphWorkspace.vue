@@ -2351,9 +2351,6 @@ async function saveNow(targetOverride = null, { force = false } = {}) {
         runnable,
         validation_errors: validationErrors,
       });
-      if (response?.status === 'error') {
-        throw new Error(response.message || '保存节点图失败');
-      }
       if (target.archiveSession !== loadedArchiveSession) return false;
       graphDirty = JSON.stringify(graphSnapshot()) !== snapshotFingerprint;
       saveLabel.value = runnable
@@ -2418,7 +2415,6 @@ async function loadGraphForCurrentTarget() {
       scene_name: isProject ? '' : target.sceneName || '', actor_name: isProject ? '' : target.actorName || '',
     });
     if (!componentMounted || loadSequence !== graphLoadSequence) return;
-    if (response?.status === 'error') throw new Error(response.message || '节点图加载失败');
     loadedArchiveSession = scope.archive_session;
     loadedProjectPath = activeProjectPath.value = scope.project_path;
     if (response?.status === 'loaded') {

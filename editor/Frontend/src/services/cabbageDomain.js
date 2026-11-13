@@ -197,13 +197,19 @@ export async function contextTransaction(
     if (signal?.aborted || revision !== worldModeState.revision) throw new Error('当前任务已取消');
     fillSlots(context, Date.now());
     context.updatedAt = Math.max(Date.now(), context.updatedAt + 1);
-    const saved = await editorApi.projectSettings.commitProjectDocument({
-      ...request,
-      revision: read.revision,
-      content: context,
-    });
+    let saved;
+    try {
+      saved = await editorApi.projectSettings.commitProjectDocument({
+        ...request,
+        revision: read.revision,
+        content: context,
+      });
+    } catch (error) {
+      // A lost compare-and-swap rejects with DOCUMENT_CONFLICT: reload and retry once more.
+      if (error?.code === 'DOCUMENT_CONFLICT') continue;
+      throw error;
+    }
     if (saved?.success) return { success: true, status: 'ok', context, ...result };
-    if (saved?.error !== 'DOCUMENT_CONFLICT') throw new Error(saved?.error || '保存助手状态失败');
   }
   throw new Error('助手状态正在被其他窗口修改，请重试');
 }
