@@ -63,7 +63,7 @@ function mainDeps() {
         active_camera_id: 'main', cameras: [{ camera_id: 'main', opaque_handle: '18446744073709551615',
           vision_accumulation: true, vision_denoise: false, vision_denoiser: 'relax', vision_stable_planes: false }] }; }, index: async (...args) => { calls.push(['actors', ...args]); return { ...identity, actors: [{ actor_guid: 'actor', name: 'Probe' }] }; } }),
 
-      getEnvironment: async (...args) => { calls.push(['environment', ...args]); return { ...identity,
+      readEnvironment: async (...args) => { calls.push(['environment', ...args]); return { ...identity,
         sun: { enabled: false, direction: [3, 2, 1] }, grid: { enabled: false } }; },
 
     } },
@@ -77,7 +77,8 @@ function cameraDeps(read) {
     pendingDenoiserSelection: null, pendingStablePlanesSelection: null,
     normalizeVisionRenderMode, visionAccumulationFromCamera, visionDenoiseFromCamera,
     visionDenoiserFromCamera, visionStablePlanesFromCamera,
-    editorApi: { scene: { ...sceneQueryFixture({ cameras: read }),   isVisionAvailable: async () => ({ available: true }) } },
+    editorApi: { scene: { ...sceneQueryFixture({ cameras: read }) },
+      app: { isVisionAvailable: async () => ({ available: true }) } },
   };
   for (const key of ['camera', 'cameraName', 'backend', 'visionAvailable', 'visionAccumulation', 'visionDenoise',
     'visionDenoiser', 'visionStablePlanes', 'visionRenderMode', 'outputMode', 'moveSpeed', 'renderWidth', 'renderHeight'])

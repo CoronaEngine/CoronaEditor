@@ -27,6 +27,8 @@ const fileOp = async (op, request, args) => bridgeCall('ProjectArchive', 'file_m
 const editorApiStatic = {
   app: {
     closeProcess: () => window.corona.app.closeProcess(),
+    // Engine capability, not scene state: the panel asks before rendering a vision tab.
+    isVisionAvailable: () => window.corona.app.isVisionAvailable(),
   },
   files: {
     getFileTree: async request => ({
@@ -74,16 +76,17 @@ const editorApiStatic = {
     play: (identity, options = {}) => window.corona.audio.play({ ...identity, ...options }),
     stop: identity => window.corona.audio.stop({ ...identity }),
   },
+  input: {
+    // The camera is the target; the scene it belongs to is an argument.
+    dispatch: (sceneName, cameraId, event) => window.corona.input.dispatch(sceneName, cameraId, event),
+  },
   scene: {
     readScene: request => window.corona.scene.readScene(request),
-    dispatchInput: (sceneName, cameraId, event) =>
-      window.corona.scene.dispatchInput(sceneName, cameraId, event),
     readActorRig: (sceneName, actor, scope) => window.corona.scene.readActorRig(sceneName, actor, scope),
     selectActor: (sceneName, actorType, actorName, context = null) =>
       context ? window.corona.scene.selectActor(sceneName, actorType, actorName, context)
         : window.corona.scene.selectActor(sceneName, actorType, actorName),
     createCamera: (sceneName, options) => window.corona.scene.createCamera(sceneName, options),
-    isVisionAvailable: () => window.corona.scene.isVisionAvailable(),
     readActive: () => window.corona.scene.readActive(),
     selectModelFile: (sceneName, fileType = 'model', scope) =>
       window.corona.scene.selectModelFile(sceneName, { ...(scope || {}), file_type: fileType }),
@@ -114,8 +117,7 @@ const editorApiStatic = {
       window.corona.scene.readCameraRenderSettings(sceneName, cameraId, scope),
     deleteCamera: (sceneName, cameraId, scope) =>
       window.corona.scene.deleteCamera(sceneName, cameraId, scope),
-    captureScreenshot: (sceneName, cameraId, options) => window.corona.scene.captureScreenshot(sceneName, cameraId, options),
-    getEnvironment: (sceneName, scope) => window.corona.scene.getEnvironment(sceneName, scope),
+    readEnvironment: (sceneName, scope) => window.corona.scene.readEnvironment(sceneName, scope),
     setEnvironment: (sceneName, patch) => window.corona.scene.setEnvironment(sceneName, patch),
   },
   window: {
@@ -140,6 +142,9 @@ const editorApiStatic = {
       window.corona.viewport.setGizmoTarget(sceneId, cameraId, options),
     setGizmoPointer: (sceneId, cameraId, options) =>
       window.corona.viewport.setGizmoPointer(sceneId, cameraId, options),
+    // A capture is a viewport operation, not scene state.
+    captureScreenshot: (sceneName, cameraId, options) =>
+      window.corona.viewport.captureScreenshot(sceneName, cameraId, options),
   },
   scripts: {
     // The Python file host owns compilation, revision checks and run state.

@@ -93,7 +93,7 @@ test('a delayed environment result cannot update controls after the observed arc
   const h = mountMainPage(t);
   await h.mount();
   let release;
-  h.api.scene.getEnvironment = () => new Promise(resolve => { release = resolve; });
+  h.api.scene.readEnvironment = () => new Promise(resolve => { release = resolve; });
   const old = h.page.loadPhysicsParams();
   assert.equal(typeof release, 'function');
   h.page.environmentArchiveSession.value = 'replacement';

@@ -276,7 +276,7 @@ const loadCamera = async () => {
   if (!cameraArchiveSession || !viewLifetime.current()) return false;
   const [listResult, visionResult] = await Promise.all([
     editorApi.scene.readScene({ archive_session: cameraArchiveSession, scene: sceneId, cameras: true }),
-    editorApi.scene.isVisionAvailable(),
+    editorApi.app.isVisionAvailable(),
   ]);
   if (!viewLifetime.current() || listResult.archive_session !== cameraArchiveSession || listResult.scene !== sceneId) return false;
   const payload = listResult;
@@ -751,7 +751,7 @@ const scheduleWindowSizeSync = () => {
 
 const takeScreenshot = async () => {
   try {
-    await editorApi.scene.captureScreenshot(sceneId, cameraId, { archive_session: camera.value?.archive_session });
+    await editorApi.viewport.captureScreenshot(sceneId, cameraId, { archive_session: camera.value?.archive_session });
   } catch (error) {
     errorText.value = error.message;
   }

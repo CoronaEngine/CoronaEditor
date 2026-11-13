@@ -15,7 +15,7 @@ export const createScriptInputSender = ({ api, getBinding, getRenderRect }) => {
     return async (pickedActor = '') => {
       const current = getBinding() || {};
       if (disposed || current.sceneId !== sceneId || current.cameraId !== cameraId || current.archiveSession !== archiveSession) return false;
-      return api.scene.dispatchInput(sceneId, cameraId, { ...input, picked_actor: pickedActor });
+      return api.input.dispatch(sceneId, cameraId, { ...input, picked_actor: pickedActor });
     };
   };
   return sender;

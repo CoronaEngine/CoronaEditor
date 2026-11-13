@@ -27,7 +27,7 @@ function mount(t, overrides = {}) {
     return Promise.resolve(namespace === 'window' ? {} : { ok: true });
   } });
   const bindings = { ref, reactive, onMounted() {}, onUnmounted: fn => { unmounted = fn; }, createViewLifetime,
-    useRoute: () => ({}), ModelNodeHierarchy: {}, pickedNodeIdentity, editorApi: { scene: api('scene'), audio: api('audio') },
+    useRoute: () => ({}), ModelNodeHierarchy: {}, pickedNodeIdentity, editorApi: { app: api('app'), input: api('input'), scene: api('scene'), audio: api('audio'), viewport: api('viewport') },
     appService: api('window'), DEFAULT_SCENE_NAME: 'scene.ini', resolveOpenedProjectScene: value => value.scene,
     emptySceneTreeSettlement, resolveSceneTreeSnapshot,
     useErrorHandler: () => ({ error: (...args) => errors.push(args), warn: (...args) => warnings.push(args) }),

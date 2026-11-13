@@ -72,6 +72,7 @@ export function mountMainPage(t, visionMode = 'path_tracing', { nativeCursor = f
   const api = {
     viewport: { configure: async (...args) => { calls.push(['viewport', ...args]); return {}; } },
     sceneTools: {},
+    app: { isVisionAvailable: async () => ({ available: true }) },
     scene: { ...sceneQueryFixture({ index: async () => ({ archive_session: 'main-archive', scene: 'scene_v3.xml', actors: [] }), cameras: async (scene, scope) => {
       calls.push(['cameras', scene, scope]);
       assert.equal(scene, 'scene_v3.xml');
@@ -84,7 +85,6 @@ export function mountMainPage(t, visionMode = 'path_tracing', { nativeCursor = f
         vision_stable_planes: true, view_open: false,
       }] };
     } }),  observe: async () => -1,
-      isVisionAvailable: async () => ({ available: true }),
       setCameraRenderSettings: async (scene, camera, patch) => {
         calls.push(['backend', patch.render_backend, scene, camera, patch]);
         assert.equal(scene, 'scene_v3.xml');
@@ -94,7 +94,7 @@ export function mountMainPage(t, visionMode = 'path_tracing', { nativeCursor = f
       },
       updateCamera: async (...args) => { calls.push(['cameraWrite', ...args]); return {}; },
       readActive: async () => ({ archive_session: 'main-archive', scene: 'scene_v3.xml' }),
-      getEnvironment: async (...args) => {
+      readEnvironment: async (...args) => {
         calls.push(['environmentRead', ...args]);
         return { archive_session: 'main-archive', scene: 'scene_v3.xml', physics: {
           gravity: [1, -8, 2], floor_y: 4, floor_restitution: 0.3, fixed_dt: 0.02,

@@ -14,7 +14,7 @@ for (const retirement of ['unmount', 'archive', 'scene']) {
     ['light', 'updateSceneLight', ['x'], 'setEnvironment'],
     ['grid', 'setSceneGridEnabledFromPanel', [false], 'setEnvironment'],
     ['physics write', 'handleApplyPhysics', [], 'setEnvironment'],
-    ['physics read', 'loadPhysicsParams', [], 'getEnvironment'],
+    ['physics read', 'loadPhysicsParams', [], 'readEnvironment'],
     ['resource status', 'pollProjectResourceLoadStatus', [], 'getProjectLoadStatus'],
   ]) for (const failure of [false, true]) {
     test(`main ${name} ${failure ? 'failure' : 'reply'} is retired after ${retirement}`, async t => {
@@ -69,7 +69,7 @@ test('an older grid reply cannot undo a newer grid choice', async t => {
 
 test('physics read started before a new write cannot replace the submitted values', async t => {
   const h = mountMainPage(t); await h.mount(); const pending = deferred();
-  h.api.scene.getEnvironment = () => pending.promise;
+  h.api.scene.readEnvironment = () => pending.promise;
   const reading = h.page.loadPhysicsParams();
   await h.page.applyPhysicsFromSettings({ floorY: 6 });
   pending.resolve({ physics: { floor_y: 1 } });
@@ -98,7 +98,7 @@ test('stopping resource polling also retires its in-flight sample', async t => {
 
 test('camera projection read before environment edits cannot roll back light and grid', async t => {
   const h = mountMainPage(t); await h.mount(); const pending = deferred();
-  h.api.scene.getEnvironment = () => pending.promise;
+  h.api.scene.readEnvironment = () => pending.promise;
   const reading = h.page.syncSceneCameraBinding('scene_v3.xml');
   h.page.sceneLightSettings.direction.x = 7; await h.page.updateSceneLight('x');
   await h.page.setSceneGridEnabledFromPanel(false);
@@ -110,7 +110,7 @@ test('camera projection read before environment edits cannot roll back light and
 
 test('camera projection from a previous scene in the same archive is retired', async t => {
   const h = mountMainPage(t); await h.mount(); const pending = deferred();
-  h.api.scene.getEnvironment = () => pending.promise;
+  h.api.scene.readEnvironment = () => pending.promise;
   const reading = h.page.syncSceneCameraBinding('scene_v3.xml');
   h.page.currentSceneId.value = 'other.xml';
   pending.resolve({ archive_session: 'main-archive', scene: 'scene_v3.xml', sun: { direction: [99, 1, 1] } });
@@ -119,7 +119,7 @@ test('camera projection from a previous scene in the same archive is retired', a
 
 for (const field of ['archive_session', 'scene']) test(`physics projection rejects a foreign ${field}`, async t => {
   const h = mountMainPage(t); await h.mount();
-  h.api.scene.getEnvironment = async () => ({ archive_session: 'main-archive', scene: 'scene_v3.xml',
+  h.api.scene.readEnvironment = async () => ({ archive_session: 'main-archive', scene: 'scene_v3.xml',
     [field]: 'foreign', physics: { floor_y: 99 } });
   assert.equal(await h.page.loadPhysicsParams(), false);
   assert.notEqual(h.page.physicsParams.value.floorY, 99);
@@ -139,7 +139,7 @@ test('a camera refresh started during a light write preserves the draft while st
   h.api.scene.setEnvironment = () => pending.promise;
   h.page.sceneLightSettings.direction.x = 7;
   const saving = h.page.updateSceneLight('x');
-  h.api.scene.getEnvironment = async () => ({ archive_session: 'main-archive', scene: 'scene_v3.xml', sun: { direction: [1, 1, 1] } });
+  h.api.scene.readEnvironment = async () => ({ archive_session: 'main-archive', scene: 'scene_v3.xml', sun: { direction: [1, 1, 1] } });
   assert.equal(await h.page.syncSceneCameraBinding('scene_v3.xml'), true);
   assert.equal(h.page.sceneLightSettings.direction.x, 7);
   assert.equal(h.page.cameraBindingState.value.cameraId, 'camera-1');
@@ -151,7 +151,7 @@ test('a camera refresh started during a light write preserves the draft while st
 test('current light failure still restores native values and releases busy', async t => {
   const h = mountMainPage(t); await h.mount();
   h.api.scene.setEnvironment = async () => { throw Error('native rejected'); };
-  h.api.scene.getEnvironment = async () => ({ archive_session: 'main-archive', scene: 'scene_v3.xml', sun: { direction: [2, 1, 1] } });
+  h.api.scene.readEnvironment = async () => ({ archive_session: 'main-archive', scene: 'scene_v3.xml', sun: { direction: [2, 1, 1] } });
   h.page.sceneLightSettings.direction.x = 9;
   assert.equal(await h.page.updateSceneLight('x'), false);
   assert.equal(h.page.sceneLightSettings.direction.x, 2);

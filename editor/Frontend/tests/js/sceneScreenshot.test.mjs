@@ -19,7 +19,7 @@ function handler(path, name, deps) {
 test('SceneBar screenshot captures the exact selected camera and archive in a single operation', async () => {
   const calls = [], errors = [];
   const take = handler('../../src/views/sidebar/SceneBar.vue', 'TakeScreenshot', {
-    editorApi: { scene: { captureScreenshot: async (...args) => { calls.push(args); return { status: 'canceled', path: '' }; } } },
+    editorApi: { viewport: { captureScreenshot: async (...args) => { calls.push(args); return { status: 'canceled', path: '' }; } } },
     currentSceneName: ref('scene.ini'), archiveSession: ref('archive'),
     getTargetCamera: () => ({ camera_id: 'camera-guid', name: 'Display camera' }),
     getTargetCameraName: () => 'Display camera', logError: (...args) => errors.push(args),
@@ -32,7 +32,7 @@ test('SceneBar screenshot captures the exact selected camera and archive in a si
 test('CameraView screenshot uses its loaded archive and preserves native errors', async () => {
   const calls = [], errorText = ref('');
   const take = handler('../../src/views/tools/CameraView.vue', 'takeScreenshot', {
-    editorApi: { scene: { captureScreenshot: async (...args) => { calls.push(args); throw new Error('capture failed'); } } },
+    editorApi: { viewport: { captureScreenshot: async (...args) => { calls.push(args); throw new Error('capture failed'); } } },
     camera: ref({ archive_session: 'archive' }), sceneId: 'scene.ini', cameraId: 'camera-guid', errorText,
     unwrap: value => value?.data ?? value,
   });

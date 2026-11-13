@@ -210,7 +210,7 @@ function detachedHost({ fields = {}, fail = false, pending = false, accumulation
       if (typeof vision.denoise === 'boolean') return { vision: { denoise: pending ? !vision.denoise : vision.denoise }, pending };
       if (typeof vision.accumulation === 'boolean') return { vision: { accumulation: pending ? !vision.accumulation : vision.accumulation }, pending };
       return { render_backend: patch.render_backend || 'native' };
-    }, isVisionAvailable: async () => ({ available: true }) } });
+    } }, app: { isVisionAvailable: async () => ({ available: true }) } });
   return { ...host, calls, patches };
 }
 

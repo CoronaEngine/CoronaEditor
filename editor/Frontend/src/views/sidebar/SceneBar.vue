@@ -834,7 +834,7 @@ const TakeScreenshot = async () => {
   try {
     const camera = getTargetCamera();
     if (!camera?.camera_id) return;
-    await editorApi.scene.captureScreenshot(context.scene, camera.camera_id, {
+    await editorApi.viewport.captureScreenshot(context.scene, camera.camera_id, {
       archive_session: context.archive,
     });
   } catch (e) {
@@ -857,7 +857,7 @@ const RefreshRenderBackendState = async () => {
     if (!scene || !archive) return;
     const [cameraResult, availResult] = await Promise.all([
       editorApi.scene.readScene({ archive_session: archive, scene: scene, cameras: true }),
-      editorApi.scene.isVisionAvailable(),
+      editorApi.app.isVisionAvailable(),
     ]);
     if (!current() || sequence !== renderBackendSequence || cameraResult.archive_session !== archive || cameraResult.scene !== scene) return;
     visionAvailable.value = !!availResult?.available;

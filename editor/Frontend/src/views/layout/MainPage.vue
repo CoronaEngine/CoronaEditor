@@ -1336,7 +1336,7 @@ const syncSceneCameraBinding = async (sceneId, { preservePose = false } = {}) =>
     const scope = { archive_session: archive };
     const [snapshot, environment] = await Promise.all([
       editorApi.scene.readScene({ ...scope, scene: sceneId, actors: 'index', cameras: true }),
-      editorApi.scene.getEnvironment(sceneId, scope),
+      editorApi.scene.readEnvironment(sceneId, scope),
     ]);
     if (!current() || [snapshot, environment].some(value => value.archive_session !== archive || value.scene !== sceneId)) return false;
     applySceneSnapshot(sceneId, { ...snapshot, scene_id: snapshot.scene,
@@ -1820,7 +1820,7 @@ const loadPhysicsParams = async () => {
   const { sceneId } = context;
   const scope = { archive_session: context.archive };
   try {
-    const environment = await editorApi.scene.getEnvironment(sceneId, scope);
+    const environment = await editorApi.scene.readEnvironment(sceneId, scope);
     if (!context.current() || environment.archive_session !== context.archive || environment.scene !== sceneId) return false;
     const data = environment.physics;
     if (data) {
@@ -2087,7 +2087,7 @@ onMounted(async () => {
   await pollProjectResourceLoadStatus();
   if (!viewCurrent()) return;
   try {
-    const visionResult = await editorApi.scene.isVisionAvailable();
+    const visionResult = await editorApi.app.isVisionAvailable();
     if (!viewCurrent()) return;
     visionAvailable.value = !!visionResult?.available;
   } catch (error) {

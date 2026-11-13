@@ -11,9 +11,13 @@ function nativeScene(t) {
     readActive: async () => snapshot,
     selectActor: async (...args) => { calls.push(args); return { status: 'success' }; },
   };
-  globalThis.window = { corona: { scene: native }, cefQuery: () => { throw new Error('legacy transport is forbidden'); } };
+  const app = {}, viewport = {};
+  globalThis.window = {
+    corona: { app, input: {}, scene: native, viewport },
+    cefQuery: () => { throw new Error('legacy transport is forbidden'); },
+  };
   t.after(() => { globalThis.window = previous; });
-  return { native, snapshot, calls };
+  return { native, app, viewport, snapshot, calls };
 }
 
 test('focus applies once through scoped V8 and has no obsolete focus facades or result event', async t => {
@@ -56,15 +60,15 @@ test('scene facade preserves native failures and does not retry an old route', a
   await assert.rejects(editorApi.scene.selectActor('scene.ini', 'model', 'Probe'), error => error === failure);
 });
 
-test('vision availability uses the typed scene binding without JSON or the legacy facade', async t => {
-  const { native } = nativeScene(t);
+test('vision availability uses the typed app binding without JSON or the legacy facade', async t => {
+  const { app } = nativeScene(t);
   const result = { available: true };
   const calls = [];
-  native.isVisionAvailable = async (...args) => { calls.push(args); return result; };
+  app.isVisionAvailable = async (...args) => { calls.push(args); return result; };
   const stringify = JSON.stringify, parse = JSON.parse;
   t.after(() => { JSON.stringify = stringify; JSON.parse = parse; });
   JSON.stringify = JSON.parse = () => { throw new Error('vision availability JSON transport forbidden'); };
-  assert.equal(await editorApi.scene.isVisionAvailable(), result);
+  assert.equal(await editorApi.app.isVisionAvailable(), result);
   assert.deepEqual(calls, [[]]);
   assert.equal('isVisionAvailable' in (editorApi.sceneTools || {}), false);
 });
@@ -130,7 +134,7 @@ test('environment has one raw V8 read and patch for sun, grid and physics with J
   const calls = [];
   const result = { archive_session: 'archive', scene: 'scene.ini', sun: { enabled: false },
     grid: { enabled: true }, physics: { gravity: [0, -9, 0], fixed_dt: 0.01 } };
-  for (const method of ['getEnvironment', 'setEnvironment']) {
+  for (const method of ['readEnvironment', 'setEnvironment']) {
     native[method] = async (...args) => { calls.push([method, ...args]); return result; };
   }
   const stringify = JSON.stringify, parse = JSON.parse;
@@ -138,10 +142,10 @@ test('environment has one raw V8 read and patch for sun, grid and physics with J
   JSON.stringify = JSON.parse = () => { throw new Error('JSON environment is forbidden'); };
   const scope = { archive_session: 'archive' };
   const patch = { ...scope, sun: { enabled: false }, grid: { enabled: true }, physics: { gravity: [0, -9, 0] } };
-  assert.equal(await editorApi.scene.getEnvironment('scene.ini', scope), result);
+  assert.equal(await editorApi.scene.readEnvironment('scene.ini', scope), result);
   assert.equal(await editorApi.scene.setEnvironment('scene.ini', patch), result);
-  assert.deepEqual(calls, [['getEnvironment', 'scene.ini', scope], ['setEnvironment', 'scene.ini', patch]]);
-  for (const old of ['getEnvironment', 'setEnvironment', 'sunDirection', 'floorGrid', 'getPhysicsParams', 'setPhysicsParams']) {
+  assert.deepEqual(calls, [['readEnvironment', 'scene.ini', scope], ['setEnvironment', 'scene.ini', patch]]);
+  for (const old of ['getEnvironment', 'readEnvironment', 'setEnvironment', 'sunDirection', 'floorGrid', 'getPhysicsParams', 'setPhysicsParams']) {
     assert.equal(old in (editorApi.sceneTools || {}), false, `retired environment wrapper: ${old}`);
   }
 });
@@ -149,24 +153,24 @@ test('environment has one raw V8 read and patch for sun, grid and physics with J
 test('environment preserves native scope failures without retrying granular manifest routes', async t => {
   const { native } = nativeScene(t);
   const failure = Object.assign(new Error('old archive'), { code: 'PROJECT_CONTEXT_CHANGED' });
-  native.getEnvironment = native.setEnvironment = () => Promise.reject(failure);
-  await assert.rejects(editorApi.scene.getEnvironment('scene.ini', { archive_session: 'old' }), error => error === failure);
+  native.readEnvironment = native.setEnvironment = () => Promise.reject(failure);
+  await assert.rejects(editorApi.scene.readEnvironment('scene.ini', { archive_session: 'old' }), error => error === failure);
   await assert.rejects(editorApi.scene.setEnvironment('scene.ini', { archive_session: 'old', grid: { enabled: false } }),
     error => error === failure);
 });
 
 test('screenshot uses one raw scoped V8 operation for explicit paths and interactive capture', async t => {
-  const { native } = nativeScene(t);
+  const { viewport } = nativeScene(t);
   const calls = [];
   const result = { status: 'success', archive_session: 'archive', scene: 'scene.ini', camera_id: 'camera-guid', path: '图.png' };
-  native.captureScreenshot = async (...args) => { calls.push(args); return result; };
+  viewport.captureScreenshot = async (...args) => { calls.push(args); return result; };
   const stringify = JSON.stringify, parse = JSON.parse;
   t.after(() => { JSON.stringify = stringify; JSON.parse = parse; });
   JSON.stringify = JSON.parse = () => { throw new Error('JSON screenshot transport is forbidden'); };
   const options = { archive_session: 'archive', path: '图.png' };
-  assert.equal(await editorApi.scene.captureScreenshot('scene.ini', 'camera-guid', options), result);
+  assert.equal(await editorApi.viewport.captureScreenshot('scene.ini', 'camera-guid', options), result);
   const scope = { archive_session: 'archive' };
-  assert.equal(await editorApi.scene.captureScreenshot('scene.ini', 'camera-guid', scope), result);
+  assert.equal(await editorApi.viewport.captureScreenshot('scene.ini', 'camera-guid', scope), result);
   assert.deepEqual(calls, [['scene.ini', 'camera-guid', options], ['scene.ini', 'camera-guid', scope]]);
   assert.equal('selectScreenshotPath' in (editorApi.sceneTools || {}), false);
   assert.equal('saveScreenshot' in (editorApi.sceneTools || {}), false);
@@ -174,13 +178,13 @@ test('screenshot uses one raw scoped V8 operation for explicit paths and interac
 });
 
 test('screenshot cancellation and native errors do not retry or invoke an old picker', async t => {
-  const { native } = nativeScene(t);
+  const { viewport } = nativeScene(t);
   const canceled = { status: 'canceled', path: '' };
-  native.captureScreenshot = async () => canceled;
-  assert.equal(await editorApi.scene.captureScreenshot('scene.ini', 'camera-guid', { archive_session: 'archive' }), canceled);
+  viewport.captureScreenshot = async () => canceled;
+  assert.equal(await editorApi.viewport.captureScreenshot('scene.ini', 'camera-guid', { archive_session: 'archive' }), canceled);
   const failure = Object.assign(new Error('old archive'), { code: 'PROJECT_CONTEXT_CHANGED' });
-  native.captureScreenshot = () => Promise.reject(failure);
-  await assert.rejects(editorApi.scene.captureScreenshot('scene.ini', 'camera-guid', { archive_session: 'old' }), error => error === failure);
+  viewport.captureScreenshot = () => Promise.reject(failure);
+  await assert.rejects(editorApi.viewport.captureScreenshot('scene.ini', 'camera-guid', { archive_session: 'old' }), error => error === failure);
 });
 
 test('camera pose and view settings share one scoped V8 patch with JSON disabled', async t => {
