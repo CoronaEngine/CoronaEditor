@@ -39,8 +39,9 @@ test('file operation refusals surface as rejections with the service code', asyn
   t.after(() => { globalThis.window = previous; });
   const request = { archive_session: 'lease', project_path: 'P:/世界', path: 'scene.ini' };
   globalThis.window = { corona: {
-    bridge: { call: () => Promise.resolve(JSON.stringify({
-      status: 'error', code: 'PERMISSION_DENIED', message: 'Cannot change the archive root or scene.ini' })) },
+    // The bridge rejects a service refusal; the facade does not inspect payloads.
+    bridge: { call: () => Promise.reject(Object.assign(
+      new Error('Cannot change the archive root or scene.ini'), { code: 'PERMISSION_DENIED' })) },
     project: { openDocument: () => Promise.resolve({ ok: true }) },
   } };
   await assert.rejects(editorApi.files.deleteItem(request), error => {
