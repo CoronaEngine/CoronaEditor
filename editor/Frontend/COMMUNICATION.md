@@ -571,9 +571,9 @@ viewport.configure(scene,cameraId,{archive_session,mode?,calibration?,bounds?}) 
 
 ### 2026-11-06 指针与系统光标合并
 
-viewport.configure 的 pointer 字段显示时传 `{x,y,cursor}`，隐藏时 `{cursor:'hidden'}`；系统光标由原生同一次操作计算，返回 pointer/systemCursorHidden。两页面的 controller 使用 sceneId/cameraId/archiveSession，不转 Number(handle)，不再调用 coronaBridge。RAF 合并移动，并在 native pending 时仅保留最新未发送坐标；不重试失败请求。hide 使用最后提交的身份，刷新/关闭/归档退休的原生清理按 context owner 隔离。两个旧 Fast、SharedDataHub 专用队列和 Optics 重复缓存整体删除。
+viewport.configure 携带 mode/calibration/bounds；原生光标叠加层已删除。两页面的 controller 使用 sceneId/cameraId/archiveSession，不转 Number(handle)，不再调用 coronaBridge。RAF 合并移动，并在 native pending 时仅保留最新未发送坐标；不重试失败请求。hide 使用最后提交的身份，刷新/关闭/归档退休的原生清理按 context owner 隔离。两个旧 Fast、SharedDataHub 专用队列和 Optics 重复缓存整体删除。
 
-JS 529/529、Python 71、CTest 6/6（真实 CEF 36.91 秒）、Conan 引擎与最终前端部署通过；部署 CameraView 实际 pointermove/blur/pointercancel 验证 scoped 调用及系统光标恢复。日志出现实际 cursor=visible/warp=submitted。引擎 f0e8f941、Editor be94618 仅本地提交代码/测试；未推送，所有文档未暂存/提交。Fast 剩 5 条、manifest 175（旧 Web 156、非 Web 19）、事件 17，整体尚未完成，完整 OS/双实例验收仍待进行。
+JS 529/529、Python 71、CTest 6/6（真实 CEF 36.91 秒）、Conan 引擎与最终前端部署通过；部署 CameraView 实际 pointer 事件验证 scoped 视口配置调用。日志出现实际 warp=submitted。引擎 f0e8f941、Editor be94618 仅本地提交代码/测试；未推送，所有文档未暂存/提交。Fast 剩 5 条、manifest 175（旧 Web 156、非 Web 19）、事件 17，整体尚未完成，完整 OS/双实例验收仍待进行。
 
 
 ## 2026-11-06 无调用方网格移动通道清理

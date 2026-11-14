@@ -1,7 +1,7 @@
 // Shared viewport coordinate adapter; transport belongs to the native V8 object.
 export const createScriptInputSender = ({ api, getBinding, getRenderRect }) => {
   let disposed = false;
-  const sender = (type, event, pickedActor = '') => sender.capture(type, event)(pickedActor);
+  const sender = (type, event) => sender.capture(type, event)();
   sender.dispose = () => { disposed = true; };
   sender.capture = (eventType, event) => {
     const { sceneId, cameraId, archiveSession } = getBinding() || {};
@@ -12,10 +12,10 @@ export const createScriptInputSender = ({ api, getBinding, getRenderRect }) => {
     const input = { archive_session: archiveSession, type: 'mouse',
       event: eventType, button: { 0: 'LeftButton', 1: 'MiddleButton', 2: 'RightButton' }[event.button] || '',
       x, y, viewport_x: x - rect.left, viewport_y: y - rect.top, viewport_width: rect.width, viewport_height: rect.height };
-    return async (pickedActor = '') => {
+    return async () => {
       const current = getBinding() || {};
       if (disposed || current.sceneId !== sceneId || current.cameraId !== cameraId || current.archiveSession !== archiveSession) return false;
-      return api.input.dispatch(sceneId, cameraId, { ...input, picked_actor: pickedActor });
+      return api.input.dispatch(sceneId, cameraId, input);
     };
   };
   return sender;

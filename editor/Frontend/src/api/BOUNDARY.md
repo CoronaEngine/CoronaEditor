@@ -11,11 +11,11 @@ Python/ScriptRuntime的独立清单与接口不是Web回退。下方续批记录
 
 ## 约束
 
-viewport.configure(scene,cameraId,{archive_session,mode?,calibration?,bounds?,pointer?}) 原样引用 corona.viewport.configure；
-合并视口边界、2D/3D UI 模式、光场标定及指针/系统光标，不传数字句柄，不调用旧 Fast 或 JSON transport。
+viewport.configure(scene,cameraId,{archive_session,mode?,calibration?,bounds?}) 原样引用 corona.viewport.configure；
+合并视口边界、2D/3D UI 模式与光场标定，不传数字句柄，不调用旧 Fast 或 JSON transport。
 返回实际配置领域快照；原生校验全部字段、精确相机及归档 lease 后才写入。
 mode 为 flat2d/stereo3d，calibration 为 pe/angle/offset/parallaxScale，bounds 为 x/y/width/height/renderWidth/renderHeight。
-pointer 显示 x/y/cursor，隐藏只传 cursor=hidden；系统光标由原生计算，返回 pointer/systemCursorHidden。
+视口配置只携带 mode/calibration/bounds；原生光标叠加层已删除，光标由浏览器/系统绘制，不再有 pointer 或 systemCursorHidden 往返。
 只允许本页面的 bound viewport，native context ID 不由 Web 提供；清理不得覆盖新 context 或其他窗口的 owner。
 
 - 新的原生能力进入 C++ typed V8 契约及 caller 校验，再在 `editorApi` 中引用；不得扩展旧 JSON transport；非 Web adapter 依其独立契约保留；
@@ -85,7 +85,7 @@ appService.createCameraView 再请求原生表面，打开/关闭只走 corona.w
 `sceneTools.renameCameraView`、`sceneTools.deleteCamera` 仅保留 Python caller，不再作为 Web facade。
 
 
-无人使用的 moveActorMesh / meshMoveResult Web 通道已删除：无 onMeshMoveResult 订阅、无该结果触发的 takeViewportResults 轮询。Mechanics 原生碰撞移动仍保留，不能作为普通 transform 写入的别名。拾取只走 viewport.pick 的直接 V8 Promise，旧 pickActor/actorPickResult 已删除；视口逐指针往返通道同样已整体移除，`viewport` 命名空间只剩 pick / configure / captureScreenshot。
+无人使用的 moveActorMesh / meshMoveResult Web 通道已删除：无 onMeshMoveResult 订阅、无该结果触发的 takeViewportResults 轮询。Mechanics 原生碰撞移动仍保留，不能作为普通 transform 写入的别名。视口拾取（viewport.pick / 旧 pickActor / actorPickResult）已整体删除，等待重新设计；`viewport` 命名空间只剩 configure / captureScreenshot。
 
 
 readActorIndex(scene,{archive_session}) 是具名直接 V8 读取，仅允许非空场景和已观察的 archive_session，未知 scope 字段拒绝。

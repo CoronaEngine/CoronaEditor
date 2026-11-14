@@ -16,7 +16,6 @@ Vue 业务 service 或场景状态的 owner。
 | `viewLifetime.js` | active lifecycle helper | 阻止卸载后异步启动、回调及迟到订阅泄漏；允许附加世界 revision 检查 | 所有视图改用等价生命周期 owner 且异步卸载回归通过 |
 | `serviceInitialization.js` | active lifecycle helper | 服务初始化响应错误和有限重试策略 | 统一 service lifecycle owner 吸收后删除 |
 | `viewportCameraController.js` | active viewport adapter | 创造模式自由相机输入、运动及帧调度；不拥有场景绑定 | 统一相机控制器替代且完成视口输入回归 |
-| `viewportPick.js` | active viewport adapter | 视口拾取结果和 Actor handle 索引 | 视口控制器集中管理且完成拾取回归 |
 | `viewportUiMode.js` | active viewport adapter | 视口模式、光标设置和本地 UI 状态 | 视口状态 owner 吸收且完成设置迁移 |
 
 ## 依赖方向

@@ -220,22 +220,6 @@ test('viewport bounds deduplicate per archive and retry explicitly after native 
   assert.equal(attempts, 2);
 });
 
-test('main viewport blur and pointer cancellation retire the native cursor through the same scoped patch', async t => {
-  const h = mountMainPage(t, 'path_tracing', { nativeCursor: true });
-  await h.mount(); h.flushFrames();
-  h.page.viewportUiMode.value = 'stereo3d';
-  const pointerWrites = () => h.calls.filter(call => call[0] === 'viewport' && call[3].pointer);
-  for (const handler of ['handleMainViewportBlur', 'handleViewportPointerCancel']) {
-    h.page.handleViewportPointerDown({ type: 'pointerdown', clientX: 20, clientY: 30, pointerId: 7, button: 0 });
-    assert.notEqual(pointerWrites().at(-1)?.[3].pointer.cursor, 'hidden');
-    h.page[handler]({ pointerId: 7 });
-    assert.deepEqual(pointerWrites().at(-1), ['viewport', 'scene_v3.xml', 'camera-1', {
-      archive_session: 'main-archive', pointer: { cursor: 'hidden' },
-    }], handler);
-  }
-});
-
-
 test('world entry reads the active scene without the retired main facade', async t => {
   const h = mountMainPage(t);
   delete h.api.main;

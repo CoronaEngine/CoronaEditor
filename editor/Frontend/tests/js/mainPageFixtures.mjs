@@ -8,7 +8,6 @@ import * as constants from '../../src/utils/constants.js';
 import * as projectLauncher from '../../src/services/projectLauncherService.js';
 import * as visionRenderModes from '../../src/utils/visionRenderModes.js';
 import * as viewportCamera from '../../src/utils/viewportCameraController.js';
-import * as viewportPick from '../../src/utils/viewportPick.js';
 import * as modelHierarchy from '../../src/utils/modelHierarchy.js';
 import * as scriptInput from '../../src/utils/scriptInput.js';
 import * as viewportUiMode from '../../src/utils/viewportUiMode.js';
@@ -39,7 +38,7 @@ for (const node of [...imports].reverse()) {
 const makeComponent = new Function('modules', 'window', 'document', 'requestAnimationFrame',
   'cancelAnimationFrame', 'ResizeObserver', `${setupSource}; return MainPage;`);
 
-export function mountMainPage(t, visionMode = 'path_tracing', { nativeCursor = false } = {}) {
+export function mountMainPage(t, visionMode = 'path_tracing') {
   const messages = createWebMessages({ scope: crypto.randomUUID(), role: 'main', documentId: 'main' });
   t.after(() => messages.dispose());
   const records = [], timers = new Map();
@@ -120,11 +119,9 @@ export function mountMainPage(t, visionMode = 'path_tracing', { nativeCursor = f
     '@/utils/constants.js': constants,
     '@/services/projectLauncherService.js': projectLauncher,
     '@/utils/visionRenderModes.js': visionRenderModes,
-    '@/utils/viewportPick.js': viewportPick,
     '@/utils/modelHierarchy.js': modelHierarchy,
     '@/utils/scriptInput.js': scriptInput,
-    '@/utils/viewportUiMode.js': { ...viewportUiMode, createViewportUiCalibrationStore: () => calibration,
-      isNativeViewportCursorEnabled: () => nativeCursor },
+    '@/utils/viewportUiMode.js': { ...viewportUiMode, createViewportUiCalibrationStore: () => calibration },
     '@/utils/serviceInitialization.js': serviceInitialization,
     '@/utils/viewLifetime.js': viewLifetime,
     '@/config/pluginManifest.js': pluginManifest,
@@ -176,7 +173,7 @@ export function mountMainPage(t, visionMode = 'path_tracing', { nativeCursor = f
     contains: target => target === surface,
     getBoundingClientRect: () => ({ left: 0, top: 0, width: 1536, height: 825 }),
   };
-  page.viewportPickSurfaceRef.value = surface;
+  page.viewportSurfaceRef.value = surface;
   t.after(() => { for (const hook of unmounted) hook(); });
   return { page, calls, errors, records, timers, observed, surface, dock, bus, windowEvents, messages, calibration, api, creativeActions,
     cabbageContext: modules['@/services/cabbageAssistantContextService.js'].cabbageContextService,

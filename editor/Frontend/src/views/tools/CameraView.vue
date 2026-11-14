@@ -153,13 +153,10 @@
     <div
       ref="inputLayerRef"
       class="input-layer"
-      :class="{ 'viewport-cursor-hidden': nativeViewportCursorEnabled && viewportUiMode === 'stereo3d' }"
-      :style="nativeViewportCursorEnabled && viewportUiMode === 'stereo3d' ? { cursor: 'none' } : null"
       @pointermove="handleViewportPointer"
       @pointerdown="handleViewportPointerDown"
       @pointerup="handleViewportPointer"
       @pointercancel="handleViewportPointerCancel"
-      @pointerleave="handleViewportPointerLeave"
       @mousedown="beginLook"
       @mousemove="updateLook"
       @mouseup="endLook"
@@ -192,13 +189,10 @@ import {
   normalizeVisionRenderMode, visionAccumulationFromCamera, visionDenoiseFromCamera, visionStablePlanesFromCamera, visionRenderModes,
   visionDenoisers, visionDenoiserFromCamera,
 } from '@/utils/visionRenderModes.js';
-import { createViewportPickController } from '@/utils/viewportPick.js';
 import { createScriptInputSender } from '@/utils/scriptInput.js';
 import {
   createViewportUiCalibrationStore,
   createViewportUiModeStore,
-  createViewportUiPointerController,
-  isNativeViewportCursorEnabled,
 } from '@/utils/viewportUiMode.js';
 
 const route = useRoute();
@@ -239,7 +233,6 @@ let borderlessTogglePending = false;
 let scriptInputTimer = 0;
 let scratchMouseMoveFrame = 0;
 let pendingScratchMouseMove = null;
-let pendingScratchClick = null;
 let clickDeferTimer = 0;
 
 const outputModes = [
@@ -258,7 +251,6 @@ const viewportUiModeStore = createViewportUiModeStore();
 const viewportUiCalibrationStore = createViewportUiCalibrationStore();
 const webMessages = getWebMessages();
 const viewportCalibration = createViewportCalibrationService(webMessages, { owner: getWebDocumentIdentity().owner });
-const nativeViewportCursorEnabled = isNativeViewportCursorEnabled();
 const viewportUiModeItems = [
   { mode: 'flat2d', label: '2D UI', title: '普通屏幕 UI' },
   { mode: 'stereo3d', label: '3D UI', title: '光场屏立体 UI' },
@@ -544,32 +536,9 @@ const getCameraRenderRect = () => {
   };
 };
 
-const viewportUiPointerController = createViewportUiPointerController({
-  api: editorApi.viewport,
-  getBinding: () => ({ sceneId, cameraId, archiveSession: camera.value?.archive_session }),
-  getEnabled: () => viewportUiMode.value === 'stereo3d',
-  getNativeCursorEnabled: () => nativeViewportCursorEnabled,
-  getHitRect: getCameraViewHitRect,
-  getRenderRect: getCameraRenderRect,
-});
-
 const cameraViewSelectionContext = () => ({
   sourceViewport: 'cameraView',
   sourceCameraId: cameraId,
-});
-
-const cameraViewPickController = createViewportPickController({
-  api: editorApi,
-  getCameraBinding: () => ({
-    sceneId,
-    cameraId,
-    archiveSession: camera.value?.archive_session,
-  }),
-  getHitRect: getCameraViewHitRect,
-  getRenderRect: getCameraRenderRect,
-  onResult: (payload, result) => handleCameraViewActorPickResult(payload, result),
-  emitActorChange: (type, scene, actorName, nodeContext) =>
-    editorApi.scene.selectActor(scene, type, actorName, { ...cameraViewSelectionContext(), ...nodeContext }),
 });
 
 const publishModelNodeSelection = async (payload = {}) => {
@@ -599,9 +568,6 @@ const syncViewportUiMode = () => {
     sceneId, cameraId, archiveSession: camera.value?.archive_session,
     mode: viewportUiMode.value,
   }).catch(error => console.warn('[Viewport] Native configuration failed', error));
-  if (viewportUiMode.value !== 'stereo3d') {
-    viewportUiPointerController.hide();
-  }
   syncViewportUiCalibration();
 };
 
@@ -612,9 +578,6 @@ const selectViewportUiMode = (mode) => {
     sceneId, cameraId, archiveSession: camera.value?.archive_session,
     mode: viewportUiMode.value,
   }).catch(error => console.warn('[Viewport] Native configuration failed', error));
-  if (viewportUiMode.value !== 'stereo3d') {
-    viewportUiPointerController.hide();
-  }
   syncViewportUiCalibration();
 };
 
@@ -908,35 +871,16 @@ const onKeyUp = (event) => {
 const sendScriptInput = createScriptInputSender({ api: editorApi,
   getBinding: () => ({ sceneId, cameraId, archiveSession: camera.value?.archive_session }),
   getRenderRect: getCameraRenderRect });
-const sendScratchMouse = (type, event, pickedActor = '') => {
-  sendScriptInput(type, event, pickedActor).catch(error => console.warn('Script input failed', error));
+const sendScratchMouse = (type, event) => {
+  sendScriptInput(type, event).catch(error => console.warn('Script input failed', error));
 };
-const finishPendingScratchClick = (pickedActor = '') => {
-  const pending = pendingScratchClick;
-  if (!pending) return;
-  pendingScratchClick = null;
-  pending.send(pickedActor).catch(error => console.warn('Script input failed', error));
-};
-
 const handleScratchClick = (event) => {
   const snapshot = {
     clientX: Number(event?.clientX || 0),
     clientY: Number(event?.clientY || 0),
     button: Number(event?.button || 0),
   };
-  // Replace an unfinished pick with the newest click. Older GPU completions
-  // remain harmless because the controller matches the latest requestId.
-  pendingScratchClick = {
-    send: sendScriptInput.capture('click', snapshot),
-    requestId: '',
-  };
-
-  const requestId = cameraViewPickController.pickAt(snapshot);
-  if (!requestId) {
-    finishPendingScratchClick('');
-    return;
-  }
-  pendingScratchClick.requestId = requestId;
+  sendScriptInput('click', snapshot, '').catch(error => console.warn('Script input failed', error));
 };
 
 const handleViewportClick = (event) => {
@@ -953,27 +897,6 @@ const handleViewportClick = (event) => {
     clickDeferTimer = 0;
     handleScratchClick(snapshot);
   }, 45);
-};
-
-const finishCameraViewClickFromPick = (payload, result) => {
-  if (!pendingScratchClick || payload?.requestId !== pendingScratchClick.requestId) return;
-  if (result?.status === 'stale') return;
-  const pickedActor = result?.actor?.name || '';
-  finishPendingScratchClick(pickedActor);
-};
-
-const handleCameraViewActorPickResult = (payload, result) => {
-  if (result.status === 'selected') coronaEventBus.emit('model-node-picked', { ...payload, actor_name: payload?.actor_name || result.actor?.name });
-  if (result.status === 'miss') coronaEventBus.emit('model-node-picked', payload);
-  if (result.status === 'miss') {
-    editorApi.scene.selectActor(
-      sceneId,
-      'scene',
-      '',
-      cameraViewSelectionContext(),
-    ).catch(() => {});
-  }
-  finishCameraViewClickFromPick(payload, result);
 };
 
 const forwardScratchMouse = (eventType, event) => {
@@ -1004,8 +927,6 @@ const endLook = (event) => {
   forwardScratchMouse('mouseup', event);
 };
 
-const viewportCursorShape = () => (looking ? 'grabbing' : 'arrow');
-
 const handleViewportPointer = (event) => {
   if (event.type === 'pointerup') {
     try {
@@ -1014,7 +935,6 @@ const handleViewportPointer = (event) => {
       // Pointer capture may already have been released by the browser.
     }
   }
-  viewportUiPointerController.send(event, event.type, viewportCursorShape());
 };
 
 const handleViewportPointerDown = (event) => {
@@ -1023,28 +943,14 @@ const handleViewportPointerDown = (event) => {
   } catch (_) {
     // Pointer capture is best effort on embedded browser surfaces.
   }
-  viewportUiPointerController.send(
-    event,
-    event.type,
-    event.button === 2 ? 'grabbing' : viewportCursorShape(),
-  );
 };
 
 const handleViewportPointerCancel = (event) => {
-  viewportUiPointerController.hide();
   try {
     inputLayerRef.value?.releasePointerCapture?.(event.pointerId);
   } catch (_) {
     // Pointer capture may already have been released by the browser.
   }
-};
-
-const handleViewportPointerLeave = () => {
-  viewportUiPointerController.hide();
-};
-
-const handleCameraViewBlur = () => {
-  viewportUiPointerController.hide();
 };
 
 const updateLook = (event) => {
@@ -1125,8 +1031,6 @@ onBeforeUnmount(() => {
   pendingScratchMouseMove = null;
   if (clickDeferTimer) window.clearTimeout(clickDeferTimer);
   clickDeferTimer = 0;
-  pendingScratchClick = null;
-  cameraViewPickController.dispose();
   window.clearTimeout(resizeTimer);
   window.clearInterval(scriptInputTimer);
   window.removeEventListener('resize', scheduleWindowSizeSync);
@@ -1137,7 +1041,6 @@ onBeforeUnmount(() => {
   viewportCalibration.dispose();
   window.removeEventListener('blur', handleCameraViewBlur);
   coronaEventBus.off('camera-pose-applied', onCameraPoseApplied);
-  viewportUiPointerController.dispose();
 });
 </script>
 
@@ -1165,10 +1068,6 @@ onBeforeUnmount(() => {
   border-bottom: 1px solid rgba(255, 255, 255, 0.14);
 }
 .input-layer { position: absolute; inset: 34px 0 0; z-index: 1; touch-action: none; }
-.input-layer.viewport-cursor-hidden,
-.input-layer.viewport-cursor-hidden * {
-  cursor: none !important;
-}
 .camera-overlay.borderless .input-layer { inset: 0; }
 .ui-mode-switch {
   position: absolute;

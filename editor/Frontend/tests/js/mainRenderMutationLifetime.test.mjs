@@ -31,9 +31,9 @@ function mount(write) {
     editorApi: { scene: { setCameraRenderSettings: (...args) => { calls.push(args); return write(...args); } } },
     logError: (...args) => errors.push(args), syncSceneCameraBinding: async (...args) => reads.push(args),
     resetRealtimeCameraInput() {}, scheduleCameraViewportSync() {}, syncViewportUiMode() {}, scheduleCameraUpdate() {},
-    isRealtimeCameraInputActive: () => false, indexActorsByHandle: () => new Map() };
+    isRealtimeCameraInputActive: () => false };
   const host = new Function('deps', `const {${Object.keys(deps).join(',')}}=deps;
-    let live=true, actorPickIndex, lastCameraViewportSignature;
+    let live=true, lastCameraViewportSignature;
     const viewCurrent=()=>live, currentSceneId=ref('scene.ini'), environmentArchiveSession=ref('archive');
     const cameraBindingState=ref({sceneId:'scene.ini',cameraId:'camera',cameraHandle:12,archiveSession:'archive'});
     const cameraState=ref({position:[0,0,0],forward:[0,0,1],up:[0,1,0],fov:60});

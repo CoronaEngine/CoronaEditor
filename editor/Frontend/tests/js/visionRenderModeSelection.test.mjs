@@ -83,7 +83,7 @@ function mainHost({ fail = false, pending = false, denoiseFail = false, denoiseR
     const syncSceneCameraBinding = async () => {}, logError = () => {};
     const resetRealtimeCameraInput = () => {}, scheduleCameraViewportSync = () => {};
     const syncViewportUiMode = () => {}, scheduleCameraUpdate = () => {};
-    const isRealtimeCameraInputActive = () => false, indexActorsByHandle = () => new Map();
+    const isRealtimeCameraInputActive = () => false;
     const sceneGridEnabled = ref(true), sceneLightSettings = { direction: {} };
     const cameraState = ref({ vision_denoise: false, position: [0, 0, 0], forward: [0, 0, 1], up: [0, 1, 0], fov: 60 });
     let actorPickIndex, lastCameraViewportSignature;

@@ -15,13 +15,13 @@ const declarations = babelParse(descriptor.scriptSetup.content, { sourceType: 'm
 const names = new Set([
   'mainRenderOperations', 'retireMainRenderOperations', 'creativeRenderDefaultsBusy', 'creativeRenderDefaultsError',
   'mainVisionAccumulationBusy', 'mainVisionDenoiseBusy', 'mainVisionDenoiserBusy', 'mainVisionStablePlanesBusy',
-  'cameraState', 'cameraBindingState', 'cameraSpeed', 'mouseSensitivity', 'viewportPickSurfaceRef',
+  'cameraState', 'cameraBindingState', 'cameraSpeed', 'mouseSensitivity', 'viewportSurfaceRef',
   'cameraMovementGestures', 'movementAxisGroups', 'mouseRotateStartForward', 'mouseRotateMoved',
   'cameraControls', 'isRealtimeCameraInputActive', 'scheduleCameraUpdate',
   'vectorDistance', 'sendScriptInput', 'sendScratchPointerEvent', 'handleWheel',
   'handleKeyDown', 'handleKeyUp', 'isEditorInputLocked', 'resetRealtimeCameraInput',
   'setEditorCameraInputLock',
-  'viewportCursorShape', 'handleMainViewportBlur', 'handleMainViewportVisibility',
+  'handleMainViewportBlur', 'handleMainViewportVisibility',
   'onMouseDown', 'onMouseMove', 'onMouseUp', 'sendCameraUpdateFast', 'handleCameraMove',
   'coerceNumber', 'setCameraSpeedFromPanel', 'isVector3', 'sceneGridEnabledFromSnapshot', 'applySceneSnapshot',
   'currentMainCamera', 'currentMainCameraId', 'mainVisionDenoise', 'mainVisionDenoiseError',
@@ -35,13 +35,12 @@ const hostSource = declarations.filter(node => node.type === 'VariableDeclaratio
   .map(node => descriptor.scriptSetup.content.slice(node.start, node.end)).join('\n');
 const makeHost = new Function('deps', `
   const { ref, reactive, cameraMovementKey, createViewportCameraController, createScriptInputSender, window, document,
-    editorApi, cabbageContextService, viewCurrent, viewportUiPointerController,
+    editorApi, cabbageContextService, viewCurrent,
     refreshSceneCameraBinding, syncSceneCameraBinding, broadcastViewportControlsState,
     getEditorControlsState, normalizeVisionRenderMode, visionAccumulationFromCamera, visionDenoiseFromCamera, visionStablePlanesFromCamera, visionDenoiserFromCamera } = deps;
   const DEFAULT_SCENE_NAME = 'scene.ini';
   const currentSceneId = ref(DEFAULT_SCENE_NAME);
   const getViewportRenderRect = () => ({ left: 0, top: 0, width: 800, height: 600 });
-  const indexActorsByHandle = () => new Map();
   const sceneGridEnabled = ref(true), sceneLightSettings = reactive({ direction: {} });
   const mainRenderBackend = ref('native'), mainVisionRenderMode = ref('path_tracing');
   let actorPickIndex, lastCameraViewportSignature = '', pendingMainRenderSelection = null;
@@ -72,11 +71,10 @@ function mountCreative(t, { native = true } = {}) {
       if (native) calls.push([scene, camera, patch]);
     } }, input: { dispatch: async (...args) => { scratch.push(args); return { status: 'queued' }; } } },
     cabbageContextService: { recordEvent: async record => records.push(record) },
-    viewportUiPointerController: { hide() {} },
     refreshSceneCameraBinding: () => { refreshes++; }, syncSceneCameraBinding() {},
     broadcastViewportControlsState() {}, getEditorControlsState: () => ({}),
   });
-  page.viewportPickSurfaceRef.value = { contains: target => target === viewportTarget };
+  page.viewportSurfaceRef.value = { contains: target => target === viewportTarget };
   page.applySceneSnapshot('scene.ini', snapshot());
   function step(next) {
     time = next;
@@ -179,9 +177,9 @@ test('creative right-drag analytics and native key authority remain intact', t =
   const h = mountCreative(t), p = h.page; h.step(0);
   p.onMouseDown(input({ button: 2, clientX: 0, clientY: 0 }));
   p.onMouseMove(input({ clientX: 100, clientY: 0, buttons: 2 }));
-  assert.equal(p.viewportCursorShape(), 'grabbing');
+  assert.equal(p.cameraControls.isLooking(), true);
   p.onMouseUp(input({ button: 2 }));
-  assert.equal(p.viewportCursorShape(), 'arrow');
+  assert.equal(p.cameraControls.isLooking(), false);
   assert.ok(h.records.some(item => item.type === 'camera_rotated'));
   p.handleKeyDown(input({ code: 'KeyW', key: 'w' })); h.step(50);
   p.handleKeyUp(input({ code: 'KeyW', key: 'w' }));

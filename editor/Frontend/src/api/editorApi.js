@@ -135,7 +135,6 @@ const editorApiStatic = {
       && typeof window.corona?.window?.onCloseRequested === 'function',
   },
   viewport: {
-    pick: (sceneName, cameraId, options) => window.corona.viewport.pick(sceneName, cameraId, options),
     configure: (sceneName, cameraId, patch) => window.corona.viewport.configure(sceneName, cameraId, patch),
     // A capture is a viewport operation, not scene state.
     captureScreenshot: (sceneName, cameraId, options) =>

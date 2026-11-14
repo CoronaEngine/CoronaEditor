@@ -1,19 +1,16 @@
 <template>
   <div class="relative flex flex-col flex-1 min-h-0 h-full w-full" tabindex="0">
     <div
-      ref="viewportPickSurfaceRef"
+      ref="viewportSurfaceRef"
       tabindex="0"
       class="relative flex-1 min-h-0 w-full"
-      :class="{ 'viewport-cursor-hidden': nativeViewportCursorEnabled && viewportUiMode === 'stereo3d' }"
-      :style="nativeViewportCursorEnabled && viewportUiMode === 'stereo3d' ? { cursor: 'none' } : null"
-      data-viewport-pick-surface
+      data-viewport-surface
       data-guidance="main-viewport"
       @focus="handleViewportFocus"
       @pointermove="handleViewportPointer"
       @pointerdown="handleViewportPointerDown"
       @pointerup="handleViewportPointer"
       @pointercancel="handleViewportPointerCancel"
-      @pointerleave="handleViewportPointerLeave"
       @click="handleViewportClick"
       @wheel.prevent="handleWheel"
     ></div>
@@ -121,14 +118,11 @@ import { useDockStore } from '@/stores/dockStore.js';
 import { PLUGIN_MANIFEST } from '@/config/pluginManifest.js';
 import { pickedNodeIdentity } from '@/utils/modelHierarchy.js';
 import { coronaEventBus } from '@/utils/eventBus.js';
-import { createViewportPickController, indexActorsByHandle } from '@/utils/viewportPick.js';
 import { createScriptInputSender } from '@/utils/scriptInput.js';
 import { cameraMovementKey, createViewportCameraController, readAppliedCameraPose } from '@/utils/viewportCameraController.js';
 import {
   createViewportUiModeStore,
   createViewportUiCalibrationStore,
-  createViewportUiPointerController,
-  isNativeViewportCursorEnabled,
 } from '@/utils/viewportUiMode.js';
 import { createServiceInitializationRetry } from '@/utils/serviceInitialization.js';
 import { reviewScopeId, subscribeNodeGraphReviews } from '@/services/nodeGraphReviewService.js';
@@ -213,15 +207,13 @@ const cameraBindingState = ref({
   cameraHandle: null,
   archiveSession: '',
 });
-let actorPickIndex = new Map();
 const actorTransformBaselines = new Map();
 const ACTOR_TRANSFORM_EPSILON = 1e-5;
 let clickDeferTimer = 0;
-const viewportPickSurfaceRef = ref(null);
+const viewportSurfaceRef = ref(null);
 const viewportLayoutVersion = ref(0);
 const viewportUiMode = ref('flat2d');
 const viewportUiModeStore = createViewportUiModeStore();
-const nativeViewportCursorEnabled = isNativeViewportCursorEnabled();
 const viewportUiModeItems = [
   { mode: 'flat2d', label: '2D UI', title: '普通屏幕 UI' },
   { mode: 'stereo3d', label: '3D UI', title: '光场屏立体 UI' },
@@ -293,7 +285,7 @@ const computeCameraViewportRenderSize = (width, height, scale) => {
   };
 };
 
-const getViewportHitRect = () => viewportPickSurfaceRef.value?.getBoundingClientRect?.() ?? null;
+const getViewportHitRect = () => viewportSurfaceRef.value?.getBoundingClientRect?.() ?? null;
 
 const getViewportRenderRect = () => {
   const rect = getViewportHitRect();
@@ -388,13 +380,8 @@ const handleActorTransformForCabbage = (payload = {}) => {
   }
 };
 
-const emitActorChangeFast = (type, sceneId, actorName, nodeContext = {}) => {
-  editorApi.scene.selectActor(sceneId, type, actorName, {
-    ...nodeContext,
-    sourceViewport: 'main',
-  }).catch((error) => {
-    logError('Failed to publish actor selection', error);
-  });
+const handleModelNodeSelection = (identity) => {
+  mainSceneOperations.delete('selection');
 };
 
 const handleActorSelectionForObjectDock = async (payload = {}, maybeSceneId = '', maybeActorName = '') => {
@@ -421,28 +408,6 @@ const handleActorSelectionForObjectDock = async (payload = {}, maybeSceneId = ''
   }
   return true;
 };
-
-const viewportPickController = createViewportPickController({
-  api: editorApi,
-  getCameraBinding: () => cameraBindingState.value,
-  getHitRect: getViewportHitRect,
-  getRenderRect: getViewportRenderRect,
-  onResult: (payload, result) => handleActorPickResult(payload, result),
-  emitActorChange: (type, sceneId, actorName, nodeContext) => emitActorChangeFast(type, sceneId, actorName, nodeContext),
-});
-
-const handleModelNodeSelection = (identity) => {
-  mainSceneOperations.delete('selection');
-};
-
-const viewportUiPointerController = createViewportUiPointerController({
-  api: editorApi.viewport,
-  getBinding: () => cameraBindingState.value,
-  getEnabled: () => viewportUiMode.value === 'stereo3d',
-  getNativeCursorEnabled: () => nativeViewportCursorEnabled,
-  getHitRect: getViewportHitRect,
-  getRenderRect: getViewportRenderRect,
-});
 
 let cameraViewportSyncRafId = null;
 let cameraViewportResizeObserver = null;
@@ -509,9 +474,6 @@ const syncViewportUiMode = () => {
     archiveSession: cameraBindingState.value.archiveSession,
     mode,
   }).catch(error => console.warn('[Viewport] Native configuration failed', error));
-  if (mode !== 'stereo3d') {
-    viewportUiPointerController.hide();
-  }
   syncViewportUiCalibrationPanel(mode);
 };
 
@@ -524,9 +486,6 @@ const selectViewportUiMode = (mode) => {
     archiveSession: cameraBindingState.value.archiveSession,
     mode: viewportUiMode.value,
   }).catch(error => console.warn('[Viewport] Native configuration failed', error));
-  if (viewportUiMode.value !== 'stereo3d') {
-    viewportUiPointerController.hide();
-  }
   syncViewportUiCalibrationPanel(viewportUiMode.value);
 };
 
@@ -1142,7 +1101,6 @@ const applySceneSnapshot = (sceneId, payload, { preservePose = false, preserveEn
     sceneLightSettings.direction.z = Number(lightDirection[2] ?? 1);
   }
   const cameras = Array.isArray(snapshot.cameras) ? snapshot.cameras : [];
-  actorPickIndex = indexActorsByHandle(Array.isArray(snapshot.actors) ? snapshot.actors : []);
   const activeCameraName =
     snapshot.active_camera_name ?? snapshot.activeCameraName ?? cameras[0]?.name ?? null;
   const activeCamera =
@@ -1360,8 +1318,8 @@ const restoreCameraViews = async (sceneId) => {
 
 const sendScriptInput = createScriptInputSender({ api: editorApi,
   getBinding: () => cameraBindingState.value, getRenderRect: getViewportRenderRect });
-const sendScratchPointerEvent = (type, event, pickedActor = '') => {
-  sendScriptInput(type, event, pickedActor).catch(error => logError('Script input failed', error));
+const sendScratchPointerEvent = (type, event) => {
+  sendScriptInput(type, event).catch(error => logError('Script input failed', error));
 };
 const vectorDistance = (left = [], right = []) => Math.sqrt(
   left.reduce((sum, value, index) => sum + ((Number(value) || 0) - (Number(right[index]) || 0)) ** 2, 0)
@@ -1508,63 +1466,40 @@ const vec3 = {
   },
 };
 
-const viewportCursorShape = () => (cameraControls.isLooking() ? 'grabbing' : 'arrow');
-
 const handleViewportPointer = (event) => {
   if (event.type === 'pointerup') {
     try {
-      viewportPickSurfaceRef.value?.releasePointerCapture?.(event.pointerId);
+      viewportSurfaceRef.value?.releasePointerCapture?.(event.pointerId);
     } catch (_) {
       // Pointer capture may already have been released.
     }
   }
   sendScratchPointerEvent(event.type === 'pointerup' ? 'mouseup' : 'move', event);
-  viewportUiPointerController.send(event, event.type, viewportCursorShape());
 };
 
 const handleViewportPointerDown = (event) => {
   try {
-    viewportPickSurfaceRef.value?.setPointerCapture?.(event.pointerId);
+    viewportSurfaceRef.value?.setPointerCapture?.(event.pointerId);
   } catch (_) {
     // Pointer capture is best effort on embedded browser surfaces.
   }
   sendScratchPointerEvent('mousedown', event);
-  viewportUiPointerController.send(
-    event,
-    event.type,
-    event.button === 2 ? 'grabbing' : viewportCursorShape(),
-  );
 };
 
 const handleViewportPointerCancel = (event) => {
-  viewportUiPointerController.hide();
   resetRealtimeCameraInput();
   try {
-    viewportPickSurfaceRef.value?.releasePointerCapture?.(event.pointerId);
+    viewportSurfaceRef.value?.releasePointerCapture?.(event.pointerId);
   } catch (_) {
     // Pointer capture may already have been released.
   }
 };
 
-const handleViewportPointerLeave = () => {
-  viewportUiPointerController.hide();
-};
-
 const handleMainViewportBlur = () => {
-  viewportUiPointerController.hide();
   resetRealtimeCameraInput();
 };
 const handleMainViewportVisibility = () => {
   if (document.hidden) handleMainViewportBlur();
-};
-
-let pendingScratchClick = null;
-
-const finishPendingScratchClick = (pickedActor = '') => {
-  const pending = pendingScratchClick;
-  if (!pending) return;
-  pendingScratchClick = null;
-  pending.send(pickedActor).catch(error => logError('Script input failed', error));
 };
 
 const handleViewportScratchClick = (event) => {
@@ -1573,20 +1508,7 @@ const handleViewportScratchClick = (event) => {
     clientY: Number(event?.clientY || 0),
     button: Number(event?.button || 0),
   };
-  const requestId = viewportPickController.pickAt(event);
-  if (!requestId) {
-    sendScratchPointerEvent('click', eventSnapshot, '');
-    return;
-  }
-
-  // A newer click supersedes an unfinished request. The engine may still
-  // complete the old request, but viewportPickController filters it by the
-  // latest requestId and finishScratchClickFromPick ignores its old pending
-  // entry. This keeps a later blank click from being swallowed by a slow pick.
-  pendingScratchClick = {
-    requestId,
-    send: sendScriptInput.capture('click', eventSnapshot),
-  };
+  sendScratchPointerEvent('click', eventSnapshot, '');
 };
 
 const handleViewportClick = (event) => {
@@ -1605,15 +1527,8 @@ const handleViewportClick = (event) => {
   }, 45);
 };
 
-const finishScratchClickFromPick = (payload, result) => {
-  if (!pendingScratchClick || payload?.requestId !== pendingScratchClick.requestId) return;
-  if (result?.status === 'stale') return;
-  const pickedActor = result?.actor?.name || '';
-  finishPendingScratchClick(pickedActor);
-};
-
 const onMouseDown = (event) => {
-  if (!viewportPickSurfaceRef.value?.contains(event.target)) return;
+  if (!viewportSurfaceRef.value?.contains(event.target)) return;
   if (cameraControls.pointerDown(event)) {
     mouseRotateStartForward = [...cameraState.value.forward];
     mouseRotateMoved = false;
@@ -1643,29 +1558,6 @@ const onMouseUp = (event) => {
 const onContextMenu = (event) => {
   if (isEditorInputLocked()) return;
   event.preventDefault();
-};
-
-const applyActorPickResult = (result, payload = result?.payload) => {
-  if (result.status === 'pending' || result.status === 'stale') return;
-  if (result.status === 'selected') coronaEventBus.emit('model-node-picked', { ...payload, actor_name: payload?.actor_name || result.actor?.name });
-  if (result.status === 'miss') coronaEventBus.emit('model-node-picked', payload);
-
-  // 选中结果已由 viewportPickController 内部 emitActorChange 驱动属性面板，
-  // 此处无需额外处理。
-};
-
-const handleActorPickResult = (payload, result) => {
-  applyActorPickResult(result, payload);
-  // A miss still publishes the empty scene selection so that the same
-  // selection path clears the property panel exactly once.
-  if (result.status === 'miss') {
-    emitActorChangeFast(
-      'scene',
-      payload?.scene || cameraBindingState.value.sceneId || DEFAULT_SCENE_NAME,
-      '',
-    );
-  }
-  finishScratchClickFromPick(payload, result);
 };
 
 const sendCameraUpdateFast = () => {
@@ -2011,9 +1903,9 @@ onMounted(async () => {
   if (!viewCurrent()) return;
   syncViewportUiMode();
   scheduleCameraViewportSync();
-  if (typeof ResizeObserver !== 'undefined' && viewportPickSurfaceRef.value) {
+  if (typeof ResizeObserver !== 'undefined' && viewportSurfaceRef.value) {
     cameraViewportResizeObserver = new ResizeObserver(handleViewportLayoutChange);
-    cameraViewportResizeObserver.observe(viewportPickSurfaceRef.value);
+    cameraViewportResizeObserver.observe(viewportSurfaceRef.value);
   }
   await restoreCameraViews(initialSceneId);
   if (!viewCurrent()) return;
@@ -2128,8 +2020,6 @@ onUnmounted(() => {
   }
   cameraViewportResizeObserver?.disconnect?.();
   cameraViewportResizeObserver = null;
-  viewportPickController.dispose();
-  viewportUiPointerController.dispose();
   document.removeEventListener('keydown', handleKeyDown);
   document.removeEventListener('keyup', handleKeyUp);
   document.removeEventListener('mousedown', onMouseDown);
@@ -2175,13 +2065,8 @@ provideCreativePanelState(() => ({
 </script>
 
 <style scoped>
-[data-viewport-pick-surface] {
+[data-viewport-surface] {
   touch-action: none;
-}
-
-.viewport-cursor-hidden,
-.viewport-cursor-hidden * {
-  cursor: none !important;
 }
 
 .dock-shortcut-bar {
