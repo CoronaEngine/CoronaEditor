@@ -5,7 +5,6 @@ import test from 'node:test';
 import { babelParse, parse } from 'vue/compiler-sfc';
 import { editorApi } from '../../src/api/editorApi.js';
 import { deferred } from './windowSessionFixtures.mjs';
-import { indexActorsByHandle } from '../../src/utils/viewportPick.js';
 
 function handler(file, name, deps) {
   const script = parse(readFileSync(new URL(`../../src/${file}.vue`, import.meta.url), 'utf8')).descriptor.scriptSetup.content;
@@ -128,73 +127,6 @@ test('actor index facade calls the named V8 binding with the observed scope and 
   assert.equal(await editorApi.scene.readScene({ ...(scope), scene: 'scene.ini', actors: 'index' }), result);
   assert.deepEqual(calls, [['scene.ini', scope]]);
 });
-
-test('CameraView picks use a scoped actor index without loading the full scene tree', async () => {
-  const calls = [];
-  const deps = { sceneId: 'scene.ini', camera: { value: { archive_session: 'archive' } },
-    viewLifetime: { current: () => true }, actorPickIndex: new Map(), indexActorsByHandle,
-    editorApi: { scene: { ...sceneQueryFixture({ index: async (...args) => {
-      calls.push(args);
-      return { scene: 'scene.ini', archive_session: 'archive', actors: [{ actor_guid: 'actor', name: 'Probe', type: '.actor' }] };
-    } }),   } },
-  };
-  const refresh = handler('views/tools/CameraView', 'refreshCameraViewActorPickIndex', deps);
-  assert.equal(await refresh(), true);
-  assert.deepEqual(calls, [['scene.ini', { archive_session: 'archive' }]]);
-  assert.equal(deps.actorPickIndex.get('actor').name, 'Probe');
-});
-
-for (const change of ['archive', 'unmount']) {
-  test(`CameraView drops an actor index that arrives after ${change}`, async () => {
-    const pending = deferred(); let mounted = true;
-    const original = new Map([['original', { name: 'Old' }]]);
-    const deps = { sceneId: 'scene.ini', camera: { value: { archive_session: 'archive' } },
-      viewLifetime: { current: () => mounted }, actorPickIndex: original, indexActorsByHandle,
-      editorApi: { scene: { ...sceneQueryFixture({ index: () => pending.promise }),   } },
-    };
-    const refresh = handler('views/tools/CameraView', 'refreshCameraViewActorPickIndex', deps);
-    const work = refresh();
-    if (change === 'archive') deps.camera.value = { archive_session: 'new-archive' };
-    else mounted = false;
-    pending.resolve({ scene: 'scene.ini', archive_session: 'archive', actors: [{ actor_guid: 'late', name: 'Late' }] });
-    assert.equal(await work, false);
-    assert.equal(deps.actorPickIndex, original);
-  });
-}
-
-test('main viewport uses the same scoped actor index for Gizmo identity lookup', async () => {
-  const calls = [], deps = {
-    cameraBindingState: { value: { sceneId: 'scene.ini', archiveSession: 'archive' } },
-    viewCurrent: () => true, actorPickIndex: new Map(), indexActorsByHandle,
-    editorApi: { scene: { ...sceneQueryFixture({ index: async (...args) => {
-      calls.push(args);
-      return { scene: 'scene.ini', archive_session: 'archive', actors: [{ actor_guid: 'actor', name: 'Probe', type: 'actor' }] };
-    } }),   } },
-  };
-  const refresh = handler('views/layout/MainPage', 'refreshActorPickIndex', deps);
-  assert.equal(await refresh('scene.ini'), true);
-  assert.deepEqual(calls, [['scene.ini', { archive_session: 'archive' }]]);
-  assert.equal(deps.actorPickIndex.get('actor').name, 'Probe');
-});
-
-for (const change of ['archive', 'scene', 'unmount']) {
-  test(`main viewport drops a late actor index after ${change}`, async () => {
-    const pending = deferred(); let mounted = true;
-    const original = new Map([['original', { name: 'Old' }]]);
-    const deps = { cameraBindingState: { value: { sceneId: 'scene.ini', archiveSession: 'archive' } },
-      viewCurrent: () => mounted, actorPickIndex: original, indexActorsByHandle,
-      editorApi: { scene: { ...sceneQueryFixture({ index: () => pending.promise }),   },
-        sceneTools: {} },
-    };
-    const work = handler('views/layout/MainPage', 'refreshActorPickIndex', deps)('scene.ini');
-    if (change === 'archive') deps.cameraBindingState.value.archiveSession = 'next';
-    else if (change === 'scene') deps.cameraBindingState.value.sceneId = 'other.ini';
-    else mounted = false;
-    pending.resolve({ scene: 'scene.ini', archive_session: 'archive', actors: [{ actor_guid: 'late', name: 'Late' }] });
-    assert.equal(await work, false);
-    assert.equal(deps.actorPickIndex, original);
-  });
-}
 
 function targetDeps(read) {
   return { props: { sceneName: 'scene.ini', actorName: 'Before' }, initialLoadComplete: true,

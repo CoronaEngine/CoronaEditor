@@ -16,7 +16,6 @@ Vue 业务 service 或场景状态的 owner。
 | `viewLifetime.js` | active lifecycle helper | 阻止卸载后异步启动、回调及迟到订阅泄漏；允许附加世界 revision 检查 | 所有视图改用等价生命周期 owner 且异步卸载回归通过 |
 | `serviceInitialization.js` | active lifecycle helper | 服务初始化响应错误和有限重试策略 | 统一 service lifecycle owner 吸收后删除 |
 | `viewportCameraController.js` | active viewport adapter | 创造模式自由相机输入、运动及帧调度；不拥有场景绑定 | 统一相机控制器替代且完成视口输入回归 |
-| `viewportGizmo.js` | active viewport adapter | Gizmo 命中、拖拽、取消和完成状态机 | 视口控制器集中管理且完成 pointer 回归 |
 | `viewportPick.js` | active viewport adapter | 视口拾取结果和 Actor handle 索引 | 视口控制器集中管理且完成拾取回归 |
 | `viewportUiMode.js` | active viewport adapter | 视口模式、光标设置和本地 UI 状态 | 视口状态 owner 吸收且完成设置迁移 |
 
@@ -45,7 +44,7 @@ pointer controller 同样只组合 editorApi.viewport.configure，传精确 bind
 
 选择归属使用原生 selection.source_camera_handle 与 CameraView opaque_handle 的精确
 非零十进制字符串比较，拒绝 numeric handle，不以 Number 转换比较。此规则只覆盖已迁移的
-Actor 选择和拾取路径；Gizmo 选择归属使用精确 source_camera_id/cameraId，不能恢复 numeric handle 比较。
+Actor 选择和拾取路径。
 
 `viewportCameraController.readAppliedCameraPose` 仅校验 archive/scene/camera 身份与有限姿态并复制领域数组，
 供 MainPage/CameraView 同步已经由原生应用的相机状态；不调用 V8、不创建消息通道、不重发相机写入。

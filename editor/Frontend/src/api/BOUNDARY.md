@@ -85,7 +85,7 @@ appService.createCameraView 再请求原生表面，打开/关闭只走 corona.w
 `sceneTools.renameCameraView`、`sceneTools.deleteCamera` 仅保留 Python caller，不再作为 Web facade。
 
 
-无人使用的 moveActorMesh / meshMoveResult Web 通道已删除：无 onMeshMoveResult 订阅、无该结果触发的 takeViewportResults 轮询。Mechanics 原生碰撞移动仍保留，不能作为普通 transform 写入的别名。拾取只走 viewport.pick 的直接 V8 Promise，旧 pickActor/actorPickResult 已删除；仅 Gizmo 继续使用原 scope 的旧结果轮询。
+无人使用的 moveActorMesh / meshMoveResult Web 通道已删除：无 onMeshMoveResult 订阅、无该结果触发的 takeViewportResults 轮询。Mechanics 原生碰撞移动仍保留，不能作为普通 transform 写入的别名。拾取只走 viewport.pick 的直接 V8 Promise，旧 pickActor/actorPickResult 已删除；视口逐指针往返通道同样已整体移除，`viewport` 命名空间只剩 pick / configure / captureScreenshot。
 
 
 readActorIndex(scene,{archive_session}) 是具名直接 V8 读取，仅允许非空场景和已观察的 archive_session，未知 scope 字段拒绝。

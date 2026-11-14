@@ -1,7 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { editorApi } from '../../src/api/editorApi.js';
-import { isViewportGizmoSelectionOwner } from '../../src/utils/viewportGizmo.js';
 
 function nativeScene(t) {
   const previous = globalThis.window;
@@ -71,13 +70,6 @@ test('vision availability uses the typed app binding without JSON or the legacy 
   assert.equal(await editorApi.app.isVisionAvailable(), result);
   assert.deepEqual(calls, [[]]);
   assert.equal('isVisionAvailable' in (editorApi.sceneTools || {}), false);
-});
-
-test('selection ownership compares stable camera IDs exactly', () => {
-  const selection = { source_viewport: 'cameraView', source_camera_id: 'camera/9007199254740993' };
-  assert.equal(isViewportGizmoSelectionOwner({ viewportScope: 'cameraView', cameraId: 'camera/9007199254740992', selection }), false);
-  assert.equal(isViewportGizmoSelectionOwner({ viewportScope: 'cameraView', cameraId: 'camera/9007199254740993', selection }), true);
-  assert.equal(isViewportGizmoSelectionOwner({ viewportScope: 'cameraView', cameraId: '', selection }), false);
 });
 
 test('Actor transform has one native patch entry with raw values and no JSON transport', async t => {

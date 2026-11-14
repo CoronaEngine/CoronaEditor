@@ -11,7 +11,6 @@ import * as viewportCamera from '../../src/utils/viewportCameraController.js';
 import * as viewportPick from '../../src/utils/viewportPick.js';
 import * as modelHierarchy from '../../src/utils/modelHierarchy.js';
 import * as scriptInput from '../../src/utils/scriptInput.js';
-import * as viewportGizmo from '../../src/utils/viewportGizmo.js';
 import * as viewportUiMode from '../../src/utils/viewportUiMode.js';
 import * as viewportCalibration from '../../src/services/viewportCalibrationService.js';
 import * as serviceInitialization from '../../src/utils/serviceInitialization.js';
@@ -124,7 +123,6 @@ export function mountMainPage(t, visionMode = 'path_tracing', { nativeCursor = f
     '@/utils/viewportPick.js': viewportPick,
     '@/utils/modelHierarchy.js': modelHierarchy,
     '@/utils/scriptInput.js': scriptInput,
-    '@/utils/viewportGizmo.js': viewportGizmo,
     '@/utils/viewportUiMode.js': { ...viewportUiMode, createViewportUiCalibrationStore: () => calibration,
       isNativeViewportCursorEnabled: () => nativeCursor },
     '@/utils/serviceInitialization.js': serviceInitialization,

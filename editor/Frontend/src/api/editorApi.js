@@ -137,11 +137,6 @@ const editorApiStatic = {
   viewport: {
     pick: (sceneName, cameraId, options) => window.corona.viewport.pick(sceneName, cameraId, options),
     configure: (sceneName, cameraId, patch) => window.corona.viewport.configure(sceneName, cameraId, patch),
-    // The gizmo is a viewport overlay, so it lives with the viewport bindings.
-    setGizmoTarget: (sceneId, cameraId, options) =>
-      window.corona.viewport.setGizmoTarget(sceneId, cameraId, options),
-    setGizmoPointer: (sceneId, cameraId, options) =>
-      window.corona.viewport.setGizmoPointer(sceneId, cameraId, options),
     // A capture is a viewport operation, not scene state.
     captureScreenshot: (sceneName, cameraId, options) =>
       window.corona.viewport.captureScreenshot(sceneName, cameraId, options),

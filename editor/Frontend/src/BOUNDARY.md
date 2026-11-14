@@ -34,7 +34,7 @@
   的 `utils/` adapter；`components/` 不应反向依赖路由级 `views/`；
 - 外部旧宿主 bridge 已删除；transport 和 service 实现分别归 `api/` 与 `services/`，
   不得在 Vue 业务中复制旧协议；
-- 拾取、Gizmo、视口和输入 adapter 只组合现有 V8 能力，不恢复 window.coronaBridge；不得传递 `Camera`、`Actor` 或 `Geometry` 对象；
+- 拾取、视口和输入 adapter 只组合现有 V8 能力，不恢复 window.coronaBridge；不得传递 `Camera`、`Actor` 或 `Geometry` 对象；
 - `api/webDocument.js` 缓存不可变的文档启动身份，App、路由、窗口会话、AI 和消息模块共享；路由变化不能改变主/子角色。子文档必须继承启动 owner；
 - `utils/viewLifetime.js` 提供异步初始化、订阅及迟到响应的清理保护；App 项目/LAN 订阅也复用该保护，保留项目 refresh/preparation revision；语言协作经公共 Web 消息传递，localStorage 只持久化偏好；
 - 新的场景、项目、Actor、AI 或脚本语义必须登记到对应 typed 原生契约或 Web service owner，不能

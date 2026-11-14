@@ -35,7 +35,7 @@ const hostSource = declarations.filter(node => node.type === 'VariableDeclaratio
   .map(node => descriptor.scriptSetup.content.slice(node.start, node.end)).join('\n');
 const makeHost = new Function('deps', `
   const { ref, reactive, cameraMovementKey, createViewportCameraController, createScriptInputSender, window, document,
-    editorApi, cabbageContextService, viewCurrent, viewportGizmoController, viewportUiPointerController,
+    editorApi, cabbageContextService, viewCurrent, viewportUiPointerController,
     refreshSceneCameraBinding, syncSceneCameraBinding, broadcastViewportControlsState,
     getEditorControlsState, normalizeVisionRenderMode, visionAccumulationFromCamera, visionDenoiseFromCamera, visionStablePlanesFromCamera, visionDenoiserFromCamera } = deps;
   const DEFAULT_SCENE_NAME = 'scene.ini';
@@ -72,7 +72,6 @@ function mountCreative(t, { native = true } = {}) {
       if (native) calls.push([scene, camera, patch]);
     } }, input: { dispatch: async (...args) => { scratch.push(args); return { status: 'queued' }; } } },
     cabbageContextService: { recordEvent: async record => records.push(record) },
-    viewportGizmoController: { isDragging: () => false, cancel() {} },
     viewportUiPointerController: { hide() {} },
     refreshSceneCameraBinding: () => { refreshes++; }, syncSceneCameraBinding() {},
     broadcastViewportControlsState() {}, getEditorControlsState: () => ({}),

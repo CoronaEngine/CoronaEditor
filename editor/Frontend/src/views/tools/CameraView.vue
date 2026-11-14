@@ -192,12 +192,8 @@ import {
   normalizeVisionRenderMode, visionAccumulationFromCamera, visionDenoiseFromCamera, visionStablePlanesFromCamera, visionRenderModes,
   visionDenoisers, visionDenoiserFromCamera,
 } from '@/utils/visionRenderModes.js';
-import { createViewportPickController, indexActorsByHandle } from '@/utils/viewportPick.js';
+import { createViewportPickController } from '@/utils/viewportPick.js';
 import { createScriptInputSender } from '@/utils/scriptInput.js';
-import {
-  createViewportGizmoController,
-  isViewportGizmoSelectionOwner,
-} from '@/utils/viewportGizmo.js';
 import {
   createViewportUiCalibrationStore,
   createViewportUiModeStore,
@@ -243,12 +239,8 @@ let borderlessTogglePending = false;
 let scriptInputTimer = 0;
 let scratchMouseMoveFrame = 0;
 let pendingScratchMouseMove = null;
-let actorPickIndex = new Map();
 let pendingScratchClick = null;
-let gizmoDownRequestId = '';
-let gizmoDownPointerId = null;
-let gizmoDownConsumed = false;
-let gizmoClickTimer = 0;
+let clickDeferTimer = 0;
 
 const outputModes = [
   { value: 'final_color', label: 'Final' },
@@ -580,69 +572,9 @@ const cameraViewPickController = createViewportPickController({
     editorApi.scene.selectActor(scene, type, actorName, { ...cameraViewSelectionContext(), ...nodeContext }),
 });
 
-const viewportGizmoController = createViewportGizmoController({
-  getApi: () => editorApi,
-  getCameraBinding: () => ({
-    sceneId,
-    cameraId,
-    archiveSession: camera.value?.archive_session,
-  }),
-  getHitRect: getCameraViewHitRect,
-  getRenderRect: getCameraRenderRect,
-  onResult: result => {
-    if (result.requestId === gizmoDownRequestId && result.consumed) gizmoDownConsumed = true;
-    if (result.status === 'ended' || result.status === 'cancelled') { gizmoDownRequestId = ''; gizmoDownPointerId = null; }
-  },
-});
-
-const refreshCameraViewActorPickIndex = async () => {
-  const archive = camera.value?.archive_session;
-  if (!viewLifetime.current() || !sceneId || !archive) return false;
-  const snapshot = await editorApi.scene.readScene({ archive_session: archive, scene: sceneId, actors: 'index' });
-  if (!viewLifetime.current() || camera.value?.archive_session !== archive ||
-      snapshot.archive_session !== archive || snapshot.scene !== sceneId) return false;
-  actorPickIndex = indexActorsByHandle(Array.isArray(snapshot?.actors) ? snapshot.actors : []);
-  return actorPickIndex.size > 0;
-};
-
-const findActorPickEntryByName = (actorName) => {
-  for (const [, actorEntry] of actorPickIndex.entries()) {
-    if (actorEntry?.name === actorName) return actorEntry;
-  }
-  return null;
-};
-
-const handleModelNodeGizmoSelection = (identity) => { if (identity) viewportGizmoController.clearTarget(); };
-const syncViewportGizmoSelection = async (payload = {}) => {
+const publishModelNodeSelection = async (payload = {}) => {
   coronaEventBus.modelNodeSelection = pickedNodeIdentity(payload);
   coronaEventBus.emit('model-node-selection', coronaEventBus.modelNodeSelection);
-  if (coronaEventBus.modelNodeSelection) { viewportGizmoController.clearTarget(); return; }
-  const ownsGizmo = isViewportGizmoSelectionOwner({
-    viewportScope: 'cameraView',
-    cameraId,
-    selection: payload,
-  });
-  if (!ownsGizmo) {
-    viewportGizmoController.clearTarget();
-    return;
-  }
-  const actorName = String(payload.actor || '');
-  const actorType = String(payload.actor_type || payload.type || '');
-  const selectedScene = String(payload.scene || sceneId);
-  if (!actorName || actorType === 'scene' || selectedScene !== sceneId) {
-    viewportGizmoController.clearTarget();
-    return;
-  }
-  let entry = findActorPickEntryByName(actorName);
-  if (!entry) {
-    await refreshCameraViewActorPickIndex().catch(() => false);
-    entry = findActorPickEntryByName(actorName);
-  }
-  if (entry?.actor_guid && !coronaEventBus.modelNodeSelection) {
-    viewportGizmoController.setTarget({ actor_guid: entry.actor_guid, name: actorName });
-  } else {
-    viewportGizmoController.clearTarget();
-  }
 };
 
 const applyViewportUiCalibration = () => {
@@ -944,11 +876,6 @@ const onKeyDown = (event) => {
     }
     return;
   }
-  if ((event.key === 'Escape' || event.code === 'Escape') && viewportGizmoController.isDragging()) {
-    event.preventDefault();
-    cancelViewportGizmoDrag('escape');
-    return;
-  }
   if (isTextInputEvent(event)) return;
   // Native SDL owns Scratch keyboard delivery.
   if (isEditorInputLocked()) {
@@ -1014,17 +941,17 @@ const handleScratchClick = (event) => {
 
 const handleViewportClick = (event) => {
   // A single click owns selection/clearing. Ignore the synthetic second
-  // click from a rapid double-click so it cannot reset an active Gizmo drag.
+  // click from a rapid double-click so it cannot clear the selection twice.
   if (Number(event?.detail || 0) > 1) return;
-  if (gizmoClickTimer) window.clearTimeout(gizmoClickTimer);
+  if (clickDeferTimer) window.clearTimeout(clickDeferTimer);
   const snapshot = {
     clientX: Number(event?.clientX || 0),
     clientY: Number(event?.clientY || 0),
     button: Number(event?.button || 0),
   };
-  gizmoClickTimer = window.setTimeout(() => {
-    gizmoClickTimer = 0;
-    if (!gizmoDownConsumed) handleScratchClick(snapshot);
+  clickDeferTimer = window.setTimeout(() => {
+    clickDeferTimer = 0;
+    handleScratchClick(snapshot);
   }, 45);
 };
 
@@ -1080,7 +1007,6 @@ const endLook = (event) => {
 const viewportCursorShape = () => (looking ? 'grabbing' : 'arrow');
 
 const handleViewportPointer = (event) => {
-  viewportGizmoController.pointer(event, event.type);
   if (event.type === 'pointerup') {
     try {
       inputLayerRef.value?.releasePointerCapture?.(event.pointerId);
@@ -1097,9 +1023,6 @@ const handleViewportPointerDown = (event) => {
   } catch (_) {
     // Pointer capture is best effort on embedded browser surfaces.
   }
-  gizmoDownConsumed = false;
-  gizmoDownPointerId = event.pointerId;
-  gizmoDownRequestId = viewportGizmoController.pointer(event, event.type) || '';
   viewportUiPointerController.send(
     event,
     event.type,
@@ -1109,25 +1032,19 @@ const handleViewportPointerDown = (event) => {
 
 const handleViewportPointerCancel = (event) => {
   viewportUiPointerController.hide();
-  if (event.pointerId !== gizmoDownPointerId) return;
   try {
     inputLayerRef.value?.releasePointerCapture?.(event.pointerId);
   } catch (_) {
     // Pointer capture may already have been released by the browser.
   }
-  cancelViewportGizmoDrag('pointercancel');
 };
 
 const handleViewportPointerLeave = () => {
   viewportUiPointerController.hide();
 };
 
-const cancelViewportGizmoDrag = (reason = 'cancel') => {
-  viewportGizmoController.cancel(reason);
-};
 const handleCameraViewBlur = () => {
   viewportUiPointerController.hide();
-  cancelViewportGizmoDrag('blur');
 };
 
 const updateLook = (event) => {
@@ -1172,10 +1089,8 @@ onMounted(async () => {
   if (!viewLifetime.current()) return;
   try {
     if (!await loadCamera() || !viewLifetime.current()) return;
-    await refreshCameraViewActorPickIndex().catch(() => false);
-    if (!viewLifetime.current()) return;
     await viewLifetime.subscribe(
-      callback => getObserverRuntime().observe('selection', callback), syncViewportGizmoSelection,
+      callback => getObserverRuntime().observe('selection', callback), publishModelNodeSelection,
       token => getObserverRuntime().off(token));
     if (!viewLifetime.current()) return;
     syncViewportUiMode();
@@ -1192,7 +1107,6 @@ onMounted(async () => {
     if (viewLifetime.current()) syncViewportUiCalibration();
   }).catch(error => { if (viewLifetime.current()) errorText.value = error.message; });
   window.addEventListener('blur', handleCameraViewBlur);
-  coronaEventBus.on('model-node-selection', handleModelNodeGizmoSelection);
   coronaEventBus.on('camera-pose-applied', onCameraPoseApplied);
   animationFrame = requestAnimationFrame(movementFrame);
   await pollScriptInputLock();
@@ -1209,11 +1123,9 @@ onBeforeUnmount(() => {
   if (scratchMouseMoveFrame) window.cancelAnimationFrame(scratchMouseMoveFrame);
   scratchMouseMoveFrame = 0;
   pendingScratchMouseMove = null;
-  if (gizmoClickTimer) window.clearTimeout(gizmoClickTimer);
-  gizmoClickTimer = 0;
+  if (clickDeferTimer) window.clearTimeout(clickDeferTimer);
+  clickDeferTimer = 0;
   pendingScratchClick = null;
-  viewportGizmoController.cancel('cancel');
-  viewportGizmoController.clearTarget();
   cameraViewPickController.dispose();
   window.clearTimeout(resizeTimer);
   window.clearInterval(scriptInputTimer);
@@ -1224,7 +1136,6 @@ onBeforeUnmount(() => {
   stopViewportUiCalibrationMessages = null;
   viewportCalibration.dispose();
   window.removeEventListener('blur', handleCameraViewBlur);
-  coronaEventBus.off('model-node-selection', handleModelNodeGizmoSelection);
   coronaEventBus.off('camera-pose-applied', onCameraPoseApplied);
   viewportUiPointerController.dispose();
 });

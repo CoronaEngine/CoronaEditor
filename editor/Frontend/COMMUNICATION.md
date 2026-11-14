@@ -28,7 +28,7 @@
 - 上轮为 progress：Conan 部署 62219 完整 exit0，退休接口/工作区 pin 52393 完整 exit0、51 passed。Editor 本地 e3107026234fee2414cccea05633681e24d78df1；Engine 配对 pin 待本地提交，无 push。文档/inventory 仅本地，不暂存提交；保留用户 Optics hunk，不主动修改 Horizon/ImGui。
 - aiWorkflows 在首个 await 前捕获 projectIdentity/revision，load/startGoal/startScore/goalStatus/readContext 贯穿原始归属；路径/revision 更换取消旧任务，旧 catch 不写新档案。明确重新启动已取消的 goal 会领取新 generation，其他窗口恢复有效 provider 与评分平滑保持。14 项新回归先复现失败、修复后通过；全量 1257 JS、65 Python、lint/Vite 通过。证据均为 build/web-opt-ai-workflow-lifetime-*，取消 provider 的独立红为 web-opt-ai-workflow-cancelled-provider-red.log。
 - 当前部署 frontend SHA256=30c224aa6908740c82f64295ae16bc751034911f2e40564f1a25292836dcfedb，exe SHA256=440ed238ab859af6afe043e7564607a9fe34e110bc847c91e3040c325f5994c8。
-- 首次完整 UI 29525 exit1，run-1o57yvon：focus 通过，environment 在“real selection Actor index reply held”前置超时，cleanup_ok=true、optics_failures=[]。原夹具在创建 Actor/等待 SceneBar 后才拦截读取，后台刷新可能已缓存 Actor。改为创建前拦截所有 MainPage index 回复，仍使用真实点击/原生回复并断言新请求发生、退休后无 gizmo/Dock 副作用；不改生产代码或降低断言。独立 environment 76992 完整 exit0；完整 all 20395 正在执行，尚未标通过。
+- 首次完整 UI 29525 exit1，run-1o57yvon：focus 通过，environment 在“real selection Actor index reply held”前置超时，cleanup_ok=true、optics_failures=[]。原夹具在创建 Actor/等待 SceneBar 后才拦截读取，后台刷新可能已缓存 Actor。改为创建前拦截所有 MainPage index 回复，仍使用真实点击/原生回复并断言新请求发生、退休后无 Dock 副作用；不改生产代码或降低断言。独立 environment 76992 完整 exit0；完整 all 20395 正在执行，尚未标通过。
 - 当前组合 CEF、双实例、资源/音频及四业务探针尚待串行验证。既有 DEVICE_LOST/bad_alloc 风险未修复，不将历史结果当当前组合证明。整体 goal 保持 active。
 
 ## 当前实施：助手事件、加载与生成请求归属（2026-11-08）
@@ -94,8 +94,8 @@
 
 ## 当前接续：MainPage选择退休（2026-11-08）
 
-- Editor本地1528d49ccb916be87f3fc264d4a0dcfd7011e2da，选择复用场景领域请求token并核对camera身份；旧索引、gizmo及Object开窗/baseline采样共用有效性。处理新选择和模型节点选择替换、scene/archive/camera/handle ABA；普通同身份投影刷新继续有效；无相机或当前索引读取失败仍允许打开Object。
-- 31项生产setup回归、全量1140 JS、lint/Vite、Frontend Python65项通过，Conan17537完整exit0。真实旧部署85942复现卸载后clear gizmo并open Object（web-opt-main-selection-lifetime-packaged-red-ready.log）；新部署完整12套UI66982完整exit0（run-zgmqoh9s），退休effects=[]、正常重挂与后续全部业务通过。CEF7381完整exit0，JSON禁用具名V8及主/停靠/分离文档通信通过，cleanup_ok/graceful_exit=true。Engine本地f2706ee5已配对本Editor及探针，frontend=d9804b933e6f0070191fe18804e0656a72142f4f6c9f4939b7f2c700d2f964c3。退休绑定/Git workspace40124仍在运行。所有文档仅本地、无push，用户Optics hunk保留，Horizon/ImGui未主动修改。本轮未重跑双实例网络。
+- Editor本地1528d49ccb916be87f3fc264d4a0dcfd7011e2da，选择复用场景领域请求token并核对camera身份；旧索引及Object开窗/baseline采样共用有效性。处理新选择和模型节点选择替换、scene/archive/camera/handle ABA；普通同身份投影刷新继续有效；无相机或当前索引读取失败仍允许打开Object。
+- 31项生产setup回归、全量1140 JS、lint/Vite、Frontend Python65项通过，Conan17537完整exit0。真实旧部署85942复现卸载后仍 open Object（web-opt-main-selection-lifetime-packaged-red-ready.log）；新部署完整12套UI66982完整exit0（run-zgmqoh9s），退休effects=[]、正常重挂与后续全部业务通过。CEF7381完整exit0，JSON禁用具名V8及主/停靠/分离文档通信通过，cleanup_ok/graceful_exit=true。Engine本地f2706ee5已配对本Editor及探针，frontend=d9804b933e6f0070191fe18804e0656a72142f4f6c9f4939b7f2c700d2f964c3。退休绑定/Git workspace40124仍在运行。所有文档仅本地、无push，用户Optics hunk保留，Horizon/ImGui未主动修改。本轮未重跑双实例网络。
 - 退休绑定/Git workspace40124最终完整exit0：121项和6subtests通过（1条既有pytest插件warning）。本轮全部会话已终态，Engine/Editor暂存区均空，以上运行中记录以本条为准。
 - goal仍active；项目事件错误、变换采样顺序、助手及JSON/最终审计待处理。详细过程与最终证据以本地整体计划顶部为准。
 
@@ -104,7 +104,7 @@
 - Editor本地8c027683已由Conan30584完整部署。原样独立environment14858、完整12套UI63250均exit0；完整结果run-xpkw1mrx包含旧环境投影退休、存活Dock网格写入、光照/物理及保存重开，cleanup_ok=true、optics_failures=[]。frontend=b5547cca9531f26286c48eda45044da3bbe492a55b825f2d0118aed1e345e6c8。最终CEF33270运行中，Engine配对pin/探针待本地提交。
 - 旧完整17878崩溃转储本轮已解析：ReSTIR StablePlaneData约1.49GB分配抛std::bad_alloc，noexcept终止期间Python faulthandler再访问冲突；并无证据归因于资源轮询。没有修复原生内存分配问题，不用后续绿掩盖此风险。完整48662为graph CDP页面发现3秒超时失败，仍保留证据；工具连接预算统一20秒后，3项单测与完整63250通过，工具提交3e7132ce。
 - 最终CEF33270已完整exit0：JSON禁用具名V8与真实主/停靠/分离CEF通信通过，cleanup_ok=true、graceful_exit=true。Engine本地b395f4e7已配对Editor8c027683和真实环境探针；以上待运行/提交描述以本条终态为准。本轮未重跑双实例网络。
-- 不push，文档仅本地；用户Optics hunk保留，未主动修改Horizon/ImGui。整体goal仍active，MainPage选择/gizmo及助手等异步路径、JSON归类和最终逐项审计仍待完成。细节以本地整体计划顶部接续为准。
+- 不push，文档仅本地；用户Optics hunk保留，未主动修改Horizon/ImGui。整体goal仍active，MainPage选择及助手等异步路径、JSON归类和最终逐项审计仍待完成。细节以本地整体计划顶部接续为准。
 
 ## 当前实施：MainPage 环境编辑与资源轮询退休（2026-11-08）
 
@@ -317,7 +317,7 @@ Engine本地HEAD 6d09941a（生产51a39d5c、探针6d09941a）/ Editor及pin8728
 ## 当前实现边界
 
 - Web间唯一消息owner是 `api/webMessages.js`，用BroadcastChannel和结构化克隆；现Dock设计保留。
-- Web/C++仅用 `window.corona` 下具名绑定：app、window、project、files、projectSettings、projectFiles、scene、audio、viewport、gizmo、input、scripts、network、lanChat。editorApi仅转发领域调用，场景观察由Web的sceneReader采样。
+- Web/C++仅用 `window.corona` 下具名绑定：app、window、project、files、projectSettings、projectFiles、scene、audio、viewport、input、scripts、network、lanChat。editorApi仅转发领域调用，场景观察由Web的sceneReader采样。
 - `corona.editor`、Bridge、listMethods/listEvents、通用native on/off和manifest/schema/timeout层已删除；`editorApi.off`只清理Web场景观察token。窗口和LANChat事件返回原生同步disposer，由viewLifetime拥有。
 - V8 入口传输对象、数组、标量及约定二进制。PT/ReSTIR/ReBLUR/ReLAX 的具名入口、命令队列、requested/effective 状态及渲染消费者已改为 owned 对象，独立旧 string API 仅在其边界适配。底层网络包、资源/存档格式和独立 Python 接口保留自己的格式。
 - 此前批次Engine 9e11e072 / Editor a129ddf（当前配对与最新验收以下方2026-11-08节为准）。Conan examples75292完整exit0，exe SHA256=c4e2792276596549715b614bb09ff736581026c63a717bfaa73898510ce2dbe4。真实CEF59789完整exit0、graceful_exit=true：全部业务断言完成且引擎正常exit0，无强制终止（build/web-opt-ui-stop-graceful-native-cef.log）。Mechanics/Optics快照与UI停止顺序已按功能本地提交；音频owner消费/字段合并、原生identity及此前完整GPU回归通过。packaged七套all78194完整通过；双实例首轮CDP超时后原脚本19835通过（未改断言）；Blockly60355与Archive69652真实业务探针通过。Native-file曾在96066失败于Scripts.stop的Python runtime 2秒超时；09cb6e34修复Native派发锁交接，真实Registry/Coordinator双竞态回归2/2通过，最新静态宿主61241完整通过三次Native运行/输入/停止恢复及13项目文件不变。scene-pull95362完整通过，资源导入/取消、45骨骼IK、997Hz输出loopback74186和正式runner62980均通过。正式业务runner已提交9e11e072。上述主exe c4e279仍不含Native派发修复，最新Conan examples7060仍复制Python runtime，完整构建及部署后真实CEF复验尚待完成。图保存中关闭/失败重试、生命周期竞态、标定/助手跨owner恢复及LANChat完整重连多实例等仍待验收。全部文档仅本地，代码不推送。
@@ -470,7 +470,7 @@ Engine本地HEAD 6d09941a（生产51a39d5c、探针6d09941a）/ Editor及pin8728
 ### 2026-11-05 场景读取与 Actor 选择（历史记录）
 
 - `editorApi.scene.readActive()` 和 `scene.selectActor(...)` 直接调用同一 `window.corona.scene` V8 绑定，不经 manifest、JSON、旧入口或 transport data 包装。场景 owner 与 renderer 间传 typed DTO，原生 selection 也改为 typed 状态。
-- tree_revision 与 selection.source_camera_handle 为十进制字符串。CameraView 传递 native opaque_handle，选择归属不再用 Number 比较；Fast 拾取/Gizmo 的 numeric handle 尚待迁移。
+- tree_revision 与 selection.source_camera_handle 为十进制字符串。CameraView 传递 native opaque_handle，选择归属不再用 Number 比较；Fast 拾取的 numeric handle 尚待迁移。
 - selectActor 捕获该 context 最近 readActive 观察的 archive session，在原生 owner 校验后才修改；未读取或存档已替换时拒绝。刷新必须先读取，旧存档选择不重试；Actor GUID 由原生确定。
 - 旧 read_active_scene/select_actor CEF 路由返回 403，JS wrapper 清空。原有非 Web caller adapter 保留，不提供 Web 兼容回退。图保存协调的 active scope 读取已走 V8；图存储仍为待迁移 manifest。
 - 当前 176 项 manifest 中 173 项仍允许 CEF、3 项仅非 Web；本批迁移 2 项，Scripts.run_path 原本即 Native-only。历史“176 项剩余 Web 方法”是统计口径混用，现已纠正。18 项事件、Fast 和活动 storage 仍待迁移。
@@ -543,7 +543,7 @@ Engine本地HEAD 6d09941a（生产51a39d5c、探针6d09941a）/ Editor及pin8728
 - 该链路由 context → typed DTO → 原生场景操作 → context Promise 完成，不经 JSON 字符串、cefQuery、CefProcessMessage 或 registry 旧 handler。返回相机的 opaque_handle 是十进制字符串，不输出 numeric handle。
 - 主视口移动、CameraView 移动、保存设置与窗口尺寸同步共用该操作。CameraView 合并局部回复以保留未返回的渲染元数据；主视口重绑定比较 archive/session、相机 ID、scene 和 handle，存档替换即使复用 handle 也会取消旧按键状态。
 - 删除 CameraMoveFast、coronaBridge.cameraMove、SharedDataHub 专用移动命令/队列及 Optics 消费；两个旧 CEF wrapper/caller 已关闭，无 alias 或 fallback。非 Web 的 SceneTools.set_camera_pose 仅保留 ScriptRuntime，update_camera_view 仅保留 PythonScript，二者在各自值边界适配后共享原生操作。运行时持有输入时，Web 姿态写返回 EDITOR_INPUT_LOCKED；纯窗口设置仍可操作，脚本自身姿态权限不变。
-- 本批仅完成相机姿态/基本配置子项。其余相机渲染参数、viewport/pick/Gizmo/input Fast、manifest 事件/方法、活动 storage、原生图存储及完整 OS/双实例验收仍待迁移，整体 M4/M5 未完成。沿用现有 Dock 设计。
+- 本批仅完成相机姿态/基本配置子项。其余相机渲染参数、viewport/pick/input Fast、manifest 事件/方法、活动 storage、原生图存储及完整 OS/双实例验收仍待迁移，整体 M4/M5 未完成。沿用现有 Dock 设计。
 
 | 验证 | 结果 | 本地证据 |
 | --- | --- | --- |
@@ -578,9 +578,9 @@ JS 529/529、Python 71、CTest 6/6（真实 CEF 36.91 秒）、Conan 引擎与�
 
 ## 2026-11-06 无调用方网格移动通道清理
 
-核查 Web/Python 业务及动态门面后，旧 moveActorMesh / meshMoveResult 无实际业务调用。删除原生 Fast 生产/消费、JSON 回调、manifest 事件、Web onMeshMoveResult 及结果轮询触发；Mechanics 原生碰撞移动能力保持，不混并为普通 transform 写入，不增加无人使用的新 V8 入口。拾取/Gizmo 结果轮询保留并补作用域回归。
+核查 Web/Python 业务及动态门面后，旧 moveActorMesh / meshMoveResult 无实际业务调用。删除原生 Fast 生产/消费、JSON 回调、manifest 事件、Web onMeshMoveResult 及结果轮询触发；Mechanics 原生碰撞移动能力保持，不混并为普通 transform 写入，不增加无人使用的新 V8 入口。拾取结果轮询保留并补作用域回归。
 
-JS 533/533、Python 边界及聚合 115 passed、CTest 6/6（真实 CEF 37.89 秒）、Conan 引擎和前端生产部署通过。真实 CEF 验证所有测试窗口无旧绑定、原生清单无旧事件且订阅拒绝，pick/Gizmo 事件仍可用。引擎 cad80be4、Editor 5f0010e 仅本地提交代码/测试；无推送、文档未暂存/未提交。当前 manifest 175（旧 Web 156、非 Web 19）、事件 16、Fast 4，整体尚未完成，保持当前 Dock 设计。
+JS 533/533、Python 边界及聚合 115 passed、CTest 6/6（真实 CEF 37.89 秒）、Conan 引擎和前端生产部署通过。真实 CEF 验证所有测试窗口无旧绑定、原生清单无旧事件且订阅拒绝，pick 事件仍可用。引擎 cad80be4、Editor 5f0010e 仅本地提交代码/测试；无推送、文档未暂存/未提交。当前 manifest 175（旧 Web 156、非 Web 19）、事件 16、Fast 4，整体尚未完成，保持当前 Dock 设计。
 
 
 ## 2026-11-06 Web 生命周期与协作一致性收敛
@@ -595,7 +595,7 @@ api/webDocument.js 缓存不可变启动身份，App、路由、窗口会话、A
 
 验证：JS 563/563；Frontend Python 边界 27/27；引擎 source baseline 测试 16/16；本轮改动文件 ESLint 无错误，CameraView 原有 4 条模板格式警告保留。真实 CEF 主文档/停靠/分离文档 structured-clone 往返及图保存协调通过，应用通信测试禁用 JSON 编解码；测试使用生产 BrowserManager 加载 file-origin fixture，并非 packaged Vue 点击流程。完整 Vue Dock 点击、CameraView UI、最小化与双引擎隔离仍未在本轮验收。
 
-失败及修正记录：两个新增 SceneBar 迟到响应测试先失败后修复；ESLint 首次从仓库根调用找不到配置，改在 Frontend 下运行。Python 旧断言仍要求 Gizmo cameraHandle，核对基线代码已使用 cameraId，更新为精确 ID 断言。CEF fixture 首次遗漏新 import，随后又因旧测试直接访问已删除 coronaBridge 全局而失败，改为加载真实 identity 依赖并用可选访问验证旧入口不存在后通过。未将这些失败记为成功。
+失败及修正记录：两个新增 SceneBar 迟到响应测试先失败后修复；ESLint 首次从仓库根调用找不到配置，改在 Frontend 下运行。Python 旧断言仍要求 cameraHandle，核对基线代码已使用 cameraId，更新为精确 ID 断言。CEF fixture 首次遗漏新 import，随后又因旧测试直接访问已删除 coronaBridge 全局而失败，改为加载真实 identity 依赖并用可选访问验证旧入口不存在后通过。未将这些失败记为成功。
 
 前端已生产构建并部署到 Conan RelWithDebInfo 运行目录。本轮无 C++ 修改，未重新链接引擎、未运行会修改 Horizon 的原生构建引导。Editor 最终提交 68c58ae；引擎测试适配 7422736b，Editor 本地 pin 更新 e5ccbc57。仅本地代码提交，无推送；所有 Markdown 未暂存/未提交，Horizon 未修改。
 
@@ -654,7 +654,7 @@ api/webDocument.js 缓存不可变启动身份，App、路由、窗口会话、A
 
 2026-11-07 同一 Actor 索引子批追加：
 
-- MainPage 为 Gizmo 查找 Actor 身份的 refreshActorPickIndex 也迁移到同一 readActorIndex；保留归档、scene 和卸载围栏。新增4项回归先失败（web-opt-main-actor-index-red.log），随后完整JS605/605（web-opt-main-actor-index-full-js.log），定向lint无错误，Vite构建6.71秒成功。Editor 6dbfac6c52fcbc7061edc20f4275b5982dfadfc1，Engine最终配对pin为此版本。
+- MainPage 查找 Actor 身份的 refreshActorPickIndex 也迁移到同一 readActorIndex；保留归档、scene 和卸载围栏。新增4项回归先失败（web-opt-main-actor-index-red.log），随后完整JS605/605（web-opt-main-actor-index-full-js.log），定向lint无错误，Vite构建6.71秒成功。Editor 6dbfac6c52fcbc7061edc20f4275b5982dfadfc1，Engine最终配对pin为此版本。
 - 无扩展名音频Actor的type fallback修复后，Conan tests构建退出0，CameraWindowIdentityTests通过5.22秒（web-opt-actor-index-type-green-build.log / type-green.log）。
 - 第一轮examples构建已退出0（web-opt-actor-index-engine-build.log），但其UI库编译早于type fallback，不代替最终版本。
 - web-opt-actor-index-engine-final-build.log 已编译最新原生库、链接引擎并部署前端，但最终CEF Release目录复制失败；原因是测试提前启动，与post-build DLL复制重叠。这是执行顺序错误，不能记为构建成功。测试进程已退出，改为等待Conan完整退出后串行验收；重新构建日志为web-opt-actor-index-engine-delivery-build.log，结果待记。
