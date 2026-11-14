@@ -9,6 +9,10 @@
       @mousedown.stop @pointerdown.stop @click.stop @wheel.stop @keydown.esc.stop="open = false; trigger?.focus()">
       <header><strong>ReSTIR 参数</strong><button type="button" aria-label="关闭 ReSTIR 参数" @click="open = false">×</button></header>
       <p class="hint">当前相机 · 应用后重置历史 · 随场景保存</p>
+      <label title="关闭后仅保留 ReSTIR DI">
+        <span>启用 ReSTIR GI</span><input v-model="draft.indirect.open" type="checkbox" aria-label="启用间接光照（GI）" :disabled="busy || !loaded" />
+      </label>
+      <p class="hint">关闭后仅保留 ReSTIR DI</p>
       <p v-if="busy && !loaded" role="status" class="hint">正在准备 ReSTIR 并读取当前相机参数…</p>
       <fieldset :disabled="busy || !loaded">
         <legend>路径追踪</legend>
@@ -19,7 +23,7 @@
       </fieldset>
       <fieldset v-for="group in restirGroups" :key="group.key" :disabled="busy || !loaded">
         <legend>{{ group.label }}</legend>
-        <label title="关闭后保留本组参数，再次启用时继续使用。">
+        <label v-if="group.key === 'direct'" title="关闭后保留本组参数，再次启用时继续使用。">
           <span>启用{{ group.label }}</span><input v-model="draft[group.key].open" type="checkbox" :aria-label="'启用' + group.label" />
         </label>
         <fieldset :disabled="!draft[group.key].open" :aria-label="group.prefix + ' 参数'">
