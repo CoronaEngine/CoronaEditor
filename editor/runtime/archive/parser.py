@@ -515,6 +515,28 @@ def _parse_archive_impl(input_path: str) -> dict[str, Any]:
 def parse_archive(input_path: str) -> dict[str, Any]:
     """Parse an archive without creating engine or Python scene entities."""
     try:
+        if Path(input_path).name.lower().endswith(".snapshot.json"):
+            source = Path(input_path).expanduser().resolve()
+            snapshot = json.loads(source.read_text(encoding="utf-8-sig"))
+            if (not isinstance(snapshot, dict)
+                    or type(snapshot.get("schema_version")) is not int
+                    or snapshot["schema_version"] != 1
+                    or snapshot.get("read_only") is not True
+                    or not isinstance(snapshot.get("scene"), dict)):
+                raise ValueError("Expected a read-only schema_version 1 scene snapshot")
+            for collection in ("actors", "cameras"):
+                items = snapshot["scene"].get(collection, [])
+                if (not isinstance(items, list) or len(items) > MAX_SNAPSHOT_ITEMS
+                        or any(not isinstance(item, dict) for item in items)):
+                    raise ValueError(f"Invalid snapshot scene.{collection}")
+            diagnostics = snapshot.get("diagnostics", [])
+            if not isinstance(diagnostics, list) or any(not isinstance(item, dict) for item in diagnostics):
+                raise ValueError("Invalid snapshot diagnostics")
+            # Native scene preflight validates actor resources and material graphs.
+            # These documents are external inputs, never writable project archives.
+            snapshot.update(archive_type="read_only_snapshot", source_path=str(source),
+                            project_root=str(source.parent), diagnostics=diagnostics)
+            return snapshot
         if Path(input_path).suffix.lower() in {".xml", ".pbrt"}:
             from .external_scene import parse_external_scene
             return parse_external_scene(input_path)
