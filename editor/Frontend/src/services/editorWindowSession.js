@@ -43,7 +43,7 @@ export function createEditorWindowSession({ state, send, publish, getWorld, getQ
   }
   // The existing command acknowledges after TWO main-thread turns. With no scene
   // selected it closes nothing, but fences queued creates and SDL surface retirement.
-  const fence = () => send({ cmd: 'suspendCameraViews', sceneId: '' });
+  const fence = () => send({ cmd: 'suspendCameraViews', scene_id: '' });
   function taggedRoute(route, generation, id, sessionOwner) {
     return `${route || '/'}${String(route || '').includes('?') ? '&' : '?'}uiSession=${encodeURIComponent(generation)}&uiWindow=${encodeURIComponent(id)}&uiOwner=${encodeURIComponent(sessionOwner)}`;
   }
@@ -60,18 +60,18 @@ export function createEditorWindowSession({ state, send, publish, getWorld, getQ
       await fence();
     } else if (record.kind === 'camera') {
       await fence();
-      await send({ cmd: 'suspendCameraViews', sceneId: record.sceneId });
-    } else if (Number.isInteger(record.windowToken)) {
+      await send({ cmd: 'suspendCameraViews', scene_id: record.scene_id });
+    } else if (Number.isInteger(record.window_token)) {
       if (notify) {
         await beforeClose(record);
         record = records().find(item => item.id === record.id && item.generation === record.generation
-          && item.windowToken === record.windowToken);
+          && item.window_token === record.window_token);
         if (!record) return;
         record.status = 'closing'; await save(record);
         await drain(item => item.source === record.id);
         await activities.drain(item => item.source === record.id);
       }
-      if (record.panelId) await send({ cmd: 'closePanelTab', panelId: record.panelId });
+      if (record.panel_id) await send({ cmd: 'closePanelTab', panel_id: record.panel_id });
     }
     await forget(record);
   }
@@ -125,7 +125,7 @@ export function createEditorWindowSession({ state, send, publish, getWorld, getQ
     const current = requirePolicy();
     const id = uniqueId();
     const record = { owner: current.owner, id,
-      generation: current.generation, source: query().get('uiWindow'), panelId: command.panelId || '', sceneId: command.sceneId,
+      generation: current.generation, source: query().get('uiWindow'), panel_id: command.panel_id || '', scene_id: command.scene_id,
       kind: command.cmd === 'createCameraView' ? 'camera'
         : command.cmd.startsWith('create') ? 'panel' : 'operation', status: 'pending' };
     const activityId = record.kind === 'operation'
@@ -136,16 +136,16 @@ export function createEditorWindowSession({ state, send, publish, getWorld, getQ
       if (!state.main) await saved;
     }
     const request = { ...command };
-    if (record.kind !== 'operation') request.routePath = taggedRoute(command.routePath, current.generation, id, current.owner);
+    if (record.kind !== 'operation') request.route_path = taggedRoute(command.route_path, current.generation, id, current.owner);
     const finish = async result => {
-      record.windowToken = result?.window_token;
+      record.window_token = result?.window_token;
       record.status = 'settling';
       if (record.kind !== 'operation') await save(record);
       if (record.kind === 'operation') {
         if (!policy().enabled || policy().generation !== current.generation) throw new Error('世界已切换，已丢弃旧窗口请求');
         return;
       }
-      if (record.kind !== 'operation' && !Number.isInteger(record.windowToken)) {
+      if (record.kind !== 'operation' && !Number.isInteger(record.window_token)) {
         record.status = 'uncertain'; await save(record);
         throw new Error('窗口创建结果缺少 window_token，已取消切换世界');
       }
@@ -176,10 +176,10 @@ export function createEditorWindowSession({ state, send, publish, getWorld, getQ
     const sourceOwner = query().get('uiOwner') || current?.owner;
     return id && sourceOwner ? records().find(item => item.id === id && item.owner === sourceOwner) : null;
   }
-  async function closeThis(panelId) {
+  async function closeThis(panel_id) {
     if (!standalone()) throw new Error('主世界窗口不能作为面板关闭');
     let record = ownRecord();
-    panelId ||= record?.panelId || '';
+    panel_id ||= record?.panel_id || '';
     // Once retired, the owner closes this page only after its outstanding native
     // replies settle. Self-closing now would strand their registered callbacks.
     if (record && !policy().enabled && record.status !== 'closing') return;
@@ -198,19 +198,19 @@ export function createEditorWindowSession({ state, send, publish, getWorld, getQ
       const current = read();
       if (!current?.enabled || current.generation !== record.generation) return;
     }
-    await send({ cmd: 'closeThisTab', panelId: '' });
+    await send({ cmd: 'closeThisTab', panel_id: '' });
     if (record) await forget(record);
   }
-  async function closeTab(panelId) {
-    const record = records().find(item => item.panelId === panelId);
+  async function closeTab(panel_id) {
+    const record = records().find(item => item.panel_id === panel_id);
     if (record) return dispose(record, true);
-    return send({ cmd: 'closePanelTab', panelId });
+    return send({ cmd: 'closePanelTab', panel_id });
   }
   async function broadcast(event, payload) {
     const current = requirePolicy();
     const record = ownRecord();
     return publish(event, {
-      ...payload, uiGeneration: current.generation, ...(record?.windowToken !== undefined ? { windowToken: record.windowToken } : {}),
+      ...payload, uiGeneration: current.generation, ...(record?.window_token !== undefined ? { window_token: record.window_token } : {}),
     });
   }
   function accepts(payload) {

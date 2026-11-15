@@ -21,8 +21,8 @@ function nativeSurface(t) {
   const surface = {
     // The plural close is the retirement fence, so it is the one that waits for a reply.
     // Closing a single panel resolves immediately and is only recorded.
-    corona: { window: { close: identity => (identity && 'sceneId' in identity)
-      ? new Promise((resolve, reject) => barriers.push({ sceneId: identity.sceneId, resolve, reject }))
+    corona: { window: { close: identity => (identity && 'scene_id' in identity)
+      ? new Promise((resolve, reject) => barriers.push({ scene_id: identity.scene_id, resolve, reject }))
       : (sent.push(['close', identity]), Promise.resolve(true)),
       onCloseRequested: () => () => {} } },
     localStorage: memoryStorage(), sessionStorage: memoryStorage(), location: { hash: '#/' }, dispatchEvent() {} };

@@ -21,23 +21,22 @@ const windowSessions = new WeakMap();
 // Native merged its duplicated window verbs, so the intents below express *what*
 // they want (a kind of panel, a window state) rather than the verb that used to
 // encode it. Placement is ImGui's: the user docks a panel, not the Web layer.
+// The window commands below already carry the wire spelling (snake_case), so each entry
+// hands its parameters straight to the binding: there is no translation step, and no
+// second vocabulary to keep in sync.
 const windowCommandOps = {
   closeThisTab: () => editorApi.window.close(),
-  closePanelTab: parameters => editorApi.window.close({ panelId: parameters.panelId }),
-  focusPanelTab: parameters => editorApi.window.focus({ panelId: parameters.panelId }),
+  closePanelTab: parameters => editorApi.window.close(parameters),
+  focusPanelTab: parameters => editorApi.window.focus(parameters),
   createPanelTab: parameters => editorApi.window.createPanel(parameters),
   // The plural form of close: every camera view of that scene, and the two-turn fence.
-  suspendCameraViews: parameters => editorApi.window.close({ sceneId: parameters.sceneId }),
-  closeCameraView: parameters =>
-    editorApi.window.close({ sceneId: parameters.sceneId, cameraId: parameters.cameraId }),
-  cycleThisCameraViewWindowMode: parameters => editorApi.window.setWindowPresentation({
-    sceneId: parameters.sceneId, cameraId: parameters.cameraId, mode: 'toggle' }),
-  setThisCameraViewPresentation: parameters => editorApi.window.setWindowPresentation({
-    sceneId: parameters.sceneId, cameraId: parameters.cameraId, mode: parameters.mode }),
+  suspendCameraViews: parameters => editorApi.window.close(parameters),
+  closeCameraView: parameters => editorApi.window.close(parameters),
+  cycleThisCameraViewWindowMode: parameters =>
+    editorApi.window.setWindowPresentation({ ...parameters, mode: 'toggle' }),
+  setThisCameraViewPresentation: parameters => editorApi.window.setWindowPresentation(parameters),
   // A size is a presentation too, so it rides the same entry as the modes.
-  resizeThisCameraView: parameters => editorApi.window.setWindowPresentation({
-    sceneId: parameters.sceneId, cameraId: parameters.cameraId,
-    width: parameters.width, height: parameters.height }),
+  resizeThisCameraView: parameters => editorApi.window.setWindowPresentation(parameters),
   createCameraView: parameters => editorApi.window.createPanel({ ...parameters, kind: 'camera' }),
 };
 function sendWindowCommand(command) {
@@ -66,7 +65,7 @@ function session() {
       activities: createWindowSessionActivities(messages),
       send: sendWindowCommand,
       beforeRetire: () => flushActiveNodeGraphs(surface),
-      beforeClose: record => record.panelId === 'NodeGraphPanel' ? flushActiveNodeGraphs(surface) : undefined,
+      beforeClose: record => record.panel_id === 'NodeGraphPanel' ? flushActiveNodeGraphs(surface) : undefined,
       publish: (topic, payload) => messages.emit(topic, payload),
       getWorld: () => worldModeState,
       getQuery: () => query,
@@ -79,42 +78,45 @@ export const isCurrentWindowEvent = payload => editorUiAllowed() && session().ac
 const openEditorWindow = command => session().open(command);
 
 export const appService = {
-  focusPanelTab: panelId => openEditorWindow({ cmd: 'focusPanelTab', panelId }),
+  focusPanelTab: panel_id => openEditorWindow({ cmd: 'focusPanelTab', panel_id }),
   readEditorUiPolicy: async () => { await session().hydrate(); return session().policy(); },
   setEditorUiEnabled: enabled => session().prepare(enabled),
+  // The facade hands the native subscription straight through, so the returned
+  // unsubscribe is the native one. The payload uses the wire spelling (snake_case),
+  // the same one every reply carries.
   onWindowClosed: callback => editorApi.window.onClosed(callback),
   onWindowCloseRequested: callback => editorApi.window.onCloseRequested(callback),
   openNativePanel: options => openEditorWindow({ cmd: 'createPanelTab', ...options }),
-  closeThisTab: (panelId) => session().closeThis(panelId),
+  closeThisTab: (panel_id) => session().closeThis(panel_id),
   // Panel identity is the stable panel id, not the transient tab id a reply carried.
-  closePanelTab: panelId => session().closeTab(panelId),
+  closePanelTab: panel_id => session().closeTab(panel_id),
   // Keep all camera controls in the window session so retired surfaces cannot
   // apply their operations against the next creative world.
-  cycleThisCameraViewWindowMode: (sceneId = '', cameraId = '') =>
-    openEditorWindow({ cmd: 'cycleThisCameraViewWindowMode', sceneId, cameraId }),
+  cycleThisCameraViewWindowMode: (scene_id = '', camera_id = '') =>
+    openEditorWindow({ cmd: 'cycleThisCameraViewWindowMode', scene_id, camera_id }),
   // The camera view tracks its own borderless state, so it can ask for the state
   // it wants instead of flipping an unknown one.
-  setThisCameraViewPresentation: (mode, sceneId = '', cameraId = '') =>
-    openEditorWindow({ cmd: 'setThisCameraViewPresentation', mode, sceneId, cameraId }),
+  setThisCameraViewPresentation: (mode, scene_id = '', camera_id = '') =>
+    openEditorWindow({ cmd: 'setThisCameraViewPresentation', mode, scene_id, camera_id }),
   toggleMainWindowBorderless: () =>
     editorApi.window.setWindowPresentation({ target: 'main', mode: 'toggle' }),
-  resizeThisCameraView: (width, height, sceneId = '', cameraId = '') =>
-    openEditorWindow({ cmd: 'resizeThisCameraView', width, height, sceneId, cameraId }),
+  resizeThisCameraView: (width, height, scene_id = '', camera_id = '') =>
+    openEditorWindow({ cmd: 'resizeThisCameraView', width, height, scene_id, camera_id }),
   createCameraView: (camera) =>
     openEditorWindow({
       cmd: 'createCameraView',
-      sceneId: camera.scene_id,
-      cameraId: camera.camera_id || camera.id,
-      archiveSession: camera.archive_session,
-      routePath: `/CameraView?scene=${encodeURIComponent(camera.scene_id)}&camera=${encodeURIComponent(camera.camera_id || camera.id)}&archive=${encodeURIComponent(camera.archive_session)}`,
+      scene_id: camera.scene_id,
+      camera_id: camera.camera_id || camera.id,
+      archive_session: camera.archive_session,
+      route_path: `/CameraView?scene=${encodeURIComponent(camera.scene_id)}&camera=${encodeURIComponent(camera.camera_id || camera.id)}&archive=${encodeURIComponent(camera.archive_session)}`,
       width: camera.view_width ?? 960,
       height: camera.view_height ?? 540,
       x: camera.view_x ?? 120,
       y: camera.view_y ?? 120,
     }),
-  closeCameraView: (sceneId, cameraId) =>
-    openEditorWindow({ cmd: 'closeCameraView', sceneId, cameraId }),
-  suspendCameraViews: (sceneId) => editorApi.window.close({ sceneId }),
+  closeCameraView: (scene_id, camera_id) =>
+    openEditorWindow({ cmd: 'closeCameraView', scene_id, camera_id }),
+  suspendCameraViews: (scene_id) => editorApi.window.close({ scene_id }),
   crossTabBroadcast: (event, payload) =>
     session().broadcast(event, payload),
   closeProcess: () => editorApi.app.closeProcess(),

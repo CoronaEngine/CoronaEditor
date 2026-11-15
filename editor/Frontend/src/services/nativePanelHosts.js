@@ -7,7 +7,7 @@ export function createNativePanelHosts({ open, close, focus = async () => {}, on
   let latestPanels = [];
   function retire(id, host) {
     if (closing.has(id)) return closing.get(id);
-    const pending = Promise.resolve().then(() => close(host.windowToken, id)).then(() => {
+    const pending = Promise.resolve().then(() => close(host.window_token, id)).then(() => {
       if (hosts.get(id) === host) hosts.delete(id);
       if (!disposed && host.wanted) reconcile(latestPanels);
     }).catch(onError).finally(() => {
@@ -22,7 +22,7 @@ export function createNativePanelHosts({ open, close, focus = async () => {}, on
     for (const [id, host] of hosts) {
       const wasWanted = host.wanted;
       host.wanted = wanted.has(id);
-      if (!host.wanted && wasWanted && host.windowToken !== undefined) {
+      if (!host.wanted && wasWanted && host.window_token !== undefined) {
         void retire(id, host);
       }
     }
@@ -37,9 +37,9 @@ export function createNativePanelHosts({ open, close, focus = async () => {}, on
           return;
         }
         const result = await open(panel);
-        const windowToken = result?.window_token;
-        if (!Number.isInteger(windowToken)) throw new Error(`Missing window_token for ${id}`);
-        host.windowToken = windowToken;
+        const window_token = result?.window_token;
+        if (!Number.isInteger(window_token)) throw new Error(`Missing window_token for ${id}`);
+        host.window_token = window_token;
         if (disposed || !host.wanted) {
           await retire(id, host);
         }
@@ -50,9 +50,9 @@ export function createNativePanelHosts({ open, close, focus = async () => {}, on
       });
     }
   }
-  function closed(id, windowToken) {
+  function closed(id, window_token) {
     const host = hosts.get(id);
-    if (!Number.isInteger(windowToken) || !host || host.windowToken !== windowToken || closing.has(id)) return false;
+    if (!Number.isInteger(window_token) || !host || host.window_token !== window_token || closing.has(id)) return false;
     hosts.delete(id);
     return true;
   }
@@ -61,7 +61,7 @@ export function createNativePanelHosts({ open, close, focus = async () => {}, on
     const host = hosts.get(id);
     if (!host) return false;
     await host.pending;
-    if (disposed || hosts.get(id) !== host || !host.wanted || host.windowToken === undefined) return false;
+    if (disposed || hosts.get(id) !== host || !host.wanted || host.window_token === undefined) return false;
     await focus(id);
     return true;
   }
