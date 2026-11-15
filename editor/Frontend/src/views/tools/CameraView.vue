@@ -588,21 +588,20 @@ const saveSettings = async () => {
   try {
     const width = Math.max(Number(renderWidth.value) || 960, 64);
     const height = Math.max(Number(renderHeight.value) || 540, 64);
+    // The native host owns the camera's render size: it follows the window's
+    // physical pixels each frame. This call only carries the speed, and the
+    // resize below re-sizes the window so the render size follows.
     const result = await editorApi.scene.updateCamera(sceneId, cameraId, {
       archive_session: camera.value?.archive_session,
       move_speed: Math.max(Number(moveSpeed.value) || 1, 0.01),
-      width,
-      height,
-      view_width: width,
-      view_height: height,
     });
     if (!viewLifetime.current()) return;
     Object.assign(camera.value, result.camera);
-    renderWidth.value = result.camera.width || width;
-    renderHeight.value = result.camera.height || height;
+    renderWidth.value = width;
+    renderHeight.value = height;
     await appService.resizeThisCameraView(
-      renderWidth.value,
-      renderHeight.value,
+      width,
+      height,
       sceneId,
       cameraId,
     ).catch(() => {});
@@ -615,7 +614,10 @@ let resizeTimer = 0;
 let lastSyncedWidth = 0;
 let lastSyncedHeight = 0;
 
-const syncWindowSize = async (force = false) => {
+// The window size is the only size the Web side records: the native host derives
+// the camera's render extent from the window's physical pixels every frame, so
+// sending it here again would fight the viewport update on high-DPI displays.
+const syncWindowSize = (force = false) => {
   if (!camera.value) return;
   const width = Math.max(Math.round(window.innerWidth || renderWidth.value), 64);
   const height = Math.max(Math.round(window.innerHeight || renderHeight.value), 64);
@@ -624,19 +626,6 @@ const syncWindowSize = async (force = false) => {
   lastSyncedHeight = height;
   renderWidth.value = width;
   renderHeight.value = height;
-  try {
-    const result = await editorApi.scene.updateCamera(sceneId, cameraId, {
-      archive_session: camera.value?.archive_session,
-      width,
-      height,
-      view_width: width,
-      view_height: height,
-      move_speed: Math.max(Number(moveSpeed.value) || 1, 0.01),
-    });
-    Object.assign(camera.value, result.camera);
-  } catch (error) {
-    errorText.value = error.message;
-  }
 };
 
 const scheduleWindowSizeSync = () => {
@@ -1000,7 +989,7 @@ onMounted(async () => {
       token => getObserverRuntime().off(token));
     if (!viewLifetime.current()) return;
     syncViewportUiMode();
-    await syncWindowSize(true);
+    syncWindowSize(true);
   } catch (error) {
     if (viewLifetime.current()) errorText.value = error.message;
   }

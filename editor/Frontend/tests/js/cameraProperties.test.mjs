@@ -25,8 +25,10 @@ test('CameraView settings share scoped properties and preserve camera metadata o
     } } }, appService: { resizeThisCameraView: async (...args) => calls.push(['resize', ...args]) },
   });
   await save();
+  // The native host derives the render size from the window's physical pixels;
+  // the Web side only carries the speed and asks for the window size.
   assert.deepEqual(calls, [['scene.ini', 'camera-id', { archive_session: 'archive',
-    move_speed: 0.5, width: 640, height: 480, view_width: 640, view_height: 480 }], ['resize', 640, 480, 'scene.ini', 'camera-id']]);
+    move_speed: 0.5 }], ['resize', 640, 480, 'scene.ini', 'camera-id']]);
   assert.equal(camera.value.handle, 42);
   assert.equal(camera.value.render_backend, 'vision');
   assert.equal(camera.value.vision_denoise, true);
@@ -45,7 +47,7 @@ test('CameraView pose publisher submits copied vectors through the same scoped i
     forward: [0, 0, 1], world_up: [0, 1, 0], fov: 45 }]]);
 });
 
-test('camera size synchronization cannot reopen a retiring window', async () => {
+test('camera size synchronization records the window size without a native write', async () => {
   const calls = [], camera = ref({ archive_session: 'archive', camera_id: 'camera-id' });
   const { descriptor } = parse(readFileSync(new URL('../../src/views/tools/CameraView.vue', import.meta.url), 'utf8'));
   const source = descriptor.scriptSetup.content;
@@ -58,8 +60,11 @@ test('camera size synchronization cannot reopen a retiring window', async () => 
   };
   const sync = new Function('deps', `const {${Object.keys(deps).join(',')}} = deps; let lastSyncedWidth = 0, lastSyncedHeight = 0; ${source.slice(node.start, node.end)}; return syncWindowSize;`)(deps);
   await sync();
-  assert.deepEqual(calls, [['scene.ini', 'camera-id', { archive_session: 'archive', width: 800, height: 600,
-    view_width: 800, view_height: 600, move_speed: 0.5 }]]);
+  assert.deepEqual(calls, [], 'the native camera size follows the window itself');
+  assert.equal(deps.renderWidth.value, 800);
+  assert.equal(deps.renderHeight.value, 600);
+  await sync();
+  assert.deepEqual(calls, [], 'a repeated sync stays local');
 });
 
 test('CameraView pose publisher respects runtime input ownership and surfaces native rejections', async () => {

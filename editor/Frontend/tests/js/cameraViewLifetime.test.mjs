@@ -47,8 +47,11 @@ test('CameraView applies a settings reply and resizes its live window', async ()
     appService: { resizeThisCameraView: async (...args) => resized.push(args) },
   };
   await action('saveSettings', scope)();
-  assert.deepEqual(resized, [[1200, 800, 'scene', 'camera']]);
-  assert.equal(scope.camera.value.width, 1200);
+  // The widget sizes the window; the native host derives the camera's render
+  // extent from its physical pixels, so the reply no longer drives the size.
+  assert.deepEqual(resized, [[960, 540, 'scene', 'camera']]);
+  assert.equal(scope.camera.value.width, 1200, 'the reply still updates the metadata');
+  assert.equal(scope.renderWidth.value, 960);
 });
 
 for (const outcome of ['success', 'failure']) {
