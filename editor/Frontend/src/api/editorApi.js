@@ -17,11 +17,11 @@ const bridgeCall = async (service, method, args = []) => {
  * carrying error.code (the bridge raises it on the service side), so callers
  * branch on error.code instead of matching translated message text.
  */
-const fileOp = async (op, request, args) => bridgeCall('project_archive', 'file_manager', [{
+const fileOp = async (op, request, fields) => bridgeCall('project_archive', 'file_manager', [{
   archive_session: request.archive_session,
   project_path: request.project_path,
   op,
-  args,
+  ...fields,
 }]);
 
 const editorApiStatic = {
@@ -32,13 +32,13 @@ const editorApiStatic = {
   },
   files: {
     getFileTree: async request => ({
-      ...await fileOp('get_file_tree', request, [request.path ?? '']),
+      ...await fileOp('get_file_tree', request, { path: request.path ?? '' }),
       project_path: request.project_path,
     }),
-    createFolder: request => fileOp('create_folder', request, [request.path, request.name]),
-    createActorTemplate: request => fileOp('create_file', request, [request.path, request.name, 'actor']),
-    deleteItem: request => fileOp('delete_item', request, [request.path]),
-    renameItem: request => fileOp('rename_item', request, [request.path, request.name]),
+    createFolder: request => fileOp('create_folder', request, { path: request.path, name: request.name }),
+    createActorTemplate: request => fileOp('create_file', request, { path: request.path, name: request.name, file_type: 'actor' }),
+    deleteItem: request => fileOp('delete_item', request, { path: request.path }),
+    renameItem: request => fileOp('rename_item', request, { path: request.path, name: request.name }),
   },
   network: {
     startSession: (instanceName, projectId, port = 27960, role = 'host') =>
