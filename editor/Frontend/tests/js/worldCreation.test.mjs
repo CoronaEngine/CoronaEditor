@@ -27,19 +27,17 @@ for (const node of [...imports].reverse()) {
     + setupSource.slice(node.end);
 }
 const makeComponent = new Function('modules', `${setupSource}; return NewGame;`);
-const idle = () => ({ status: 'stopped', restored: false, snapshotCaptured: false, restoreStatus: 'idle' });
 const deferred = () => {
   let resolve;
   const promise = new Promise(done => { resolve = done; });
   return { promise, resolve };
 };
 
-async function mountCreationPage(t, { stopResult = idle(), networkError } = {}) {
+async function mountCreationPage(t, { networkError, createGate } = {}) {
   const calls = [], alerts = [], saves = [], mounted = [], unmounted = [];
   let activePath = 'creative-world';
   let route = '/NewGame';
   let sequence = 0;
-  let scriptResult = stopResult;
   const previous = { window: globalThis.window, CustomEvent: globalThis.CustomEvent, alert: globalThis.alert };
   const timers = new Map();
   globalThis.window = {
@@ -62,6 +60,7 @@ async function mountCreationPage(t, { stopResult = idle(), networkError } = {}) 
   t.mock.method(editorApi.projectSettings, 'getActiveProjectInfo', async () => ({ project_path: activePath, mode: 'creative' }));
   t.mock.method(editorApi.project, 'createWorldProject', async payload => {
     calls.push(['create', payload]);
+    if (createGate) await createGate;
     return { name: `创造世界_${++sequence}`, path: `creative-world-${sequence}` };
   });
   const networkStops = [];
@@ -69,10 +68,6 @@ async function mountCreationPage(t, { stopResult = idle(), networkError } = {}) 
     networkStops.push(activePath);
     if (networkError) throw networkError;
     return { ok: true };
-  });
-  t.mock.method(editorApi.scripts, 'stop', async (id, restore) => {
-    calls.push(['script', restore]);
-    return await scriptResult;
   });
   t.mock.method(editorApi.project, 'openProject', async path => {
     calls.push(['open', path]);
@@ -102,7 +97,6 @@ async function mountCreationPage(t, { stopResult = idle(), networkError } = {}) 
   assert.match(descriptor.template.content, /@click="handleCreate"/);
   return {
     page, calls, alerts, saves, networkStops,
-    setStopResult: result => { scriptResult = result; },
     activePath: () => activePath,
     route: () => route,
   };
@@ -143,39 +137,9 @@ test('network cleanup failure prevents project replacement', async t => {
   assert.equal(h.alerts.length, 1);
 });
 
-test('creation keeps the old world on real failures and the button can retry', async t => {
-  for (const stopResult of [
-    { status: 'stopped', restored: false, snapshotCaptured: true, restoreStatus: 'error', restoreError: 'scene restore failed' },
-    { status: 'error', restored: false, message: 'cooperative stop timed out', pendingThreads: ['child-worker'] },
-  ]) {
-    await t.test(stopResult.restoreError || stopResult.message, async t => {
-      const h = await mountCreationPage(t, { stopResult });
-      await h.page.handleCreate();
-      assert.deepEqual(h.calls, [
-        ['create', { prompt: '' }], ['script', true], ['replace', '/StartScreen'],
-      ]);
-      assert.equal(h.activePath(), 'creative-world');
-      assert.equal(h.alerts.length, 1);
-      assert.ok(h.alerts[0].includes(stopResult.restoreError || stopResult.message));
-      assert.equal(h.page.creating.value, false);
-      assert.equal(worldMode.worldModeService.opening, false);
-      assert.deepEqual(h.saves, []);
-      h.setStopResult(idle());
-      h.calls.length = 0;
-      await h.page.handleCreate();
-      assert.deepEqual(h.calls, [
-        ['create', { prompt: '' }], ['script', true], ['open', 'creative-world-2'], ['route', '/'],
-      ]);
-      assert.equal(h.activePath(), 'creative-world-2');
-      assert.equal(h.route(), '/');
-      assert.equal(h.alerts.length, 1);
-    });
-  }
-});
-
-test('creation waits for cleanup, disables duplicate requests, and respects service readiness', async t => {
-  const stop = deferred();
-  const h = await mountCreationPage(t, { stopResult: stop.promise });
+test('creation waits for service readiness, disables duplicate requests, and routes home', async t => {
+  const gate = deferred();
+  const h = await mountCreationPage(t, { createGate: gate.promise });
   h.page.archiveReady.value = false;
   await h.page.handleCreate();
   assert.deepEqual(h.calls, []);
@@ -183,10 +147,10 @@ test('creation waits for cleanup, disables duplicate requests, and respects serv
   const creation = h.page.handleCreate();
   await new Promise(resolve => setImmediate(resolve));
   assert.equal(h.page.creating.value, true);
-  assert.deepEqual(h.calls, [['create', { prompt: '' }], ['script', true]]);
+  assert.deepEqual(h.calls, [['create', { prompt: '' }]]);
   await h.page.handleCreate();
   assert.equal(h.calls.filter(([call]) => call === 'create').length, 1);
-  stop.resolve(idle());
+  gate.resolve();
   await creation;
   assert.equal(h.route(), '/');
   assert.equal(h.page.creating.value, false);
