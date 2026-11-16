@@ -17,7 +17,7 @@ const bridgeCall = async (service, method, args = []) => {
  * carrying error.code (the bridge raises it on the service side), so callers
  * branch on error.code instead of matching translated message text.
  */
-const fileOp = async (op, request, args) => bridgeCall('ProjectArchive', 'file_manager', [{
+const fileOp = async (op, request, args) => bridgeCall('project_archive', 'file_manager', [{
   archive_session: request.archive_session,
   project_path: request.project_path,
   op,
@@ -57,7 +57,7 @@ const editorApiStatic = {
     // The version lives in the editor ini, which the archive service owns; the facade asks it
     // through the bridge instead of keeping a native route that only forwarded the answer.
     getAppVersion: async () => {
-      const settings = await bridgeCall('ProjectArchive', 'editor_settings',
+      const settings = await bridgeCall('project_archive', 'editor_settings',
         [{ section: 'General', key: 'version', fallback: '1.2.0' }]);
       return settings?.value ?? '1.2.0';
     },
@@ -140,23 +140,15 @@ const editorApiStatic = {
     captureScreenshot: (sceneName, cameraId, options) =>
       window.corona.viewport.captureScreenshot(sceneName, cameraId, options),
   },
-  scripts: {
-    // The Python file host owns compilation, revision checks and run state.
-    getStatus: () => bridgeCall('FileScripts', 'get_script_status', []),
-    runFile: request => bridgeCall('FileScripts', 'run_file', [request]),
-    getRun: requestId => bridgeCall('FileScripts', 'get_file_run', [{ requestId }]),
-    stop: (runId, restoreState = true, requestId) =>
-      bridgeCall('FileScripts', 'stop_file', [{ runId, requestId, restore_state: restoreState }]),
-  },
   projectFiles: {
-    save: request => bridgeCall('ProjectFiles', 'save', [request]),
-    load: request => bridgeCall('ProjectFiles', 'load', [request]),
+    save: request => bridgeCall('project_files', 'save', [request]),
+    load: request => bridgeCall('project_files', 'load', [request]),
   },
   projectSettings: {
     // Documents are owned by the Python archive service.
-    readProjectDocument: request => bridgeCall('ProjectArchive', 'read_document',
+    readProjectDocument: request => bridgeCall('project_archive', 'read_document',
       [{ ...request, revision_only: true }]),
-    commitProjectDocument: request => bridgeCall('ProjectArchive', 'commit_document',
+    commitProjectDocument: request => bridgeCall('project_archive', 'commit_document',
       [{ ...request, revision_only: true }]),
     // The projection is composed here from the scene primitive plus archive metadata.
     getActiveProjectInfo: async () => {
@@ -165,7 +157,7 @@ const editorApiStatic = {
         return { name: active.name, mode: 'creative', project_path: active.project_path,
           read_only: true, source_path: active.project_path, archive_session: active.archive_session };
       }
-      const info = await bridgeCall('ProjectArchive', 'project_info', [{ path: active.project_path }]);
+      const info = await bridgeCall('project_archive', 'project_info', [{ path: active.project_path }]);
       return { ...info, archive_session: active.archive_session, read_only: false };
     },
     // Saving metadata refreshes the native scene cache, so this route stays in C++.

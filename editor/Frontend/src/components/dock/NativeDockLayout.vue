@@ -12,7 +12,7 @@ const store = useDockStore();
 const { t } = useI18n();
 const hosts = createNativePanelHosts({
   open: panel => appService.openNativePanel({
-    panelId: panel.id, routePath: panel.routePath, title: t(panel.displayNameKey),
+    panel_id: panel.id, route_path: panel.routePath, title: t(panel.displayNameKey),
     width: panel.defaultWidth, height: panel.defaultHeight,
   }),
   close: (windowToken, id) => appService.closePanelTab(id),
@@ -22,8 +22,8 @@ const hosts = createNativePanelHosts({
 const stop = watch(() => PLUGIN_MANIFEST.filter(panel => store.panels[panel.id].open),
   panels => hosts.reconcile(panels), { immediate: true });
 function closed(payload) {
-  if (!payload?.panelId) return;
-  if (hosts.closed(payload.panelId, payload.windowToken)) store.closePanel(payload.panelId);
+  if (!payload?.panel_id) return;
+  if (hosts.closed(payload.panel_id, payload.window_token)) store.closePanel(payload.panel_id);
 }
 const stopClosed = appService.onWindowClosed(closed);
 const focusPanel = id => { void hosts.focusPanel(id).catch(error => console.error('[NativeDock] focus failed', error)); };

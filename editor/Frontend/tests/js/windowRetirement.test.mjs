@@ -16,7 +16,6 @@ import { worldModeService, worldModeState } from '../../src/services/worldModeSe
 
 function nativeSurface(t) {
   t.mock.method(editorApi.scene, 'readActive', async () => ({ archive_session: '' }));
-  t.mock.method(editorApi.scripts, 'getStatus', async () => ({ status: 'idle' }));
   const sent = [], barriers = [];
   const surface = {
     // The plural close is the retirement fence, so it is the one that waits for a reply.
@@ -132,7 +131,6 @@ test('launcher and watcher save the old archive in every Web document before nat
     return new Promise(resolve => { release = resolve; });
   } });
   t.after(() => { state.dispose(); peer.dispose(); messages.dispose(); });
-  t.mock.method(editorApi.scripts, 'getStatus', async () => ({ status: 'idle' }));
   t.mock.method(editorApi.project, 'openProject', async () => {
     assert.equal(calls, 1); opens++; archive = 'new-archive'; return { ok: true, path: 'new' };
   });
@@ -161,7 +159,6 @@ test('launcher blocks on a failed unmounted graph and saves retained state on ex
   const { surface, barriers, barrierReply } = nativeSurface(t);
   let archive = 'old-archive', succeed = false, calls = 0, opens = 0;
   t.mock.method(editorApi.scene, 'readActive', async () => ({ archive_session: archive }));
-  t.mock.method(editorApi.scripts, 'getStatus', async () => ({ status: 'idle' }));
   t.mock.method(editorApi.projectSettings, 'getActiveProjectInfo', async () => ({ project_path: opens ? 'new' : 'old', mode: 'creative' }));
   await worldModeService.resolve('old', { force: true });
   const messages = getWebMessages(surface);

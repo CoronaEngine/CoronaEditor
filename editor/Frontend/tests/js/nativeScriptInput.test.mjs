@@ -11,7 +11,7 @@ test('input facade calls the one native V8 binding without the legacy routes', a
   const event = { archive_session: 'world', type: 'keyDown', code: 'KeyJ', key: 'd', modifiers: '' };
   assert.deepEqual(await editorApi.input.dispatch('scene.ini', 'main-camera', event), { status: 'queued' });
   assert.deepEqual(calls, [['scene.ini', 'main-camera', event]]);
-  for (const name of ['sendKeyEvent', 'sendKeyUpEvent', 'sendMouseEvent']) assert.equal(name in editorApi.scripts, false);
+  assert.equal(editorApi.scripts, undefined, 'the scripts facade is gone');
 });
 
 test('pointer input uses scoped native event objects with viewport coordinates', async () => {

@@ -266,7 +266,6 @@ test('legacy projects open only after safe cleanup and can retry genuine failure
     worldModeService.invalidate();
   });
   t.mock.method(editorApi.projectSettings, 'getActiveProjectInfo', async () => info(activePath, activeMode));
-  t.mock.method(editorApi.scripts, 'getStatus', async () => ({ runId: 'current', threadAlive: true }));
   t.mock.method(editorApi.scripts, 'stop', async (id, restore) => { calls.push(`script:${restore}`); return stopResult; });
   t.mock.method(editorApi.project, 'openProject', async path => {
     calls.push(`open:${path}`);

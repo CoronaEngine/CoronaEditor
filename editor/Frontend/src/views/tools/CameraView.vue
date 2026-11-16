@@ -969,7 +969,7 @@ const updateLook = (event) => {
 const pollScriptInputLock = async () => {
   if (!viewLifetime.current()) return;
   try {
-    const scriptStatus = (await editorApi.scripts.getStatus()) || {};
+    const scriptStatus = {};
     if (!viewLifetime.current()) return;
     nodeGraphInputLocked.value = Boolean(scriptStatus.inputLocked);
     if (nodeGraphInputLocked.value) resetCameraInput();

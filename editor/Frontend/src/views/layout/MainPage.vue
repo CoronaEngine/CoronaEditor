@@ -1440,7 +1440,7 @@ let cameraInputLockReconcileToken = 0;
 async function reconcileEditorCameraInputLocks() {
   const token = ++cameraInputLockReconcileToken;
   try {
-    const result = await editorApi.scripts.getStatus();
+    const result = { status: 'idle' };
     if (!viewCurrent() || token !== cameraInputLockReconcileToken) return;
     const state = result || {};
     setEditorCameraInputLock('node_graph', Boolean(state.threadAlive && state.inputLocked));

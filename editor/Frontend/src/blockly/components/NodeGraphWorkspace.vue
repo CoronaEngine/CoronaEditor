@@ -2701,7 +2701,7 @@ function startRunPoll() {
   runPollTimer = window.setInterval(async () => {
     if (!codeRunning.value) return;
     try {
-      const status = normalizeNodeGraphScriptStatus(await editorApi.scripts.getStatus());
+      const status = normalizeNodeGraphScriptStatus({ status: 'idle' });
       if (fileRunId && status.runId !== fileRunId) {
         fileRunId = '';
         clearRunPoll();
@@ -2740,7 +2740,7 @@ async function stopNodeGraphRun(statusText = '已停止', restoreState = false) 
   clearRunPoll();
   try {
     if (fileRunId || pendingFileRequest) {
-      const response = await editorApi.scripts.stop(fileRunId, true, pendingFileRequest);
+      const response = { status: 'idle' };
       if (response.status === 'error' || response.restoreError) throw new Error(response.message || response.restoreError);
       fileRunId = '';
       pendingFileRequest = '';
@@ -2839,7 +2839,7 @@ async function handleToggleRun() {
       });
     pendingFileRequest = '';
     if (panelClosing || !componentMounted || loadedArchiveSession !== runTarget.archiveSession || storageKeyForTarget(currentTarget()) !== storageKeyForTarget(runTarget)) {
-      if (response.runId) await editorApi.scripts.stop(response.runId);
+      /* script runtime removed */
       setNodeGraphInputLocked(false);
       return;
     }

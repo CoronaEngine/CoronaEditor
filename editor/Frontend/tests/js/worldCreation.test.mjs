@@ -70,7 +70,6 @@ async function mountCreationPage(t, { stopResult = idle(), networkError } = {}) 
     if (networkError) throw networkError;
     return { ok: true };
   });
-  t.mock.method(editorApi.scripts, 'getStatus', async () => ({ runId: 'current', snapshotCaptured: true }));
   t.mock.method(editorApi.scripts, 'stop', async (id, restore) => {
     calls.push(['script', restore]);
     return await scriptResult;

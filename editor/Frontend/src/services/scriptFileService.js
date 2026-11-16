@@ -7,7 +7,7 @@ export async function readScriptProject() {
   return { project_path: state.project_path, archive_session: state.archive_session };
 }
 
-export async function startScriptFile(request, scripts = editorApi.scripts) {
+export async function startScriptFile(request, scripts = null) {
   try {
     return await scripts.runFile(request);
   } catch (error) {

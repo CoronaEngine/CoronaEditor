@@ -36,7 +36,7 @@ test('project documents route through the bridge with revision-only identity', a
   const documents = calls.filter(call => call[1] === 'read_document' || call[1] === 'commit_document');
   assert.deepEqual(documents.map(call => call[1]), ['read_document', 'commit_document']);
   for (const [service, , args] of documents) {
-    assert.equal(service, 'ProjectArchive');
+    assert.equal(service, 'project_archive');
     assert.equal(args[0].archive_session, 'a');
     assert.equal(args[0].project_path, 'P:/世界');
     assert.equal(args[0].document, 'notes.json');
@@ -56,7 +56,7 @@ test('active project info composes the scene primitive with archive metadata', a
     archive_session: 'a', read_only: false,
   });
   assert.deepEqual(calls[0], ['readActive']);
-  assert.deepEqual(calls[1], ['ProjectArchive', 'project_info', [{ path: 'P:/世界' }]]);
+  assert.deepEqual(calls[1], ['project_archive', 'project_info', [{ path: 'P:/世界' }]]);
 });
 
 test('read-only projects keep the synthetic info shape without archive metadata', async t => {

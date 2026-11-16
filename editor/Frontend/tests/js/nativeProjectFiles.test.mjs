@@ -15,8 +15,8 @@ test('project document facades call the Python bridge and parse its records', as
   assert.deepEqual(await editorApi.projectFiles.save(scope), record);
   assert.deepEqual(await editorApi.projectFiles.load(scope), record);
   assert.deepEqual(calls, [
-    { service: 'ProjectFiles', function: 'save', args: [scope] },
-    { service: 'ProjectFiles', function: 'load', args: [scope] },
+    { service: 'project_files', function: 'save', args: [scope] },
+    { service: 'project_files', function: 'load', args: [scope] },
   ]);
 });
 

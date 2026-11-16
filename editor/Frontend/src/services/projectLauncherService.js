@@ -46,20 +46,7 @@ function worldRuntimeCleanupError(kind, result) {
 // Finish restoring the OLD scene before native open replaces it. Never run a
 // stop/restore against the new scene, and fail closed if workers persist.
 export async function stopWorldRuntimeBeforeOpen(api = editorApi) {
-  const status = await api.scripts.getStatus();
-  if ((typeof status?.status !== 'string' && typeof status?.runId !== 'string') || Object.hasOwn(status, 'data'))
-    throw new Error('无法读取旧世界脚本状态，已取消切换世界。');
-  if (!status.runId || !(status.threadAlive || status.snapshotCaptured || status.inputLocked)) return;
-  const script = await api.scripts.stop(status.runId, true);
-  if (typeof script?.status !== 'string' || Object.hasOwn(script, 'data'))
-    throw new Error('无法确认旧世界脚本已停止，已取消切换世界。');
-  // restored=false is normal when no script ever ran or a prior stop already
-  // consumed the snapshot. Only live work, retained snapshots, and real errors block opening.
-  if (['error', 'starting', 'running', 'stopping'].includes(script?.status)
-    || script?.threadAlive || script?.pendingThreads?.length || script?.snapshotCaptured
-    || ['error', 'restoring'].includes(script?.restoreStatus) || script?.restoreError) {
-    throw worldRuntimeCleanupError('脚本', script);
-  }
+  // The script runtime is gone: no script run can survive a world switch.
 }
 
 export const projectLauncherService = {

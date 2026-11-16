@@ -25,9 +25,9 @@ test('file operations reach the Python archive service through the bridge', asyn
   assert.equal(await editorApi.files.deleteItem(request), true);
   assert.deepEqual(await editorApi.project.openDocument(request), { ok: true });
   assert.deepEqual(calls.at(-1), ['openDocument', request]);
-  const ops = calls.filter(call => call.service === 'ProjectArchive').map(call => call.args[0].op);
+  const ops = calls.filter(call => call.service === 'project_archive').map(call => call.args[0].op);
   assert.deepEqual(ops, ['get_file_tree', 'create_folder', 'create_file', 'rename_item', 'delete_item']);
-  for (const message of calls.filter(call => call.service === 'ProjectArchive')) {
+  for (const message of calls.filter(call => call.service === 'project_archive')) {
     assert.equal(message.args[0].archive_session, 'lease');
     assert.equal(message.args[0].project_path, 'P:/世界');
   }
