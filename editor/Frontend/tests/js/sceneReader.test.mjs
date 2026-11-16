@@ -20,7 +20,7 @@ test('paused windows issue no queries and resume independently', async t => {
     const calls = [], seen = [];
     const reader = createSceneReader(async (method, scope) => {
       calls.push(method);
-      if (method === 'readActive') return { archive_session: 'A', selection: { actor_guid: 'g' } };
+      if (method === 'read_active') return { archive_session: 'A', selection: { actor_guid: 'g' } };
       assert.deepEqual(scope, { archive_session: 'A', actors: ['g'] });
       return { actors: [{ actor_guid: 'g', position: [position, 0, 0] }] };
     }, 4);
@@ -77,8 +77,8 @@ test('the production observer chain samples transforms through the direct scene 
   globalThis.document = { hidden: false };
   globalThis.window = { corona: {
     scene: {
-      readActive: async () => ({ archive_session: 'A', selection: { actor_guid: 'actor' } }),
-      readTransforms: async scope => {
+      read_active: async () => ({ archive_session: 'A', selection: { actor_guid: 'actor' } }),
+      read_transforms: async scope => {
         directReads++;
         assert.deepEqual(scope, { archive_session: 'A', actors: ['actor'] });
         return { actors: [{ actor_guid: 'actor', position: [1, 2, 3] }] };

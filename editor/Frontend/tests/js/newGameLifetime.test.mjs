@@ -27,10 +27,10 @@ function mount(t, overrides = {}) {
     'notifyWorldError', 'initializeWorldTasks', 'translateUiText', 'window', 'alert', compiled)(
     ref, fn => { mounted = fn; }, fn => { unmounted = fn; }, createViewLifetime,
     () => ({ push: path => routes.push(path), replace: path => routes.push(path) }),
-    { project: { getProjectLoadStatus: invoke('status', { archive_service_ready: true }),
-      createWorldProject: invoke('create', { path: 'fixture' }), ...overrides.project },
+    { project: { get_project_load_status: invoke('status', { archive_service_ready: true }),
+      create_world_project: invoke('create', { path: 'fixture' }), ...overrides.project },
     projectSettings: { getActiveProjectInfo: invoke('activation', { project_path: 'fixture' }), ...overrides.settings } },
-    world, { openProject: overrides.open || invoke('open', { ok: true }) }, result => result?.status === 'superseded',
+    world, { open_project: overrides.open || invoke('open', { ok: true }) }, result => result?.status === 'superseded',
     () => {}, error => alerts.push(error), overrides.tasks || invoke('tasks', {}),
     text => text, surface, message => alerts.push(message));
   const state = component.setup({}, { expose() {} });
@@ -46,7 +46,7 @@ for (const outcome of ['success', 'failure']) {
   test(`NewGame ignores retired archive readiness ${outcome}`, async t => {
     const pending = deferred();
     let reads = 0;
-    const page = mount(t, { project: { getProjectLoadStatus: () => { reads++; return pending.promise; } } });
+    const page = mount(t, { project: { get_project_load_status: () => { reads++; return pending.promise; } } });
     const reading = page.state.refreshArchiveReady();
     page.dispose(); page.state.archiveReady.value = true;
     if (outcome === 'success') pending.resolve({ archive_service_ready: false });
@@ -86,7 +86,7 @@ for (const stage of ['create', 'open', 'tasks']) {
   for (const outcome of ['success', 'failure']) {
     test(`NewGame ${stage} ${outcome} after retirement cannot update busy state or navigate`, async t => {
       const pending = deferred();
-      const page = mount(t, stage === 'create' ? { project: { createWorldProject: () => pending.promise } }
+      const page = mount(t, stage === 'create' ? { project: { create_world_project: () => pending.promise } }
         : stage === 'open' ? { open: () => pending.promise }
           : { tasks: () => pending.promise });
       await page.ready();

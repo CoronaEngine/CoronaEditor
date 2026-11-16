@@ -59,10 +59,10 @@ function setup(overrides = {}) {
   const api = {
     skeleton: async () => ({ is_skinned: true, leaves: ['Foot'] }),
     ik: async () => config(),
-    setActorIkChains: async (_scene, _actor, chains, revision) => config(chains, revision + 1),
+    set_actor_ik_chains: async (_scene, _actor, chains, revision) => config(chains, revision + 1),
     ...overrides,
   };
-  api.readActorRig = async (...args) => {
+  api.read_actor_rig = async (...args) => {
     const [skeleton, ik] = await Promise.all([api.skeleton(...args), api.ik(...args)]);
     return { skeleton, ik };
   };
@@ -135,7 +135,7 @@ test('writes serialize and coalesce latest edits using the acknowledged revision
   const requests = [];
   const replies = [deferred(), deferred()];
   const { controller, state } = setup({
-    setActorIkChains: (...args) => {
+    set_actor_ik_chains: (...args) => {
       requests.push(args);
       return replies[requests.length - 1].promise;
     },
@@ -177,7 +177,7 @@ test('switching actor discards queued writes and ignores the in-flight old respo
   const { controller, state } = setup({
     skeleton: async () => ({ leaves: ['A', 'B'] }),
     ik: async (_scene, actor) => config([chain(actor)], actor === 'B' ? 20 : 4),
-    setActorIkChains: (...args) => {
+    set_actor_ik_chains: (...args) => {
       requests.push(args);
       return oldReply.promise;
     },
@@ -199,7 +199,7 @@ test('switching actor discards queued writes and ignores the in-flight old respo
 test('removing the final foot sends an empty replacement and retains an empty editor', async () => {
   const requests = [];
   const { controller, state } = setup({
-    setActorIkChains: async (...args) => {
+    set_actor_ik_chains: async (...args) => {
       requests.push(args);
       return config([], args[3] + 1);
     },
@@ -216,7 +216,7 @@ test('failed updates stop the queue until explicit refresh acquires a current re
   let revision = 1;
   const { controller, state } = setup({
     ik: async () => config([chain()], revision),
-    setActorIkChains: async () => {
+    set_actor_ik_chains: async () => {
       attempts += 1;
       throw new Error('409 revision conflict');
     },
@@ -238,7 +238,7 @@ test('a resource readiness failure cannot expose a writable empty draft', async 
   let writes = 0;
   const { controller, state } = setup({
     ik: async () => ({ ready: false, is_skinned: true }),
-    setActorIkChains: async () => {
+    set_actor_ik_chains: async () => {
       writes += 1;
     },
   });
@@ -278,7 +278,7 @@ test('legacy non-leaf Foot configuration stays visible and editable until explic
       { name: 'Toe', parent: 1, leaf: true },
     ] }),
     ik: async () => config([chain('Ankle')]),
-    setActorIkChains: async (_scene, _actor, chains, revision) => {
+    set_actor_ik_chains: async (_scene, _actor, chains, revision) => {
       writes.push(chains);
       return config(chains, revision + 1);
     },

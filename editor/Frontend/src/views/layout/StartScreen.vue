@@ -187,7 +187,7 @@ const confirmExit = () => {
     onComplete: () => {
       if (!viewLifetime.current()) return;
       showPanel.value = false;
-      appService.closeProcess();
+      appService.close_process();
     },
   }));
 };

@@ -28,7 +28,7 @@ const declarations = babelParse(source, { sourceType: 'module' }).program.body
 function mount(write) {
   const errors = [], calls = [], reads = [];
   const deps = { ref, computed, initializeWorldRenderBackend, worldModeState: { status: 'ready', mode: 'creative' }, ...visionModes, DEFAULT_SCENE_NAME: 'scene.ini',
-    editorApi: { scene: { setCameraRenderSettings: (...args) => { calls.push(args); return write(...args); } } },
+    editorApi: { scene: { set_camera_render_settings: (...args) => { calls.push(args); return write(...args); } } },
     logError: (...args) => errors.push(args), syncSceneCameraBinding: async (...args) => reads.push(args),
     resetRealtimeCameraInput() {}, scheduleCameraViewportSync() {}, syncViewportUiMode() {}, scheduleCameraUpdate() {},
     isRealtimeCameraInputActive: () => false };

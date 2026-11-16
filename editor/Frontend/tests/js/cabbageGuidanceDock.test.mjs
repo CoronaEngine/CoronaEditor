@@ -28,7 +28,7 @@ const nodeGuidance = {
 };
 
 async function fixture(t, panelId = 'MainPage') {
-  t.mock.method(editorApi.scene, 'readActive', async () => ({ archive_session: '' }));
+  t.mock.method(editorApi.scene, 'read_active', async () => ({ archive_session: '' }));
   const previous = { window: globalThis.window, document: globalThis.document, mode: { ...worldModeState } };
   const commands = [], events = [];
   const window = Object.assign(new EventTarget(), {

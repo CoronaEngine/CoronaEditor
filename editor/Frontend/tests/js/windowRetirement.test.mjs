@@ -9,13 +9,13 @@ import { setImmediate } from 'node:timers/promises';
 import { watch, nextTick } from 'vue';
 import { editorApi } from '../../src/api/editorApi.js';
 
-test.beforeEach(t => t.mock.method(editorApi.network, 'stopSession', async () => ({ ok: true })));
+test.beforeEach(t => t.mock.method(editorApi.network, 'stop_session', async () => ({ ok: true })));
 import { appService } from '../../src/services/appService.js';
 import { projectLauncherService } from '../../src/services/projectLauncherService.js';
 import { worldModeService, worldModeState } from '../../src/services/worldModeService.js';
 
 function nativeSurface(t) {
-  t.mock.method(editorApi.scene, 'readActive', async () => ({ archive_session: '' }));
+  t.mock.method(editorApi.scene, 'read_active', async () => ({ archive_session: '' }));
   const sent = [], barriers = [];
   const surface = {
     // The plural close is the retirement fence, so it is the one that waits for a reply.
@@ -23,9 +23,9 @@ function nativeSurface(t) {
     corona: { window: { close: identity => (identity && 'scene_id' in identity)
       ? new Promise((resolve, reject) => barriers.push({ scene_id: identity.scene_id, resolve, reject }))
       : (sent.push(['close', identity]), Promise.resolve(true)),
-      onCloseRequested: () => () => {} } },
+      on_close_requested: () => () => {} } },
     localStorage: memoryStorage(), sessionStorage: memoryStorage(), location: { hash: '#/' }, dispatchEvent() {} };
-  surface.corona.window.setWindowPresentation = async (...args) => { sent.push(['setWindowPresentation', ...args]); return true; };
+  surface.corona.window.set_window_presentation = async (...args) => { sent.push(['set_window_presentation', ...args]); return true; };
   const previous = globalThis.window;
   globalThis.window = surface;
   t.after(() => { getWebMessages(surface).dispose(); globalThis.window = previous; });
@@ -42,7 +42,7 @@ async function waitForBarrier(barriers, index) {
 test('real Vue watcher and launcher concurrent cleanup opens native project once', async (t) => {
   const { barriers: sent, barrierReply: reply } = nativeSurface(t);
   let nativeOpens = 0;
-  t.mock.method(editorApi.project, 'openProject', async path => { nativeOpens++; return { ok: true, path }; });
+  t.mock.method(editorApi.project, 'open_project', async path => { nativeOpens++; return { ok: true, path }; });
   t.mock.method(editorApi.projectSettings, 'getActiveProjectInfo', async () => ({ project_path: 'story', mode: 'story' }));
   worldModeService.invalidate();
   const watched = [];
@@ -50,7 +50,7 @@ test('real Vue watcher and launcher concurrent cleanup opens native project once
     if (worldModeState.status === 'loading') watched.push(appService.setEditorUiEnabled(false));
   });
   t.after(stop);
-  const opened = projectLauncherService.openProject('story');
+  const opened = projectLauncherService.open_project('story');
   await nextTick(); await waitForBarrier(sent, 0);
   assert.equal(sent.length, 1); // watcher and launcher share the same retirement
   reply(0); await waitForBarrier(sent, 1);
@@ -72,14 +72,14 @@ test('real Vue watcher and launcher concurrent cleanup opens native project once
 test('failed retirement blocks opening but leaves queue available for retry', async (t) => {
   const { barriers: sent, barrierReply: reply } = nativeSurface(t);
   let opens = 0;
-  t.mock.method(editorApi.project, 'openProject', async path => { opens++; return { ok: true, path }; });
+  t.mock.method(editorApi.project, 'open_project', async path => { opens++; return { ok: true, path }; });
   t.mock.method(editorApi.projectSettings, 'getActiveProjectInfo', async () => ({ project_path: 'story', mode: 'story' }));
   worldModeService.invalidate();
-  const failed = projectLauncherService.openProject('story');
+  const failed = projectLauncherService.open_project('story');
   const rejected = assert.rejects(failed, /retirement failed/);
   await waitForBarrier(sent, 0); reply(0, 'retirement failed'); await rejected;
   assert.equal(opens, 0); assert.equal(worldModeService.opening, false);
-  const retry = projectLauncherService.openProject('story');
+  const retry = projectLauncherService.open_project('story');
   await waitForBarrier(sent, 1); reply(1);
   await waitForBarrier(sent, 2); reply(2); await retry;
   assert.equal(opens, 1); assert.equal(worldModeService.opening, false);
@@ -108,7 +108,7 @@ test('retired camera surfaces cannot queue controls against the next creative wo
 test('launcher and watcher save the old archive in every Web document before native retirement or scene replacement', async t => {
   const { surface, barriers, barrierReply } = nativeSurface(t);
   let archive = 'old-archive', release;
-  t.mock.method(editorApi.scene, 'readActive', async () => ({ archive_session: archive }));
+  t.mock.method(editorApi.scene, 'read_active', async () => ({ archive_session: archive }));
   t.mock.method(editorApi.projectSettings, 'getActiveProjectInfo', async () => ({ project_path: 'old', mode: 'creative' }));
   await worldModeService.resolve('old', { force: true });
   let next = 0;
@@ -131,7 +131,7 @@ test('launcher and watcher save the old archive in every Web document before nat
     return new Promise(resolve => { release = resolve; });
   } });
   t.after(() => { state.dispose(); peer.dispose(); messages.dispose(); });
-  t.mock.method(editorApi.project, 'openProject', async () => {
+  t.mock.method(editorApi.project, 'open_project', async () => {
     assert.equal(calls, 1); opens++; archive = 'new-archive'; return { ok: true, path: 'new' };
   });
   t.mock.method(editorApi.projectSettings, 'getActiveProjectInfo', async () => ({ project_path: opens ? 'new' : 'old', mode: 'creative' }));
@@ -141,7 +141,7 @@ test('launcher and watcher save the old archive in every Web document before nat
   });
   t.after(stop);
   const barrierCount = barriers.length;
-  const opening = projectLauncherService.openProject('new');
+  const opening = projectLauncherService.open_project('new');
   for(let i=0;i<60 && !release;i++) await new Promise(resolve => setTimeout(resolve,5));
   assert.equal(calls, 1, 'the independent Dock must participate through Web messages');
   assert.equal(barriers.length, barrierCount, 'native retirement cannot start before the old archive save finishes');
@@ -158,7 +158,7 @@ test('launcher and watcher save the old archive in every Web document before nat
 test('launcher blocks on a failed unmounted graph and saves retained state on explicit retry', async t => {
   const { surface, barriers, barrierReply } = nativeSurface(t);
   let archive = 'old-archive', succeed = false, calls = 0, opens = 0;
-  t.mock.method(editorApi.scene, 'readActive', async () => ({ archive_session: archive }));
+  t.mock.method(editorApi.scene, 'read_active', async () => ({ archive_session: archive }));
   t.mock.method(editorApi.projectSettings, 'getActiveProjectInfo', async () => ({ project_path: opens ? 'new' : 'old', mode: 'creative' }));
   await worldModeService.resolve('old', { force: true });
   const messages = getWebMessages(surface);
@@ -167,16 +167,16 @@ test('launcher blocks on a failed unmounted graph and saves retained state on ex
     getSession: () => 'old-archive', flush: async () => { calls++; return succeed; },
   });
   await assert.rejects(registration.retire(), { code: 'GRAPH_SAVE_FAILED' });
-  t.mock.method(editorApi.project, 'openProject', async () => {
+  t.mock.method(editorApi.project, 'open_project', async () => {
     opens++; archive = 'new-archive'; return { ok: true, path: 'new' };
   });
-  await assert.rejects(projectLauncherService.openProject('new'), { code: 'GRAPH_SAVE_FAILED' });
+  await assert.rejects(projectLauncherService.open_project('new'), { code: 'GRAPH_SAVE_FAILED' });
   assert.equal(opens, 0);
   assert.equal(barriers.length, 0, 'failed save cannot retire native documents');
   assert.equal(calls, 2);
   succeed = true;
   let settled = false, next = 0;
-  const retry = projectLauncherService.openProject('new');
+  const retry = projectLauncherService.open_project('new');
   retry.then(() => { settled = true; }, () => { settled = true; });
   for (let i = 0; i < 400 && !settled; i++) {
     await new Promise(resolve => setTimeout(resolve, 5));
@@ -191,7 +191,7 @@ test('launcher blocks on a failed unmounted graph and saves retained state on ex
 test('an active native archive change during graph saving rejects the world switch result', async t => {
   const { surface } = nativeSurface(t);
   let archive = 'old-archive', release;
-  t.mock.method(editorApi.scene, 'readActive', async () => ({ archive_session: archive }));
+  t.mock.method(editorApi.scene, 'read_active', async () => ({ archive_session: archive }));
   const messages = getWebMessages(surface);
   t.after(() => messages.dispose());
   getNodeGraphSaves(surface).register({ getSession: () => 'old-archive',

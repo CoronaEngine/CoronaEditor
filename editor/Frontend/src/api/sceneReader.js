@@ -35,7 +35,7 @@ export function createSceneReader(query, intervalMs = 180) {
     active = true;
     const epoch = generation;
     try {
-      const state = await query('readActive');
+      const state = await query('read_active');
       if (epoch !== generation) return;
       const session = state.archive_session;
       if (!session) return;
@@ -47,7 +47,7 @@ export function createSceneReader(query, intervalMs = 180) {
 
       const kinds = new Set(Array.from(listeners.values(), e => e.kind));
       if (kinds.has('transform') && selection.actor_guid && epoch === generation) {
-        const values = await query('readTransforms', { ...scope, actors: [selection.actor_guid] });
+        const values = await query('read_transforms', { ...scope, actors: [selection.actor_guid] });
         for (const actor of values.actors) {
           publish('transform', session + transformKey(actor), { ...actor, ...scope }, epoch);
         }

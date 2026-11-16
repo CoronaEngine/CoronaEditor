@@ -31,7 +31,7 @@ test('SceneBar camera list preserves archive identity through the application wi
     localStorage: memoryStorage(), sessionStorage: memoryStorage(), location: { hash: '#/' },
     corona: { window: {
       close: async () => ({ closed: 0 }),
-      createPanel: async options => {
+      create_panel: async options => {
         assert.equal(options.kind, 'camera');
         assert.equal(options.archiveSession, 'observed-archive');
         assert.equal(new URLSearchParams(options.routePath.split('?')[1]).get('archive'), 'observed-archive');
@@ -45,7 +45,7 @@ test('SceneBar camera list preserves archive identity through the application wi
     } },
   };
   Object.assign(worldModeState, { status: 'ready', mode: 'creative', revision: 1 });
-  t.mock.method(editorApi.scene, 'readActive', async () => ({ archive_session: 'observed-archive' }));
+  t.mock.method(editorApi.scene, 'read_active', async () => ({ archive_session: 'observed-archive' }));
   const { appService } = await import('../../src/services/appService.js');
   await appService.setEditorUiEnabled(true);
   const sceneCameras = ref([]);
@@ -113,7 +113,7 @@ test('retired camera window state toggles are absent and camera object creation 
   assert.equal(editorApi.sceneTools?.openCameraView, undefined);
   assert.equal(editorApi.sceneTools?.closeCameraView, undefined);
   assert.equal(editorApi.sceneTools?.createCameraView, undefined);
-  assert.equal(typeof editorApi.scene.createCamera, 'function');
+  assert.equal(typeof editorApi.scene.create_camera, 'function');
 });
 
 test('new camera object creation is archive scoped and opens its surface only after native success', async () => {
@@ -122,7 +122,7 @@ test('new camera object creation is archive scoped and opens its surface only af
   const create = handler('sidebar/SceneBar', 'ImportCamera', {
     ShowModelDropdown: ref(true), sceneCameras: ref([{ name: 'Camera' }]), currentSceneName: ref('scene'),
     archiveSession: ref('archive'), selectedCameraName: ref(''),
-    editorApi: { scene: { createCamera: async (...args) => { calls.push(['object', ...args]); return { camera: created }; } } },
+    editorApi: { scene: { create_camera: async (...args) => { calls.push(['object', ...args]); return { camera: created }; } } },
     appService: { createCameraView: async value => calls.push(['window', value]) },
     OnInitObjTree: async () => calls.push(['refresh']), logError: (...args) => errors.push(args),
   });

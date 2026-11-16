@@ -28,16 +28,16 @@ const windowCommandOps = {
   closeThisTab: () => editorApi.window.close(),
   closePanelTab: parameters => editorApi.window.close(parameters),
   focusPanelTab: parameters => editorApi.window.focus(parameters),
-  createPanelTab: parameters => editorApi.window.createPanel(parameters),
+  createPanelTab: parameters => editorApi.window.create_panel(parameters),
   // The plural form of close: every camera view of that scene, and the two-turn fence.
   suspendCameraViews: parameters => editorApi.window.close(parameters),
   closeCameraView: parameters => editorApi.window.close(parameters),
   cycleThisCameraViewWindowMode: parameters =>
-    editorApi.window.setWindowPresentation({ ...parameters, mode: 'toggle' }),
-  setThisCameraViewPresentation: parameters => editorApi.window.setWindowPresentation(parameters),
+    editorApi.window.set_window_presentation({ ...parameters, mode: 'toggle' }),
+  setThisCameraViewPresentation: parameters => editorApi.window.set_window_presentation(parameters),
   // A size is a presentation too, so it rides the same entry as the modes.
-  resizeThisCameraView: parameters => editorApi.window.setWindowPresentation(parameters),
-  createCameraView: parameters => editorApi.window.createPanel({ ...parameters, kind: 'camera' }),
+  resizeThisCameraView: parameters => editorApi.window.set_window_presentation(parameters),
+  createCameraView: parameters => editorApi.window.create_panel({ ...parameters, kind: 'camera' }),
 };
 function sendWindowCommand(command) {
   const op = windowCommandOps[command.cmd];
@@ -84,8 +84,8 @@ export const appService = {
   // The facade hands the native subscription straight through, so the returned
   // unsubscribe is the native one. The payload uses the wire spelling (snake_case),
   // the same one every reply carries.
-  onWindowClosed: callback => editorApi.window.onClosed(callback),
-  onWindowCloseRequested: callback => editorApi.window.onCloseRequested(callback),
+  onWindowClosed: callback => editorApi.window.on_closed(callback),
+  onWindowCloseRequested: callback => editorApi.window.on_close_requested(callback),
   openNativePanel: options => openEditorWindow({ cmd: 'createPanelTab', ...options }),
   closeThisTab: (panel_id) => session().closeThis(panel_id),
   // Panel identity is the stable panel id, not the transient tab id a reply carried.
@@ -99,7 +99,7 @@ export const appService = {
   setThisCameraViewPresentation: (mode, scene_id = '', camera_id = '') =>
     openEditorWindow({ cmd: 'setThisCameraViewPresentation', mode, scene_id, camera_id }),
   toggleMainWindowBorderless: () =>
-    editorApi.window.setWindowPresentation({ target: 'main', mode: 'toggle' }),
+    editorApi.window.set_window_presentation({ target: 'main', mode: 'toggle' }),
   resizeThisCameraView: (width, height, scene_id = '', camera_id = '') =>
     openEditorWindow({ cmd: 'resizeThisCameraView', width, height, scene_id, camera_id }),
   createCameraView: (camera) =>
@@ -119,5 +119,5 @@ export const appService = {
   suspendCameraViews: (scene_id) => editorApi.window.close({ scene_id }),
   crossTabBroadcast: (event, payload) =>
     session().broadcast(event, payload),
-  closeProcess: () => editorApi.app.closeProcess(),
+  close_process: () => editorApi.app.close_process(),
 };

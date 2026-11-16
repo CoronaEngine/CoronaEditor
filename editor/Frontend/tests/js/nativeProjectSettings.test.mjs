@@ -4,8 +4,8 @@ import { editorApi } from '../../src/api/editorApi.js';
 
 const install = (window, calls, options = {}) => {
   window.corona = {
-    scene: { readActive: () => {
-      calls.push(['readActive']);
+    scene: { read_active: () => {
+      calls.push(['read_active']);
       return Promise.resolve({ archive_session: 'a', project_path: 'P:/世界', read_only: false, name: '世界' });
     } },
     bridge: { call: envelope => {
@@ -15,7 +15,7 @@ const install = (window, calls, options = {}) => {
         ? { name: '世界', mode: 'creative', prompt: '世界观', project_path: 'P:/世界' }
         : options.receipt));
     } },
-    projectSettings: { saveActiveProjectInfo: value => {
+    projectSettings: { save_active_project_info: value => {
       calls.push(['save', value]);
       return Promise.resolve(options.receipt);
     } },
@@ -55,7 +55,7 @@ test('active project info composes the scene primitive with archive metadata', a
     name: '世界', mode: 'creative', prompt: '世界观', project_path: 'P:/世界',
     archive_session: 'a', read_only: false,
   });
-  assert.deepEqual(calls[0], ['readActive']);
+  assert.deepEqual(calls[0], ['read_active']);
   assert.deepEqual(calls[1], ['project_archive', 'project_info', [{ path: 'P:/世界' }]]);
 });
 
@@ -64,7 +64,7 @@ test('read-only projects keep the synthetic info shape without archive metadata'
   t.after(() => { globalThis.window = previous; });
   const calls = [];
   globalThis.window = { corona: {
-    scene: { readActive: () => Promise.resolve(
+    scene: { read_active: () => Promise.resolve(
       { archive_session: 'a', project_path: 'P:/外部', read_only: true, name: '外部场景' }) },
     bridge: { call: () => { throw Error('metadata must not be read for read-only scenes'); } },
   } };

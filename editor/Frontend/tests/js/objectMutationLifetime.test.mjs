@@ -19,7 +19,7 @@ function mount(t, overrides = {}) {
   let unmounted;
   const scene = new Proxy({}, { get: (_, method) => (...args) => {
     calls.push({ method, args });
-    return overrides[method] ? overrides[method](...args) : Promise.resolve(method === 'readActorProperties'
+    return overrides[method] ? overrides[method](...args) : Promise.resolve(method === 'read_actor_properties'
       ? { archive_session: args[2].archive_session, scene: args[0], actor_guid: args[1], name: 'First' } : {});
   } });
   const bindings = { computed, reactive, ref, onMounted() {}, onUnmounted: fn => { unmounted = fn; },
@@ -54,8 +54,8 @@ for (const retire of ['unmount', 'actor', 'archive']) {
 
   test(`Object model chooser ignores its reply after ${retire}`, async t => {
     const pending = deferred();
-    const page = mount(t, { selectModelFile: () => pending.promise });
-    const selecting = page.state.selectModelFile();
+    const page = mount(t, { select_model_file: () => pending.promise });
+    const selecting = page.state.select_model_file();
     change(page);
     const before = page.state.actor.modelPath;
     pending.resolve('late.ply'); await selecting;
@@ -64,27 +64,27 @@ for (const retire of ['unmount', 'actor', 'archive']) {
 
   test(`Object resource chooser cannot rebind after ${retire}`, async t => {
     const pending = deferred();
-    const page = mount(t, { selectModelFile: () => pending.promise });
+    const page = mount(t, { select_model_file: () => pending.promise });
     const rebinding = page.state.rebindPlaceholderResource();
     change(page);
     pending.resolve('late.ply'); await rebinding;
-    assert.deepEqual(page.calls.map(call => call.method), ['selectModelFile']);
+    assert.deepEqual(page.calls.map(call => call.method), ['select_model_file']);
   });
 
   test(`Object rename success ignores its reply after ${retire}`, async t => {
     const pending = deferred();
-    const page = mount(t, { updateActor: () => pending.promise });
+    const page = mount(t, { update_actor: () => pending.promise });
     const renaming = page.state.commitAlias();
     change(page);
     const before = page.state.actor.name;
     pending.resolve({ new_name: 'late-renamed' }); await renaming;
     assert.equal(page.state.actor.name, before);
-    assert.equal(page.calls.filter(call => call.method === 'readActorProperties').length, 0);
+    assert.equal(page.calls.filter(call => call.method === 'read_actor_properties').length, 0);
   });
 
   test(`Object rename failure cannot replace current draft after ${retire}`, async t => {
     const pending = deferred();
-    const page = mount(t, { updateActor: () => pending.promise });
+    const page = mount(t, { update_actor: () => pending.promise });
     const renaming = page.state.commitAlias();
     change(page);
     const before = page.state.aliasDraft.value;
@@ -97,16 +97,16 @@ for (const retire of ['unmount', 'actor', 'archive']) {
   for (const outcome of ['success', 'failure']) {
     test(`Object native rebind ${outcome} is retired after ${retire}`, async t => {
       const pending = deferred();
-      const page = mount(t, { selectModelFile: async () => 'replacement.ply',
-        rebindActorResource: () => pending.promise });
+      const page = mount(t, { select_model_file: async () => 'replacement.ply',
+        rebind_actor_resource: () => pending.promise });
       const rebinding = page.state.rebindPlaceholderResource();
       await setImmediate();
-      assert.equal(page.calls.at(-1).method, 'rebindActorResource');
+      assert.equal(page.calls.at(-1).method, 'rebind_actor_resource');
       change(page);
       if (outcome === 'success') pending.resolve({ ok: true });
       else pending.reject(new Error('late rebind error'));
       await rebinding;
-      assert.equal(page.calls.filter(call => call.method === 'readActorProperties').length, 0);
+      assert.equal(page.calls.filter(call => call.method === 'read_actor_properties').length, 0);
       assert.equal(page.errors.length, 0);
     });
   }
@@ -114,7 +114,7 @@ for (const retire of ['unmount', 'actor', 'archive']) {
   for (const [method, args] of [['setRenderSpace', [true]], ['setBodyType', ['static']]]) {
     test(`Object ${method} rejection cannot roll back a retired selection after ${retire}`, async t => {
       const pending = deferred();
-      const page = mount(t, { updateActor: () => pending.promise });
+      const page = mount(t, { update_actor: () => pending.promise });
       const editing = page.state[method](...args);
       change(page);
       page.state.actor.followCamera = true;
@@ -130,7 +130,7 @@ for (const retire of ['unmount', 'actor', 'archive']) {
     ['updateLocks', ['SetLinearLock', [true, false, false]]]]) {
     test(`Object ${method} does not record an old operation after ${retire}`, async t => {
       const pending = deferred();
-      const page = mount(t, { updateActor: () => pending.promise });
+      const page = mount(t, { update_actor: () => pending.promise });
       const editing = page.state[method](...args);
       change(page); pending.resolve({}); await editing;
       assert.deepEqual(page.events, []);
@@ -139,7 +139,7 @@ for (const retire of ['unmount', 'actor', 'archive']) {
 
   test(`Object pending transform event cannot describe a new selection after ${retire}`, async t => {
     const pending = deferred();
-    const page = mount(t, { setActorTransform: () => pending.promise });
+    const page = mount(t, { set_actor_transform: () => pending.promise });
     await page.state.applyTransform('SetPosition', 'x');
     page.frame(); await page.timer();
     change(page); pending.resolve({}); await setImmediate();
@@ -163,7 +163,7 @@ for (const retire of ['unmount', 'actor', 'archive']) {
     ['updateCameraLock', []], ['updateCameraLockOffset', []]]) {
     test(`Object ${method} late native failure is ignored after ${retire}`, async t => {
       const pending = deferred();
-      const page = mount(t, { updateActor: () => pending.promise });
+      const page = mount(t, { update_actor: () => pending.promise });
       const editing = page.state[method](...args);
       change(page); pending.reject(new Error('old edit failed')); await editing;
       assert.deepEqual(page.errors, []);
@@ -175,7 +175,7 @@ for (const [method, values, read] of [['setRenderSpace', [true, false, true], pa
   ['setBodyType', ['static', 'kinematic', 'static'], page => page.state.actor.mechanics.bodyType]]) {
   test(`Object ${method} older failure cannot undo a newer same-value edit`, async t => {
     const pending = deferred(); let writes = 0;
-    const page = mount(t, { updateActor: () => ++writes === 1 ? pending.promise : Promise.resolve({}) });
+    const page = mount(t, { update_actor: () => ++writes === 1 ? pending.promise : Promise.resolve({}) });
     const first = page.state[method](values[0]);
     await page.state[method](values[1]); await page.state[method](values[2]);
     pending.reject(new Error('first edit failed')); await first;
@@ -185,7 +185,7 @@ for (const [method, values, read] of [['setRenderSpace', [true, false, true], pa
 }
 
 test('Object refuses to save after its pending native transform failed', async t => {
-  const page = mount(t, { setActorTransform: async () => { throw new Error('transform rejected'); } });
+  const page = mount(t, { set_actor_transform: async () => { throw new Error('transform rejected'); } });
   page.state.scheduleTransform('SetPosition');
   await page.state.saveActor();
   assert.equal(page.calls.filter(call => call.method === 'save').length, 0);
@@ -206,17 +206,17 @@ test('Object new selection releases a previous selection save busy state', async
 
 test('Object native save waits for its captured transform even after unmount', async t => {
   const pending = deferred();
-  const page = mount(t, { setActorTransform: () => pending.promise });
+  const page = mount(t, { set_actor_transform: () => pending.promise });
   page.state.scheduleTransform('SetPosition');
   const saving = page.state.saveActor();
   page.dispose(); pending.resolve({}); await saving;
-  assert.deepEqual(page.calls.map(call => call.method), ['setActorTransform', 'save']);
+  assert.deepEqual(page.calls.map(call => call.method), ['set_actor_transform', 'save']);
   assert.deepEqual(page.saves, []);
 });
 
 test('live Object can correct a failed transform and save the accepted value', async t => {
   let attempts = 0;
-  const page = mount(t, { setActorTransform: async () => {
+  const page = mount(t, { set_actor_transform: async () => {
     if (++attempts === 1) throw new Error('transform rejected');
     return {};
   } });
@@ -226,16 +226,16 @@ test('live Object can correct a failed transform and save the accepted value', a
   page.state.scheduleTransform('SetPosition');
   await page.state.saveActor();
   assert.equal(page.calls.filter(call => call.method === 'save').length, 1);
-  assert.equal(page.calls.filter(call => call.method === 'setActorTransform').at(-1).args[2].position[0], 3);
+  assert.equal(page.calls.filter(call => call.method === 'set_actor_transform').at(-1).args[2].position[0], 3);
   assert.equal(page.saves.length, 1);
 });
 
 test('Object transform event waits for its write when the animation frame has not run', async t => {
   const pending = deferred();
-  const page = mount(t, { setActorTransform: () => pending.promise });
+  const page = mount(t, { set_actor_transform: () => pending.promise });
   await page.state.applyTransform('SetPosition', 'x');
   await page.timer();
-  assert.equal(page.calls.filter(call => call.method === 'setActorTransform').length, 1);
+  assert.equal(page.calls.filter(call => call.method === 'set_actor_transform').length, 1);
   assert.deepEqual(page.events, []);
   pending.resolve({}); await setImmediate();
   assert.equal(page.events.length, 1);
@@ -244,7 +244,7 @@ test('Object transform event waits for its write when the animation frame has no
 
 test('live Object transform event reports its submitted value instead of a later draft', async t => {
   const pending = deferred();
-  const page = mount(t, { setActorTransform: () => pending.promise });
+  const page = mount(t, { set_actor_transform: () => pending.promise });
   page.state.actor.transform.position.x = 2;
   await page.state.applyTransform('SetPosition', 'x');
   page.frame(); await page.timer();
@@ -262,16 +262,16 @@ for (const method of ['setRenderSpace', 'setBodyType', 'updateCameraLock', 'upda
 }
 
 test('live Object resource chooser still rebinds the captured Actor', async t => {
-  const page = mount(t, { selectModelFile: async () => 'replacement.ply' });
+  const page = mount(t, { select_model_file: async () => 'replacement.ply' });
   await page.state.rebindPlaceholderResource();
-  const call = page.calls.find(call => call.method === 'rebindActorResource');
+  const call = page.calls.find(call => call.method === 'rebind_actor_resource');
   assert.deepEqual(call.args, ['scene.ini', 'first-guid', 'replacement.ply', { archive_session: 'archive' }]);
   assert.equal(page.state.placeholderRebinding.value, false);
   assert.equal(page.errors.length, 0);
 });
 
 test('live Object rename clears its busy state and preserves the stable GUID', async t => {
-  const page = mount(t, { updateActor: async () => ({ actor: { name: 'Renamed' } }) });
+  const page = mount(t, { update_actor: async () => ({ actor: { name: 'Renamed' } }) });
   await page.state.commitAlias();
   assert.equal(page.state.actor.name, 'Renamed');
   assert.equal(page.state.actor.actorGuid, 'first-guid');
@@ -280,19 +280,19 @@ test('live Object rename clears its busy state and preserves the stable GUID', a
 
 test('Object selection replacement releases the old resource chooser busy state', async t => {
   const pending = deferred();
-  const page = mount(t, { selectModelFile: () => pending.promise });
+  const page = mount(t, { select_model_file: () => pending.promise });
   const selecting = page.state.rebindPlaceholderResource();
   await page.state.loadActor('scene.ini', 'Second', 'archive', 'second-guid');
   assert.equal(page.state.placeholderRebinding.value, false);
   pending.resolve('late.ply'); await selecting;
-  assert.equal(page.calls.filter(call => call.method === 'rebindActorResource').length, 0);
+  assert.equal(page.calls.filter(call => call.method === 'rebind_actor_resource').length, 0);
 });
 
 test('Object cancelled resource chooser can be opened again', async t => {
   let picks = 0;
-  const page = mount(t, { selectModelFile: async () => ++picks === 1 ? '' : 'replacement.ply' });
+  const page = mount(t, { select_model_file: async () => ++picks === 1 ? '' : 'replacement.ply' });
   await page.state.rebindPlaceholderResource();
   assert.equal(page.state.placeholderRebinding.value, false);
   await page.state.rebindPlaceholderResource();
-  assert.equal(page.calls.filter(call => call.method === 'rebindActorResource').length, 1);
+  assert.equal(page.calls.filter(call => call.method === 'rebind_actor_resource').length, 1);
 });

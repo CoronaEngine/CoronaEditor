@@ -259,8 +259,8 @@ const viewportUiModeItems = [
 const loadCamera = async () => {
   if (!cameraArchiveSession || !viewLifetime.current()) return false;
   const [listResult, visionResult] = await Promise.all([
-    editorApi.scene.readScene({ archive_session: cameraArchiveSession, scene: sceneId, cameras: true }),
-    editorApi.app.isVisionAvailable(),
+    editorApi.scene.read_scene({ archive_session: cameraArchiveSession, scene: sceneId, cameras: true }),
+    editorApi.app.is_vision_available(),
   ]);
   if (!viewLifetime.current() || listResult.archive_session !== cameraArchiveSession || listResult.scene !== sceneId) return false;
   const payload = listResult;
@@ -305,7 +305,7 @@ const loadCamera = async () => {
 const renameCamera = async () => {
   if (!camera.value || !cameraName.value.trim() || cameraName.value === camera.value.name) return;
   try {
-    const result = await editorApi.scene.updateCamera(sceneId, cameraId, {
+    const result = await editorApi.scene.update_camera(sceneId, cameraId, {
       archive_session: cameraArchiveSession,
       name: cameraName.value.trim(),
     });
@@ -319,7 +319,7 @@ const renameCamera = async () => {
 
 const changeBackend = async () => {
   try {
-    const result = await editorApi.scene.setCameraRenderSettings(sceneId, cameraId, {
+    const result = await editorApi.scene.set_camera_render_settings(sceneId, cameraId, {
       archive_session: cameraArchiveSession,
       render_backend: backend.value,
       ...(backend.value === 'vision' ? {
@@ -350,7 +350,7 @@ const selectVisionRenderMode = async (mode) => {
   visionModeMenuOpen.value = false;
   if (visionRenderMode.value === mode && backend.value === 'vision') return;
   try {
-    const result = await editorApi.scene.setCameraRenderSettings(sceneId, cameraId, {
+    const result = await editorApi.scene.set_camera_render_settings(sceneId, cameraId, {
       archive_session: cameraArchiveSession,
       render_backend: 'vision',
       output_mode: 'final_color',
@@ -377,7 +377,7 @@ const toggleVisionAccumulation = async () => {
   visionAccumulation.value = next;
   errorText.value = '';
   try {
-    const result = await editorApi.scene.setCameraRenderSettings(sceneId, cameraId, {
+    const result = await editorApi.scene.set_camera_render_settings(sceneId, cameraId, {
       archive_session: cameraArchiveSession,
       vision: { accumulation: next },
     });
@@ -404,7 +404,7 @@ const toggleVisionDenoise = async () => {
   visionDenoise.value = next;
   errorText.value = '';
   try {
-    const result = await editorApi.scene.setCameraRenderSettings(sceneId, cameraId, {
+    const result = await editorApi.scene.set_camera_render_settings(sceneId, cameraId, {
       archive_session: cameraArchiveSession,
       vision: { denoise: next },
     });
@@ -434,7 +434,7 @@ const selectVisionDenoiser = async (type) => {
   visionDenoiser.value = type;
   errorText.value = '';
   try {
-    const result = await editorApi.scene.setCameraRenderSettings(sceneId, cameraId, {
+    const result = await editorApi.scene.set_camera_render_settings(sceneId, cameraId, {
       archive_session: cameraArchiveSession,
       vision: { denoiser: type },
     });
@@ -469,7 +469,7 @@ const toggleVisionStablePlanes = async () => {
   visionStablePlanes.value = selection.enabled;
   errorText.value = '';
   try {
-    const result = await editorApi.scene.setCameraRenderSettings(sceneId, cameraId, {
+    const result = await editorApi.scene.set_camera_render_settings(sceneId, cameraId, {
       archive_session: cameraArchiveSession,
       vision: { stable_planes: selection.enabled },
     });
@@ -496,7 +496,7 @@ const toggleVisionStablePlanes = async () => {
 const changeOutput = async () => {
   if (backend.value === 'vision') return;
   try {
-    await editorApi.scene.setCameraRenderSettings(sceneId, cameraId, {
+    await editorApi.scene.set_camera_render_settings(sceneId, cameraId, {
       archive_session: cameraArchiveSession,
       output_mode: outputMode.value,
     });
@@ -591,7 +591,7 @@ const saveSettings = async () => {
     // The native host owns the camera's render size: it follows the window's
     // physical pixels each frame. This call only carries the speed, and the
     // resize below re-sizes the window so the render size follows.
-    const result = await editorApi.scene.updateCamera(sceneId, cameraId, {
+    const result = await editorApi.scene.update_camera(sceneId, cameraId, {
       archive_session: camera.value?.archive_session,
       move_speed: Math.max(Number(moveSpeed.value) || 1, 0.01),
     });
@@ -635,7 +635,7 @@ const scheduleWindowSizeSync = () => {
 
 const takeScreenshot = async () => {
   try {
-    await editorApi.viewport.captureScreenshot(sceneId, cameraId, { archive_session: camera.value?.archive_session });
+    await editorApi.viewport.capture_screenshot(sceneId, cameraId, { archive_session: camera.value?.archive_session });
   } catch (error) {
     errorText.value = error.message;
   }
@@ -708,7 +708,7 @@ const flushPose = () => {
   if (isEditorInputLocked()) return;
   const item = camera.value;
   if (!item?.archive_session) return;
-  editorApi.scene.updateCamera(sceneId, cameraId, {
+  editorApi.scene.update_camera(sceneId, cameraId, {
     archive_session: item.archive_session,
     position: Array.from(item.position), forward: Array.from(item.forward),
     world_up: Array.from(item.world_up), fov: item.fov,

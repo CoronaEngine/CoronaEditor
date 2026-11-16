@@ -7,7 +7,7 @@ import { createObserverRuntime } from '../../src/api/observerRuntime.js';
 // scene read chain with idempotent start/dispose and hidden/BFCache recovery
 // (targets WNC-007 / WNC-009). Contract fixed here:
 //   createObserverRuntime({ query, intervalMs }) -> { start, dispose, observe, off }
-//   query('readActive') -> active snapshot; query('readTransforms', scope) -> { actors }
+//   query('read_active') -> active snapshot; query('read_transforms', scope) -> { actors }
 
 function host() {
   const listeners = new Map();

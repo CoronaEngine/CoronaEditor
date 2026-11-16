@@ -161,7 +161,7 @@ export function projectIdentity(payload = {}) {
 }
 
 async function documentScope(projectPath) {
-  const scene = await editorApi.scene.readActive();
+  const scene = await editorApi.scene.read_active();
   if (!scene?.archive_session || normalizePath(scene.project_path) !== normalizePath(projectPath))
     throw new Error('当前世界已切换');
   return { project_path: projectPath, archive_session: scene.archive_session, document: documentName };

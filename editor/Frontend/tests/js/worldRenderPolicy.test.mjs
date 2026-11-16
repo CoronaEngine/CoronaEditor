@@ -18,7 +18,7 @@ const declarations = babelParse(source, { sourceType: 'module' }).program.body
 function creative({ newProject = false, cameraId = 'camera-2', reply } = {}) {
   const calls = [];
   const state = { status: 'ready', mode: 'creative', newProject };
-  const api = { scene: { setCameraRenderSettings: async (...args) => {
+  const api = { scene: { set_camera_render_settings: async (...args) => {
     calls.push(args);
     return reply ? reply(args) : { render_backend: args[2].render_backend };
   } } };
@@ -73,7 +73,7 @@ test('a retired render envelope cannot report a successful viewport initializati
 
 test('stale world selection cannot start or finish rendering initialization', async () => {
   let current = false, calls = 0, resolve;
-  const api = { scene: { setCameraRenderSettings: () => {
+  const api = { scene: { set_camera_render_settings: () => {
     calls++;
     return new Promise(done => { resolve = done; });
   } } };
@@ -93,7 +93,7 @@ test('stale world selection cannot start or finish rendering initialization', as
 });
 
 test('Vision backend errors propagate instead of silently continuing with Native', async () => {
-  const api = { scene: { setCameraRenderSettings: async () => { throw new Error('bridge unavailable'); } } };
+  const api = { scene: { set_camera_render_settings: async () => { throw new Error('bridge unavailable'); } } };
   await assert.rejects(initializeWorldRenderBackend({ api, sceneId: 'scene.ini', archiveSession: 'archive', isCurrent: () => true }), /bridge unavailable/);
 });
 
@@ -108,7 +108,7 @@ test('restored Native camera windows select Vision before they become visible', 
     ${source.slice(node.start, node.end)}
     return restoreCameraViews;
   `)(initializeWorldRenderBackend, { scene: { ...sceneQueryFixture({ cameras: async () => ({ archive_session: 'archive', scene: 'scene.ini', cameras }) }),
-    setCameraRenderSettings: async (...args) => { calls.push(['backend', args[2].render_backend, args[0], args[1]]); return { render_backend: args[2].render_backend }; },
+    set_camera_render_settings: async (...args) => { calls.push(['backend', args[2].render_backend, args[0], args[1]]); return { render_backend: args[2].render_backend }; },
   } }, { createCameraView: async camera => calls.push(['open', camera.camera_id]) });
   await restore('scene.ini');
   assert.deepEqual(calls, [['backend', 'vision', 'scene.ini', 'saved-camera'], ['open', 'saved-camera']]);

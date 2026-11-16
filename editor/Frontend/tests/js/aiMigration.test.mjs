@@ -130,7 +130,7 @@ test('CAS conflicts replay pure changes on latest state without losing another w
   let content = null,
     version = '0',
     first = true;
-  editorApi.scene.readActive = async () => ({ archive_session: 'fixture', project_path: 'E:/World/FixtureWorld' });
+  editorApi.scene.read_active = async () => ({ archive_session: 'fixture', project_path: 'E:/World/FixtureWorld' });
   editorApi.projectSettings.readProjectDocument = async () => ({
     success: true, content: structuredClone(content), revision: version,
   });
@@ -355,7 +355,7 @@ test('contract selection stays bounded for known capabilities and falls back for
 function documentFixture(initial) {
   let content = initial,
     version = 0;
-  editorApi.scene.readActive = async () => ({ archive_session: 'fixture', project_path: 'E:/World/FixtureWorld' });
+  editorApi.scene.read_active = async () => ({ archive_session: 'fixture', project_path: 'E:/World/FixtureWorld' });
   editorApi.projectSettings.readProjectDocument = async () => ({
     success: true, content: structuredClone(content), revision: String(version),
   });

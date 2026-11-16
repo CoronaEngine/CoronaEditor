@@ -107,7 +107,7 @@ let finishActivationDelay = null;
 const refreshArchiveReady = async () => {
   if (!viewLifetime.current()) return;
   try {
-    const status = await editorApi.project.getProjectLoadStatus();
+    const status = await editorApi.project.get_project_load_status();
     if (!viewLifetime.current()) return;
     archiveReady.value = status?.archive_service_ready === true;
   } catch {
@@ -189,11 +189,11 @@ const handleCreate = async () => {
   creating.value = true;
   try {
     // 后端自动命名 + 存到引擎 data 目录，返回 { name, path }
-    const info = await editorApi.project.createWorldProject({ prompt });
+    const info = await editorApi.project.create_world_project({ prompt });
     if (!viewLifetime.current()) return;
 
     if (info && info.path) {
-      const opened = await projectLauncherService.openProject(info.path, { newProject: true });
+      const opened = await projectLauncherService.open_project(info.path, { newProject: true });
       if (!viewLifetime.current() || isProjectOpenSuperseded(opened)) return;
       const openResult = opened;
       if (openResult?.status === 'service_initializing') {

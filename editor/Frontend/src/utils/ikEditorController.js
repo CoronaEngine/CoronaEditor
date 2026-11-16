@@ -142,7 +142,7 @@ export function createIkEditorController(api, state) {
     active = session;
     state.loading = true;
     try {
-      const rig = await api.readActorRig(sceneName, actorName, scope);
+      const rig = await api.read_actor_rig(sceneName, actorName, scope);
       if (active !== session) return;
       const skeleton = resultData(rig.skeleton);
       const config = resultData(rig.ik);
@@ -169,7 +169,7 @@ export function createIkEditorController(api, state) {
         const chains = session.pending;
         session.pending = null;
         const response = resultData(
-          await api.setActorIkChains(session.sceneName, session.actorName, chains, session.revision, session.scope)
+          await api.set_actor_ik_chains(session.sceneName, session.actorName, chains, session.revision, session.scope)
         );
         if (active !== session) return;
         if (!Number.isSafeInteger(response.revision) || response.revision <= session.revision) {

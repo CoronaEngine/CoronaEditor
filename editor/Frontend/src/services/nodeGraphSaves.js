@@ -71,10 +71,10 @@ export function getNodeGraphSaves(surface = window) {
 export function flushActiveNodeGraphs(surface = window) {
   if (activeFlushes.has(surface)) return activeFlushes.get(surface);
   const work = (async () => {
-    const scope = await editorApi.scene.readActive();
+    const scope = await editorApi.scene.read_active();
     if (!scope.archive_session) return [];
     const results = await getNodeGraphSaves(surface).flush(scope.archive_session);
-    const after = await editorApi.scene.readActive();
+    const after = await editorApi.scene.read_active();
     if (after.archive_session !== scope.archive_session) {
       throw failure('CONTEXT_CHANGED', '保存期间原生存档已切换');
     }

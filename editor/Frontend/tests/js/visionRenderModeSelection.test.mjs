@@ -33,7 +33,7 @@ function mainHost({ fail = false, pending = false, denoiseFail = false, denoiseR
     'pendingMainStablePlanesSelection', 'toggleMainVisionStablePlanes',
     'isVector3', 'sceneGridEnabledFromSnapshot', 'applySceneSnapshot',
   ]);
-  const api = { setCameraRenderSettings: async (scene, camera, patch) => {
+  const api = { set_camera_render_settings: async (scene, camera, patch) => {
     patches.push([scene, camera, structuredClone(patch)]);
     const vision = patch.vision || {};
     if (vision.render_mode) {
@@ -144,7 +144,7 @@ test('detached camera selects ReSTIR and stores the returned camera mode', async
     const unwrap = value => value?.data ?? value;
     ${source}
     return { selectVisionRenderMode, visionRenderMode, camera, visionModeMenuOpen };
-  `)(ref, { scene: { setCameraRenderSettings: async (...args) => {
+  `)(ref, { scene: { set_camera_render_settings: async (...args) => {
     calls.push(args); return { render_backend: 'vision', vision: { render_mode: 'path_tracing' }, pending: true };
   } } });
   await host.selectVisionRenderMode('restir');
@@ -186,7 +186,7 @@ function detachedHost({ fields = {}, fail = false, pending = false, accumulation
       visionAccumulation: typeof visionAccumulation === 'undefined' ? undefined : visionAccumulation,
       toggleVisionAccumulation: typeof toggleVisionAccumulation === 'undefined' ? undefined : toggleVisionAccumulation };
   `)(ref, visionModes, { scene: { ...sceneQueryFixture({ cameras: async () => ({ archive_session: 'archive', scene: 'scene.ini',
-    cameras: cameraSnapshot(fields, 'camera-3').cameras }) }),   setCameraRenderSettings: async (scene, cameraId, patch) => {
+    cameras: cameraSnapshot(fields, 'camera-3').cameras }) }),   set_camera_render_settings: async (scene, cameraId, patch) => {
       patches.push([scene, cameraId, structuredClone(patch)]);
       const vision = patch.vision || {};
       if (vision.denoiser) {
@@ -210,7 +210,7 @@ function detachedHost({ fields = {}, fail = false, pending = false, accumulation
       if (typeof vision.denoise === 'boolean') return { vision: { denoise: pending ? !vision.denoise : vision.denoise }, pending };
       if (typeof vision.accumulation === 'boolean') return { vision: { accumulation: pending ? !vision.accumulation : vision.accumulation }, pending };
       return { render_backend: patch.render_backend || 'native' };
-    } }, app: { isVisionAvailable: async () => ({ available: true }) } });
+    } }, app: { is_vision_available: async () => ({ available: true }) } });
   return { ...host, calls, patches };
 }
 

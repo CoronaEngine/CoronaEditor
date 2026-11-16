@@ -55,7 +55,7 @@ export function useReblurSettings(props, api) {
     if (!open.value) return;
     busy.value = true;
     try {
-      const result = await api.readCameraRenderSettings(props.sceneId, props.cameraId,
+      const result = await api.read_camera_render_settings(props.sceneId, props.cameraId,
         { archive_session: props.archiveSession, family: 'reblur' });
       const response = result;
       if (token !== generation) return;
@@ -84,7 +84,7 @@ export function useReblurSettings(props, api) {
     const settings = { ...draft.value };
     busy.value = true;
     try {
-      const result = await api.setCameraRenderSettings(props.sceneId, props.cameraId,
+      const result = await api.set_camera_render_settings(props.sceneId, props.cameraId,
         { archive_session: props.archiveSession, family: 'reblur', settings });
       const response = result;
       if (token !== generation) return false;

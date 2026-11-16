@@ -59,13 +59,13 @@ test('Vue production code does not import the compatibility project-settings ser
 
 test('project lifecycle callers use editorApi for pure project operations', () => {
   const pureMethods = [
-    'getProjectLoadStatus',
+    'get_project_load_status',
     'getAppVersion',
-    'getRecentProjects',
+    'get_recent_projects',
     'choosePortableSceneTarget',
-    'openProjectFile',
-    'createWorldProject',
-    'createMultiplayerProject',
+    'open_project_file',
+    'create_world_project',
+    'create_multiplayer_project',
     'setProjectMode',
   ];
   const violations = sourceFiles(sourceRoot)

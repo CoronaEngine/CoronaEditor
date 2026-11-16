@@ -153,7 +153,7 @@ const isSelected = (node) =>
 
 const conflictCodes = new Set(['ACTOR_VERSION_CONFLICT', 'CONFLICT']);
 const writeNodeState = (identity, patch) =>
-  editorApi.scene.setModelNodeState({ ...identity, expected_actor_version: actorVersion.value }, patch);
+  editorApi.scene.set_model_node_state({ ...identity, expected_actor_version: actorVersion.value }, patch);
 
 const persistNodePatch = (node, patch) => {
   if (!viewLifetime.current()) return Promise.resolve(null);
@@ -226,7 +226,7 @@ const loadPage = async (parentIndex, offset = 0) => {
   pages.value = { ...pages.value, [key]: { ...(pages.value[key] || {}), loading: true } };
   loading.value = true;
   try {
-    const data = await editorApi.scene.readModelNodes(props.sceneName, {
+    const data = await editorApi.scene.read_model_nodes(props.sceneName, {
       archive_session: archiveSession.value,
       actor_guid: actorGuid.value,
       parent_index: parentIndex,

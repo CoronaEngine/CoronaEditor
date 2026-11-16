@@ -7,7 +7,7 @@ import test from 'node:test';
 import { createWorldModeController, createWorldModeRouteGuard, normalizeWorldMode, normalizeProjectPath, requireProjectInfo, worldModeService } from '../../src/services/worldModeService.js';
 import { editorApi } from '../../src/api/editorApi.js';
 
-test.beforeEach(t => t.mock.method(editorApi.network, 'stopSession', async () => ({ ok: true })));
+test.beforeEach(t => t.mock.method(editorApi.network, 'stop_session', async () => ({ ok: true })));
 import { appService } from '../../src/services/appService.js';
 import { projectLauncherService, resolveOpenedProjectScene, stopWorldRuntimeBeforeOpen } from '../../src/services/projectLauncherService.js';
 
@@ -157,7 +157,7 @@ test('failed mode reads return to launcher and never fall back to creative', asy
 test('project opening is serialized and commits only verified authoritative worlds', async (t) => {
   const first = deferred(), paths = [], saved = [];
   let activePath = 'first';
-  t.mock.method(editorApi.project, 'openProject', async (path) => {
+  t.mock.method(editorApi.project, 'open_project', async (path) => {
     paths.push(path); if (path === 'first') await first.promise;
     activePath = path; return { ok: true, path };
   });
@@ -167,11 +167,11 @@ test('project opening is serialized and commits only verified authoritative worl
   globalThis.CustomEvent = class { constructor(type, options) { Object.assign(this, { type }, options); } };
   t.after(() => { globalThis.window = previousWindow; globalThis.CustomEvent = previousEvent; });
   worldModeService.invalidate();
-  const a = projectLauncherService.openProject('first');
+  const a = projectLauncherService.open_project('first');
   await new Promise((resolve) => setImmediate(resolve));
   assert.deepEqual(paths, ['first']);
-  const skipped = projectLauncherService.openProject('middle');
-  const b = projectLauncherService.openProject('second');
+  const skipped = projectLauncherService.open_project('middle');
+  const b = projectLauncherService.open_project('second');
   first.resolve();
   assert.equal((await a).status, 'superseded');
   assert.equal((await skipped).status, 'superseded');

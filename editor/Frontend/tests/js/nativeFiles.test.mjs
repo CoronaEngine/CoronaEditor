@@ -16,15 +16,15 @@ test('file operations reach the Python archive service through the bridge', asyn
         ? tree : true));
     } },
     // Opening a scene reloads the native scene, so this route stays in C++.
-    project: { openDocument: value => { calls.push(['openDocument', value]); return Promise.resolve({ ok: true }); } },
+    project: { open_document: value => { calls.push(['open_document', value]); return Promise.resolve({ ok: true }); } },
   } };
   assert.deepEqual(await editorApi.files.getFileTree(request), { ...tree, project_path: 'P:/世界' });
   assert.equal(await editorApi.files.createFolder(request), true);
   assert.equal(await editorApi.files.createActorTemplate(request), true);
   assert.equal(await editorApi.files.renameItem(request), true);
   assert.equal(await editorApi.files.deleteItem(request), true);
-  assert.deepEqual(await editorApi.project.openDocument(request), { ok: true });
-  assert.deepEqual(calls.at(-1), ['openDocument', request]);
+  assert.deepEqual(await editorApi.project.open_document(request), { ok: true });
+  assert.deepEqual(calls.at(-1), ['open_document', request]);
   const ops = calls.filter(call => call.service === 'project_archive').map(call => call.args[0].op);
   assert.deepEqual(ops, ['get_file_tree', 'create_folder', 'create_file', 'rename_item', 'delete_item']);
   for (const message of calls.filter(call => call.service === 'project_archive')) {
@@ -42,7 +42,7 @@ test('file operation refusals surface as rejections with the service code', asyn
     // The bridge rejects a service refusal; the facade does not inspect payloads.
     bridge: { call: () => Promise.reject(Object.assign(
       new Error('Cannot change the archive root or scene.ini'), { code: 'PERMISSION_DENIED' })) },
-    project: { openDocument: () => Promise.resolve({ ok: true }) },
+    project: { open_document: () => Promise.resolve({ ok: true }) },
   } };
   await assert.rejects(editorApi.files.deleteItem(request), error => {
     assert.equal(error.code, 'PERMISSION_DENIED');

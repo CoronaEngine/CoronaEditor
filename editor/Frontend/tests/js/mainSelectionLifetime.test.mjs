@@ -11,7 +11,7 @@ async function mount(t) {
   const h = mountMainPage(t); await h.mount();
   const effects = [];
   h.dock.openPanel = id => { effects.push(['open', id]); h.dock.panels[id] = { open: true }; };
-  h.api.scene.readActorProperties = async () => ({ scene, archive_session: archive, geometry: {} });
+  h.api.scene.read_actor_properties = async () => ({ scene, archive_session: archive, geometry: {} });
   return { ...h, effects };
 }
 
@@ -29,7 +29,7 @@ test('a scene selection opens nothing', async t => {
 
 test('a current selection still opens Object when the transform read fails', async t => {
   const h = await mount(t);
-  h.api.scene.readActorProperties = async () => { throw Error('properties unavailable'); };
+  h.api.scene.read_actor_properties = async () => { throw Error('properties unavailable'); };
   await h.page.handleActorSelectionForObjectDock(selection('A'));
   assert.deepEqual(h.effects, [['open', 'Object']]);
 });
@@ -37,7 +37,7 @@ test('a current selection still opens Object when the transform read fails', asy
 for (const scope of ['unmount', 'scene', 'archive']) test(`selection entry rejects ${scope} before publishing or reading`, async t => {
   const h = await mount(t);
   let reads = 0, events = 0;
-  h.api.scene.readScene.projections.index = h.api.scene.readActorProperties = async () => { reads++; return snapshot([]); };
+  h.api.scene.read_scene.projections.index = h.api.scene.read_actor_properties = async () => { reads++; return snapshot([]); };
   h.bus.on('model-node-selection', () => events++);
   if (scope === 'unmount') h.unmount();
   const payload = { ...selection('A'), actor_name: 'A', node_index: 1 };
@@ -50,7 +50,7 @@ for (const scope of ['unmount', 'scene', 'archive']) test(`selection entry rejec
 
 test('retired selection cannot seed an old transform baseline after selection changes', async t => {
   const h = await mount(t), pending = deferred();
-  h.api.scene.readActorProperties = () => pending.promise;
+  h.api.scene.read_actor_properties = () => pending.promise;
   await h.page.handleActorSelectionForObjectDock(selection('A'));
   await h.page.handleActorSelectionForObjectDock({ scene, actor_type: 'scene' });
   pending.resolve({ scene, archive_session: archive, geometry: { position: [9, 9, 9] } });

@@ -9,9 +9,9 @@ import { editorApi } from './editorApi.js';
 let instance = null;
 
 function editorQuery(method, payload) {
-  return method === 'readActive'
-    ? editorApi.scene.readActive()
-    : editorApi.scene.readTransforms(payload.archive_session, payload.actors);
+  return method === 'read_active'
+    ? editorApi.scene.read_active()
+    : editorApi.scene.read_transforms(payload.archive_session, payload.actors);
 }
 
 export function createObserverRuntime({ query = editorQuery, intervalMs = 180 } = {}) {

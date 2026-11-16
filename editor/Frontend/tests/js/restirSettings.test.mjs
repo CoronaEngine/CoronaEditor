@@ -31,11 +31,11 @@ async function fixture(api = {}) {
   const state = scope.run(() => module.useRestirSettings(props, {
     getRestirSettings: async (...args) => { reads.push(args); return { settings: fresh(), ready: true }; },
     setRestirSettings: async (...args) => { sent.push(args); return { settings: args[2], pending: true }; },
-    readCameraRenderSettings: async (...args) => {
+    read_camera_render_settings: async (...args) => {
       const result = await (api.getRestirSettings || (async () => ({ settings: fresh(), ready: true })))(args[0], args[1]);
       return result;
     },
-    setCameraRenderSettings: async (...args) => {
+    set_camera_render_settings: async (...args) => {
       if (!api.setRestirSettings) sent.push([args[0], args[1], args[2].settings]);
       const result = await (api.setRestirSettings || (async () => ({ settings: args[2].settings, pending: true })))(args[0], args[1], args[2].settings);
       return result;

@@ -8,9 +8,9 @@ test('LANChat facade and store are retired while named network bindings remain',
   assert.equal(fs.existsSync(new URL('../../src/stores/lanchat.js', import.meta.url)), false);
   const previous = globalThis.window;
   const reply = { active: false, local_ip: '192.0.2.1' };
-  globalThis.window = { corona: { network: { getSessionInfo: async () => reply } } };
+  globalThis.window = { corona: { network: { get_session_info: async () => reply } } };
   try {
-    assert.equal(await editorApi.network.getSessionInfo(), reply);
+    assert.equal(await editorApi.network.get_session_info(), reply);
   } finally {
     globalThis.window = previous;
   }
@@ -22,7 +22,7 @@ test('world entry and local IP lookup have no chat dependency', () => {
     assert.doesNotMatch(fs.readFileSync(new URL(`../../src/${file}`, import.meta.url), 'utf8'), /lan_?chat/i);
   }
   const join = fs.readFileSync(new URL('../../src/views/layout/JoinGame.vue', import.meta.url), 'utf8');
-  assert.match(join, /editorApi\.network\.getSessionInfo\(\)/);
+  assert.match(join, /editorApi\.network\.get_session_info\(\)/);
   assert.match(join, /result\.local_ip/);
 });
 

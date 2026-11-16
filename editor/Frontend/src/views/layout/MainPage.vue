@@ -336,7 +336,7 @@ const seedActorTransformBaseline = async (sceneId, actorName, isCurrent = () => 
   const context = mainSceneOperation(`transform:${key}`);
   if (!context.current() || context.archive !== archive || context.sceneId !== scene) return;
   try {
-    const data = await editorApi.scene.readActorProperties(scene, actor, { archive_session: archive });
+    const data = await editorApi.scene.read_actor_properties(scene, actor, { archive_session: archive });
     if (!viewCurrent() || !context.current() || !isCurrent() || cameraBindingState.value.archiveSession !== archive
         || cameraBindingState.value.sceneId !== scene || data?.archive_session !== archive || data?.scene !== scene) return;
     actorTransformBaselines.set(
@@ -850,7 +850,7 @@ const selectMainRenderMode = async (mode) => {
         expiresAt: Date.now() + 3000,
       };
       mainRenderBackend.value = 'native';
-      const result = await editorApi.scene.setCameraRenderSettings(sceneId, cameraId, {
+      const result = await editorApi.scene.set_camera_render_settings(sceneId, cameraId, {
         archive_session: context.archive,
         render_backend: 'native',
       });
@@ -870,7 +870,7 @@ const selectMainRenderMode = async (mode) => {
     mainRenderBackend.value = 'vision';
     mainVisionRenderMode.value = mode;
 
-    const result = await editorApi.scene.setCameraRenderSettings(sceneId, cameraId, {
+    const result = await editorApi.scene.set_camera_render_settings(sceneId, cameraId, {
       archive_session: context.archive,
       render_backend: 'vision',
       output_mode: 'final_color',
@@ -911,7 +911,7 @@ const toggleMainVisionAccumulation = async () => {
   mainVisionAccumulation.value = selection.enabled;
   mainVisionAccumulationError.value = '';
   try {
-    const result = await editorApi.scene.setCameraRenderSettings(sceneId, cameraId, {
+    const result = await editorApi.scene.set_camera_render_settings(sceneId, cameraId, {
       archive_session: context.archive,
       vision: { accumulation: selection.enabled },
     });
@@ -950,7 +950,7 @@ const toggleMainVisionDenoise = async () => {
   mainVisionDenoise.value = selection.enabled;
   mainVisionDenoiseError.value = '';
   try {
-    const result = await editorApi.scene.setCameraRenderSettings(sceneId, cameraId, {
+    const result = await editorApi.scene.set_camera_render_settings(sceneId, cameraId, {
       archive_session: context.archive,
       vision: { denoise: selection.enabled },
     });
@@ -990,7 +990,7 @@ const selectMainVisionDenoiser = async (type) => {
   mainVisionDenoiser.value = type;
   mainVisionDenoiserError.value = '';
   try {
-    const result = await editorApi.scene.setCameraRenderSettings(sceneId, cameraId, {
+    const result = await editorApi.scene.set_camera_render_settings(sceneId, cameraId, {
       archive_session: context.archive,
       vision: { denoiser: type },
     });
@@ -1028,7 +1028,7 @@ const toggleMainVisionStablePlanes = async () => {
   mainVisionStablePlanes.value = selection.enabled;
   mainVisionStablePlanesError.value = '';
   try {
-    const result = await editorApi.scene.setCameraRenderSettings(sceneId, cameraId, {
+    const result = await editorApi.scene.set_camera_render_settings(sceneId, cameraId, {
       archive_session: context.archive,
       vision: { stable_planes: selection.enabled },
     });
@@ -1228,8 +1228,8 @@ const syncSceneCameraBinding = async (sceneId, { preservePose = false } = {}) =>
   try {
     const scope = { archive_session: archive };
     const [snapshot, environment] = await Promise.all([
-      editorApi.scene.readScene({ ...scope, scene: sceneId, actors: 'index', cameras: true }),
-      editorApi.scene.readEnvironment(sceneId, scope),
+      editorApi.scene.read_scene({ ...scope, scene: sceneId, actors: 'index', cameras: true }),
+      editorApi.scene.read_environment(sceneId, scope),
     ]);
     if (!current() || [snapshot, environment].some(value => value.archive_session !== archive || value.scene !== sceneId)) return false;
     applySceneSnapshot(sceneId, { ...snapshot, scene_id: snapshot.scene,
@@ -1256,7 +1256,7 @@ const updateSceneLight = async (axis = '') => {
     direction: [Number(direction.x) || 0, Number(direction.y) || 0, Number(direction.z) || 0] };
   sceneLightBusy.value = true;
   try {
-    await editorApi.scene.setEnvironment(sceneId, { archive_session: archive, sun });
+    await editorApi.scene.set_environment(sceneId, { archive_session: archive, sun });
     if (!context.current()) return false;
     void cabbageContextService.recordEvent({
       type: 'lighting_changed', category: 'lighting', success: true,
@@ -1300,7 +1300,7 @@ const restoreCameraViews = async (sceneId) => {
   const current = () => viewCurrent() && archive === environmentArchiveSession.value;
   if (!current() || !sceneId || !archive) return;
   try {
-    const payload = await editorApi.scene.readScene({ archive_session: archive, scene: sceneId, cameras: true });
+    const payload = await editorApi.scene.read_scene({ archive_session: archive, scene: sceneId, cameras: true });
     if (!current() || payload.archive_session !== archive || payload.scene !== sceneId) return;
     const openCameras = Array.isArray(payload?.cameras)
       ? payload.cameras.filter((camera) => camera.view_open)
@@ -1568,7 +1568,7 @@ const sendCameraUpdateFast = () => {
   const { sceneId, cameraId, archiveSession } = cameraBindingState.value;
   if (!sceneId || !cameraId || !archiveSession) return false;
   try {
-    editorApi.scene.updateCamera(sceneId, cameraId, {
+    editorApi.scene.update_camera(sceneId, cameraId, {
       archive_session: archiveSession,
       position: [...cameraState.value.position],
       forward: [...cameraState.value.forward],
@@ -1593,7 +1593,7 @@ const handleApplyPhysics = async () => {
   const scope = { archive_session: context.archive };
 
   try {
-    await editorApi.scene.setEnvironment(sceneId, { ...scope, physics: {
+    await editorApi.scene.set_environment(sceneId, { ...scope, physics: {
       gravity: [
         physicsParams.value.gravityX,
         physicsParams.value.gravityY,
@@ -1620,7 +1620,7 @@ const loadPhysicsParams = async () => {
   const { sceneId } = context;
   const scope = { archive_session: context.archive };
   try {
-    const environment = await editorApi.scene.readEnvironment(sceneId, scope);
+    const environment = await editorApi.scene.read_environment(sceneId, scope);
     if (!context.current() || environment.archive_session !== context.archive || environment.scene !== sceneId) return false;
     const data = environment.physics;
     if (data) {
@@ -1655,7 +1655,7 @@ const pollProjectResourceLoadStatus = async () => {
   const context = mainSceneOperation('resources');
   if (!context.current()) return;
   try {
-    const status = await editorApi.project.getProjectLoadStatus();
+    const status = await editorApi.project.get_project_load_status();
     if (!context.current()) return;
     projectResourceLoadStatus.value = status?.active ? status : null;
     if (status?.loading) {
@@ -1733,7 +1733,7 @@ const setSceneGridEnabledFromPanel = async (enabled, requestedSceneId = '') => {
       return getEditorControlsState();
     }
 
-    await editorApi.scene.setEnvironment(sceneId, { ...scope, grid: { enabled: nextEnabled } });
+    await editorApi.scene.set_environment(sceneId, { ...scope, grid: { enabled: nextEnabled } });
     if (!context.current()) return false;
     sceneGridEnabled.value = nextEnabled;
     broadcastViewportControlsState();
@@ -1844,7 +1844,7 @@ const onProjectOpenedEvent = async (payload = {}) => {
   const current = () => viewCurrent() && refreshRevision >= projectOpenedRefreshRevision
     && archive === environmentArchiveSession.value && scene === currentSceneId.value;
   try {
-    const active = await editorApi.scene.readActive();
+    const active = await editorApi.scene.read_active();
     if (!current()) return;
     const sceneId = typeof active?.scene === 'string' ? active.scene.trim() : '';
     // A sampled project event can arrive after a newer world has committed.
@@ -1874,7 +1874,7 @@ onMounted(async () => {
   // A reused CEF page must not inherit camera locks from a previous world.
   // Real active workers are added back by reconcileEditorCameraInputLocks().
   clearKnownEditorCameraInputLocks();
-  const active = await editorApi.scene.readActive();
+  const active = await editorApi.scene.read_active();
   if (!viewCurrent()) return;
   const openedSceneId = typeof active?.scene === 'string' ? active.scene.trim() : '';
   if (!active?.archive_session || !openedSceneId) return;
@@ -1887,7 +1887,7 @@ onMounted(async () => {
   await pollProjectResourceLoadStatus();
   if (!viewCurrent()) return;
   try {
-    const visionResult = await editorApi.app.isVisionAvailable();
+    const visionResult = await editorApi.app.is_vision_available();
     if (!viewCurrent()) return;
     visionAvailable.value = !!visionResult?.available;
   } catch (error) {

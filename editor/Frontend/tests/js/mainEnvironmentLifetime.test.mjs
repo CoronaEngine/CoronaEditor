@@ -11,11 +11,11 @@ function retire(h, kind) {
 }
 for (const retirement of ['unmount', 'archive', 'scene']) {
   for (const [name, method, args, native] of [
-    ['light', 'updateSceneLight', ['x'], 'setEnvironment'],
-    ['grid', 'setSceneGridEnabledFromPanel', [false], 'setEnvironment'],
-    ['physics write', 'handleApplyPhysics', [], 'setEnvironment'],
-    ['physics read', 'loadPhysicsParams', [], 'readEnvironment'],
-    ['resource status', 'pollProjectResourceLoadStatus', [], 'getProjectLoadStatus'],
+    ['light', 'updateSceneLight', ['x'], 'set_environment'],
+    ['grid', 'setSceneGridEnabledFromPanel', [false], 'set_environment'],
+    ['physics write', 'handleApplyPhysics', [], 'set_environment'],
+    ['physics read', 'loadPhysicsParams', [], 'read_environment'],
+    ['resource status', 'pollProjectResourceLoadStatus', [], 'get_project_load_status'],
   ]) for (const failure of [false, true]) {
     test(`main ${name} ${failure ? 'failure' : 'reply'} is retired after ${retirement}`, async t => {
       const h = mountMainPage(t); await h.mount();
@@ -40,7 +40,7 @@ for (const retirement of ['unmount', 'archive', 'scene']) {
 
 test('light event records the submitted direction instead of a later draft', async t => {
   const h = mountMainPage(t); await h.mount(); const pending = deferred();
-  h.api.scene.setEnvironment = () => pending.promise;
+  h.api.scene.set_environment = () => pending.promise;
   h.page.sceneLightSettings.direction.x = 3;
   const saving = h.page.updateSceneLight('x');
   h.page.sceneLightSettings.direction.x = 8;
@@ -50,7 +50,7 @@ test('light event records the submitted direction instead of a later draft', asy
 
 test('light scope replacement permits a new edit and old finally cannot release its busy flag', async t => {
   const h = mountMainPage(t); await h.mount(); const first = deferred(), next = deferred(); let writes = 0;
-  h.api.scene.setEnvironment = () => ++writes === 1 ? first.promise : next.promise;
+  h.api.scene.set_environment = () => ++writes === 1 ? first.promise : next.promise;
   const old = h.page.updateSceneLight();
   h.page.environmentArchiveSession.value = 'replacement';
   assert.equal(h.page.sceneLightBusy.value, false);
@@ -61,7 +61,7 @@ test('light scope replacement permits a new edit and old finally cannot release 
 
 test('an older grid reply cannot undo a newer grid choice', async t => {
   const h = mountMainPage(t); await h.mount(); const pending = deferred(); let writes = 0;
-  h.api.scene.setEnvironment = () => ++writes === 1 ? pending.promise : Promise.resolve({});
+  h.api.scene.set_environment = () => ++writes === 1 ? pending.promise : Promise.resolve({});
   const old = h.page.setSceneGridEnabledFromPanel(false);
   await h.page.setSceneGridEnabledFromPanel(true);
   pending.resolve({}); assert.equal(await old, false); assert.equal(h.page.sceneGridEnabled.value, true);
@@ -69,7 +69,7 @@ test('an older grid reply cannot undo a newer grid choice', async t => {
 
 test('physics read started before a new write cannot replace the submitted values', async t => {
   const h = mountMainPage(t); await h.mount(); const pending = deferred();
-  h.api.scene.readEnvironment = () => pending.promise;
+  h.api.scene.read_environment = () => pending.promise;
   const reading = h.page.loadPhysicsParams();
   await h.page.applyPhysicsFromSettings({ floorY: 6 });
   pending.resolve({ physics: { floor_y: 1 } });
@@ -78,7 +78,7 @@ test('physics read started before a new write cannot replace the submitted value
 
 for (const failure of [false, true]) test(`older resource ${failure ? 'failure' : 'reply'} cannot replace a newer sample`, async t => {
   const h = mountMainPage(t); await h.mount(); const pending = deferred(); let reads = 0;
-  h.api.project.getProjectLoadStatus = () => ++reads === 1 ? pending.promise : Promise.resolve({ active: true, loading: true, ready: 5 });
+  h.api.project.get_project_load_status = () => ++reads === 1 ? pending.promise : Promise.resolve({ active: true, loading: true, ready: 5 });
   const old = h.page.pollProjectResourceLoadStatus();
   await h.page.pollProjectResourceLoadStatus();
   const before = h.page.projectResourceLoadStatus.value, timers = h.timers.size;
@@ -90,7 +90,7 @@ for (const failure of [false, true]) test(`older resource ${failure ? 'failure' 
 
 test('stopping resource polling also retires its in-flight sample', async t => {
   const h = mountMainPage(t); await h.mount(); const pending = deferred();
-  h.api.project.getProjectLoadStatus = () => pending.promise;
+  h.api.project.get_project_load_status = () => pending.promise;
   const reading = h.page.pollProjectResourceLoadStatus(); h.page.stopProjectResourceLoadPolling();
   pending.resolve({ active: true, loading: true }); await reading;
   assert.equal(h.page.projectResourceLoadStatus.value, null); assert.equal(h.timers.size, 0);
@@ -98,7 +98,7 @@ test('stopping resource polling also retires its in-flight sample', async t => {
 
 test('camera projection read before environment edits cannot roll back light and grid', async t => {
   const h = mountMainPage(t); await h.mount(); const pending = deferred();
-  h.api.scene.readEnvironment = () => pending.promise;
+  h.api.scene.read_environment = () => pending.promise;
   const reading = h.page.syncSceneCameraBinding('scene_v3.xml');
   h.page.sceneLightSettings.direction.x = 7; await h.page.updateSceneLight('x');
   await h.page.setSceneGridEnabledFromPanel(false);
@@ -110,7 +110,7 @@ test('camera projection read before environment edits cannot roll back light and
 
 test('camera projection from a previous scene in the same archive is retired', async t => {
   const h = mountMainPage(t); await h.mount(); const pending = deferred();
-  h.api.scene.readEnvironment = () => pending.promise;
+  h.api.scene.read_environment = () => pending.promise;
   const reading = h.page.syncSceneCameraBinding('scene_v3.xml');
   h.page.currentSceneId.value = 'other.xml';
   pending.resolve({ archive_session: 'main-archive', scene: 'scene_v3.xml', sun: { direction: [99, 1, 1] } });
@@ -119,7 +119,7 @@ test('camera projection from a previous scene in the same archive is retired', a
 
 for (const field of ['archive_session', 'scene']) test(`physics projection rejects a foreign ${field}`, async t => {
   const h = mountMainPage(t); await h.mount();
-  h.api.scene.readEnvironment = async () => ({ archive_session: 'main-archive', scene: 'scene_v3.xml',
+  h.api.scene.read_environment = async () => ({ archive_session: 'main-archive', scene: 'scene_v3.xml',
     [field]: 'foreign', physics: { floor_y: 99 } });
   assert.equal(await h.page.loadPhysicsParams(), false);
   assert.notEqual(h.page.physicsParams.value.floorY, 99);
@@ -136,10 +136,10 @@ for (const [name, action, changed] of [
 
 test('a camera refresh started during a light write preserves the draft while still applying cameras', async t => {
   const h = mountMainPage(t); await h.mount(); const pending = deferred();
-  h.api.scene.setEnvironment = () => pending.promise;
+  h.api.scene.set_environment = () => pending.promise;
   h.page.sceneLightSettings.direction.x = 7;
   const saving = h.page.updateSceneLight('x');
-  h.api.scene.readEnvironment = async () => ({ archive_session: 'main-archive', scene: 'scene_v3.xml', sun: { direction: [1, 1, 1] } });
+  h.api.scene.read_environment = async () => ({ archive_session: 'main-archive', scene: 'scene_v3.xml', sun: { direction: [1, 1, 1] } });
   assert.equal(await h.page.syncSceneCameraBinding('scene_v3.xml'), true);
   assert.equal(h.page.sceneLightSettings.direction.x, 7);
   assert.equal(h.page.cameraBindingState.value.cameraId, 'camera-1');
@@ -150,8 +150,8 @@ test('a camera refresh started during a light write preserves the draft while st
 
 test('current light failure still restores native values and releases busy', async t => {
   const h = mountMainPage(t); await h.mount();
-  h.api.scene.setEnvironment = async () => { throw Error('native rejected'); };
-  h.api.scene.readEnvironment = async () => ({ archive_session: 'main-archive', scene: 'scene_v3.xml', sun: { direction: [2, 1, 1] } });
+  h.api.scene.set_environment = async () => { throw Error('native rejected'); };
+  h.api.scene.read_environment = async () => ({ archive_session: 'main-archive', scene: 'scene_v3.xml', sun: { direction: [2, 1, 1] } });
   h.page.sceneLightSettings.direction.x = 9;
   assert.equal(await h.page.updateSceneLight('x'), false);
   assert.equal(h.page.sceneLightSettings.direction.x, 2);
@@ -160,7 +160,7 @@ test('current light failure still restores native values and releases busy', asy
 
 test('current resource samples schedule exactly one next poll and stop when loading ends', async t => {
   const h = mountMainPage(t); await h.mount(); let reads = 0;
-  h.api.project.getProjectLoadStatus = async () => ++reads === 1 ? { active: true, loading: true, ready: 1 } : { active: true, loading: false };
+  h.api.project.get_project_load_status = async () => ++reads === 1 ? { active: true, loading: true, ready: 1 } : { active: true, loading: false };
   await h.page.pollProjectResourceLoadStatus(); assert.equal(h.timers.size, 1);
   const [id, callback] = [...h.timers][0]; h.timers.delete(id); callback();
   await setImmediate();
@@ -169,7 +169,7 @@ test('current resource samples schedule exactly one next poll and stop when load
 
 test('a queued resource timer cannot restart a stopped polling chain', async t => {
   const h = mountMainPage(t); await h.mount(); let reads = 0;
-  h.api.project.getProjectLoadStatus = async () => { reads++; return { active: true, loading: true }; };
+  h.api.project.get_project_load_status = async () => { reads++; return { active: true, loading: true }; };
   await h.page.pollProjectResourceLoadStatus(); const callback = [...h.timers.values()][0];
   h.page.stopProjectResourceLoadPolling(); callback(); await Promise.resolve();
   assert.equal(reads, 1); assert.equal(h.timers.size, 0);

@@ -20,25 +20,25 @@ function createFakeCefHost() {
     callbacks,
     corona: {
       project: {
-        openProject(...args) {
-          const api = 'corona.project.openProject';
+        open_project(...args) {
+          const api = 'corona.project.open_project';
           requests.push({ api, args });
           if (hangFor.has(api)) return new Promise((resolve, reject) => pending.set(api, { resolve, reject }));
           return Promise.resolve({ ok: true, status: 'opened', path: args[0] });
         },
-        openProjectFile(...args) {
-          const api = 'corona.project.openProjectFile';
+        open_project_file(...args) {
+          const api = 'corona.project.open_project_file';
           requests.push({ api, args });
           return new Promise((resolve, reject) => pending.set(api, { resolve, reject }));
         },
       },
       scene: {
-        readCameraRenderSettings(...args) {
-          requests.push({ api: 'corona.scene.readCameraRenderSettings', args });
+        read_camera_render_settings(...args) {
+          requests.push({ api: 'corona.scene.read_camera_render_settings', args });
           return Promise.resolve({ archive_session: args[2].archive_session, scene: args[0], camera_id: args[1], settings: {} });
         },
-        setCameraRenderSettings(...args) {
-          requests.push({ api: 'corona.scene.setCameraRenderSettings', args });
+        set_camera_render_settings(...args) {
+          requests.push({ api: 'corona.scene.set_camera_render_settings', args });
           return Promise.resolve({ archive_session: args[2].archive_session, scene: args[0], camera_id: args[1] });
         },
       },
@@ -73,7 +73,7 @@ test('orphan mesh movement subscription is absent before and after loading nativ
 test('model node operations are not exposed through the manifest transport', async () => {
   const { editorApi, host } = await loadEditorApi();
   assert.equal(editorApi.sceneTools?.getModelNodes, undefined);
-  assert.equal(editorApi.sceneTools?.setModelNodeState, undefined);
+  assert.equal(editorApi.sceneTools?.set_model_node_state, undefined);
   assert.equal(host.requests.some((item) => item.api === 'SceneTools.get_model_nodes' || item.api === 'SceneTools.set_model_node_state'), false);
 });
 
@@ -86,10 +86,10 @@ test('camera render settings use one scoped V8 patch and expose no legacy Web se
     vision: { render_mode: 'restir', accumulation: true },
   };
 
-  await editorApi.scene.setCameraRenderSettings('SceneA', 'camera-1', patch);
+  await editorApi.scene.set_camera_render_settings('SceneA', 'camera-1', patch);
 
-  assert.deepEqual(host.requests.find(item => item.api === 'corona.scene.setCameraRenderSettings'), {
-    api: 'corona.scene.setCameraRenderSettings', args: ['SceneA', 'camera-1', patch],
+  assert.deepEqual(host.requests.find(item => item.api === 'corona.scene.set_camera_render_settings'), {
+    api: 'corona.scene.set_camera_render_settings', args: ['SceneA', 'camera-1', patch],
   });
   assert.equal(editorApi.sceneTools?.setRenderBackend, undefined);
   assert.equal(editorApi.sceneTools?.setOutputMode, undefined);
@@ -104,17 +104,17 @@ test('camera render settings use one scoped V8 patch and expose no legacy Web se
 test('editor API calls pass structured values through the typed V8 binding', async () => {
   const { editorApi, host } = await loadEditorApi();
   const options = { load_policy: 'degraded' };
-  await editorApi.project.openProject('C:/Projects/Kitchen/Kitchen.corona', options);
+  await editorApi.project.open_project('C:/Projects/Kitchen/Kitchen.corona', options);
 
-  const call = host.requests.find((request) => request.api === 'corona.project.openProject');
+  const call = host.requests.find((request) => request.api === 'corona.project.open_project');
   assert.deepEqual(call.args, ['C:/Projects/Kitchen/Kitchen.corona', options]);
   assert.equal(host.cefQuery, undefined);
 });
 
 const PICKER_CASES = [
   {
-    api: 'corona.project.openProjectFile',
-    invoke: (editorApi) => editorApi.project.openProjectFile(),
+    api: 'corona.project.open_project_file',
+    invoke: (editorApi) => editorApi.project.open_project_file(),
     selected: { name: 'Kitchen', path: 'C:/Projects/Kitchen/Kitchen.corona' },
     canceled: {},
   },
@@ -146,13 +146,13 @@ for (const picker of PICKER_CASES) {
 test('a picker still rejects a native error after waiting for user selection', async () => {
   const { editorApi, host } = await loadEditorApi();
 
-  host.hangFor.add('corona.project.openProjectFile');
-  const outcome = editorApi.project.openProjectFile().then(
+  host.hangFor.add('corona.project.open_project_file');
+  const outcome = editorApi.project.open_project_file().then(
     (value) => ({ value }), (error) => ({ error }),
   );
   await new Promise((resolve) => setTimeout(resolve, 60));
 
-  host.pending.get('corona.project.openProjectFile').reject(
+  host.pending.get('corona.project.open_project_file').reject(
     Object.assign(new Error('dialog unavailable'), { code: '-2' }),
   );
   const actual = await outcome;
@@ -161,25 +161,25 @@ test('a picker still rejects a native error after waiting for user selection', a
 
 test('a native project open remains pending until its native owner replies', async () => {
   const { editorApi, host } = await loadEditorApi();
-  host.hangFor.add('corona.project.openProject');
-  const outcome = editorApi.project.openProject('C:/Projects/World', { load_policy: 'degraded' })
+  host.hangFor.add('corona.project.open_project');
+  const outcome = editorApi.project.open_project('C:/Projects/World', { load_policy: 'degraded' })
     .then(value => ({ value }), error => ({ error }));
   await new Promise(resolve => setTimeout(resolve, 60));
   const reply = { ok: false, status: 'decision_required', diagnostics: [{ code: 'RESOURCE_NOT_FOUND' }] };
-  host.pending.get('corona.project.openProject').resolve(reply);
+  host.pending.get('corona.project.open_project').resolve(reply);
   const actual = await outcome;
   assert.ifError(actual.error);
   assert.equal(actual.value, reply);
-  assert.deepEqual(host.requests, [{ api: 'corona.project.openProject',
+  assert.deepEqual(host.requests, [{ api: 'corona.project.open_project',
     args: ['C:/Projects/World', { load_policy: 'degraded' }] }]);
 });
 
 test('camera render settings use one scoped V8 patch and expose no legacy Web setters', async () => {
   const { editorApi, host } = await loadEditorApi();
 
-  await editorApi.scene.readCameraRenderSettings('SceneA', 'camera-a', { archive_session: 'archive-a', family: 'restir' });
+  await editorApi.scene.read_camera_render_settings('SceneA', 'camera-a', { archive_session: 'archive-a', family: 'restir' });
 
-  const sent = host.requests.find((entry) => entry.api === 'corona.scene.readCameraRenderSettings');
+  const sent = host.requests.find((entry) => entry.api === 'corona.scene.read_camera_render_settings');
   assert.ok(
     sent,
     `typed binding must reach native, saw: ${host.requests.map((r) => r.api).join(', ')}`
@@ -190,12 +190,12 @@ test('camera render settings use one scoped V8 patch and expose no legacy Web se
 test('ReSTIR settings preserve the camera binding and nested settings through V8', async () => {
   const { editorApi, host } = await loadEditorApi();
   const settings = { direct: { temporal: { open: false, radius: 8 } }, indirect: { open: true } };
-  await editorApi.scene.readCameraRenderSettings('SceneA', 'camera-b', { archive_session: 'archive-a', family: 'restir' });
-  await editorApi.scene.setCameraRenderSettings('SceneA', 'camera-b', { family: 'restir', settings, archive_session: 'archive-a' });
-  const calls = host.requests.filter(entry => entry.api.includes('CameraRenderSettings'));
+  await editorApi.scene.read_camera_render_settings('SceneA', 'camera-b', { archive_session: 'archive-a', family: 'restir' });
+  await editorApi.scene.set_camera_render_settings('SceneA', 'camera-b', { family: 'restir', settings, archive_session: 'archive-a' });
+  const calls = host.requests.filter(entry => entry.api.includes('camera_render_settings'));
   assert.deepEqual(calls.map(({ api, args }) => ({ api, args })), [
-    { api: 'corona.scene.readCameraRenderSettings', args: ['SceneA', 'camera-b', { archive_session: 'archive-a', family: 'restir' }] },
-    { api: 'corona.scene.setCameraRenderSettings', args: ['SceneA', 'camera-b', { family: 'restir', settings, archive_session: 'archive-a' }] },
+    { api: 'corona.scene.read_camera_render_settings', args: ['SceneA', 'camera-b', { archive_session: 'archive-a', family: 'restir' }] },
+    { api: 'corona.scene.set_camera_render_settings', args: ['SceneA', 'camera-b', { family: 'restir', settings, archive_session: 'archive-a' }] },
   ]);
 });
 
@@ -214,7 +214,7 @@ test('an unknown wrapper path is rejected instead of being sent to native', asyn
 test('explicit namespaces resolve declared methods and do not expose unknown members', async () => {
   const { editorApi, host } = await loadEditorApi();
   assert.equal(editorApi.sceneTools?.getModelNodes, undefined);
-  assert.equal(typeof editorApi.scene.readCameraRenderSettings, 'function');
+  assert.equal(typeof editorApi.scene.read_camera_render_settings, 'function');
   assert.equal(typeof editorApi.sceneTools?.getRestirSettings, 'undefined');
   assert.equal(typeof editorApi.sceneTools?.setRestirSettings, 'undefined');
   assert.equal(editorApi.sceneTools?.then, undefined);

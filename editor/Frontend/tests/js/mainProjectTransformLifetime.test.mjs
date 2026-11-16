@@ -11,13 +11,13 @@ const properties = x => ({ scene, archive_session: archive, geometry: transform(
 for (const retirement of ['unmount', 'archive', 'scene', 'new project']) {
   test(`project event failure after ${retirement} does not report an old error`, async t => {
     const h = mountMainPage(t); await h.mount(); const pending = deferred();
-    h.api.scene.readActive = () => pending.promise;
+    h.api.scene.read_active = () => pending.promise;
     const old = h.page.onProjectOpenedEvent({ archive_session: archive });
     if (retirement === 'unmount') h.unmount();
     if (retirement === 'archive') h.page.environmentArchiveSession.value = 'replacement';
     if (retirement === 'scene') h.page.currentSceneId.value = 'other.xml';
     if (retirement === 'new project') {
-      h.api.scene.readActive = async () => ({ archive_session: archive, scene });
+      h.api.scene.read_active = async () => ({ archive_session: archive, scene });
       await h.page.onProjectOpenedEvent({ archive_session: archive });
     }
     const before = h.errors.slice();
@@ -28,7 +28,7 @@ for (const retirement of ['unmount', 'archive', 'scene', 'new project']) {
 
 test('a current project event read failure still reports the native error', async t => {
   const h = mountMainPage(t); await h.mount(); const failure = Error('native read unavailable');
-  h.api.scene.readActive = async () => { throw failure; };
+  h.api.scene.read_active = async () => { throw failure; };
   await h.page.onProjectOpenedEvent({ archive_session: archive });
   assert.equal(h.errors.length, 1);
   assert.equal(h.errors[0][1], failure);
@@ -36,9 +36,9 @@ test('a current project event read failure still reports the native error', asyn
 
 test('a rejected stale notification does not suppress the current refresh error', async t => {
   const h = mountMainPage(t); await h.mount(); const pending = deferred();
-  h.api.scene.readActive = () => pending.promise;
+  h.api.scene.read_active = () => pending.promise;
   const current = h.page.onProjectOpenedEvent({ archive_session: archive });
-  h.api.scene.readActive = async () => ({ archive_session: archive, scene });
+  h.api.scene.read_active = async () => ({ archive_session: archive, scene });
   await h.page.onProjectOpenedEvent({ archive_session: 'stale' });
   pending.reject(Error('current refresh failed')); await current;
   assert.equal(h.errors.length, 1);
@@ -46,7 +46,7 @@ test('a rejected stale notification does not suppress the current refresh error'
 
 for (const scope of ['scene', 'archive']) test(`a sampled project reply cannot restore bindings after the observed ${scope} changes`, async t => {
   const h = mountMainPage(t); await h.mount(); const pending = deferred();
-  h.api.scene.readActive = () => pending.promise;
+  h.api.scene.read_active = () => pending.promise;
   const old = h.page.onProjectOpenedEvent({ archive_session: archive });
   if (scope === 'archive') h.page.environmentArchiveSession.value = 'replacement';
   else h.page.currentSceneId.value = 'other.xml';
@@ -59,14 +59,14 @@ for (const scope of ['scene', 'archive']) test(`a sampled project reply cannot r
 
 test('a retired project callback does not start a native read', async t => {
   const h = mountMainPage(t); await h.mount(); h.unmount(); let reads = 0;
-  h.api.scene.readActive = async () => { reads++; return {}; };
+  h.api.scene.read_active = async () => { reads++; return {}; };
   await h.page.onProjectOpenedEvent({ archive_session: archive });
   assert.equal(reads, 0);
 });
 
 test('a delayed property baseline cannot replace a newer transform notification', async t => {
   const h = mountMainPage(t); await h.mount(); const pending = deferred();
-  h.api.scene.readActorProperties = () => pending.promise;
+  h.api.scene.read_actor_properties = () => pending.promise;
   const seeding = h.page.seedActorTransformBaseline(scene, 'Probe');
   h.page.handleActorTransformForCabbage(transform(4));
   pending.resolve(properties(0)); await seeding;
@@ -77,7 +77,7 @@ test('a delayed property baseline cannot replace a newer transform notification'
 
 test('a newer property baseline wins when two reads finish out of order', async t => {
   const h = mountMainPage(t); await h.mount(); const pending = deferred(); let reads = 0;
-  h.api.scene.readActorProperties = () => ++reads === 1 ? pending.promise : Promise.resolve(properties(4));
+  h.api.scene.read_actor_properties = () => ++reads === 1 ? pending.promise : Promise.resolve(properties(4));
   const old = h.page.seedActorTransformBaseline(scene, 'Probe');
   await h.page.seedActorTransformBaseline(scene, 'Probe');
   pending.resolve(properties(0)); await old;
@@ -86,7 +86,7 @@ test('a newer property baseline wins when two reads finish out of order', async 
 
 test('a superseded property read cannot seed a baseline while the newer read is still pending', async t => {
   const h = mountMainPage(t); await h.mount(); const first = deferred(), second = deferred(); let reads = 0;
-  h.api.scene.readActorProperties = () => ++reads === 1 ? first.promise : second.promise;
+  h.api.scene.read_actor_properties = () => ++reads === 1 ? first.promise : second.promise;
   const old = h.page.seedActorTransformBaseline(scene, 'Probe');
   const current = h.page.seedActorTransformBaseline(scene, 'Probe');
   first.resolve(properties(0)); await old; assert.equal(h.page.actorTransformBaselines.size, 0);

@@ -26,7 +26,7 @@ async function fixture(t) {
   document.profile = { score: 50, updatedAt: 1000, lastScoredEventCount: 0 };
   document.metrics.nodeEdits = 2;
   const reads = [], commits = [], starts = [], cancels = [], releases = [];
-  t.mock.method(editorApi.scene, 'readActive', async () => ({ archive_session: archive, project_path: worldModeState.activeProjectPath }));
+  t.mock.method(editorApi.scene, 'read_active', async () => ({ archive_session: archive, project_path: worldModeState.activeProjectPath }));
   t.mock.method(editorApi.projectSettings, 'readProjectDocument', async request => {
     reads.push(request);
     return { success: true, content: structuredClone(document), revision: String(version) };
@@ -82,15 +82,15 @@ async function fixture(t) {
     document: () => document, project: () => worldModeState.activeProjectPath };
 }
 
-for (const boundary of ['readActive', 'readProjectDocument']) {
+for (const boundary of ['read_active', 'readProjectDocument']) {
   test(`same-path reopening retires a context read waiting on ${boundary}`, async t => {
     const f = await fixture(t);
-    const hold = f.holdOnce(boundary === 'readActive' ? editorApi.scene : editorApi.projectSettings, boundary);
+    const hold = f.holdOnce(boundary === 'read_active' ? editorApi.scene : editorApi.projectSettings, boundary);
     const request = f.readContext(f.project());
     await hold.started;
     f.reopen(); hold.release();
     await assert.rejects(request, /切换|取消/);
-    if (boundary === 'readActive') assert.equal(f.reads.length, 0, 'retired scope must not start a document read');
+    if (boundary === 'read_active') assert.equal(f.reads.length, 0, 'retired scope must not start a document read');
   });
 }
 

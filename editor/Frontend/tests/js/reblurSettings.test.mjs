@@ -12,11 +12,11 @@ function fixture(api = {}) {
   const state = scope.run(() => useReblurSettings(props, {
     getReblurSettings: async () => ({ settings: { max_history: 18, anti_firefly: false } }),
     setReblurSettings: async (...args) => { sent.push(args); return { settings: args[2], pending: true }; },
-    readCameraRenderSettings: async (...args) => {
+    read_camera_render_settings: async (...args) => {
       const result = await (api.getReblurSettings || (async () => ({ settings: { max_history: 18, anti_firefly: false } })))(args[0], args[1]);
       return result;
     },
-    setCameraRenderSettings: async (...args) => {
+    set_camera_render_settings: async (...args) => {
       if (!api.setReblurSettings) sent.push([args[0], args[1], args[2].settings]);
       const result = await (api.setReblurSettings || (async () => ({ settings: args[2].settings, pending: true })))(args[0], args[1], args[2].settings);
       return result;

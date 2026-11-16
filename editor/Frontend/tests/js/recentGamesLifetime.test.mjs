@@ -18,15 +18,15 @@ function mount(t, overrides = {}) {
   t.after(() => { unmounted?.(); globalThis.window = previous; });
   const project = {
     getAppVersion: async () => '2.0',
-    getRecentProjects: async () => { calls.push('history'); return [{ path: 'world', name: 'World' }]; },
-    getProjectLoadStatus: async () => { calls.push('status'); return { archive_service_ready: true }; },
+    get_recent_projects: async () => { calls.push('history'); return [{ path: 'world', name: 'World' }]; },
+    get_project_load_status: async () => { calls.push('status'); return { archive_service_ready: true }; },
     ...overrides,
   };
   const component = new Function('ref', 'onMounted', 'onUnmounted', 'createViewLifetime', 'useRouter', 'editorApi',
     'projectLauncherService', 'isProjectOpenSuperseded', 'notifyWorldError', compiled)(
     ref, fn => { mounted = fn; }, fn => { unmounted = fn; }, createViewLifetime,
     () => ({ push: path => routes.push(path), replace: async path => routes.push(path) }), { project },
-    { openProject: overrides.openProject || (async path => ({ ok: true, path })) }, () => false, () => {});
+    { open_project: overrides.open_project || (async path => ({ ok: true, path })) }, () => false, () => {});
   const state = component.setup({}, { expose() {} });
   return { state, calls, routes, timers, ready: mounted(), dispose: () => unmounted() };
 }
@@ -46,7 +46,7 @@ test('retired launcher does not start more reads or an interval after a late ver
 });
 
 test('retired launcher ignores a late history reply and creates no status poll', async t => {
-  const pending = deferred(), page = mount(t, { getRecentProjects: () => pending.promise });
+  const pending = deferred(), page = mount(t, { get_recent_projects: () => pending.promise });
   await Promise.resolve(); page.dispose(); pending.resolve([{ path: 'late' }]); await page.ready;
   assert.deepEqual(page.state.recentProjects.value, []); assert.equal(page.timers.size, 0);
   assert.deepEqual(page.calls, []);
@@ -54,7 +54,7 @@ test('retired launcher ignores a late history reply and creates no status poll',
 
 test('status polling cannot apply an older reply or write after retirement', async t => {
   const older = deferred(), retired = deferred(); let reads = 0;
-  const page = mount(t, { getProjectLoadStatus: () => {
+  const page = mount(t, { get_project_load_status: () => {
     ++reads;
     return reads === 2 ? older.promise : reads === 4 ? retired.promise
       : Promise.resolve({ archive_service_ready: reads === 3 });
@@ -71,21 +71,21 @@ test('status polling cannot apply an older reply or write after retirement', asy
 
 
 test('a direct project picker selection opens the project', async t => {
-  const page = mount(t, { openProjectFile: async () => ({ name: 'World', path: 'world' }) });
+  const page = mount(t, { open_project_file: async () => ({ name: 'World', path: 'world' }) });
   await page.ready;
   await page.state.handleImport();
   assert.deepEqual(page.routes, ['/']);
 });
 
 test('a canceled project picker does not open a project', async t => {
-  const page = mount(t, { openProjectFile: async () => ({}) });
+  const page = mount(t, { open_project_file: async () => ({}) });
   await page.ready;
   await page.state.handleImport();
   assert.deepEqual(page.routes, []);
 });
 
 test('a project picker completing after retirement does not open a project', async t => {
-  const pending = deferred(), page = mount(t, { openProjectFile: () => pending.promise });
+  const pending = deferred(), page = mount(t, { open_project_file: () => pending.promise });
   await page.ready;
   const importing = page.state.handleImport();
   page.dispose();
@@ -96,7 +96,7 @@ test('a project picker completing after retirement does not open a project', asy
 
 test('direct open diagnostics reach confirmation before a degraded retry', async t => {
   const calls = [], confirmations = [];
-  const page = mount(t, { openProject: async (path, options) => {
+  const page = mount(t, { open_project: async (path, options) => {
     calls.push({ path, options });
     return calls.length === 1 ? { ok: false, status: 'decision_required', diagnostics: [
       { actor_name: 'Chair', resource_path: 'Assets/chair.ply', count: 2, message: 'Missing geometry' },
@@ -115,7 +115,7 @@ test('direct open diagnostics reach confirmation before a degraded retry', async
 
 test('declining direct open diagnostics leaves the project unopened', async t => {
   let opens = 0;
-  const page = mount(t, { openProject: async () => {
+  const page = mount(t, { open_project: async () => {
     ++opens;
     return { ok: false, status: 'decision_required', diagnostics: [{ code: 'RESOURCE_NOT_FOUND' }] };
   } });

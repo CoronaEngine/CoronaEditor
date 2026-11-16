@@ -19,10 +19,10 @@ test('Actor properties use one named V8 facade and retire the duplicate actor re
   const previous = globalThis.window, parse = JSON.parse, stringify = JSON.stringify;
   t.after(() => { globalThis.window = previous; JSON.parse = parse; JSON.stringify = stringify; });
   const calls = [], result = { archive_session: 'archive', scene: 'scene.ini', name: 'Probe' };
-  globalThis.window = { corona: { scene: { readActorProperties: async (...args) => { calls.push(args); return result; } } } };
+  globalThis.window = { corona: { scene: { read_actor_properties: async (...args) => { calls.push(args); return result; } } } };
   JSON.parse = JSON.stringify = () => { throw new Error('JSON DTO transport'); };
   const scope = { archive_session: 'archive' };
-  assert.equal(await editorApi.scene.readActorProperties('scene.ini', 'guid', scope), result);
+  assert.equal(await editorApi.scene.read_actor_properties('scene.ini', 'guid', scope), result);
   assert.deepEqual(calls, [['scene.ini', 'guid', scope]]);
   assert.equal(editorApi.scene.getActor, undefined);
   assert.equal(editorApi.scene.readActor, undefined);
@@ -38,7 +38,7 @@ function objectDeps(read) {
     assignVector: (target, values, fallback) => Object.assign(target, values || fallback),
     readFollowCamera: data => data.follow_camera, normalizeBodyType: value => value || 'dynamic',
     syncViewportTransformBaseline() {}, logError() {}, unwrap: value => value,
-    editorApi: { scene: { readActorProperties: read } },
+    editorApi: { scene: { read_actor_properties: read } },
   };
 }
 
@@ -88,7 +88,7 @@ test('main viewport transform baseline uses the scoped property projection', asy
     viewCurrent: () => true, actorTransformBaselines: new Map(),
     mainSceneOperation: () => ({ current: () => true, archive: 'archive', sceneId: 'scene.ini' }),
     actorTransformKey: (scene, actor) => `${scene}::${actor}`, normalizeActorTransform: value => value,
-    editorApi: { scene: { readActorProperties: async (...args) => {
+    editorApi: { scene: { read_actor_properties: async (...args) => {
       calls.push(args); return { archive_session: 'archive', scene: 'scene.ini', geometry: { position: [1, 2, 3] } };
     } } },
   };
@@ -104,7 +104,7 @@ for (const change of ['archive', 'scene', 'unmount']) {
       viewCurrent: () => true, actorTransformBaselines: new Map(),
       mainSceneOperation: () => ({ current: () => true, archive: 'archive', sceneId: 'scene.ini' }),
       actorTransformKey: (scene, actor) => `${scene}::${actor}`, normalizeActorTransform: value => value,
-      editorApi: { scene: { readActorProperties: () => pending.promise } },
+      editorApi: { scene: { read_actor_properties: () => pending.promise } },
     };
     const work = handler('views/layout/MainPage', 'seedActorTransformBaseline', deps)('scene.ini', 'Probe');
     if (change === 'archive') deps.cameraBindingState.value.archiveSession = 'next';
@@ -124,7 +124,7 @@ test('actor index facade calls the named V8 binding with the observed scope and 
   globalThis.window = { corona: { scene: { ...sceneQueryFixture({ index: async (...args) => { calls.push(args); return result; } }),   } } };
   JSON.parse = JSON.stringify = () => { throw new Error('JSON DTO transport'); };
   const scope = { archive_session: 'archive' };
-  assert.equal(await editorApi.scene.readScene({ ...(scope), scene: 'scene.ini', actors: 'index' }), result);
+  assert.equal(await editorApi.scene.read_scene({ ...(scope), scene: 'scene.ini', actors: 'index' }), result);
   assert.deepEqual(calls, [['scene.ini', scope]]);
 });
 
@@ -158,7 +158,7 @@ test('project graph resolves its observed scene before checking a run target', a
     return { scene: 'scene.ini', archive_session: 'archive', actors: [{ name: 'Probe' }] };
   });
   deps.props.sceneName = '';
-  deps.editorApi.scene.readActive = async () => ({ scene: 'scene.ini', archive_session: 'archive' });
+  deps.editorApi.scene.read_active = async () => ({ scene: 'scene.ini', archive_session: 'archive' });
   deps.emit = (...args) => calls.push(args);
   await handler('blockly/components/NodeGraphWorkspace', 'selectRunTarget', deps)({ target: { value: 'Probe' } });
   assert.deepEqual(calls, [['scene.ini', { archive_session: 'archive' }],
@@ -168,7 +168,7 @@ test('project graph resolves its observed scene before checking a run target', a
 test('project graph never applies its old run target to a new active archive', async () => {
   const calls = [], deps = targetDeps(async (...args) => calls.push(args));
   deps.props.sceneName = '';
-  deps.editorApi.scene.readActive = async () => ({ scene: 'scene.ini', archive_session: 'next' });
+  deps.editorApi.scene.read_active = async () => ({ scene: 'scene.ini', archive_session: 'next' });
   deps.emit = (...args) => calls.push(args);
   await handler('blockly/components/NodeGraphWorkspace', 'selectRunTarget', deps)({ target: { value: 'Probe' } });
   assert.deepEqual(calls, []);

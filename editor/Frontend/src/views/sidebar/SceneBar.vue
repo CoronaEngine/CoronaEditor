@@ -533,7 +533,7 @@ const selectModelNode = (identity) => {
   if (!actorName) return;
   const actor = sceneImages.value.find((item) => item.name === actorName);
   editorApi.scene
-    .selectActor(currentSceneName.value, actor?.type || 'model', actorName, {
+    .select_actor(currentSceneName.value, actor?.type || 'model', actorName, {
       node_index: identity?.nodeIndex ?? null,
     })
     .catch((error) => logError('Failed to publish model node selection', error));
@@ -596,7 +596,7 @@ const SelectActor = (scene) => {
     },
   });
   editorApi.scene
-    .selectActor(currentSceneName.value, scene.type || 'actor', scene.name)
+    .select_actor(currentSceneName.value, scene.type || 'actor', scene.name)
     .catch((error) => {
       logError('Failed to publish actor selection', error);
     });
@@ -637,7 +637,7 @@ const DeleteCamera = async (cam) => {
     if (!context.current()) return;
     await new Promise((resolve) => setTimeout(resolve, 0));
     if (!context.current()) return;
-    await editorApi.scene.deleteCamera(context.scene, cameraId, scope);
+    await editorApi.scene.delete_camera(context.scene, cameraId, scope);
     if (!context.current()) return;
     if (selectedCameraName.value === cam.name) selectedCameraName.value = null;
     if (selectedItem.value === `cam:${cam.name}`) selectedItem.value = null;
@@ -666,7 +666,7 @@ const focusActorFromList = async (scene) => {
       logWarn('Actor focus skipped: missing target camera identity', scene?.name);
       return;
     }
-    const result = await editorApi.scene.focusActor(
+    const result = await editorApi.scene.focus_actor(
       sceneId, scene.actor_guid || scene.name, camera.camera_id, scope,
     );
     if (!context.current() || focusSeq !== actorFocusSeq) return;
@@ -744,7 +744,7 @@ const ToggleVisible = async (scene) => {
   // 音视频资源没有对应 Actor，仅在前端切换可见标记
   if (isMediaItem(scene)) return;
   try {
-    await editorApi.scene.updateActor(context.scene, scene.actor_guid || scene.name, {
+    await editorApi.scene.update_actor(context.scene, scene.actor_guid || scene.name, {
       archive_session: context.archive,
       visible: newVisible,
     });
@@ -786,12 +786,12 @@ const RebindActorResource = async (scene) => {
   if (!context.current()) return;
   const actorGuid = scene.actor_guid;
   try {
-    const selected = await editorApi.scene.selectModelFile(
+    const selected = await editorApi.scene.select_model_file(
       context.scene, 'model', { archive_session: context.archive },
     );
     const path = selected;
     if (!context.current() || !path) return;
-    const result = await editorApi.scene.rebindActorResource(
+    const result = await editorApi.scene.rebind_actor_resource(
       context.scene,
       actorGuid,
       path,
@@ -834,7 +834,7 @@ const TakeScreenshot = async () => {
   try {
     const camera = getTargetCamera();
     if (!camera?.camera_id) return;
-    await editorApi.viewport.captureScreenshot(context.scene, camera.camera_id, {
+    await editorApi.viewport.capture_screenshot(context.scene, camera.camera_id, {
       archive_session: context.archive,
     });
   } catch (e) {
@@ -856,8 +856,8 @@ const RefreshRenderBackendState = async () => {
     const current = () => viewLifetime.current() && scene === currentSceneName.value && archive === archiveSession.value;
     if (!scene || !archive) return;
     const [cameraResult, availResult] = await Promise.all([
-      editorApi.scene.readScene({ archive_session: archive, scene: scene, cameras: true }),
-      editorApi.app.isVisionAvailable(),
+      editorApi.scene.read_scene({ archive_session: archive, scene: scene, cameras: true }),
+      editorApi.app.is_vision_available(),
     ]);
     if (!current() || sequence !== renderBackendSequence || cameraResult.archive_session !== archive || cameraResult.scene !== scene) return;
     visionAvailable.value = !!availResult?.available;
@@ -880,7 +880,7 @@ const ToggleRenderBackend = async () => {
   try {
     const target = getTargetCamera();
     if (!target?.camera_id || !archiveSession.value) throw new Error('没有可用的活动相机');
-    const payload = await editorApi.scene.setCameraRenderSettings(context.scene, target.camera_id, {
+    const payload = await editorApi.scene.set_camera_render_settings(context.scene, target.camera_id, {
       archive_session: context.archive,
       render_backend: next,
     });
@@ -910,7 +910,7 @@ const ImportCamera = async () => {
     while (existingNames.has(cameraName)) {
       cameraName = `Camera_${suffix++}`;
     }
-    const payload = await editorApi.scene.createCamera(context.scene, {
+    const payload = await editorApi.scene.create_camera(context.scene, {
       archive_session: context.archive, name: cameraName,
     });
     if (!context.current()) return;
@@ -942,7 +942,7 @@ const importSceneResource = async (fileType, actorType, errorTitle) => {
   }
   publishImportProgress(true, '请稍候...');
   try {
-    const payload = await editorApi.scene.importResourceFile(scene, fileType, { archive_session: archive });
+    const payload = await editorApi.scene.import_resource_file(scene, fileType, { archive_session: archive });
     if (!current() || payload?.status === 'canceled' || !matches(payload)) return;
     if (payload?.status !== 'success') throw new Error(payload?.message || '资源导入失败');
     const media = payload.media;
@@ -953,7 +953,7 @@ const importSceneResource = async (fileType, actorType, errorTitle) => {
     const path = media?.path || payload.path;
     if (!path) throw new Error('未能获取所选文件路径');
     publishImportProgress(true, '创建对象', 55);
-    const actor = await editorApi.scene.createActor(scene, path, {
+    const actor = await editorApi.scene.create_actor(scene, path, {
       archive_session: archive,
       actor_type: actorType,
       ...(actorType === 'audio' ? { audio_resource_id: String(media?.resource_id || ''), actor_name: media?.name } : {}),
@@ -1005,7 +1005,7 @@ const DeleteActor = async (scene) => {
   const context = sceneOperation();
   if (!context.current()) return;
   try {
-    const result = await editorApi.scene.deleteActor(
+    const result = await editorApi.scene.delete_actor(
       context.scene,
       scene.actor_guid || scene.name,
       { archive_session: context.archive },
@@ -1034,7 +1034,7 @@ const OnInitObjTree = async () => {
   const current = () => viewLifetime.current() && requestSeq === sceneTreeRequestSeq
     && sceneName === currentSceneName.value && archive === archiveSession.value;
   try {
-    const data = await editorApi.scene.readScene({ archive_session: archive, scene: sceneName, actors: 'tree', cameras: true });
+    const data = await editorApi.scene.read_scene({ archive_session: archive, scene: sceneName, actors: 'tree', cameras: true });
     if (!current() || data.archive_session !== archive || data.scene !== sceneName) return;
     const nextActors = Array.isArray(data.actors)
       ? data.actors.map((item) => ({
@@ -1073,7 +1073,7 @@ const OnInitObjTree = async () => {
 
 onMounted(async () => {
   coronaEventBus.on('model-node-picked', handleModelNodePick);
-  const active = await editorApi.scene.readActive();
+  const active = await editorApi.scene.read_active();
   if (!viewLifetime.current()) return;
   const queryString = window.location.hash?.split('?')[1] || window.location.search?.slice(1);
   const urlSceneName = queryString ? new URLSearchParams(queryString).get('sceneName') : null;
@@ -1159,7 +1159,7 @@ const RefreshCameraListOnly = async () => {
   }
   cameraListRefreshInFlight = true;
   try {
-    const data = await editorApi.scene.readScene({ archive_session: archive, scene: scene, cameras: true });
+    const data = await editorApi.scene.read_scene({ archive_session: archive, scene: scene, cameras: true });
     if (!current() || data.archive_session !== archive || data.scene !== scene) return;
     if (Array.isArray(data?.cameras)) {
       applyCameraList(data.cameras);

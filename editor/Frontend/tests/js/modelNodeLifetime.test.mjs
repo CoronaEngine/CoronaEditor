@@ -28,9 +28,9 @@ function mount(t, overrides = {}) {
     'createViewLifetime', 'ResizeObserver', compiled)(computed, overrides.nextTick || (() => Promise.resolve()),
     fn => { mounted = fn; }, fn => { unmounted = fn; }, ref,
     (_, receive, options) => { if (options?.immediate) receive(); },
-    { scene: { readModelNodes: async (...args) => { calls.push({ read: args }); return overrides.read
+    { scene: { read_model_nodes: async (...args) => { calls.push({ read: args }); return overrides.read
       ? overrides.read(...args) : { nodes: [node], actor_version: 2 }; },
-    setModelNodeState: async (...args) => { calls.push({ write: args }); return overrides.write
+    set_model_node_state: async (...args) => { calls.push({ write: args }); return overrides.write
       ? overrides.write(...args) : { nodes: [{ ...node, ...args[1] }], actor_version: args[0].expected_actor_version + 1 }; } } },
     hierarchy.flattenLoadedNodes, hierarchy.MODEL_NODE_DISPLAY_MAX_SKIP, hierarchy.resolveModelNodeDisplayParent,
     hierarchy.virtualNodeWindow, createViewLifetime, Observer);

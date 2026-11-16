@@ -14,8 +14,8 @@ test('world entry retains the initialized scene controls and scene manager', asy
 for (const retiredBy of ['archive', 'unmount']) {
   test(`world entry does not select a backend after ${retiredBy} retires the initial camera read`, async t => {
     const h = mountMainPage(t);
-    const read = h.api.scene.readScene.projections.cameras;
-    h.api.scene.readScene.projections.cameras = async (...args) => {
+    const read = h.api.scene.read_scene.projections.cameras;
+    h.api.scene.read_scene.projections.cameras = async (...args) => {
       const result = await read(...args);
       if (retiredBy === 'archive') h.page.environmentArchiveSession.value = 'replacement';
       else h.unmount();
@@ -32,7 +32,7 @@ test('backend completion from a replaced archive cannot continue viewport initia
   const h = mountMainPage(t);
   await h.mount();
   h.calls.length = 0;
-  h.api.scene.setCameraRenderSettings = async () => {
+  h.api.scene.set_camera_render_settings = async () => {
     h.page.environmentArchiveSession.value = 'replacement';
     return { render_backend: 'vision' };
   };
@@ -93,7 +93,7 @@ test('a delayed environment result cannot update controls after the observed arc
   const h = mountMainPage(t);
   await h.mount();
   let release;
-  h.api.scene.readEnvironment = () => new Promise(resolve => { release = resolve; });
+  h.api.scene.read_environment = () => new Promise(resolve => { release = resolve; });
   const old = h.page.loadPhysicsParams();
   assert.equal(typeof release, 'function');
   h.page.environmentArchiveSession.value = 'replacement';
@@ -105,7 +105,7 @@ test('a delayed environment result cannot update controls after the observed arc
 test('light actions return native failures to the shared Web request owner', async t => {
   const h = mountMainPage(t);
   await h.mount();
-  h.api.scene.setEnvironment = async () => { throw Object.assign(new Error('old archive'), { code: 'PROJECT_CONTEXT_CHANGED' }); };
+  h.api.scene.set_environment = async () => { throw Object.assign(new Error('old archive'), { code: 'PROJECT_CONTEXT_CHANGED' }); };
   assert.equal(await h.creativeActions.setSceneLightEnabled(false), false);
   assert.equal(await h.creativeActions.setSceneLightDirection('x', 2), false);
   assert.equal(await h.creativeActions.setSceneLightDirection('unknown', 2), false);
@@ -224,8 +224,8 @@ test('world entry reads the active scene without the retired main facade', async
   const h = mountMainPage(t);
   delete h.api.main;
   let reads = 0;
-  const read = h.api.scene.readActive;
-  h.api.scene.readActive = async () => { reads++; return read(); };
+  const read = h.api.scene.read_active;
+  h.api.scene.read_active = async () => { reads++; return read(); };
   await h.mount();
   assert.equal(reads, 1);
   assert.equal(h.page.currentSceneId.value, 'scene_v3.xml');
@@ -234,7 +234,7 @@ test('world entry reads the active scene without the retired main facade', async
 for (const active of [{ archive_session: '', scene: '' }, { archive_session: 'main-archive', scene: '' }]) {
   test(`world entry does not invent a default scene for ${JSON.stringify(active)}`, async t => {
     const h = mountMainPage(t);
-    h.api.scene.readActive = async () => active;
+    h.api.scene.read_active = async () => active;
     await h.mount();
     assert.deepEqual(h.calls, []);
     assert.deepEqual(h.observed, []);
@@ -242,7 +242,7 @@ for (const active of [{ archive_session: '', scene: '' }, { archive_session: 'ma
 }
 test('unmounted world entry ignores an active-scene response', async t => {
   const h = mountMainPage(t);
-  h.api.scene.readActive = async () => { h.unmount(); return { archive_session: 'main-archive', scene: 'scene_v3.xml' }; };
+  h.api.scene.read_active = async () => { h.unmount(); return { archive_session: 'main-archive', scene: 'scene_v3.xml' }; };
   await h.mount();
   assert.deepEqual(h.calls, []);
 });
@@ -259,10 +259,10 @@ test('interleaved project notifications discard the earlier active-scene reply',
   const h = mountMainPage(t);
   await h.mount();
   let release;
-  h.api.scene.readActive = () => new Promise(resolve => { release = resolve; });
+  h.api.scene.read_active = () => new Promise(resolve => { release = resolve; });
   const earlier = h.page.onProjectOpenedEvent({ archive_session: 'retired', scene: { path: 'old.ini' } });
   assert.equal(typeof release, 'function');
-  h.api.scene.readActive = async () => ({ archive_session: 'main-archive', scene: 'scene_v3.xml' });
+  h.api.scene.read_active = async () => ({ archive_session: 'main-archive', scene: 'scene_v3.xml' });
   await h.page.onProjectOpenedEvent({ archive_session: 'main-archive', scene: { path: 'scene_v3.xml' } });
   release({ archive_session: 'retired', scene: 'old.ini' });
   await earlier;
@@ -276,9 +276,9 @@ test('a rejected stale notification cannot cancel a valid project refresh alread
   await h.mount();
   h.calls.length = 0;
   let release;
-  h.api.scene.readActive = () => new Promise(resolve => { release = resolve; });
+  h.api.scene.read_active = () => new Promise(resolve => { release = resolve; });
   const current = h.page.onProjectOpenedEvent({ archive_session: 'main-archive' });
-  h.api.scene.readActive = async () => ({ archive_session: 'main-archive', scene: 'scene_v3.xml' });
+  h.api.scene.read_active = async () => ({ archive_session: 'main-archive', scene: 'scene_v3.xml' });
   await h.page.onProjectOpenedEvent({ archive_session: 'retired' });
   release({ archive_session: 'main-archive', scene: 'scene_v3.xml' });
   await current;

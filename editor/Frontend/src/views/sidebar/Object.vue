@@ -56,7 +56,7 @@
         <div class="property-row property-row-wide">
           <label>模型资源</label>
           <input :value="actor.modelPath" type="text" readonly placeholder="未设置模型资源" />
-          <button type="button" class="inline-button" @click="selectModelFile">浏览</button>
+          <button type="button" class="inline-button" @click="select_model_file">浏览</button>
         </div>
       </section>
 
@@ -463,7 +463,7 @@ async function loadActor(sceneName, actorName, session, actorGuid) {
     && archiveSession.value === session;
   ikController.clear();
   try {
-    const data = await editorApi.scene.readActorProperties(sceneName, actorGuid || actorName, { archive_session: session });
+    const data = await editorApi.scene.read_actor_properties(sceneName, actorGuid || actorName, { archive_session: session });
     if (!current() || data?.archive_session !== session || data?.scene !== sceneName) return;
     if (!data || data.status === 'error') throw new Error(data?.message || '无法读取对象属性');
     archiveSession.value = data.archive_session || '';
@@ -522,7 +522,7 @@ async function commitAlias() {
   aliasSaving.value = true;
   aliasError.value = '';
   try {
-    const result = await editorApi.scene.updateActor(currentScene, actor.actorGuid || currentName, {
+    const result = await editorApi.scene.update_actor(currentScene, actor.actorGuid || currentName, {
       archive_session: operation.session,
       name: nextName,
     });
@@ -571,7 +571,7 @@ function flushTransformUpdates() {
         : update.operation === 'SetRotation'
           ? 'rotation'
           : 'scale';
-      return editorApi.scene.setActorTransform(
+      return editorApi.scene.set_actor_transform(
         update.sceneName,
         update.actorName,
         { [key]: update.vector, archive_session: update.session },
@@ -640,7 +640,7 @@ async function setRenderSpace(enabled) {
   const previous = actor.followCamera;
   actor.followCamera = enabled;
   try {
-    await editorApi.scene.updateActor(
+    await editorApi.scene.update_actor(
       selectedSceneName.value,
       selectedActorName.value,
       { archive_session: archiveSession.value, follow_camera: Boolean(enabled) },
@@ -652,11 +652,11 @@ async function setRenderSpace(enabled) {
   }
 }
 
-async function selectModelFile() {
+async function select_model_file() {
   if (!viewLifetime.current() || !selectedActorName.value) return;
   const operation = actorOperation();
   try {
-    const path = await editorApi.scene.selectModelFile(
+    const path = await editorApi.scene.select_model_file(
       operation.scene, 'model', { archive_session: operation.session },
     );
     if (operation.current() && path) actor.modelPath = String(path);
@@ -670,11 +670,11 @@ async function rebindPlaceholderResource() {
   const operation = actorOperation();
   placeholderRebinding.value = true;
   try {
-    const path = await editorApi.scene.selectModelFile(
+    const path = await editorApi.scene.select_model_file(
       operation.scene, 'model', { archive_session: operation.session },
     );
     if (!operation.current() || !path) return;
-    const result = await editorApi.scene.rebindActorResource(
+    const result = await editorApi.scene.rebind_actor_resource(
       operation.scene,
       operation.guid,
       path,
@@ -700,7 +700,7 @@ async function setBodyType(type) {
   const next = normalizeBodyType(type);
   actor.mechanics.bodyType = next;
   try {
-    await editorApi.scene.updateActor(
+    await editorApi.scene.update_actor(
       selectedSceneName.value,
       selectedActorName.value,
       { archive_session: archiveSession.value, mechanics: { body_type: next } },
@@ -739,7 +739,7 @@ async function updateMechanic(operation, value) {
     return;
   }
   try {
-    await editorApi.scene.updateActor(
+    await editorApi.scene.update_actor(
       selectedSceneName.value,
       selectedActorName.value,
       { archive_session: archiveSession.value, mechanics: { [field]: value } },
@@ -771,7 +771,7 @@ async function updateLocks(operation, values) {
     return;
   }
   try {
-    await editorApi.scene.updateActor(
+    await editorApi.scene.update_actor(
       selectedSceneName.value,
       selectedActorName.value,
       { archive_session: archiveSession.value, mechanics: { [field]: values.map((value) => Boolean(value)) } },
@@ -796,7 +796,7 @@ async function updateCameraLock() {
   if (!viewLifetime.current() || !selectedActorName.value) return;
   const context = actorOperation();
   try {
-    await editorApi.scene.updateActor(
+    await editorApi.scene.update_actor(
       selectedSceneName.value,
       selectedActorName.value,
       { archive_session: archiveSession.value, camera_lock: { enabled: actor.cameraLock.enabled } },
@@ -815,7 +815,7 @@ async function updateCameraLockOffset() {
     return Number.isFinite(number) ? number : fallback;
   };
   try {
-    await editorApi.scene.updateActor(
+    await editorApi.scene.update_actor(
       selectedSceneName.value,
       selectedActorName.value,
       {

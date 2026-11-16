@@ -50,7 +50,7 @@ export async function stopWorldRuntimeBeforeOpen(api = editorApi) {
 }
 
 export const projectLauncherService = {
-  openProject: (projectPath, options = {}) => {
+  open_project: (projectPath, options = {}) => {
     // Selection ownership starts at submission, NOT when the native queue runs.
     const selection = ++selectionVersion;
     const current = () => selection === selectionVersion;
@@ -64,7 +64,7 @@ export const projectLauncherService = {
           await appService.setEditorUiEnabled(false);
         }
         await drainWorldSession();
-        await withWorldTimeout(editorApi.network.stopSession(), '关闭旧世界网络会话');
+        await withWorldTimeout(editorApi.network.stop_session(), '关闭旧世界网络会话');
         if (runtimeCleanupRequired) {
           await withWorldTimeout(stopWorldRuntimeBeforeOpen(), '停止旧世界运行');
           runtimeCleanupRequired = false;
@@ -72,7 +72,7 @@ export const projectLauncherService = {
         if (!current()) return superseded();
         const loadPolicy = options.loadPolicy || options.load_policy || 'prompt';
         // Native scene replacement is serialized even if this selection becomes stale.
-        const result = await editorApi.project.openProject(projectPath, { load_policy: loadPolicy });
+        const result = await editorApi.project.open_project(projectPath, { load_policy: loadPolicy });
         if (!current()) return superseded();
         const opened = result;
         const activeProjectPath = opened?.path || projectPath;

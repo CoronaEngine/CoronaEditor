@@ -20,10 +20,10 @@ function mount(t, overrides = {}) {
   const api = namespace => new Proxy({}, { get: (_, method) => (...args) => {
     calls.push({ method, args });
     if (overrides[method]) return overrides[method](...args);
-    if (method === 'readScene') return Promise.resolve({ archive_session: args[0].archive_session,
+    if (method === 'read_scene') return Promise.resolve({ archive_session: args[0].archive_session,
       scene: args[0].scene, actors: [{ name: 'Probe', actor_guid: 'actor', type: 'model' }], cameras: [] });
-    if (method === 'createCamera') return Promise.resolve({ camera: { name: 'New', camera_id: 'new-camera' } });
-    if (method === 'isVisionAvailable') return Promise.resolve({ available: true });
+    if (method === 'create_camera') return Promise.resolve({ camera: { name: 'New', camera_id: 'new-camera' } });
+    if (method === 'is_vision_available') return Promise.resolve({ available: true });
     return Promise.resolve(namespace === 'window' ? {} : { ok: true });
   } });
   const bindings = { ref, reactive, onMounted() {}, onUnmounted: fn => { unmounted = fn; }, createViewLifetime,
@@ -71,21 +71,21 @@ for (const retirement of ['unmount', 'archive', 'scene']) {
   });
 
   test(`SceneBar created camera cannot open a new window after ${retirement}`, async t => {
-    const pending = deferred(), page = mount(t, { createCamera: () => pending.promise });
+    const pending = deferred(), page = mount(t, { create_camera: () => pending.promise });
     const creating = page.state.ImportCamera();
     retire(page); pending.resolve({ camera: { name: 'New', camera_id: 'new-camera' } }); await creating;
-    assert.deepEqual(page.calls.map(call => call.method), ['createCamera']);
+    assert.deepEqual(page.calls.map(call => call.method), ['create_camera']);
   });
 
   test(`SceneBar resource chooser cannot bind to a changed scope after ${retirement}`, async t => {
-    const pending = deferred(), page = mount(t, { selectModelFile: () => pending.promise });
+    const pending = deferred(), page = mount(t, { select_model_file: () => pending.promise });
     const selecting = page.state.RebindActorResource(page.actor);
     retire(page); pending.resolve('replacement.ply'); await selecting;
-    assert.deepEqual(page.calls.map(call => call.method), ['selectModelFile']);
+    assert.deepEqual(page.calls.map(call => call.method), ['select_model_file']);
   });
 
   test(`SceneBar render backend reply cannot overwrite retired state after ${retirement}`, async t => {
-    const pending = deferred(), page = mount(t, { setCameraRenderSettings: () => pending.promise });
+    const pending = deferred(), page = mount(t, { set_camera_render_settings: () => pending.promise });
     const switching = page.state.ToggleRenderBackend();
     retire(page); pending.resolve({ render_backend: 'vision' }); await switching;
     assert.equal(page.state.activeRenderBackend.value, 'native');
@@ -99,7 +99,7 @@ for (const retirement of ['unmount', 'archive', 'scene']) {
   });
 
   test(`SceneBar stale visibility failure cannot roll back a retired row after ${retirement}`, async t => {
-    const pending = deferred(), page = mount(t, { updateActor: () => pending.promise });
+    const pending = deferred(), page = mount(t, { update_actor: () => pending.promise });
     const editing = page.state.ToggleVisible(page.actor);
     retire(page); pending.reject(new Error('old visibility edit')); await editing;
     assert.equal(page.actor.visible, false);
@@ -107,21 +107,21 @@ for (const retirement of ['unmount', 'archive', 'scene']) {
   });
 
   test(`SceneBar stale delete reply cannot clear the new selection after ${retirement}`, async t => {
-    const pending = deferred(), page = mount(t, { deleteActor: () => pending.promise });
+    const pending = deferred(), page = mount(t, { delete_actor: () => pending.promise });
     page.state.selectedItem.value = 'Probe';
     const deleting = page.state.DeleteActor(page.actor);
     retire(page); pending.resolve({ actor_guid: 'actor' }); await deleting;
     assert.equal(page.state.selectedItem.value, 'Probe');
-    assert.equal(page.calls.filter(call => call.method === 'readScene').length, 0);
+    assert.equal(page.calls.filter(call => call.method === 'read_scene').length, 0);
   });
 
   for (const [method, pendingMethod, argumentsFor] of [
     ['OpenCameraView', 'createCameraView', page => [page.camera]],
-    ['ImportCamera', 'createCamera', () => []],
-    ['RebindActorResource', 'selectModelFile', page => [page.actor]],
-    ['TakeScreenshot', 'captureScreenshot', () => []],
-    ['focusActorFromList', 'focusActor', page => [page.actor]],
-    ['RefreshRenderBackendState', 'readScene', () => []],
+    ['ImportCamera', 'create_camera', () => []],
+    ['RebindActorResource', 'select_model_file', page => [page.actor]],
+    ['TakeScreenshot', 'capture_screenshot', () => []],
+    ['focusActorFromList', 'focus_actor', page => [page.actor]],
+    ['RefreshRenderBackendState', 'read_scene', () => []],
   ]) {
     test(`SceneBar ${method} late failure is ignored after ${retirement}`, async t => {
       const pending = deferred(), page = mount(t, { [pendingMethod]: () => pending.promise });
@@ -136,21 +136,21 @@ for (const retirement of ['unmount', 'archive', 'scene']) {
     const creating = page.state.ImportCamera();
     await setImmediate(); retire(page); pending.resolve({}); await creating;
     assert.equal(page.state.selectedCameraName.value, 'Camera');
-    assert.equal(page.calls.filter(call => call.method === 'readScene').length, 0);
+    assert.equal(page.calls.filter(call => call.method === 'read_scene').length, 0);
   });
 
   test(`SceneBar rebind reply cannot alert or refresh after ${retirement}`, async t => {
-    const pending = deferred(), page = mount(t, { selectModelFile: async () => 'replacement.ply',
-      rebindActorResource: () => pending.promise });
+    const pending = deferred(), page = mount(t, { select_model_file: async () => 'replacement.ply',
+      rebind_actor_resource: () => pending.promise });
     const rebinding = page.state.RebindActorResource(page.actor);
     await setImmediate(); retire(page); pending.resolve({ ok: false }); await rebinding;
     assert.deepEqual(page.errors, []);
-    assert.equal(page.calls.filter(call => call.method === 'readScene').length, 0);
+    assert.equal(page.calls.filter(call => call.method === 'read_scene').length, 0);
   });
 }
 
 test('SceneBar cannot apply a backend reply to a different selected camera', async t => {
-  const pending = deferred(), page = mount(t, { setCameraRenderSettings: () => pending.promise });
+  const pending = deferred(), page = mount(t, { set_camera_render_settings: () => pending.promise });
   const switching = page.state.ToggleRenderBackend();
   page.state.selectedCameraName.value = 'Main';
   pending.resolve({ render_backend: 'vision' }); await switching;
@@ -159,7 +159,7 @@ test('SceneBar cannot apply a backend reply to a different selected camera', asy
 
 test('SceneBar newer backend change wins over an older read', async t => {
   const pending = deferred(), page = mount(t, { ...sceneQueryFixture({ cameras: () => pending.promise }),
-    setCameraRenderSettings: async () => ({ render_backend: 'vision' }) });
+    set_camera_render_settings: async () => ({ render_backend: 'vision' }) });
   const reading = page.state.RefreshRenderBackendState();
   await page.state.ToggleRenderBackend();
   pending.resolve({ archive_session: 'archive', scene: 'scene.ini', cameras: [{ camera_id: 'camera', render_backend: 'native' }] });
@@ -169,7 +169,7 @@ test('SceneBar newer backend change wins over an older read', async t => {
 
 test('SceneBar old visibility failure cannot undo a newer same-value edit', async t => {
   const pending = deferred(); let calls = 0;
-  const page = mount(t, { updateActor: () => ++calls === 1 ? pending.promise : Promise.resolve({}) });
+  const page = mount(t, { update_actor: () => ++calls === 1 ? pending.promise : Promise.resolve({}) });
   const first = page.state.ToggleVisible(page.actor);
   await page.state.ToggleVisible(page.actor); await page.state.ToggleVisible(page.actor);
   pending.reject(new Error('first visibility edit failed')); await first;
@@ -188,14 +188,14 @@ test('SceneBar live camera deletion keeps close, retirement wait, delete and ref
   const page = mount(t);
   const deleting = page.state.DeleteCamera(page.camera);
   await setImmediate(); await page.tick(); await deleting;
-  assert.deepEqual(page.calls.map(call => call.method), ['closeCameraView', 'deleteCamera', 'readScene']);
+  assert.deepEqual(page.calls.map(call => call.method), ['closeCameraView', 'delete_camera', 'read_scene']);
   assert.deepEqual(page.calls[1].args, ['scene.ini', 'camera', { archive_session: 'archive' }]);
 });
 
 test('SceneBar live camera creation still opens exactly one surface', async t => {
   const page = mount(t);
   await page.state.ImportCamera();
-  assert.deepEqual(page.calls.map(call => call.method), ['createCamera', 'createCameraView', 'readScene']);
+  assert.deepEqual(page.calls.map(call => call.method), ['create_camera', 'createCameraView', 'read_scene']);
 });
 
 
@@ -209,22 +209,22 @@ test('SceneBar live save notifies only after native success with the captured sc
 });
 
 test('SceneBar canceled resource chooser leaves the actor untouched', async t => {
-  const page = mount(t, { selectModelFile: async () => '' });
+  const page = mount(t, { select_model_file: async () => '' });
   await page.state.RebindActorResource(page.actor);
-  assert.deepEqual(page.calls.map(call => call.method), ['selectModelFile']);
+  assert.deepEqual(page.calls.map(call => call.method), ['select_model_file']);
   assert.deepEqual(page.errors, []);
 });
 
 test('SceneBar live rebind preserves actor GUID and archive through refresh', async t => {
-  const page = mount(t, { selectModelFile: async () => 'replacement.ply' });
+  const page = mount(t, { select_model_file: async () => 'replacement.ply' });
   await page.state.RebindActorResource(page.actor);
-  assert.deepEqual(page.calls.map(call => call.method), ['selectModelFile', 'rebindActorResource', 'readScene']);
+  assert.deepEqual(page.calls.map(call => call.method), ['select_model_file', 'rebind_actor_resource', 'read_scene']);
   assert.deepEqual(page.calls[1].args, ['scene.ini', 'actor', 'replacement.ply', { archive_session: 'archive' }]);
   assert.deepEqual(page.errors, []);
 });
 
 test('SceneBar current visibility failure rolls back and reports the failed edit', async t => {
-  const page = mount(t, { updateActor: async () => { throw Error('native rejected'); } });
+  const page = mount(t, { update_actor: async () => { throw Error('native rejected'); } });
   await page.state.ToggleVisible(page.actor);
   assert.equal(page.actor.visible, true);
   assert.deepEqual(page.calls[0].args, ['scene.ini', 'actor', { archive_session: 'archive', visible: false }]);
@@ -232,17 +232,17 @@ test('SceneBar current visibility failure rolls back and reports the failed edit
 });
 
 test('SceneBar current render backend failure preserves the previous value and reports it', async t => {
-  const page = mount(t, { setCameraRenderSettings: async () => { throw Error('native rejected'); } });
+  const page = mount(t, { set_camera_render_settings: async () => { throw Error('native rejected'); } });
   await page.state.ToggleRenderBackend();
   assert.equal(page.state.activeRenderBackend.value, 'native');
   assert.equal(page.errors.length, 1);
 });
 
 test('SceneBar current actor deletion clears its selection and refreshes', async t => {
-  const page = mount(t, { deleteActor: async () => ({ actor_guid: 'actor' }) });
+  const page = mount(t, { delete_actor: async () => ({ actor_guid: 'actor' }) });
   page.state.selectedItem.value = 'Probe';
   await page.state.DeleteActor(page.actor);
   assert.equal(page.state.selectedItem.value, null);
-  assert.deepEqual(page.calls.map(call => call.method), ['deleteActor', 'readScene']);
+  assert.deepEqual(page.calls.map(call => call.method), ['delete_actor', 'read_scene']);
   assert.deepEqual(page.errors, []);
 });

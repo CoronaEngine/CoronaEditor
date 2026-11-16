@@ -8,9 +8,9 @@ import { test } from 'node:test';
 // the shape to pin.
 
 const WINDOW_METHODS = [
-  'close', 'focus', 'createPanel', 'setWindowPresentation',
+  'close', 'focus', 'create_panel', 'set_window_presentation',
 ];
-const WINDOW_EVENTS = ['onClosed', 'onCloseRequested'];
+const WINDOW_EVENTS = ['on_closed', 'on_close_requested'];
 
 function withNativeWindow(t, native) {
   const previous = globalThis.window;
@@ -28,14 +28,14 @@ test('the facade exposes a window namespace with every named binding', async () 
 test('window wrapper passes each identity through unchanged', async t => {
   const calls = [];
   const native = {
-    createPanel: async options => { calls.push(['createPanel', options]); return { window_token: 1 }; },
+    create_panel: async options => { calls.push(['create_panel', options]); return { window_token: 1 }; },
     close: async identity => { calls.push(['close', identity]); return { closed: 1 }; },
     focus: async identity => { calls.push(['focus', identity]); return true; },
   };
   withNativeWindow(t, native);
   const { editorApi } = await import(`../../src/api/editorApi.js?window-passthrough=${Date.now()}`);
   const options = { panelId: 'inspector', routePath: '/Inspector' };
-  assert.deepEqual(await editorApi.window.createPanel(options), { window_token: 1 });
+  assert.deepEqual(await editorApi.window.create_panel(options), { window_token: 1 });
   assert.equal(calls[0][1], options);
   await editorApi.window.close({ panelId: 'inspector' });
   assert.deepEqual(calls[1], ['close', { panelId: 'inspector' }]);
@@ -57,14 +57,14 @@ test('window event subscriptions return the native unsubscribe function', async 
   const stop = () => {};
   const seen = [];
   const native = {
-    onClosed: cb => { seen.push(cb); return stop; },
-    onCloseRequested: cb => { seen.push(cb); return stop; },
+    on_closed: cb => { seen.push(cb); return stop; },
+    on_close_requested: cb => { seen.push(cb); return stop; },
   };
   withNativeWindow(t, native);
   const { editorApi } = await import(`../../src/api/editorApi.js?window-events=${Date.now()}`);
   const closed = () => {}, requested = () => {};
-  assert.equal(editorApi.window.onClosed(closed), stop);
-  assert.equal(editorApi.window.onCloseRequested(requested), stop);
+  assert.equal(editorApi.window.on_closed(closed), stop);
+  assert.equal(editorApi.window.on_close_requested(requested), stop);
   assert.deepEqual(seen, [closed, requested]);
 });
 
@@ -72,11 +72,11 @@ test('the facade exposes one native window presence probe', async t => {
   withNativeWindow(t, undefined);
   const absent = await import(`../../src/api/editorApi.js?window-presence=${Date.now()}`);
   assert.equal(absent.editorApi.window.hasWindowBindings(), false);
-  // Both halves matter: retiring windows needs close, subscribing needs onCloseRequested.
+  // Both halves matter: retiring windows needs close, subscribing needs on_close_requested.
   withNativeWindow(t, { close: () => {} });
   const half = await import(`../../src/api/editorApi.js?window-presence2=${Date.now()}`);
   assert.equal(half.editorApi.window.hasWindowBindings(), false);
-  withNativeWindow(t, { close: () => {}, onCloseRequested: () => {} });
+  withNativeWindow(t, { close: () => {}, on_close_requested: () => {} });
   const present = await import(`../../src/api/editorApi.js?window-presence3=${Date.now()}`);
   assert.equal(present.editorApi.window.hasWindowBindings(), true);
 });

@@ -281,33 +281,33 @@ const runBusy = async (message, work) => {
 const stopExistingSession = async () => {
   if (!viewLifetime.current()) return;
   try {
-    const info = await editorApi.network.getSessionInfo();
+    const info = await editorApi.network.get_session_info();
     if (!viewLifetime.current()) return;
     if (info?.active) {
-      await editorApi.network.stopSession();
+      await editorApi.network.stop_session();
     }
   } catch (_) {
-    // 没有会话或读取失败时，后续 startSession 会给出明确错误。
+    // 没有会话或读取失败时，后续 start_session 会给出明确错误。
   }
 };
 
 const prepareMultiplayerProject = async (role) => {
   if (!viewLifetime.current()) return null;
   busyText.value = '正在准备联机存档…';
-  const project = await editorApi.project.createMultiplayerProject({ role });
+  const project = await editorApi.project.create_multiplayer_project({ role });
   if (!viewLifetime.current()) return null;
   if (!project?.path) {
     throw new Error('创建联机存档失败');
   }
 
-  const opened = await projectLauncherService.openProject(project.path);
+  const opened = await projectLauncherService.open_project(project.path);
   if (!viewLifetime.current() || isProjectOpenSuperseded(opened)) return null;
   const openedOk = opened;
   if (!openedOk?.ok) {
     throw new Error('打开联机存档失败');
   }
 
-  const rootResult = await editorApi.network.setProjectRoot(project.path);
+  const rootResult = await editorApi.network.set_project_root(project.path);
   if (!viewLifetime.current()) return null;
   if (rootResult?.ok === false) {
     throw new Error(rootResult.error || '设置联机项目目录失败');
@@ -315,10 +315,10 @@ const prepareMultiplayerProject = async (role) => {
   return project;
 };
 
-const startSession = async (role, port, instanceName = playerName()) => {
+const start_session = async (role, port, instanceName = playerName()) => {
   if (!viewLifetime.current()) return null;
   busyText.value = role === 'host' ? '正在创建房间…' : '正在启动本地客户端…';
-  const result = await editorApi.network.startSession(instanceName, 0, port, role);
+  const result = await editorApi.network.start_session(instanceName, 0, port, role);
   if (!viewLifetime.current()) return null;
   if (!result?.ok) {
     throw new Error(result?.error || '启动联机会话失败');
@@ -331,9 +331,9 @@ const handleRefresh = async () => {
   if (!viewLifetime.current() || scanning.value) return;
   scanning.value = true;
   try {
-    await editorApi.network.clearDiscoveredPeers().catch(() => {});
+    await editorApi.network.clear_discovered_peers().catch(() => {});
     if (!viewLifetime.current()) return;
-    await editorApi.network.searchLan();
+    await editorApi.network.search_lan();
     if (!viewLifetime.current()) return;
     await new Promise(resolve => {
       finishDiscoveryDelay = resolve;
@@ -344,7 +344,7 @@ const handleRefresh = async () => {
       }, 1500);
     });
     if (!viewLifetime.current()) return;
-    const result = await editorApi.network.getDiscoveredPeers();
+    const result = await editorApi.network.get_discovered_peers();
     if (!viewLifetime.current()) return;
     const peers = Array.isArray(result?.peers) ? result.peers : [];
     rooms.value = peers
@@ -369,11 +369,11 @@ const joinHost = async ({ ip, port, peerName = '' }) => {
     await stopExistingSession();
     if (!viewLifetime.current()) return;
     if (!await prepareMultiplayerProject('guest')) return;
-    await startSession('client', port);
+    await start_session('client', port);
     if (!viewLifetime.current()) return;
 
     busyText.value = '正在连接房主…';
-    const result = await editorApi.network.connectToPeer(ip, port, peerName || playerName());
+    const result = await editorApi.network.connect_to_peer(ip, port, peerName || playerName());
     if (!viewLifetime.current()) return;
     if (!result?.ok) {
       throw new Error(result?.error || '连接房主失败');
@@ -403,7 +403,7 @@ const handleCreateRoom = () => {
     await stopExistingSession();
     if (!viewLifetime.current()) return;
     if (!await prepareMultiplayerProject('host')) return;
-    await startSession('host', parsePort(host.value.port), host.value.roomName.trim() || playerName());
+    await start_session('host', parsePort(host.value.port), host.value.roomName.trim() || playerName());
     if (viewLifetime.current()) router.push('/');
   });
 };
@@ -415,7 +415,7 @@ const goHome = () => {
 const loadLocalIp = async () => {
   if (!viewLifetime.current()) return;
   try {
-    const result = await editorApi.network.getSessionInfo();
+    const result = await editorApi.network.get_session_info();
     if (!viewLifetime.current()) return;
     if (result?.local_ip) {
       localIp.value = result.local_ip;

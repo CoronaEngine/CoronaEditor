@@ -22,8 +22,8 @@ function fixture(type = 'model') {
     viewLifetime:{current:()=>true},ShowModelDropdown:{value:true},publishImportProgress:()=>{},
     reportImportError:(...v)=>errors.push(v),OnInitObjTree:async()=>{refreshed.push(true);},
     cabbageContextService:{recordEvent:v=>events.push(v)},addMediaToList:async v=>media.push(v),
-    editorApi:{scene:{importResourceFile:async()=>payload,createActor:async(...v)=>{created.push(v);return result;}},
-      sceneTools:{createActor:async(...v)=>{created.push(v);return result;}}},
+    editorApi:{scene:{import_resource_file:async()=>payload,create_actor:async(...v)=>{created.push(v);return result;}},
+      sceneTools:{create_actor:async(...v)=>{created.push(v);return result;}}},
   };
   const handlers = make(deps);
   return {deps,payload,result,created,refreshed,errors,events,media,run:()=>handlers[type]()};
@@ -33,10 +33,10 @@ test('Actor creation forwards captured scope without JSON or archive rediscovery
   const previous = globalThis.window, stringify=JSON.stringify, parse=JSON.parse;
   t.after(()=>{globalThis.window=previous;JSON.stringify=stringify;JSON.parse=parse;});
   const calls=[], result={status:'success',actor:{actor_guid:'guid'}};
-  globalThis.window={corona:{scene:{createActor:async(...v)=>{calls.push(v);return result;}}}};
+  globalThis.window={corona:{scene:{create_actor:async(...v)=>{calls.push(v);return result;}}}};
   JSON.stringify=JSON.parse=()=>{throw Error('JSON transport forbidden');};
   const options={archive_session:'archive',actor_type:'audio',audio_resource_id:'18446744073709551615'};
-  assert.equal(await editorApi.scene.createActor('scene.ini','sound.wav',options),result);
+  assert.equal(await editorApi.scene.create_actor('scene.ini','sound.wav',options),result);
   assert.deepEqual(calls,[['scene.ini','sound.wav',options]]);
   assert.equal(editorApi.sceneTools,undefined);
 });
@@ -52,7 +52,7 @@ for (const type of ['model','ui_image','actor','multimedia']) {
   });
   for (const change of ['archive','scene','unmount']) {
     test(`${type} picker reply cannot create after ${change}`,async()=>{
-      const f=fixture(type),pending=deferred();f.deps.editorApi.scene.importResourceFile=()=>pending.promise;
+      const f=fixture(type),pending=deferred();f.deps.editorApi.scene.import_resource_file=()=>pending.promise;
       const work=f.run();
       if(change==='archive')f.deps.archiveSession.value='new-archive';
       if(change==='scene')f.deps.currentSceneName.value='other.ini';
@@ -66,7 +66,7 @@ for (const type of ['model','ui_image','actor','multimedia']) {
 for (const phase of ['creation','refresh']) {
   test(`a late ${phase} reply cannot select or publish into a replacement archive`,async()=>{
     const f=fixture(),pending=deferred();
-    if(phase==='creation')f.deps.editorApi.scene.createActor=f.deps.editorApi.sceneTools.createActor=()=>pending.promise;
+    if(phase==='creation')f.deps.editorApi.scene.create_actor=f.deps.editorApi.sceneTools.create_actor=()=>pending.promise;
     else f.deps.OnInitObjTree=()=>pending.promise;
     const work=f.run();await new Promise(r=>setImmediate(r));
     f.deps.archiveSession.value='new-archive';pending.resolve(f.result);await work;
@@ -83,7 +83,7 @@ test('cancellation and mismatched picker scope never create Actors',async()=>{
 test('a newer import supersedes an older outstanding picker without duplicate creation', async () => {
   const f=fixture(), first=deferred(), second=deferred();
   let count=0;
-  f.deps.editorApi.scene.importResourceFile=()=>++count===1?first.promise:second.promise;
+  f.deps.editorApi.scene.import_resource_file=()=>++count===1?first.promise:second.promise;
   const old=f.run(), recent=f.run();
   second.resolve(f.payload);await recent;
   first.resolve(f.payload);await old;
@@ -96,6 +96,6 @@ test('video import stays a resource and does not create an audio Actor', async (
 });
 
 test('native creation rejection reports failure without refreshing or selecting', async () => {
-  const f=fixture();f.deps.editorApi.scene.createActor=async()=>{throw Error('creation failed');};
+  const f=fixture();f.deps.editorApi.scene.create_actor=async()=>{throw Error('creation failed');};
   await f.run();assert.equal(f.errors.length,1);assert.deepEqual(f.refreshed,[]);assert.equal(f.deps.selectedItem.value,'');
 });

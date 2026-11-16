@@ -25,7 +25,7 @@ function fixture() {
   const result = { archive_session: 'archive', scene: 'scene.ini', camera: {
     camera_id: 'camera-guid', position: [1, 2, 3], forward: [0, 0, 1], world_up: [0, 1, 0], fov: 45,
   } };
-  const api = { scene: { focusActor: async (...args) => { calls.push(args); return result; } } };
+  const api = { scene: { focus_actor: async (...args) => { calls.push(args); return result; } } };
   const appService = { crossTabBroadcast: async (...args) => events.push(args) };
   const focus = makeFocus({ editorApi: api, appService, currentSceneName: ref('scene.ini'), archiveSession,
     getTargetCamera: () => ({ camera_id: 'camera-guid', name: 'Display camera' }),
@@ -114,13 +114,13 @@ test('CameraView accepts an applied pose for its own camera without publishing i
 test('SceneBar does not publish an old focus after its archive changes or native rejects', async () => {
   const f = fixture();
   let release;
-  f.api.scene.focusActor = () => new Promise(resolve => { release = resolve; });
+  f.api.scene.focus_actor = () => new Promise(resolve => { release = resolve; });
   const pending = f.focus({ name: 'Actor' });
   f.archiveSession.value = 'replacement';
   release(f.result);
   await pending;
   assert.deepEqual(f.events, []);
-  f.api.scene.focusActor = () => Promise.reject(new Error('Native focus failed'));
+  f.api.scene.focus_actor = () => Promise.reject(new Error('Native focus failed'));
   await f.focus({ name: 'Actor' });
   assert.deepEqual(f.events, []);
   assert.equal(f.errors.length, 1);

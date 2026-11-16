@@ -140,8 +140,8 @@ test('only persistent scene methods mark the scene dirty', async () => {
   const clock = fakeClock();
   const calls = [];
   const scene = {
-    readActive: async () => ({ archive_session: 'lease', scene: 'scene.ini', read_only: false }),
-    readScene: () => calls.push('readScene'),
+    read_active: async () => ({ archive_session: 'lease', scene: 'scene.ini', read_only: false }),
+    read_scene: () => calls.push('read_scene'),
     save: async () => {
       calls.push('save');
       return { status: 'saved' };
@@ -154,15 +154,15 @@ test('only persistent scene methods mark the scene dirty', async () => {
     { now: clock.now, setTimer: clock.setTimer, clearTimer: clock.clearTimer, debounceMs: 1000, notify: () => {} },
   );
 
-  api.scene.readScene();
-  api.scene.deleteActor('scene.ini', 'actor');
+  api.scene.read_scene();
+  api.scene.delete_actor('scene.ini', 'actor');
   assert.equal(api.autosave.state().dirty, true);
 
   clock.advance(1000);
   await settle();
   assert.ok(calls.includes('save'), 'the write went through the native save');
 
-  api.scene.readScene();
+  api.scene.read_scene();
   assert.equal(api.autosave.state().dirty, false, 'reads alone never dirty the scene');
   assert.equal(api.files.getFileTree(), 'forwarded', 'other namespaces are forwarded untouched');
 });
@@ -171,19 +171,19 @@ test('a read-only scene is never autosaved', async () => {
   const clock = fakeClock();
   const saved = [];
   const scene = {
-    readActive: async () => ({ archive_session: 'lease', scene: 'scene.ini', read_only: true }),
+    read_active: async () => ({ archive_session: 'lease', scene: 'scene.ini', read_only: true }),
     save: async () => {
       saved.push('save');
       return { status: 'saved' };
     },
-    updateActor: () => {},
+    update_actor: () => {},
   };
   const api = withAutosave(
     { scene },
     { now: clock.now, setTimer: clock.setTimer, clearTimer: clock.clearTimer, debounceMs: 1000, notify: () => {} },
   );
 
-  api.scene.updateActor('scene.ini', 'actor', { visible: false });
+  api.scene.update_actor('scene.ini', 'actor', { visible: false });
   clock.advance(1000);
   await settle();
 
@@ -193,16 +193,16 @@ test('a read-only scene is never autosaved', async () => {
 
 test('saveActiveScene reports what it did', async () => {
   const ok = await saveActiveScene({
-    readActive: async () => ({ archive_session: 'lease', scene: 'scene.ini' }),
+    read_active: async () => ({ archive_session: 'lease', scene: 'scene.ini' }),
     save: async () => ({ status: 'saved' }),
   });
   assert.deepEqual(ok, { saved: true, reason: 'saved', result: { status: 'saved' } });
 
-  const empty = await saveActiveScene({ readActive: async () => ({ archive_session: '' }) });
+  const empty = await saveActiveScene({ read_active: async () => ({ archive_session: '' }) });
   assert.deepEqual(empty, { saved: false, reason: 'no_scene' });
 
   const readOnly = await saveActiveScene({
-    readActive: async () => ({ archive_session: 'lease', read_only: true }),
+    read_active: async () => ({ archive_session: 'lease', read_only: true }),
   });
   assert.deepEqual(readOnly, { saved: false, reason: 'read_only' });
 });
@@ -211,19 +211,19 @@ test('a manual save settles the scene instead of writing it again', async () => 
   const clock = fakeClock();
   const saved = [];
   const scene = {
-    readActive: async () => ({ archive_session: 'lease', scene: 'scene.ini' }),
+    read_active: async () => ({ archive_session: 'lease', scene: 'scene.ini' }),
     save: async () => {
       saved.push('save');
       return { status: 'saved' };
     },
-    updateActor: () => {},
+    update_actor: () => {},
   };
   const api = withAutosave(
     { scene },
     { now: clock.now, setTimer: clock.setTimer, clearTimer: clock.clearTimer, debounceMs: 1000, notify: () => {} },
   );
 
-  api.scene.updateActor('scene.ini', 'actor', { visible: false });
+  api.scene.update_actor('scene.ini', 'actor', { visible: false });
   assert.equal(api.autosave.state().dirty, true);
 
   await api.scene.save('scene.ini', { archive_session: 'lease' });   // the user presses save

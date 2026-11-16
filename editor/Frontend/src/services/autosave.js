@@ -10,19 +10,19 @@
 
 /** Scene methods that change persisted state. Reads and camera framing do not belong here. */
 export const PERSISTENT_SCENE_METHODS = [
-  'createActor',
-  'deleteActor',
-  'updateActor',
-  'setActorTransform',
-  'rebindActorResource',
-  'setActorIkChains',
-  'setEnvironment',
-  'setModelNodeState',
-  'createCamera',
-  'deleteCamera',
-  'updateCamera',
-  'setCameraRenderSettings',
-  'importResourceFile',
+  'create_actor',
+  'delete_actor',
+  'update_actor',
+  'set_actor_transform',
+  'rebind_actor_resource',
+  'set_actor_ik_chains',
+  'set_environment',
+  'set_model_node_state',
+  'create_camera',
+  'delete_camera',
+  'update_camera',
+  'set_camera_render_settings',
+  'import_resource_file',
 ];
 
 /**
@@ -99,7 +99,7 @@ export function createAutosavePolicy({
 
 /** Read the active scene and write it. Skips a read-only scene and an empty editor. */
 export async function saveActiveScene(scene) {
-  const active = await scene.readActive();
+  const active = await scene.read_active();
   if (!active || !active.archive_session) return { saved: false, reason: 'no_scene' };
   if (active.read_only) return { saved: false, reason: 'read_only' };
   const result = await scene.save(active.scene, { archive_session: active.archive_session });

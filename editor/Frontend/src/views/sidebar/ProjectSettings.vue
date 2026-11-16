@@ -147,7 +147,7 @@ const handleSave = async () => {
   };
   saving.value = true;
   try {
-    await editorApi.project.saveActiveProjectInfo(payload);
+    await editorApi.project.save_active_project_info(payload);
     if (owns()) setStatus(t('projectSettings.saveSuccess'), true);
   } catch (e) {
     if (owns()) setStatus(String(e), false);

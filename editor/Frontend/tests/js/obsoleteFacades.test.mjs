@@ -58,8 +58,8 @@ test('unused project launch operations have no Web facade or production consumer
 
 test('project launcher service keeps orchestration without duplicate forwarding methods', () => {
   const source = fs.readFileSync(path.join(sourceRoot, 'services/projectLauncherService.js'), 'utf8');
-  for (const method of ['getAppVersion', 'getRecentProjects', 'getProjectLoadStatus',
-    'openProjectFile', 'createWorldProject', 'createMultiplayerProject']) {
+  for (const method of ['getAppVersion', 'get_recent_projects', 'get_project_load_status',
+    'open_project_file', 'create_world_project', 'create_multiplayer_project']) {
     assert.doesNotMatch(source, new RegExp(`^  ${method}:`, 'm'), method);
   }
 });

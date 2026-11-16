@@ -2277,11 +2277,11 @@ async function selectRunTarget(event) {
   try {
     let sceneName = props.sceneName;
     if (!sceneName) {
-      const active = await editorApi.scene.readActive();
+      const active = await editorApi.scene.read_active();
       if (!current() || active.archive_session !== archive) return;
       sceneName = active.scene;
     }
-    const scene = await editorApi.scene.readScene({ archive_session: archive, scene: sceneName, actors: 'index' });
+    const scene = await editorApi.scene.read_scene({ archive_session: archive, scene: sceneName, actors: 'index' });
     if (!current() || scene.archive_session !== archive) return;
     const route = scene.scene;
     if (actorName && (!route || !scene.actors?.some(actor => actor.name === actorName))) {
@@ -2915,11 +2915,11 @@ async function refreshSceneActorOptions({ rescan = false } = {}) {
   try {
     if (!current()) return false;
     if (!requestedSceneName) {
-      const active = await editorApi.scene.readActive();
+      const active = await editorApi.scene.read_active();
       if (!current() || active.archive_session !== archive) return false;
       requestedSceneName = String(active.scene || '').trim();
     }
-    const response = await editorApi.scene.readScene({ archive_session: archive, scene: requestedSceneName, actors: 'context' });
+    const response = await editorApi.scene.read_scene({ archive_session: archive, scene: requestedSceneName, actors: 'context' });
     if (!current() || response?.archive_session !== archive || response?.scene !== requestedSceneName) return false;
     if (response?.success === false || response?.status === 'error') {
       throw new Error(response?.message || 'Actor tree query failed');

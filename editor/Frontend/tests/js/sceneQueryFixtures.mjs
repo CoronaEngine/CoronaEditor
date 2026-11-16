@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 // Component fixtures describe returned projections; the exposed mock follows
 // the same single, explicitly scoped query contract as the production bridge.
 export function sceneQueryFixture(projections) {
-  const readScene = async request => {
+  const read_scene = async request => {
     assert.ok(request.archive_session);
     assert.ok(request.scene);
     const scope = { archive_session: request.archive_session };
@@ -20,6 +20,6 @@ export function sceneQueryFixture(projections) {
     assert.ok(results.length);
     return results.length === 1 ? results[0] : Object.assign({}, ...results);
   };
-  readScene.projections = projections;
-  return { readScene };
+  read_scene.projections = projections;
+  return { read_scene };
 }

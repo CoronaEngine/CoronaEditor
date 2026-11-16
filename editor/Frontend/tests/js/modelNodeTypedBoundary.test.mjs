@@ -10,15 +10,15 @@ const manifest = read('src/systems/ui/editor_api/cef_editor_api.cpp');
 const component = fs.readFileSync(new URL('../../src/components/ui/ModelNodeHierarchy.vue', import.meta.url), 'utf8');
 
 test('model node operations use the typed scene surface with archive and actor identity', () => {
-  assert.match(binding, /scene->SetValue\("readModelNodes"/);
-  assert.match(binding, /scene->SetValue\("setModelNodeState"/);
-  assert.match(component, /editorApi\.scene\.readModelNodes/);
-  assert.match(component, /editorApi\.scene\.setModelNodeState/);
+  assert.match(binding, /scene->SetValue\("read_model_nodes"/);
+  assert.match(binding, /scene->SetValue\("set_model_node_state"/);
+  assert.match(component, /editorApi\.scene\.read_model_nodes/);
+  assert.match(component, /editorApi\.scene\.set_model_node_state/);
   assert.match(component, /archive_session:\s*archiveSession/);
   assert.match(component, /actor_guid:\s*actorGuid/);
   assert.match(component, /actor_version/);
   assert.equal(editorApi.sceneTools?.getModelNodes, undefined);
-  assert.equal(editorApi.sceneTools?.setModelNodeState, undefined);
+  assert.equal(editorApi.sceneTools?.set_model_node_state, undefined);
 });
 
 test('model node manifest routes are unavailable to CEF callers', () => {

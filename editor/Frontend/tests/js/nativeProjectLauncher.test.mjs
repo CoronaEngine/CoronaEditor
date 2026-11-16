@@ -6,8 +6,8 @@ test('launcher reads use named V8 bindings and return direct snapshots', async t
   const previous = globalThis.window;
   t.after(() => { globalThis.window = previous; });
   const calls = [];
-  const results = { getAppVersion: '1.2.0', getRecentProjects: [{ name: '世界', path: 'P:/世界' }],
-    getProjectLoadStatus: { active: true, archive_service_ready: true, loading: false } };
+  const results = { getAppVersion: '1.2.0', get_recent_projects: [{ name: '世界', path: 'P:/世界' }],
+    get_project_load_status: { active: true, archive_service_ready: true, loading: false } };
   globalThis.window = { corona: { project: Object.fromEntries(Object.entries(results).map(([name, value]) =>
     [name, (...args) => { calls.push([name, args]); return Promise.resolve(value); }])) } };
   for (const [name, value] of Object.entries(results)) {
@@ -20,10 +20,10 @@ test('project creation calls one named V8 operation with the original request', 
   const previous = globalThis.window;
   t.after(() => { globalThis.window = previous; });
   const calls = [], result = { name: '世界', path: 'P:/世界' };
-  globalThis.window = { corona: { project: Object.fromEntries(['createWorldProject', 'createMultiplayerProject']
+  globalThis.window = { corona: { project: Object.fromEntries(['create_world_project', 'create_multiplayer_project']
     .map(name => [name, request => { calls.push([name, request]); return Promise.resolve(result); }])) } };
-  for (const [name, request] of [['createWorldProject', { prompt: '夜空' }],
-    ['createMultiplayerProject', { role: 'host' }]]) {
+  for (const [name, request] of [['create_world_project', { prompt: '夜空' }],
+    ['create_multiplayer_project', { role: 'host' }]]) {
     assert.equal(await editorApi.project[name](request), result);
     assert.deepEqual(calls.at(-1), [name, request]);
     assert.equal(calls.at(-1)[1], request);

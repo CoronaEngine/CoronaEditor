@@ -11,7 +11,7 @@ const { editorApi } = await import('../../src/api/editorApi.js');
 const { worldModeState } = await import('../../src/services/worldModeService.js');
 
 function nativeWindow(t) {
-  t.mock.method(editorApi.scene, 'readActive', async () => ({ archive_session: '' }));
+  t.mock.method(editorApi.scene, 'read_active', async () => ({ archive_session: '' }));
   const previous = globalThis.window;
   const calls = [];
   const native = {
@@ -45,8 +45,8 @@ test('window service preserves native errors without retrying legacy transport',
 test('window subscriptions reference the native callbacks and return their unsubscribe functions', t => {
   const { native } = nativeWindow(t);
   const callback = () => {}, stop = () => {};
-  native.onClosed = value => { assert.equal(value, callback); return stop; };
-  native.onCloseRequested = value => { assert.equal(value, callback); return stop; };
+  native.on_closed = value => { assert.equal(value, callback); return stop; };
+  native.on_close_requested = value => { assert.equal(value, callback); return stop; };
   assert.equal(appService.onWindowClosed(callback), stop);
   assert.equal(appService.onWindowCloseRequested(callback), stop);
 });
@@ -75,10 +75,10 @@ test('closing the registered node panel uses the graph save barrier and retains 
   window.localStorage = memoryStorage(); window.sessionStorage = memoryStorage(); window.location = { hash: '#/' };
   let nextTab = 0, saves = 0, fail = true;
   const closed = [];
-  native.createPanel = async () => ({ window_token: ++nextTab });
+  native.create_panel = async () => ({ window_token: ++nextTab });
   native.close = async identity => { if (identity.panel_id) closed.push(identity.panel_id); return { closed: 1 }; };
   await appService.setEditorUiEnabled(true);
-  t.mock.method(editorApi.scene, 'readActive', async () => ({ archive_session: 'graph-archive' }));
+  t.mock.method(editorApi.scene, 'read_active', async () => ({ archive_session: 'graph-archive' }));
   getNodeGraphSaves().register({ getSession: () => 'graph-archive', flush: () => { saves++; return !fail; } });
   const graph = PLUGIN_MANIFEST.find(panel => panel.routePath === '/NodeGraph');
   await appService.openNativePanel({ panel_id: graph.id, route_path: graph.routePath });
@@ -101,7 +101,7 @@ test('panel creation uses a typed V8 operation and carries no placement', async 
   t.after(() => { Object.assign(worldModeState, oldWorld); });
   Object.assign(worldModeState, { status: 'ready', mode: 'creative', revision: 1 });
   window.localStorage = memoryStorage(); window.sessionStorage = memoryStorage(); window.location = { hash: '#/' };
-  native.createPanel = async options => { calls.push(options); return { window_token: 12, panel_id: options.panel_id }; };
+  native.create_panel = async options => { calls.push(options); return { window_token: 12, panel_id: options.panel_id }; };
   await appService.setEditorUiEnabled(true);
   calls.length = 0;
   assert.deepEqual(await appService.openNativePanel({ panel_id: 'inspector', route_path: '/Inspector', width: 420 }),
@@ -117,7 +117,7 @@ test('panel creation uses a typed V8 operation and carries no placement', async 
   assert.equal(appService.detachPanel, undefined);
   assert.equal(appService.redockPanel, undefined);
   const failure = Object.assign(new Error('retired'), { code: 'CONTEXT_CHANGED' });
-  native.createPanel = () => Promise.reject(failure);
+  native.create_panel = () => Promise.reject(failure);
   await assert.rejects(appService.openNativePanel({ panel_id: 'other' }), error => error === failure);
 });
 
@@ -162,7 +162,7 @@ test('camera presentation and main borderless name the state instead of a toggle
   t.after(() => { Object.assign(worldModeState, oldWorld); });
   Object.assign(worldModeState, { status: 'ready', mode: 'creative', revision: 1 });
   window.localStorage = memoryStorage(); window.sessionStorage = memoryStorage(); window.location = { hash: '#/' };
-  native.setWindowPresentation = async identity => { calls.push(identity); return true; };
+  native.set_window_presentation = async identity => { calls.push(identity); return true; };
   await appService.setEditorUiEnabled(true);
   assert.equal(await appService.cycleThisCameraViewWindowMode('scene', 'camera'), true);
   assert.equal(await appService.setThisCameraViewPresentation('borderless', 'scene', 'camera'), true);
@@ -183,7 +183,7 @@ test('camera windows use archive and camera identity without reading a Web numer
   Object.assign(worldModeState, { status: 'ready', mode: 'creative', revision: 1 });
   window.localStorage = memoryStorage(); window.sessionStorage = memoryStorage(); window.location = { hash: '#/' };
   const calls = [];
-  native.createPanel = async options => { calls.push(options); return { window_token: 31, panel_id: '', existing: false }; };
+  native.create_panel = async options => { calls.push(options); return { window_token: 31, panel_id: '', existing: false }; };
   await appService.setEditorUiEnabled(true);
   const camera = { archive_session: 'archive-opaque-18446744073709551615', scene_id: 'scene.ini', camera_id: 'camera-main',
     view_x: 0, view_y: 0, view_width: 800, view_height: 600,
@@ -200,6 +200,6 @@ test('camera windows use archive and camera identity without reading a Web numer
   assert.equal('cmd' in calls[0], false);
   assert.match(calls[0].route_path, /uiSession=.*uiWindow=.*uiOwner=/);
   const failure = Object.assign(new Error('retired scene'), { code: 'PROJECT_CONTEXT_CHANGED' });
-  native.createPanel = async () => { throw failure; };
+  native.create_panel = async () => { throw failure; };
   await assert.rejects(appService.createCameraView(camera), error => error === failure);
 });

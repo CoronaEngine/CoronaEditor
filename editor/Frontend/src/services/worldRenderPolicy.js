@@ -5,7 +5,7 @@ import { trackWorldSessionWork } from './worldSessionLifecycle.js';
 export async function initializeWorldRenderBackend({ api, sceneId, cameraId, archiveSession, isCurrent }) {
   if (!archiveSession) throw new Error('启用渲染后端需要存档会话');
   if (!isCurrent()) return false;
-  const result = await trackWorldSessionWork(api.scene.setCameraRenderSettings(sceneId, cameraId, {
+  const result = await trackWorldSessionWork(api.scene.set_camera_render_settings(sceneId, cameraId, {
     archive_session: archiveSession,
     render_backend: 'vision',
   }));

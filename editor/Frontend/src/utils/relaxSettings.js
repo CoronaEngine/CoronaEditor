@@ -71,7 +71,7 @@ export function useRelaxSettings(props, api) {
     if (!open.value) return;
     busy.value = true;
     try {
-      const result = await api.readCameraRenderSettings(props.sceneId, props.cameraId,
+      const result = await api.read_camera_render_settings(props.sceneId, props.cameraId,
         { archive_session: props.archiveSession, family: 'relax' });
       const response = result;
       if (token !== generation) return;
@@ -103,7 +103,7 @@ export function useRelaxSettings(props, api) {
     const settings = { ...draft.value };
     busy.value = true;
     try {
-      const result = await api.setCameraRenderSettings(props.sceneId, props.cameraId,
+      const result = await api.set_camera_render_settings(props.sceneId, props.cameraId,
         { archive_session: props.archiveSession, family: 'relax', settings });
       const response = result;
       if (token !== generation) return false;

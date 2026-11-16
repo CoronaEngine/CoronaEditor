@@ -23,7 +23,7 @@ test('rich tree uses one scoped V8 facade and retires the manifest reader', asyn
   globalThis.window = { corona: { scene: { ...sceneQueryFixture({ tree: async (...args) => { calls.push(args); return result; } }),   } } };
   JSON.parse = JSON.stringify = () => { throw Error('JSON tree transport'); };
   const scope = { archive_session: 'archive' };
-  assert.equal(await editorApi.scene.readScene({ ...(scope), scene: 'scene.ini', actors: 'tree', cameras: true }), result);
+  assert.equal(await editorApi.scene.read_scene({ ...(scope), scene: 'scene.ini', actors: 'tree', cameras: true }), result);
   assert.deepEqual(calls, [['scene.ini', scope]]);
   assert.equal(editorApi.sceneTools?.listSceneTree, undefined);
 });

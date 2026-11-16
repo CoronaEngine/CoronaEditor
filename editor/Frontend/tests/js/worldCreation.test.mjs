@@ -56,20 +56,20 @@ async function mountCreationPage(t, { networkError, createGate } = {}) {
     worldMode.worldModeService.invalidate();
   });
   t.mock.method(console, 'error', () => {});
-  t.mock.method(editorApi.project, 'getProjectLoadStatus', async () => ({ archive_service_ready: true }));
+  t.mock.method(editorApi.project, 'get_project_load_status', async () => ({ archive_service_ready: true }));
   t.mock.method(editorApi.projectSettings, 'getActiveProjectInfo', async () => ({ project_path: activePath, mode: 'creative' }));
-  t.mock.method(editorApi.project, 'createWorldProject', async payload => {
+  t.mock.method(editorApi.project, 'create_world_project', async payload => {
     calls.push(['create', payload]);
     if (createGate) await createGate;
     return { name: `创造世界_${++sequence}`, path: `creative-world-${sequence}` };
   });
   const networkStops = [];
-  t.mock.method(editorApi.network, 'stopSession', async () => {
+  t.mock.method(editorApi.network, 'stop_session', async () => {
     networkStops.push(activePath);
     if (networkError) throw networkError;
     return { ok: true };
   });
-  t.mock.method(editorApi.project, 'openProject', async path => {
+  t.mock.method(editorApi.project, 'open_project', async path => {
     calls.push(['open', path]);
     activePath = path;
     return { ok: true, path };

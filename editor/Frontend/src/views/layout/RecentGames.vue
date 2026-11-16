@@ -112,7 +112,7 @@ const refreshArchiveReady = async () => {
   const sequence = ++statusSequence;
   const current = () => lifetime.current() && sequence === statusSequence;
   try {
-    const status = await editorApi.project.getProjectLoadStatus();
+    const status = await editorApi.project.get_project_load_status();
     if (current()) archiveReady.value = status?.archive_service_ready === true;
   } catch {
     if (current()) archiveReady.value = false;
@@ -129,7 +129,7 @@ onMounted(async () => {
     if (!lifetime.current()) return;
     if (version) appVersion.value = version;
 
-    const saved = await editorApi.project.getRecentProjects();
+    const saved = await editorApi.project.get_recent_projects();
     if (!lifetime.current()) return;
     if (saved) recentProjects.value = saved;
     await refreshArchiveReady();
@@ -166,7 +166,7 @@ const openSelectedProject = () => {
 
 const handleOpenProject = async (path, project = null) => {
   try {
-    let result = await projectLauncherService.openProject(path);
+    let result = await projectLauncherService.open_project(path);
     if (!lifetime.current() || isProjectOpenSuperseded(result)) return;
     let opened = result;
     if (opened?.status === 'decision_required') {
@@ -175,7 +175,7 @@ const handleOpenProject = async (path, project = null) => {
         `场景中有部分资源无法加载：\n\n${details}\n\n是否继续打开可用几何？缺失资源保留占位，不支持的形状将跳过。`,
       );
       if (!proceed) return;
-      result = await projectLauncherService.openProject(path, { loadPolicy: 'degraded' });
+      result = await projectLauncherService.open_project(path, { loadPolicy: 'degraded' });
       if (!lifetime.current() || isProjectOpenSuperseded(result)) return;
       opened = result;
     }
@@ -204,7 +204,7 @@ const handleOpenProject = async (path, project = null) => {
 
 const handleImport = async () => {
   try {
-    const result = await editorApi.project.openProjectFile();
+    const result = await editorApi.project.open_project_file();
     if (!lifetime.current()) return;
     if (result?.path) {
       const path = result.path;

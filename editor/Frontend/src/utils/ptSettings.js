@@ -38,7 +38,7 @@ export function usePtSettings(props, api) {
       const deadline = Date.now() + 30000;
       let response;
       while (true) {
-        const result = await api.readCameraRenderSettings(props.sceneId, props.cameraId,
+        const result = await api.read_camera_render_settings(props.sceneId, props.cameraId,
           { archive_session: props.archiveSession, family: 'pt' });
         response = result;
         if (token !== generation) return;
@@ -79,7 +79,7 @@ export function usePtSettings(props, api) {
     const settings = { ...draft.value };
     busy.value = true;
     try {
-      const result = await api.setCameraRenderSettings(props.sceneId, props.cameraId,
+      const result = await api.set_camera_render_settings(props.sceneId, props.cameraId,
         { archive_session: props.archiveSession, family: 'pt', settings });
       const response = result;
       if (token !== generation) return false;

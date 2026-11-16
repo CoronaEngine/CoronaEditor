@@ -71,7 +71,7 @@ function start(t) {
     'useI18n', 'useRouter', 'appService', 'THREE', 'gsap', 'NewGame', 'RecentGames', 'JoinGame',
     'window', 'document', 'requestAnimationFrame', 'cancelAnimationFrame', 'setTimeout', 'clearTimeout', startSource)(
     ref, shallowRef, () => tick.promise, fn => { mounted = fn; }, fn => { unmounted = fn; }, createViewLifetime,
-    () => ({ t: text => text }), () => ({}), { closeProcess: () => { closed++; } }, { ...THREE, WebGLRenderer: Renderer },
+    () => ({ t: text => text }), () => ({}), { close_process: () => { closed++; } }, { ...THREE, WebGLRenderer: Renderer },
     gsap, {}, {}, {}, surface, host('document'),
     fn => { frames.set(++sequence, fn); return sequence; }, id => frames.delete(id),
     fn => { timers.set(++sequence, fn); return sequence; }, id => timers.delete(id));
