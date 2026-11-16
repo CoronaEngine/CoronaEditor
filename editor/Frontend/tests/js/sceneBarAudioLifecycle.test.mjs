@@ -12,7 +12,7 @@ function fixture(operation) {
     playingStates: {}, pendingAudioRows: new WeakSet(),
     currentSceneName: { value: 'scene.ini' }, archiveSession: { value: 'archive' },
     viewLifetime: { current: () => true }, logWarn: () => {}, logError: (...args) => errors.push(args),
-    editorApi: { audio: Object.fromEntries(['playActor', 'stopActor', 'playResource', 'stopResource']
+    editorApi: { audio: Object.fromEntries(['play', 'stop']
       .map(method => [method, (...args) => { calls.push([method, ...args]); return operation(); }])) },
   };
   const run = new Function('deps', `with(deps){return (${script.slice(node.start, node.end)});}`)(deps);
@@ -57,5 +57,6 @@ test('duplicate clicks share one pending native operation and success updates on
   resolve({ status: 'success' });
   await Promise.all([first, second]);
   assert.equal(f.deps.playingStates.Sound, true);
-  assert.deepEqual(f.calls[0], ['playActor', 'scene.ini', 'guid', { archive_session: 'archive' }, false]);
+  assert.deepEqual(f.calls[0],
+    ['play', { scene: 'scene.ini', actor: 'guid', archive_session: 'archive' }, { loop: false }]);
 });

@@ -5,13 +5,13 @@ import { editorApi } from '../../src/api/editorApi.js';
 
 const engineRoot = new URL('../../../../../', import.meta.url);
 const read = path => fs.readFileSync(new URL(path, engineRoot), 'utf8');
-const binding = read('src/systems/ui/cef/cef_v8_binding.cpp');
-const manifest = read('src/systems/ui/editor_api/cef_editor_api.cpp');
+// The scene names are table rows now; the binding installs them, it does not spell them.
+const table = read('src/systems/ui/cef/editor_operation_table.h');
 const component = fs.readFileSync(new URL('../../src/components/ui/ModelNodeHierarchy.vue', import.meta.url), 'utf8');
 
 test('model node operations use the typed scene surface with archive and actor identity', () => {
-  assert.match(binding, /scene->SetValue\("read_model_nodes"/);
-  assert.match(binding, /scene->SetValue\("set_model_node_state"/);
+  assert.match(table, /\{"scene", "read_model_nodes", SceneMethod::ReadModelNodes,/);
+  assert.match(table, /\{"scene", "set_model_node_state", SceneMethod::SetModelNodeState,/);
   assert.match(component, /editorApi\.scene\.read_model_nodes/);
   assert.match(component, /editorApi\.scene\.set_model_node_state/);
   assert.match(component, /archive_session:\s*archiveSession/);
@@ -19,15 +19,4 @@ test('model node operations use the typed scene surface with archive and actor i
   assert.match(component, /actor_version/);
   assert.equal(editorApi.sceneTools?.getModelNodes, undefined);
   assert.equal(editorApi.sceneTools?.set_model_node_state, undefined);
-});
-
-test('model node manifest routes are unavailable to CEF callers', () => {
-  const routes = manifest.split('\n').filter(line =>
-    line.includes('(SceneTools, get_model_nodes,') || line.includes('(SceneTools, set_model_node_state,'));
-  assert.equal(routes.length, 2);
-  for (const route of routes) {
-    assert.match(route, /WRAPPED_CALLERS/);
-    assert.doesNotMatch(route, /caller_mask\(EditorApiCaller::Cef\)/);
-    assert.doesNotMatch(route, /js_wrapper/, 'the retired Web wrapper column must not return');
-  }
 });

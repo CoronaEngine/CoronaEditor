@@ -15,8 +15,8 @@ function mount(read = async () => info, save = async value => ({ ...info, ...val
   const writes = [];
   const component = new Function('ref', 'onMounted', 'onUnmounted', 'createViewLifetime', 'worldModeState', 'useI18n', 'editorApi', compiled)(
     ref, fn => { mounted = fn; }, fn => { unmounted = fn; }, createViewLifetime, project, () => ({ t: key => key }),
-    { projectSettings: { getActiveProjectInfo: read,
-      save_active_project_info: async value => { writes.push(value); return save(value); } } },
+    { project: { save_active_project_info: async value => { writes.push(value); return save(value); } },
+      projectSettings: { getActiveProjectInfo: read } },
   );
   const state = component.setup({}, { expose() {} });
   return { state, writes, ready: mounted(), dispose: () => unmounted?.() };

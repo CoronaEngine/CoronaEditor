@@ -33,10 +33,10 @@ test('SceneBar camera list preserves archive identity through the application wi
       close: async () => ({ closed: 0 }),
       create_panel: async options => {
         assert.equal(options.kind, 'camera');
-        assert.equal(options.archiveSession, 'observed-archive');
-        assert.equal(new URLSearchParams(options.routePath.split('?')[1]).get('archive'), 'observed-archive');
-        assert.equal(options.sceneId, 'scene.ini');
-        assert.equal(options.cameraId, 'focus-camera');
+        assert.equal(options.archive_session, 'observed-archive');
+        assert.equal(new URLSearchParams(options.route_path.split('?')[1]).get('archive'), 'observed-archive');
+        assert.equal(options.scene_id, 'scene.ini');
+        assert.equal(options.camera_id, 'focus-camera');
         assert.equal(options.x, 0); assert.equal(options.y, 0);
         assert.equal('handle' in options, false);
         calls.push(options);

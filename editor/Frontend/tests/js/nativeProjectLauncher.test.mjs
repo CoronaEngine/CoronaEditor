@@ -6,7 +6,7 @@ test('launcher reads use named V8 bindings and return direct snapshots', async t
   const previous = globalThis.window;
   t.after(() => { globalThis.window = previous; });
   const calls = [];
-  const results = { getAppVersion: '1.2.0', get_recent_projects: [{ name: '世界', path: 'P:/世界' }],
+  const results = { get_recent_projects: [{ name: '世界', path: 'P:/世界' }],
     get_project_load_status: { active: true, archive_service_ready: true, loading: false } };
   globalThis.window = { corona: { project: Object.fromEntries(Object.entries(results).map(([name, value]) =>
     [name, (...args) => { calls.push([name, args]); return Promise.resolve(value); }])) } };
@@ -14,6 +14,15 @@ test('launcher reads use named V8 bindings and return direct snapshots', async t
     assert.equal(await editorApi.project[name](), value);
     assert.deepEqual(calls.at(-1), [name, []]);
   }
+  // The editor version is the archive service's, not a native project read: it rides the one
+  // bridge entry instead of keeping a C++ route that only forwarded the answer.
+  globalThis.window.corona.bridge = { call: async envelope => {
+    const request = JSON.parse(envelope);
+    assert.equal(request.service, 'project_archive');
+    assert.equal(request.function, 'editor_settings');
+    return JSON.stringify({ value: '1.2.0' });
+  } };
+  assert.equal(await editorApi.project.getAppVersion(), '1.2.0');
 });
 
 test('project creation calls one named V8 operation with the original request', async t => {
