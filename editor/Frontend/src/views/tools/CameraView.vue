@@ -787,6 +787,12 @@ const resetCameraInput = () => {
   if (posePublishTimer) window.clearTimeout(posePublishTimer);
   posePublishTimer = 0;
 };
+// Losing focus must drop held keys: without this the movement loop keeps running with the
+// last pressed direction. The native pointer controller this used to hide was retired with
+// the viewport pick adapters, so clearing the input state is the whole job.
+const handleCameraViewBlur = () => {
+  resetCameraInput();
+};
 const movementFrame = (time) => {
   const dt = previousTime ? Math.min((time - previousTime) / 1000, 0.05) : 0;
   previousTime = time;
