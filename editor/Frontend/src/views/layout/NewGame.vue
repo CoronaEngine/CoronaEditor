@@ -8,7 +8,7 @@
     <div class="absolute bottom-0 left-1/4 w-[400px] h-[400px] bg-[#d8b86c]/[0.025] rounded-full blur-3xl pointer-events-none"></div>
 
     <!-- 创建世界没有可填的内容：只剩返回与创建两个动作 -->
-    <div class="relative z-10 flex-1 flex items-center justify-center px-8 py-6">
+    <div class="relative z-10 flex-1 flex items-center justify-center px-8 py-6" data-creation-page>
       <div class="w-full max-w-3xl flex items-center justify-between">
         <button
           class="px-5 py-3 text-base text-gray-400 hover:text-white hover:bg-[#222] rounded-lg transition-colors inline-flex items-center gap-1"
