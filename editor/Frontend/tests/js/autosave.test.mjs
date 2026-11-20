@@ -76,18 +76,51 @@ test('a dirty scene is written once, after the debounce', async () => {
   assert.equal(policy.state().dirty, false);
 });
 
-test('a continuous edit stream still hits the maximum interval', async () => {
+test('the debounce restarts on every edit, so a burst writes once at its end', async () => {
+  const clock = fakeClock();
+  const { policy, saves } = policyWith(clock);
+
+  policy.markDirty();
+  clock.advance(500);
+  policy.markDirty();
+  clock.advance(500);           // t=1000: the first timer was restarted at 500, so nothing yet
+  await settle();
+  assert.deepEqual(saves, [], 'the restarted debounce has not elapsed');
+
+  clock.advance(500);           // t=1500: 1000ms after the last edit
+  await settle();
+  assert.deepEqual(saves, [1500]);
+});
+
+test('a continuous edit stream writes at the ceiling, not on every edit', async () => {
   const clock = fakeClock();
   const { policy, saves } = policyWith(clock);
 
   for (let elapsed = 0; elapsed < 6000; elapsed += 400) {
     policy.markDirty();
     clock.advance(400);
-    await Promise.resolve();
+    await settle();
   }
 
-  assert.ok(saves.length >= 1, 'the deadline timer fires even though the debounce keeps moving');
-  assert.ok(saves[0] <= 5000, `first write at ${saves[0]}ms, deadline was 5000ms`);
+  // Every edit restarts the debounce, so the only write is the ceiling armed at the first edit.
+  // Without the reset this test fails with saves [1000, 2200, 3400, 4600]: four writes, none of
+  // them from the ceiling.
+  assert.deepEqual(saves, [5000], 'the first write comes from the ceiling, not the debounce');
+});
+
+test('after the ceiling write, the next edit opens a fresh window', async () => {
+  const clock = fakeClock();
+  const { policy, saves } = policyWith(clock);
+
+  for (let elapsed = 0; elapsed < 12000; elapsed += 400) {
+    policy.markDirty();
+    clock.advance(400);
+    await settle();
+  }
+
+  // 5000 from the first window; the edit after that save re-arms the ceiling at 10200. A ceiling
+  // that were re-armed per edit would never fire while the debounce keeps moving.
+  assert.deepEqual(saves, [5000, 10200]);
 });
 
 test('a failed save keeps the scene dirty and retries', async () => {

@@ -28,10 +28,11 @@ export const PERSISTENT_SCENE_METHODS = [
 /**
  * Decide when a dirty scene is written.
  *
- * Two timers, because either one alone is wrong: a debounce keeps a burst of edits from writing
- * on every keystroke, and a maximum interval keeps a continuous drag from postponing the write
- * forever. A failed save leaves the scene dirty and schedules one retry, so a transient failure
- * (the editor is busy, the archive service is starting) is not silently the last attempt.
+ * Two timers, because either one alone is wrong: the debounce restarts on every edit, so a
+ * burst writes once when it ends, and the ceiling is armed from the first edit of a dirty
+ * window so a stream that never stops still reaches the disk. A failed save leaves the scene
+ * dirty and schedules a retry, so a transient failure (the editor is busy, the archive service
+ * is starting) is not silently the last attempt.
  */
 export function createAutosavePolicy({
   save,
@@ -76,7 +77,11 @@ export function createAutosavePolicy({
     markDirty() {
       dirty = true;
       if (saving) return;
-      if (debounceTimer === null) debounceTimer = setTimer(fire, debounceMs);
+      // Restart the debounce so a stream of edits writes once, after the last one. The ceiling
+      // is armed once per dirty window and is deliberately *not* restarted: a continuous drag
+      // that never stops still has to reach the disk.
+      if (debounceTimer !== null) clearTimer(debounceTimer);
+      debounceTimer = setTimer(fire, debounceMs);
       if (deadlineTimer === null) deadlineTimer = setTimer(fire, maxIntervalMs);
     },
     flush() {
