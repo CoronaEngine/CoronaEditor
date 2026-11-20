@@ -5,6 +5,7 @@ import test from 'node:test';
 import {
   PERSISTENT_SCENE_METHODS,
   createAutosavePolicy,
+  flushBeforeClose,
   saveActiveScene,
   withAutosave,
 } from '../../src/services/autosave.js';
@@ -266,4 +267,107 @@ test('a manual save settles the scene instead of writing it again', async () => 
   clock.advance(60000);
   await settle();
   assert.deepEqual(saved, ['save'], 'the autosave must not repeat a manual save');
+});
+
+test('an edit made while a save is running is written afterwards', async () => {
+  const clock = fakeClock();
+  const saves = [];
+  let calls = 0;
+  let release;
+  const policy = createAutosavePolicy({
+    save: () => {
+      saves.push(clock.now());
+      calls += 1;
+      return calls === 1 ? new Promise(resolve => { release = resolve; }) : Promise.resolve();
+    },
+    now: clock.now, setTimer: clock.setTimer, clearTimer: clock.clearTimer,
+    debounceMs: 1000, maxIntervalMs: 5000,
+  });
+
+  policy.markDirty();
+  clock.advance(1000);                       // the first write starts at 1000
+  await settle();
+  assert.equal(policy.state().saving, true);
+
+  policy.markDirty();                        // edited while that write is in flight
+  release();
+  await settle();
+  assert.equal(policy.state().dirty, true, 'the edit during the save is still pending');
+
+  clock.advance(1000);                       // the follow-up debounce
+  await settle();
+  assert.deepEqual(saves, [1000, 2000], 'the edit made during the first write gets its own');
+});
+
+test('flush waits for a save already running and then writes the newer edits', async () => {
+  const clock = fakeClock();
+  const saves = [];
+  let calls = 0;
+  let release;
+  const policy = createAutosavePolicy({
+    save: () => {
+      saves.push(clock.now());
+      calls += 1;
+      return calls === 1 ? new Promise(resolve => { release = resolve; }) : Promise.resolve();
+    },
+    now: clock.now, setTimer: clock.setTimer, clearTimer: clock.clearTimer,
+    debounceMs: 1000, maxIntervalMs: 5000,
+  });
+
+  policy.markDirty();
+  clock.advance(1000);
+  await settle();
+  policy.markDirty();                        // still in flight
+  const flushed = policy.flush();
+  release();
+  await flushed;
+
+  assert.deepEqual(saves, [1000, 1000], 'flush wrote the edit the first save could not have seen');
+  assert.equal(policy.state().dirty, false);
+});
+
+test('a read-only world is never written and is reported once', async () => {
+  const clock = fakeClock();
+  const skipped = [];
+  const writes = [];
+  const scene = {
+    read_active: async () => ({ archive_session: 'lease', scene: 'scene.ini', read_only: true }),
+    save: async () => { writes.push('save'); return { status: 'saved' }; },
+    update_actor: async () => true,
+  };
+  const api = withAutosave({ scene }, {
+    now: clock.now, setTimer: clock.setTimer, clearTimer: clock.clearTimer,
+    debounceMs: 1000, notify: () => {}, notifySkipped: outcome => skipped.push(outcome.reason),
+  });
+
+  api.scene.update_actor('scene.ini', 'actor', { visible: false });
+  clock.advance(1000);
+  await settle();
+  api.scene.update_actor('scene.ini', 'actor', { visible: true });
+  clock.advance(1000);
+  await settle();
+
+  assert.deepEqual(writes, [], 'a read-only world is never written');
+  assert.deepEqual(skipped, ['read_only'], 'reported once per reason, not on every attempt');
+});
+
+test('closing flushes first, and closes even when the save fails or hangs', async () => {
+  const order = [];
+  const closed = await flushBeforeClose(
+    async () => { order.push('flush'); },
+    async () => { order.push('close'); return 'closed'; });
+  assert.deepEqual(order, ['flush', 'close']);
+  assert.equal(closed, 'closed');
+
+  const failed = [];
+  assert.equal(await flushBeforeClose(
+    async () => { throw new Error('archive service starting'); },
+    async () => { failed.push('close'); return 'closed'; }), 'closed');
+  assert.deepEqual(failed, ['close'], 'a failed save must not block the quit');
+
+  const hung = [];
+  assert.equal(await flushBeforeClose(
+    () => new Promise(() => {}),
+    async () => { hung.push('close'); return 'closed'; }, 10), 'closed');
+  assert.deepEqual(hung, ['close'], 'a hung save must not block the quit');
 });

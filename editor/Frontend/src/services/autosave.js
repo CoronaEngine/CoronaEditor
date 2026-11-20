@@ -8,6 +8,8 @@
 // Nothing here touches the DOM directly, and every dependency is injectable, so the policy is
 // testable with a fake clock (`tests/js/autosave.test.mjs`).
 
+import { notifyWorldError } from './worldSessionLifecycle.js';
+
 /** Scene methods that change persisted state. Reads and camera framing do not belong here. */
 export const PERSISTENT_SCENE_METHODS = [
   'create_actor',
@@ -50,41 +52,63 @@ export function createAutosavePolicy({
   let deadlineTimer = null;
   let lastSavedAt = now();
   let failure = null;
+  // Every edit bumps the generation. A save only settles the scene when the generation it
+  // started with is still current: an edit made while the write was in flight is not in that
+  // write, so marking the scene clean after it would drop the edit silently.
+  let generation = 0;
+  let inFlight = null;
 
   const clearTimers = () => {
     if (debounceTimer !== null) clearTimer(debounceTimer), (debounceTimer = null);
     if (deadlineTimer !== null) clearTimer(deadlineTimer), (deadlineTimer = null);
   };
 
-  const fire = async () => {
-    clearTimers();
-    if (!dirty || saving) return;
-    saving = true;
+  // Restart the debounce so a stream of edits writes once, after the last one. The ceiling is
+  // armed once per dirty window and is deliberately *not* restarted: a continuous drag that
+  // never stops still has to reach the disk.
+  const arm = () => {
+    if (debounceTimer !== null) clearTimer(debounceTimer);
+    debounceTimer = setTimer(fire, debounceMs);
+    if (deadlineTimer === null) deadlineTimer = setTimer(fire, maxIntervalMs);
+  };
+
+  const runSave = async () => {
+    const startedAt = generation;
     try {
       await save();
-      dirty = false;
       failure = null;
       lastSavedAt = now();
+      if (generation === startedAt) dirty = false;
     } catch (error) {
       failure = error;
-      if (dirty) debounceTimer = setTimer(fire, debounceMs);
     } finally {
       saving = false;
+      inFlight = null;
+      // Still dirty means either the write failed or an edit arrived while it ran; both need a
+      // follow-up write, and nothing else will schedule one.
+      if (dirty) arm();
     }
+  };
+
+  const fire = () => {
+    clearTimers();
+    if (!dirty || saving) return Promise.resolve();
+    saving = true;
+    inFlight = runSave();
+    return inFlight;
   };
 
   return {
     markDirty() {
       dirty = true;
-      if (saving) return;
-      // Restart the debounce so a stream of edits writes once, after the last one. The ceiling
-      // is armed once per dirty window and is deliberately *not* restarted: a continuous drag
-      // that never stops still has to reach the disk.
-      if (debounceTimer !== null) clearTimer(debounceTimer);
-      debounceTimer = setTimer(fire, debounceMs);
-      if (deadlineTimer === null) deadlineTimer = setTimer(fire, maxIntervalMs);
+      generation += 1;
+      // A running save arms the follow-up write itself when it settles.
+      if (!saving) arm();
     },
-    flush() {
+    async flush() {
+      // A write that is already running may predate the newest edit; wait for it, then write
+      // whatever is still pending.
+      if (inFlight) await inFlight;
       return fire();
     },
     /** A save that already happened elsewhere (the user pressed save) settles the scene. */
@@ -117,12 +141,19 @@ export async function saveActiveScene(scene) {
  * The native bindings are read-only V8 properties, so the facade is the only place a wrapper can
  * sit. Everything else on the object is forwarded untouched.
  */
-export function withAutosave(api, { notify = defaultNotify, ...options } = {}) {
+export function withAutosave(api, { notify = defaultNotify, notifySkipped = defaultSkippedNotice, ...options } = {}) {
   const scene = api.scene ?? {};
+  // An attempt that writes nothing is worth saying out loud once: the user edited a world whose
+  // changes cannot be saved, and repeating it on every edit would be noise.
+  const reported = new Set();
   const policy = createAutosavePolicy({
     ...options,
     save: async () => {
       const outcome = await saveActiveScene(scene);
+      if (!outcome.saved && outcome.reason !== 'no_scene' && !reported.has(outcome.reason)) {
+        reported.add(outcome.reason);
+        notifySkipped(outcome);
+      }
       notify(outcome);
       return outcome;
     },
@@ -165,5 +196,35 @@ function defaultNotify(outcome) {
     target.dispatchEvent(new CustomEvent('corona:autosave', { detail: outcome }));
   } catch {
     // A notification is a courtesy; the save already happened.
+  }
+}
+
+/**
+ * Write what autosave still holds, then close.
+ *
+ * The process is about to end, so this is the last chance for edits sitting inside the debounce
+ * window. Two things must not stop the quit: a save that fails, and a save that never answers
+ * (the archive service can be busy); the wait is bounded and the outcome is logged.
+ */
+export async function flushBeforeClose(flush, close, timeoutMs = 5000) {
+  try {
+    await Promise.race([
+      flush(),
+      new Promise(resolve => globalThis.setTimeout(resolve, timeoutMs)),
+    ]);
+  } catch (error) {
+    console.warn('[autosave] final write failed; closing anyway', error);
+  }
+  return close();
+}
+
+function defaultSkippedNotice(outcome) {
+  const message = outcome.reason === 'read_only'
+    ? '当前世界为只读，修改不会被保存'
+    : `自动保存未完成（${outcome.reason}）`;
+  try {
+    notifyWorldError(new Error(message), message);
+  } catch {
+    // A notification is a courtesy; the attempt is still reported through `corona:autosave`.
   }
 }

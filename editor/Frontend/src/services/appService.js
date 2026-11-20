@@ -14,6 +14,7 @@ import { getWebDocumentIdentity } from '../api/webDocument.js';
 import { createWindowSessionActivities } from './windowSessionActivities.js';
 import { createWindowSessionState } from './windowSessionState.js';
 import { flushActiveNodeGraphs } from './nodeGraphSaves.js';
+import { flushBeforeClose } from './autosave.js';
 
 const windowSessions = new WeakMap();
 // Closed 1:1 mapping from the window session's intent vocabulary to the named
@@ -119,5 +120,9 @@ export const appService = {
   suspendCameraViews: (scene_id) => editorApi.window.close({ scene_id }),
   crossTabBroadcast: (event, payload) =>
     session().broadcast(event, payload),
-  close_process: () => editorApi.app.close_process(),
+  // The process is about to end: write what autosave still holds (edits can be sitting inside
+  // its debounce window) before asking native to quit.
+  close_process: () => flushBeforeClose(
+    () => editorApi.autosave.flush(),
+    () => editorApi.app.close_process()),
 };
