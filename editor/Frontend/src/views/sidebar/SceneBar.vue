@@ -1071,8 +1071,29 @@ const OnInitObjTree = async () => {
   }
 };
 
+// A file-browser double-click on an Actor template is a *focus* intent, not a document open:
+// the file is a prefab, and the useful target is the instance placed in this scene. The row
+// identity, the camera target and the selection/camera-pose broadcast all live here, so the
+// file browser hands the intent over instead of duplicating them.
+const onFocusActorFile = (payload) => {
+  if (!payload?.path || !payload.archive_session) return;
+  if (payload.archive_session !== archiveSession.value) return;
+  const normalize = value => String(value || '').replace(/\\/g, '/').replace(/^\.\//, '');
+  const wanted = normalize(payload.path);
+  const rows = Array.isArray(sceneImages.value) ? sceneImages.value : [];
+  const row = rows.find(item => normalize(item?.path) === wanted);
+  if (!row) {
+    // The prefab exists on disk but nothing in this scene references it yet.
+    logWarn('Actor file is not placed in this scene', payload.path);
+    return;
+  }
+  SelectActor(row);
+  focusActorFromList(row);
+};
+
 onMounted(async () => {
   coronaEventBus.on('model-node-picked', handleModelNodePick);
+  coronaEventBus.on('focus-actor-file', onFocusActorFile);
   const active = await editorApi.scene.read_active();
   if (!viewLifetime.current()) return;
   const queryString = window.location.hash?.split('?')[1] || window.location.search?.slice(1);
@@ -1184,6 +1205,7 @@ onUnmounted(() => {
   viewLifetime.dispose();
   clearSceneTreeSettleRetry();
   coronaEventBus.off('model-node-picked', handleModelNodePick);
+  coronaEventBus.off('focus-actor-file', onFocusActorFile);
   actorFocusSeq++;
 });
 </script>

@@ -62,8 +62,8 @@
 
       <!-- 文件特有菜单 -->
       <template v-else-if="contextMenu.item">
-        <div class="px-4 py-2 hover:bg-[#b3995d] cursor-pointer" @click="handleOpenFile()">打开</div>
-        <div class="h-[1px] bg-[#2b362d] my-1"></div>
+        <div v-if="canOpen(contextMenu.item?.name)" class="px-4 py-2 hover:bg-[#b3995d] cursor-pointer" @click="handleOpenFile()">打开</div>
+        <div v-if="canOpen(contextMenu.item?.name)" class="h-[1px] bg-[#2b362d] my-1"></div>
         <div v-if="contextMenu.item?.name !== 'scene.ini'" class="px-4 py-2 hover:bg-[#b3995d] cursor-pointer" @click="handleRename">重命名</div>
         <div
           v-if="contextMenu.item?.name !== 'scene.ini'"
@@ -127,6 +127,7 @@ import { editorApi } from '@/api/editorApi.js';
 import FileTreeNode from '@/components/ui/FileTreeNode.vue';
 import { translateUiText } from '@/i18n/domTranslator.js';
 import { createViewLifetime } from '@/utils/viewLifetime.js';
+import { coronaEventBus } from '@/utils/eventBus.js';
 import { worldModeState } from '@/services/worldModeService.js';
 
 const projectRevision = worldModeState.revision;
@@ -206,16 +207,27 @@ const handleNewFolder = () => openDialog('newFolder', '新建文件夹', '输入
 const handleNewActor = () => openDialog('newActor', '新建单位', '输入单位名称 (.actor)');
 const handleRename = () => openDialog('rename', '重命名', '输入新名称');
 
+// Only two kinds of file have an "open" action: the scene source (native reload) and an Actor
+// template (focus the instance placed in the scene). Other files have nothing to open, so the
+// menu entry is not offered instead of being offered and ignored.
+const canOpen = name => name === 'scene.ini' || String(name || '').endsWith('.actor');
+
 const handleOpenFile = async (node = contextMenu.value.item, captured = contextMenu.value.scope) => {
   closeContextMenu();
-  if (!node || node.isDirectory || !owns(captured)) return;
-  const file_type = node.name === 'scene.ini' ? 'scene' : node.name.endsWith('.actor') ? 'actor' : '';
-  if (!file_type) return;
-  try {
-    await editorApi.project.open_document({ ...captured, path: node.path, file_type });
-  } catch (error) {
-    if (owns(captured)) errorMsg.value = String(error);
+  if (!node || node.isDirectory || !owns(captured) || !canOpen(node.name)) return;
+  if (node.name === 'scene.ini') {
+    // The one native effect: re-parse the scene source from disk and swap the native scene.
+    try {
+      await editorApi.project.open_document({ ...captured, path: node.path, file_type: 'scene' });
+    } catch (error) {
+      if (owns(captured)) errorMsg.value = String(error);
+    }
+    return;
   }
+  // An Actor document is a prefab, so "opening" it means focusing the Actor that references
+  // it. The scene tree owns both the row identity and the target camera, so the intent is
+  // handed over rather than reading the scene twice from here.
+  coronaEventBus.emit('focus-actor-file', { ...captured, path: node.path });
 };
 const handleNodeDblClick = node => handleOpenFile(node, scope);
 

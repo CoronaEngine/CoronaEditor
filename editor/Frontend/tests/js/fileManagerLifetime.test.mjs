@@ -13,7 +13,7 @@ const tree = name => ({ archive_session: 'a', path: '', name, children: [] });
 const deferred = () => { let resolve, reject; const promise = new Promise((yes, no) => { resolve = yes; reject = no; }); return { promise, resolve, reject }; };
 function mount(t, overrides = {}, project = { revision: 1 }) {
   let mounted, unmounted;
-  const listeners = new Map(), calls = [];
+  const listeners = new Map(), calls = [], emitted = [];
   const previous = globalThis.window, oldConfirm = globalThis.confirm, oldAlert = globalThis.alert;
   globalThis.window = { addEventListener: (name, fn) => listeners.set(name, fn), removeEventListener: name => listeners.delete(name) };
   globalThis.confirm = () => true;
@@ -22,17 +22,17 @@ function mount(t, overrides = {}, project = { revision: 1 }) {
   const files = Object.fromEntries(['getFileTree', 'createFolder', 'createActorTemplate', 'renameItem', 'deleteItem', 'openFile']
     .map(name => [name, async request => { calls.push([name, request]); return name === 'getFileTree' ? tree('root') : { archive_session: 'a', ok: true }; }]));
   Object.assign(files, overrides.files);
-  const component = new Function('ref', 'nextTick', 'onMounted', 'onUnmounted', 'createViewLifetime', 'worldModeState', 'editorApi', 'FileTreeNode', 'translateUiText', compiled)(
+  const component = new Function('ref', 'nextTick', 'onMounted', 'onUnmounted', 'createViewLifetime', 'worldModeState', 'editorApi', 'FileTreeNode', 'translateUiText', 'coronaEventBus', compiled)(
     ref, nextTick, fn => { mounted = fn; }, fn => { unmounted = fn; }, createViewLifetime, project,
     { files,
       // Opening a document reloads the native scene, so this route lives in `project`,
       // not in the bridge-backed `files` namespace.
       project: { open_document: async request => { calls.push(['open_document', request]); return { ok: true }; } },
       projectSettings: { getActiveProjectInfo: overrides.readInfo || (async () => ({ ...scope, name: 'World' })) } },
-    {}, value => value);
+    {}, value => value, { emit: (event, payload) => { emitted.push([event, payload]); }, on() {}, off() {} });
   const state = component.setup({}, { expose() {} });
   const ready = mounted();
-  return { state, calls, listeners, ready, dispose: () => unmounted?.() };
+  return { state, calls, emitted, listeners, ready, dispose: () => unmounted?.() };
 }
 test('file browser shares project metadata and scopes its tree read', async t => {
   const page = mount(t); await page.ready;
@@ -64,11 +64,28 @@ test('one captured dialog owns a mutation and late completion cannot close anoth
   assert.deepEqual(calls, [{ ...scope, path: '', name: 'first' }]);
   assert.equal(page.state.dialog.value.show, true); assert.equal(page.state.dialog.value.value, 'next');
 });
-test('context open uses the selected item and captured scope', async t => {
+test('opening a scene document reloads it through the native contract', async t => {
+  const page = mount(t); await page.ready;
+  page.state.contextMenu.value = { scope, item: { path: 'scene.ini', name: 'scene.ini', isDirectory: false } };
+  await page.state.handleOpenFile();
+  assert.deepEqual(page.calls.at(-1), ['open_document', { ...scope, path: 'scene.ini', file_type: 'scene' }]);
+  assert.equal(page.emitted.length, 0);
+});
+test('an actor document is a focus intent, not a native open', async t => {
   const page = mount(t); await page.ready;
   page.state.contextMenu.value = { scope, item: { path: 'Hero.actor', name: 'Hero.actor', isDirectory: false } };
   await page.state.handleOpenFile();
-  assert.deepEqual(page.calls.at(-1), ['open_document', { ...scope, path: 'Hero.actor', file_type: 'actor' }]);
+  // The native side no longer accepts actor documents; the scene tree owns the row identity
+  // and the target camera, so the file browser only hands over the intent.
+  assert.deepEqual(page.emitted.at(-1), ['focus-actor-file', { ...scope, path: 'Hero.actor' }]);
+  assert.equal(page.calls.filter(([name]) => name === 'open_document').length, 0);
+});
+test('a file with no open action sends nothing anywhere', async t => {
+  const page = mount(t); await page.ready;
+  page.state.contextMenu.value = { scope, item: { path: 'notes.txt', name: 'notes.txt', isDirectory: false } };
+  await page.state.handleOpenFile();
+  assert.equal(page.calls.filter(([name]) => name === 'open_document').length, 0);
+  assert.deepEqual(page.emitted, []);
 });
 test('project replacement prevents dialog writes and late nextTick menu revival', async t => {
   const project = { revision: 1 }, page = mount(t, {}, project); await page.ready;
