@@ -91,26 +91,22 @@ test('StartScreen cannot start a panel tween after nextTick completes on a retir
   assert.equal(p.tweens.length, 0);
 });
 
-for (const action of ['handleBack', 'confirmExit']) {
-  test(`StartScreen ${action} completion is ignored after retirement`, t => {
-    const p = start(t); p.state.showPanel.value = true;
-    p.state[action](); const tween = p.tweens.at(-1);
-    assert.equal(typeof tween.options.onComplete, 'function');
-    p.dispose(); tween.options.onComplete();
-    assert.equal(p.state.showPanel.value, true);
-    assert.equal(p.closed(), 0);
-    assert.equal(p.tweens.length, 1);
-    assert.equal(tween.killed, true);
-  });
-}
+test('StartScreen handleBack completion is ignored after retirement', t => {
+  const p = start(t); p.state.showPanel.value = true;
+  p.state.handleBack(); const tween = p.tweens.at(-1);
+  assert.equal(typeof tween.options.onComplete, 'function');
+  p.dispose(); tween.options.onComplete();
+  assert.equal(p.state.showPanel.value, true);
+  assert.equal(p.closed(), 0);
+  assert.equal(p.tweens.length, 1);
+  assert.equal(tween.killed, true);
+});
 
-test('StartScreen current exit and return animations retain their intended behavior', t => {
+test('StartScreen return animation retains its intended behavior', t => {
   const p = start(t);
   p.state.handleBack(); p.tweens.at(-1).options.onComplete();
   assert.equal(p.state.showPanel.value, false);
   assert.equal(p.tweens.length, 2);
-  p.state.confirmExit(); p.tweens.at(-1).options.onComplete();
-  assert.equal(p.closed(), 1);
 });
 
 test('StartScreen releases its own tweens, RAF, timers, listeners and all Three resources', t => {

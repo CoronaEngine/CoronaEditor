@@ -59,7 +59,6 @@ export default {
     newGame: 'New Game',
     continueGame: 'Continue',
     joinGame: 'Join Game',
-    leaveGame: 'Leave Game',
   },
   layout: {
     floorRestitution: 'Floor Restitution',

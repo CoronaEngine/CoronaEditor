@@ -24,18 +24,7 @@
     <!-- 右侧面板 -->
     <div v-if="showPanel" ref="panelRef" class="page-panel">
       <div class="page-panel-body">
-        <div v-if="activePage === 'panel-exit'" key="panel-exit" class="exit-panel-content">
-          <div class="exit-panel-icon">
-            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
-          </div>
-          <h2 class="exit-panel-title">断开连接</h2>
-          <p class="exit-panel-desc">切断与 Corona 系统的连接后，所有未保存的宇宙演化进程将在后台处于休眠状态。</p>
-          <div class="exit-panel-actions">
-            <button class="exit-action cancel" @click="handleBack">取消</button>
-            <button class="exit-action confirm" @click="confirmExit">确认离开</button>
-          </div>
-        </div>
-        <Transition v-else name="page-fade" mode="out-in"><component :is="pageComponent" :key="activePage" />
+        <Transition name="page-fade" mode="out-in"><component :is="pageComponent" :key="activePage" />
         </Transition>
       </div>
     </div>
@@ -46,7 +35,6 @@
 import { ref, shallowRef, nextTick, onMounted, onUnmounted } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useRouter } from 'vue-router';
-import { appService } from '@/services/appService.js';
 import * as THREE from 'three';
 import gsap from 'gsap';
 
@@ -79,7 +67,6 @@ const navItems = [
   { id: 'panel-new',      label: 'start.newGame',      page: true },
   { id: 'panel-continue', label: 'start.continueGame', page: true },
   { id: 'panel-multi',    label: 'start.joinGame',     page: true },
-  { id: 'panel-exit',     label: 'start.leaveGame',    page: false },
 ];
 
 let scene, camera, renderer, particleSystem, clock;
@@ -104,10 +91,6 @@ const animateParticles = (id) => {
         gsap.to(particleSystem.scale, { x: 1, y: 1, z: 1, duration: d, force3D: true });
         gsap.to(camera.position, { z: 65, duration: d, ease: 'power2.out', force3D: true });
         break;
-      case 'panel-exit':
-        gsap.to(particleSystem.scale, { x: 0.4, y: 0.4, z: 0.4, duration: d, ease: 'power3.inOut', force3D: true });
-        gsap.to(camera.position, { z: 100, duration: d, ease: 'power3.inOut', force3D: true });
-        break;
     }
   });
 };
@@ -127,20 +110,6 @@ const showAndSlidePanel = async (id, component) => {
 
 const handleNavClick = async (id) => {
   if (!viewLifetime.current()) return;
-  if (id === 'panel-exit') {
-    animateParticles(id);
-    activeNav.value = id;
-    if (!hasMoved.value) {
-      hasMoved.value = true;
-      animations.add(() => gsap.to(navContainer.value, {
-        x: '6vw', xPercent: 0,
-        duration: 0.7, ease: 'power3.inOut', force3D: true,
-      }));
-    }
-    await showAndSlidePanel('panel-exit', null);
-    return;
-  }
-
   if (activePage.value === id && showPanel.value) {
     handleBack();
     return;
@@ -176,18 +145,6 @@ const handleBack = () => {
         duration: 0.5, ease: 'power3.inOut', force3D: true,
       }));
       hasMoved.value = false;
-    },
-  }));
-};
-
-const confirmExit = () => {
-  if (!viewLifetime.current() || !panelRef.value) return;
-  animations.add(() => gsap.to(panelRef.value, {
-    x: '105%', duration: 0.25, ease: 'power2.in', force3D: true,
-    onComplete: () => {
-      if (!viewLifetime.current()) return;
-      showPanel.value = false;
-      appService.close_process();
     },
   }));
 };
@@ -537,91 +494,4 @@ onUnmounted(() => {
   opacity: 0;
 }
 
-/* ——— 退出确认面板（字体放大） ——— */
-.exit-panel-content {
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 16px;
-  padding: 36px;
-  text-align: center;
-}
-
-.exit-panel-icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 80px;
-  height: 80px;
-  border-radius: 50%;
-  background: rgba(255, 68, 68, 0.08);
-  color: #ff4444;
-  margin-bottom: 8px;
-}
-
-.exit-panel-title {
-font-size: 2.8rem;
-  font-weight: 700;
-  color: #fff;
-  letter-spacing: 4px;
-  margin: 0;
-}
-
-.exit-panel-desc {
-font-size: 1.3rem;
-  line-height: 1.6;
-  color: #999;
-  max-width: 420px;
-  margin: 0;
-}
-
-
-
-
-
-
-
-
-
-.exit-panel-actions {
-  display: flex;
-  gap: 16px;
-  margin-top: 12px;
-}
-
-.exit-action {
-padding: 14px 40px;
-border-radius: 8px;
-font-size: 1.15rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  letter-spacing: 1px;
-  border: none;
-}
-
-.exit-action.cancel {
-  background: rgba(255, 255, 255, 0.06);
-  color: #aaa;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-.exit-action.cancel:hover {
-  background: rgba(255, 255, 255, 0.12);
-  color: #fff;
-}
-
-.exit-action.confirm {
-  background: rgba(255, 68, 68, 0.12);
-  color: #ff4444;
-  border: 1px solid rgba(255, 68, 68, 0.25);
-}
-
-
-  .exit-action.confirm:hover {
-  background: rgba(255, 68, 68, 0.22);
-  box-shadow: 0 0 18px rgba(255, 68, 68, 0.1);
-}
 </style>

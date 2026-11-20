@@ -59,7 +59,6 @@ export default {
     newGame: '新建游戏',
     continueGame: '继续游戏',
     joinGame: '加入游戏',
-    leaveGame: '离开游戏',
   },
   layout: {
     floorRestitution: '地面弹性系数',
