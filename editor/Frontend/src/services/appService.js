@@ -14,7 +14,6 @@ import { getWebDocumentIdentity } from '../api/webDocument.js';
 import { createWindowSessionActivities } from './windowSessionActivities.js';
 import { createWindowSessionState } from './windowSessionState.js';
 import { flushActiveNodeGraphs } from './nodeGraphSaves.js';
-import { flushBeforeClose } from './autosave.js';
 
 const windowSessions = new WeakMap();
 // Closed 1:1 mapping from the window session's intent vocabulary to the named
@@ -120,10 +119,7 @@ export const appService = {
   suspendCameraViews: (scene_id) => editorApi.window.close({ scene_id }),
   crossTabBroadcast: (event, payload) =>
     session().broadcast(event, payload),
-  // The process is about to end: write the scene once before asking native to quit. `saveNow`
-  // writes even when the dirty flag is clear, because that flag only knows the facade methods it
-  // wraps - the last write before the process ends should not depend on that heuristic.
-  close_process: () => flushBeforeClose(
-    () => editorApi.autosave.saveNow(),
-    () => editorApi.app.close_process()),
+  // The native exit request writes the live scene before stopping, and the window button goes
+  // through the same request, so the renderer does not queue a save of its own on the way out.
+  close_process: () => editorApi.app.close_process(),
 };

@@ -5,7 +5,6 @@ import test from 'node:test';
 import {
   PERSISTENT_SCENE_METHODS,
   createAutosavePolicy,
-  flushBeforeClose,
   saveActiveScene,
   withAutosave,
 } from '../../src/services/autosave.js';
@@ -349,27 +348,6 @@ test('a read-only world is never written and is reported once', async () => {
 
   assert.deepEqual(writes, [], 'a read-only world is never written');
   assert.deepEqual(skipped, ['read_only'], 'reported once per reason, not on every attempt');
-});
-
-test('closing flushes first, and closes even when the save fails or hangs', async () => {
-  const order = [];
-  const closed = await flushBeforeClose(
-    async () => { order.push('flush'); },
-    async () => { order.push('close'); return 'closed'; });
-  assert.deepEqual(order, ['flush', 'close']);
-  assert.equal(closed, 'closed');
-
-  const failed = [];
-  assert.equal(await flushBeforeClose(
-    async () => { throw new Error('archive service starting'); },
-    async () => { failed.push('close'); return 'closed'; }), 'closed');
-  assert.deepEqual(failed, ['close'], 'a failed save must not block the quit');
-
-  const hung = [];
-  assert.equal(await flushBeforeClose(
-    () => new Promise(() => {}),
-    async () => { hung.push('close'); return 'closed'; }, 10), 'closed');
-  assert.deepEqual(hung, ['close'], 'a hung save must not block the quit');
 });
 
 test('saveNow writes even when nothing is dirty', async () => {

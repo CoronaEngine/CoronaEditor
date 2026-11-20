@@ -214,25 +214,9 @@ function defaultNotify(outcome) {
   }
 }
 
-/**
- * Write what autosave still holds, then close.
- *
- * The process is about to end, so this is the last chance for edits sitting inside the debounce
- * window. Two things must not stop the quit: a save that fails, and a save that never answers
- * (the archive service can be busy); the wait is bounded and the outcome is logged.
- */
-export async function flushBeforeClose(flush, close, timeoutMs = 5000) {
-  try {
-    await Promise.race([
-      flush(),
-      new Promise(resolve => globalThis.setTimeout(resolve, timeoutMs)),
-    ]);
-  } catch (error) {
-    console.warn('[autosave] final write failed; closing anyway', error);
-  }
-  return close();
-}
-
+// The quit path does not live here: `corona.app.close_process` writes the live scene natively
+// before the process stops (the Web call and the window button reach the same request), so a
+// renderer-side flush on the way out would only repeat that write.
 function defaultSkippedNotice(outcome) {
   const message = outcome.reason === 'read_only'
     ? '当前世界为只读，修改不会被保存'
