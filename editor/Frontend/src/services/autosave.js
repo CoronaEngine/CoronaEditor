@@ -72,10 +72,10 @@ export function createAutosavePolicy({
     if (deadlineTimer === null) deadlineTimer = setTimer(fire, maxIntervalMs);
   };
 
-  const runSave = async () => {
+  const runSave = async (forced) => {
     const startedAt = generation;
     try {
-      await save();
+      await save({ forced });
       failure = null;
       lastSavedAt = now();
       if (generation === startedAt) dirty = false;
@@ -90,11 +90,12 @@ export function createAutosavePolicy({
     }
   };
 
-  const fire = () => {
+  const fire = (forced = false) => {
     clearTimers();
-    if (!dirty || saving) return Promise.resolve();
+    if (saving) return inFlight ?? Promise.resolve();
+    if (!dirty && !forced) return Promise.resolve();
     saving = true;
-    inFlight = runSave();
+    inFlight = runSave(forced);
     return inFlight;
   };
 
@@ -110,6 +111,17 @@ export function createAutosavePolicy({
       // whatever is still pending.
       if (inFlight) await inFlight;
       return fire();
+    },
+    /**
+     * Write the scene even when nothing is dirty.
+     *
+     * The quit path uses this: the dirty flag is a heuristic (it only knows the facade methods
+     * it wraps), so the last write before the process ends is unconditional. A write already
+     * running is awaited first - it may predate the newest edit.
+     */
+    async saveNow() {
+      if (inFlight) await inFlight;
+      return fire(true);
     },
     /** A save that already happened elsewhere (the user pressed save) settles the scene. */
     markClean() {
@@ -148,9 +160,11 @@ export function withAutosave(api, { notify = defaultNotify, notifySkipped = defa
   const reported = new Set();
   const policy = createAutosavePolicy({
     ...options,
-    save: async () => {
+    save: async ({ forced = false } = {}) => {
       const outcome = await saveActiveScene(scene);
-      if (!outcome.saved && outcome.reason !== 'no_scene' && !reported.has(outcome.reason)) {
+      // The quit path writes unconditionally; a world it cannot write is not news at that point
+      // (the user already saw it when the first edit was refused).
+      if (!forced && !outcome.saved && outcome.reason !== 'no_scene' && !reported.has(outcome.reason)) {
         reported.add(outcome.reason);
         notifySkipped(outcome);
       }
@@ -183,6 +197,7 @@ export function withAutosave(api, { notify = defaultNotify, notifySkipped = defa
     autosave: {
       markDirty: policy.markDirty,
       flush: policy.flush,
+      saveNow: policy.saveNow,
       dispose: policy.dispose,
       state: policy.state,
     },

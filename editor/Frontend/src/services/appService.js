@@ -120,9 +120,10 @@ export const appService = {
   suspendCameraViews: (scene_id) => editorApi.window.close({ scene_id }),
   crossTabBroadcast: (event, payload) =>
     session().broadcast(event, payload),
-  // The process is about to end: write what autosave still holds (edits can be sitting inside
-  // its debounce window) before asking native to quit.
+  // The process is about to end: write the scene once before asking native to quit. `saveNow`
+  // writes even when the dirty flag is clear, because that flag only knows the facade methods it
+  // wraps - the last write before the process ends should not depend on that heuristic.
   close_process: () => flushBeforeClose(
-    () => editorApi.autosave.flush(),
+    () => editorApi.autosave.saveNow(),
     () => editorApi.app.close_process()),
 };

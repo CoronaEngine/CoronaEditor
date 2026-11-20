@@ -371,3 +371,57 @@ test('closing flushes first, and closes even when the save fails or hangs', asyn
     async () => { hung.push('close'); return 'closed'; }, 10), 'closed');
   assert.deepEqual(hung, ['close'], 'a hung save must not block the quit');
 });
+
+test('saveNow writes even when nothing is dirty', async () => {
+  const clock = fakeClock();
+  const { policy, saves } = policyWith(clock);
+
+  await policy.saveNow();
+
+  assert.deepEqual(saves, [0], 'the quit path writes unconditionally');
+  assert.equal(policy.state().dirty, false);
+});
+
+test('saveNow waits for a save already running instead of racing it', async () => {
+  const clock = fakeClock();
+  const saves = [];
+  let calls = 0;
+  let release;
+  const policy = createAutosavePolicy({
+    save: () => {
+      saves.push(clock.now());
+      calls += 1;
+      return calls === 1 ? new Promise(resolve => { release = resolve; }) : Promise.resolve();
+    },
+    now: clock.now, setTimer: clock.setTimer, clearTimer: clock.clearTimer,
+    debounceMs: 1000, maxIntervalMs: 5000,
+  });
+
+  policy.markDirty();
+  clock.advance(1000);
+  await settle();
+  const closing = policy.saveNow();          // nothing new to write, but quitting writes anyway
+  release();
+  await closing;
+
+  assert.deepEqual(saves, [1000, 1000], 'the quit write lands after the running one, not over it');
+});
+
+test('the final write on close does not report a read-only world', async () => {
+  const clock = fakeClock();
+  const skipped = [];
+  const writes = [];
+  const scene = {
+    read_active: async () => ({ archive_session: 'lease', scene: 'scene.ini', read_only: true }),
+    save: async () => { writes.push('save'); return { status: 'saved' }; },
+  };
+  const api = withAutosave({ scene }, {
+    now: clock.now, setTimer: clock.setTimer, clearTimer: clock.clearTimer,
+    notify: () => {}, notifySkipped: outcome => skipped.push(outcome.reason),
+  });
+
+  await api.autosave.saveNow();
+
+  assert.deepEqual(writes, [], 'a read-only world is still not written');
+  assert.deepEqual(skipped, [], 'quitting a read-only world must not open a dialog');
+});
