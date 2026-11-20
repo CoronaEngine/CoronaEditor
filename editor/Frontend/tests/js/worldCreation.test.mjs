@@ -147,7 +147,7 @@ test('creation waits for service readiness, disables duplicate requests, and rou
   const creation = h.page.handleCreate();
   await new Promise(resolve => setImmediate(resolve));
   assert.equal(h.page.creating.value, true);
-  assert.deepEqual(h.calls, [['create', { prompt: '' }]]);
+  assert.deepEqual(h.calls, [['create', {}]]);
   await h.page.handleCreate();
   assert.equal(h.calls.filter(([call]) => call === 'create').length, 1);
   gate.resolve();

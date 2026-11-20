@@ -7,76 +7,28 @@
     <div class="absolute top-0 left-1/2 -translate-x-1/2 w-[700px] h-[700px] bg-[#d8b86c]/[0.04] rounded-full blur-3xl pointer-events-none"></div>
     <div class="absolute bottom-0 left-1/4 w-[400px] h-[400px] bg-[#d8b86c]/[0.025] rounded-full blur-3xl pointer-events-none"></div>
 
-    <!-- 主体三段式 -->
-    <div class="relative z-10 flex-1 flex flex-col px-8 py-6 overflow-hidden">
-
-      <!-- ① 上方：悬浮提示词层（漂浮 / 发光 / 可点击注入） -->
-      <div class="relative h-44 shrink-0">
+    <!-- 创建世界没有可填的内容：只剩返回与创建两个动作 -->
+    <div class="relative z-10 flex-1 flex items-center justify-center px-8 py-6">
+      <div class="w-full max-w-3xl flex items-center justify-between">
         <button
-          v-for="(hint, i) in floatingHints"
-          :key="hint.text"
-          class="hint-chip absolute px-4 py-2 rounded-full text-sm whitespace-nowrap
-                 bg-[#d8b86c]/[0.06] border border-[#d8b86c]/25 text-[#b9d39a]
-                 backdrop-blur-sm hover:bg-[#d8b86c]/20 hover:border-[#d8b86c]/60 hover:text-white
-                 transition-colors duration-300 cursor-pointer"
-          :style="{
-            top: hint.top,
-            left: hint.left,
-            '--dur': hint.dur,
-            '--delay': hint.delay,
-          }"
-          @click="applyHint(hint.text)"
+          class="px-5 py-3 text-base text-gray-400 hover:text-white hover:bg-[#222] rounded-lg transition-colors inline-flex items-center gap-1"
+          @click="goHome"
         >
-          {{ hint.text }}
+          <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
+          返回主页
         </button>
-      </div>
 
-      <!-- ② 中间：标题 + 世界描述输入框（页面焦点） -->
-      <div class="flex-1 flex flex-col items-center justify-center min-h-0">
-        <h1 class="text-3xl font-light tracking-wide mb-2 text-center">
-          你想创造一个怎样的
-          <span class="text-[#d8b86c] font-medium">世界</span>？
-        </h1>
-        <p class="text-sm text-gray-500 mb-7 text-center">用一句话描述它，AI 会生成一步一步的专属搭建任务</p>
-
-        <div class="w-full max-w-3xl">
-          <textarea
-            ref="promptRef"
-            v-model="worldPrompt"
-            rows="5"
-            class="w-full bg-[#161616] border border-[#333] rounded-xl p-5 text-lg leading-relaxed
-                   focus:border-[#d8b86c] focus:shadow-[0_0_40px_rgba(216,184,108,0.12)]
-                   outline-none transition-all resize-none placeholder:text-gray-600"
-            placeholder="例如：一座漂浮在云海之上的赛博朋克城市，永远是雨夜，霓虹倒映在湿漉漉的街道……"
-            @keydown.ctrl.enter="handleCreate"
-          ></textarea>
-        </div>
-      </div>
-
-      <!-- ③ 底部：创建与返回 -->
-      <div class="shrink-0 flex flex-col items-center gap-6 pb-2">
-        <!-- 操作按钮 -->
-        <div class="w-full max-w-3xl flex items-center justify-between">
-          <button
-            class="px-5 py-3 text-base text-gray-400 hover:text-white hover:bg-[#222] rounded-lg transition-colors inline-flex items-center gap-1"
-            @click="goHome"
-          >
-            <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
-            返回主页
-          </button>
-
-          <button
-            :disabled="creating || !archiveReady"
-            class="px-14 py-3 bg-[#d8b86c] hover:bg-[#95b86c] disabled:bg-gray-700 disabled:cursor-not-allowed
-                   rounded-lg font-bold text-base transition-all shadow-lg
-                   inline-flex items-center gap-2"
-            @click="handleCreate"
-          >
-            <svg v-if="!creating" class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v18M3 12h18"/><path d="M5.6 5.6l1.4 1.4M17 17l1.4 1.4M18.4 5.6L17 7M7 17l-1.4 1.4"/></svg>
-            <svg v-else class="w-5 h-5 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>
-            {{ creating ? '创造中…' : (archiveReady ? '创造世界' : '存档服务正在初始化…') }}
-          </button>
-        </div>
+        <button
+          :disabled="creating || !archiveReady"
+          class="px-14 py-3 bg-[#d8b86c] hover:bg-[#95b86c] disabled:bg-gray-700 disabled:cursor-not-allowed
+                 rounded-lg font-bold text-base transition-all shadow-lg
+                 inline-flex items-center gap-2"
+          @click="handleCreate"
+        >
+          <svg v-if="!creating" class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v18M3 12h18"/><path d="M5.6 5.6l1.4 1.4M17 17l1.4 1.4M18.4 5.6L17 7M7 17l-1.4 1.4"/></svg>
+          <svg v-else class="w-5 h-5 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>
+          {{ creating ? '创造中…' : (archiveReady ? '创造世界' : '存档服务正在初始化…') }}
+        </button>
       </div>
     </div>
   </div>
@@ -89,16 +41,13 @@ import { editorApi } from '@/api/editorApi.js';
 import { worldModeState } from '@/services/worldModeService.js';
 import { projectLauncherService, isProjectOpenSuperseded, cancelPendingProjectOpen } from '@/services/projectLauncherService.js';
 import { notifyWorldError } from '@/services/worldSessionLifecycle.js';
-import { initializeWorldTasks } from '@/services/cabbageAssistantContextService.js';
 import { translateUiText } from '@/i18n/domTranslator.js';
 import { createViewLifetime } from '@/utils/viewLifetime.js';
 
 const router = useRouter();
 
-const worldPrompt = ref('');
 const creating = ref(false);
 const archiveReady = ref(false);
-const promptRef = ref(null);
 let archiveStatusTimer = null;
 const viewLifetime = createViewLifetime();
 let activationDelayTimer = null;
@@ -128,24 +77,6 @@ onUnmounted(() => {
   if (activationDelayTimer !== null) window.clearTimeout(activationDelayTimer);
   finishActivationDelay?.();
 });
-
-// 静态预设的悬浮提示词（点击注入输入框）；top/left 散布，dur/delay 错峰漂浮
-const floatingHints = [
-  { text: '赛博朋克雨夜都市',   top: '8%',  left: '6%',  dur: '7s',  delay: '0s' },
-  { text: '漂浮的群岛与天空之城', top: '52%', left: '14%', dur: '8.5s', delay: '0.6s' },
-  { text: '废土上的最后绿洲',   top: '24%', left: '34%', dur: '6.5s', delay: '1.2s' },
-  { text: '水墨风的仙侠秘境',   top: '64%', left: '46%', dur: '9s',  delay: '0.3s' },
-  { text: '深海下的远古遗迹',   top: '10%', left: '60%', dur: '7.5s', delay: '1.6s' },
-  { text: '霓虹蒸汽朋克工坊',   top: '46%', left: '72%', dur: '8s',  delay: '0.9s' },
-  { text: '永夜极光下的雪原',   top: '18%', left: '84%', dur: '6.8s', delay: '0.2s' },
-];
-
-const applyHint = (text) => {
-  worldPrompt.value = worldPrompt.value.trim()
-    ? `${worldPrompt.value.trim()}，${text}`
-    : text;
-  promptRef.value?.focus();
-};
 
 const goHome = () => {
   cancelPendingProjectOpen();
@@ -184,12 +115,12 @@ const waitForPythonProjectActivation = async (expectedPath, current, timeoutMs =
 
 const handleCreate = async () => {
   if (!viewLifetime.current() || creating.value || !archiveReady.value) return;
-  const prompt = worldPrompt.value.trim(); // 允许为空：无提示词也可创建
 
   creating.value = true;
   try {
-    // 后端自动命名 + 存到引擎 data 目录，返回 { name, path }
-    const info = await editorApi.project.create_world_project({ prompt });
+    // 后端自动命名 + 存到引擎 data 目录，返回 { name, path }。世界设定已经去掉，
+    // 所以这里不再有描述可传：服务端用默认命名建一个空世界。
+    const info = await editorApi.project.create_world_project({});
     if (!viewLifetime.current()) return;
 
     if (info && info.path) {
@@ -203,30 +134,14 @@ const handleCreate = async () => {
       if (openResult?.ok) {
         const revision = worldModeState.revision;
         const current = () => viewLifetime.current() && worldModeState.status === 'ready' && worldModeState.revision === revision;
-        // Never send a world description or task request until Python confirms
-        // that the newly created world is the active project. Otherwise the old
-        // world can receive the new task plan and a stale node request can cross over.
+        // Enter the editor only once Python confirms that the new world is the active project;
+        // otherwise the editor would open the previous world for a moment.
         const projectReady = await waitForPythonProjectActivation(info.path, current);
         if (!current()) return;
-        if (projectReady) {
-          try {
-            // This operation only creates personalized guidance tasks. It never
-            // creates or modifies the project node graph.
-            await initializeWorldTasks({
-              prompt,
-              mode: 'creative',
-              waitForCompletion: Boolean(prompt),
-            });
-          } catch (taskError) {
-            console.warn('World task initialization failed; opening the world with fallback tasks:', taskError?.message || taskError);
-          }
-        } else {
-          // scene.ini already contains the prompt. MainPage will retry loading the
-          // current world and let the task service recover from that durable value.
-          console.warn('Python project activation is still pending; skipped the creation-page task request to protect the previous world.');
+        if (!projectReady) {
+          console.warn('Python project activation is still pending; the editor will wait for the world on its own.');
         }
-        if (!current()) return;
-        if (current()) router.push('/');
+        router.push('/');
         return;
       }
     }
@@ -243,17 +158,6 @@ const handleCreate = async () => {
 </script>
 
 <style scoped>
-/* 悬浮提示词缓慢漂浮 + 发光呼吸 */
-@keyframes floatDrift {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-12px); }
-}
-.hint-chip {
-  animation: floatDrift var(--dur, 8s) ease-in-out infinite;
-  animation-delay: var(--delay, 0s);
-  box-shadow: 0 0 18px rgba(216, 184, 108, 0.08);
-}
-
 ::-webkit-scrollbar {
   width: 4px;
 }
