@@ -101,7 +101,7 @@ for (const stage of ['create', 'open']) {
   }
 }
 
-test('NewGame current creation opens the world and retires its status interval', async t => {
+test('NewGame current creation opens the world and stops asking once the service is ready', async t => {
   const page = mount(t); page.start(); await page.ready();
   await page.state.handleCreate();
   // Creation no longer asks for a task plan: the world has no description to personalise.
@@ -109,7 +109,8 @@ test('NewGame current creation opens the world and retires its status interval',
   assert.ok(!page.calls.includes('tasks'));
   assert.deepEqual(page.routes, ['/']);
   assert.equal(page.state.creating.value, false);
-  assert.equal(page.intervals.size, 1);
+  // Ready is one-way, so the readiness poll cleared itself instead of running forever.
+  assert.equal(page.intervals.size, 0);
   page.dispose(); assert.equal(page.intervals.size, 0);
 });
 

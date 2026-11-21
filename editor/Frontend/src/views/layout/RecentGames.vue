@@ -114,8 +114,18 @@ const refreshArchiveReady = async () => {
   try {
     const status = await editorApi.project.get_project_load_status();
     if (current()) archiveReady.value = status?.archive_service_ready === true;
+    // The flag is one-way in practice: once Python registered its dispatcher it cannot go back
+    // while this page exists, so keep polling only while it is still false.
+    if (current() && archiveReady.value) stopArchivePolling();
   } catch {
     if (current()) archiveReady.value = false;
+  }
+};
+
+const stopArchivePolling = () => {
+  if (archiveStatusTimer !== null) {
+    window.clearInterval(archiveStatusTimer);
+    archiveStatusTimer = null;
   }
 };
 
@@ -134,7 +144,8 @@ onMounted(async () => {
     if (saved) recentProjects.value = saved;
     await refreshArchiveReady();
     if (!lifetime.current()) return;
-    archiveStatusTimer = window.setInterval(refreshArchiveReady, 250);
+    // 500ms while the service is still starting; `refreshArchiveReady` clears it once ready.
+    archiveStatusTimer = window.setInterval(refreshArchiveReady, 500);
   } catch (error) {
     if (lifetime.current()) console.error('RecentGames 初始化失败:', error);
   }

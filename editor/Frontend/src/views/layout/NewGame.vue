@@ -59,14 +59,24 @@ const refreshArchiveReady = async () => {
     const status = await editorApi.project.get_project_load_status();
     if (!viewLifetime.current()) return;
     archiveReady.value = status?.archive_service_ready === true;
+    // The flag is one-way in practice: once Python registered its dispatcher it cannot go back
+    // while this page exists, so keep polling only while it is still false.
+    if (archiveReady.value) stopArchivePolling();
   } catch {
     if (viewLifetime.current()) archiveReady.value = false;
   }
 };
 
+const stopArchivePolling = () => {
+  if (archiveStatusTimer !== null) {
+    window.clearInterval(archiveStatusTimer);
+    archiveStatusTimer = null;
+  }
+};
+
 onMounted(() => {
   void refreshArchiveReady();
-  archiveStatusTimer = window.setInterval(refreshArchiveReady, 250);
+  archiveStatusTimer = window.setInterval(refreshArchiveReady, 500);
 });
 
 onUnmounted(() => {

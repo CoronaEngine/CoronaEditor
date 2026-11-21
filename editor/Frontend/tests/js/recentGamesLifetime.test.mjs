@@ -52,7 +52,7 @@ test('retired launcher ignores a late history reply and creates no status poll',
   assert.deepEqual(page.calls, []);
 });
 
-test('status polling cannot apply an older reply or write after retirement', async t => {
+test('status polling cannot apply an older reply, and stops once the service is ready', async t => {
   const older = deferred(), retired = deferred(); let reads = 0;
   const page = mount(t, { get_project_load_status: () => {
     ++reads;
@@ -62,9 +62,12 @@ test('status polling cannot apply an older reply or write after retirement', asy
   await page.ready;
   const poll = page.timers.get(1)();
   await page.timers.get(1)();
+  // Read 3 said ready, which is one-way: the poll cleared itself instead of asking again.
+  assert.equal(page.timers.size, 0, 'ready stops the readiness poll');
   older.resolve({ archive_service_ready: false }); await poll;
   assert.equal(page.state.archiveReady.value, true);
-  const late = page.timers.get(1)(); page.dispose();
+  // A read that is still in flight when the view retires cannot write either.
+  const late = page.state.refreshArchiveReady(); page.dispose();
   retired.resolve({ archive_service_ready: false }); await late;
   assert.equal(page.state.archiveReady.value, true); assert.equal(page.timers.size, 0);
 });
