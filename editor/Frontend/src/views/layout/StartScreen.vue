@@ -327,9 +327,17 @@ const initThree = () => {
   };
   window.addEventListener("resize", onResize);
 
+  // The canvas covers the whole window, so every painted frame is a full-viewport CEF repaint
+  // (the engine log showed `avg_dirty_area=100% zero_dirty_frames=0`). While a panel is open the
+  // galaxy sits behind a nearly opaque sheet and nobody can see it move, and while the window is
+  // hidden there is nothing to show: stop painting then. The loop stays alive, so resuming costs
+  // nothing but the next frame.
+  const shouldPaint = () => !showPanel.value && !document.hidden;
+
   const animate = () => {
     if (!viewLifetime.current()) return;
     animationFrameId = requestAnimationFrame(animate);
+    if (!shouldPaint()) return;
     const elapsed = clock.getElapsedTime();
     starMaterial.uniforms.uTime.value = elapsed;
     particleSystem.rotation.y += 0.0005;
@@ -465,8 +473,10 @@ onUnmounted(() => {
   width: 44vw;
   height: 70vh;
   z-index: 30;
-  background: rgba(5, 5, 5, 0.92);
-  backdrop-filter: blur(4px);
+  /* No backdrop blur: the panel covered 44vw x 70vh of the launcher canvas, which repaints every
+     frame, so the blur was recomputed over that whole region every frame. At 0.96 alpha it bought
+     almost nothing visually. */
+  background: rgba(5, 5, 5, 0.96);
   display: flex;
   flex-direction: column;
   overflow: hidden;
