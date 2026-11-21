@@ -166,7 +166,10 @@ const initThree = () => {
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   container.appendChild(renderer.domElement);
 
-  const particleCount = 30000;
+  // 30k was paying for a full-viewport repaint every frame: the engine's UI system measured
+  // 14.5ms of its 16.7ms budget with this background animating. 8k keeps the galaxy shape and
+  // drops most of the per-frame raster cost (the star count scales with it below).
+  const particleCount = 8000;
   const geometry = new THREE.BufferGeometry();
   const positions = new Float32Array(particleCount * 3);
   const colors = new Float32Array(particleCount * 3);
@@ -206,7 +209,7 @@ const initThree = () => {
   particleSystem = new THREE.Points(geometry, material);
   scene.add(particleSystem);
 
-  const starCount = 3200;
+  const starCount = 800;
   const starRadiusMin = 160;
   const starRadiusMax = 280;
   const starGoldRatio = 0.08;
