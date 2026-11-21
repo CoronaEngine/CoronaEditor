@@ -21,8 +21,8 @@
       </button>
     </div>
 
-    <!-- 右侧面板 -->
-    <div v-if="showPanel" ref="panelRef" class="page-panel">
+    <!-- 右侧面板：常驻 DOM（关闭时在屏幕外且不可点），这样第一次打开不必再付图层创建的成本 -->
+    <div ref="panelRef" class="page-panel" :class="{ 'is-open': showPanel }">
       <div class="page-panel-body">
         <Transition name="page-fade" mode="out-in"><component :is="pageComponent" :key="activePage" />
         </Transition>
@@ -97,11 +97,15 @@ const animateParticles = (id) => {
 
 const showAndSlidePanel = async (id, component) => {
   if (!viewLifetime.current()) return;
+  // The slide belongs to opening and closing, not to switching. When a panel is already on
+  // screen the content cross-fades in place (`page-fade`); replaying `105% -> 0%` made every
+  // switch look like a new panel flying in.
+  const switching = showPanel.value;
   activePage.value = id;
   pageComponent.value = component;
   showPanel.value = true;
   await nextTick();
-  if (!viewLifetime.current()) return;
+  if (!viewLifetime.current() || switching) return;
   animations.add(() => gsap.fromTo(panelRef.value,
     { x: '105%' },
     { x: '0%', duration: 0.45, ease: 'power3.out', force3D: true }
@@ -473,6 +477,11 @@ onUnmounted(() => {
   width: 44vw;
   height: 70vh;
   z-index: 30;
+  /* Closed: parked off-screen and inert, but still in the DOM so its layer is created at mount
+     instead of at the first click (that first paint measured ~200-230ms). */
+  transform: translateX(105%);
+  opacity: 0;
+  pointer-events: none;
   /* No backdrop blur: the panel covered 44vw x 70vh of the launcher canvas, which repaints every
      frame, so the blur was recomputed over that whole region every frame. At 0.96 alpha it bought
      almost nothing visually. */
@@ -484,6 +493,11 @@ onUnmounted(() => {
   border: 2px solid #d8b86c;
   box-shadow: -8px 0 40px rgba(0, 0, 0, 0.4);
   contain: layout style paint;
+}
+
+.page-panel.is-open {
+  opacity: 1;
+  pointer-events: auto;
 }
 
 .page-panel-body {
