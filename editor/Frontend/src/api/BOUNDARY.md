@@ -45,7 +45,7 @@ archive_session；顶层字段为 visible、follow_camera、mechanics、animatio
 mechanics 使用具名 mass/restitution/damping/body_type 和三个布尔值的 linear_lock/angular_lock。
 所有字段校验通过后才修改，成功一次 patch 只增加一次 Actor/tree revision；返回原生属性快照。
 动画源仍异步加载，requested_animation_sources 只表示接受的源请求，不表示加载完成。
-不保留 setActorState/setActorPhysics/setActorCameraLock Web alias；其原非 Web 契约共享 typed 写操作。
+不保留 setActorState/setActorPhysics Web alias；其原非 Web 契约共享 typed 写操作。
 
 getEnvironment(scene,{archive_session}) / setEnvironment(scene,patch) 是唯一 Web 环境读写。
 patch 顶层只接受 archive_session、sun、grid、physics；sun 使用 enabled/direction，grid 使用 enabled，
@@ -94,7 +94,7 @@ CameraView、MainPage 的索引刷新及 NodeGraphWorkspace 运行目标校验�
 MainPage 初始化复用相机/环境/Actor索引投影；SceneBar 的丰富场景树及助手上下文仍属于未完成迁移，不存在新接口失败回退旧完整树的路径。
 
 readActorProperties(scene,actor,{archive_session}) 是 Object 属性面板及主视口变换基线的唯一 Actor 属性读取。
-直接 V8 对象返回归档/场景、GUID、名称、字符串 opaque handle、加载状态/错误、模型路径、变换、物理及相机锁定。
+直接 V8 对象返回归档/场景、GUID、名称、字符串 opaque handle、加载状态/错误、模型路径、变换、物理。
 不读取 AABB、材质、动画和模型节点；基础属性与 setActorProperties 回复复用同一 native snapshot。
 getActor/readActor Web 门面及旧 SceneTools.read_actor CEF 权限已删除，不再用 readActive 为缺失归档补默认值。
 Python 的 scene.read_actor 仍保留原完整数据契约。组件必须丢弃归档替换、切换场景、重载和卸载后的迟到结果。
