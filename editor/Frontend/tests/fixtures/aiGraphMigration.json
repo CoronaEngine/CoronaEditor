@@ -4326,8 +4326,7 @@
           ]
         }
       },
-      "accepted": false,
-      "error": "Camera follow block must target the requested actor FollowerActor"
+      "accepted": true
     },
     {
       "result": {

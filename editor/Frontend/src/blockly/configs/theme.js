@@ -17,7 +17,6 @@ const COLOURS = {
   physics:    '#3C7552', // green
   condition:  '#32776E', // teal
   gameplay:   '#8F5F29', // copper
-  camera:     '#496D97', // slate blue
   appearance: '#845A9B', // purple
   event:      '#965B32', // orange
   control:    '#8C742F', // amber
@@ -74,7 +73,6 @@ export const CoronaTheme = Blockly.Theme.defineTheme('CoronaTheme', {
     physics_blocks:    bs(COLOURS.physics),
     condition_blocks:  bs(COLOURS.condition),
     gameplay_blocks:   bs(COLOURS.gameplay),
-    camera_blocks:     bs(COLOURS.camera),
     appearance_blocks: bs(COLOURS.appearance),
     event_blocks:      bs(COLOURS.event),
     control_blocks:    bs(COLOURS.control),
@@ -103,7 +101,6 @@ export const CoronaTheme = Blockly.Theme.defineTheme('CoronaTheme', {
     physics_category:    { colour: COLOURS.physics },
     condition_category:  { colour: COLOURS.condition },
     gameplay_category:   { colour: COLOURS.gameplay },
-    camera_category:     { colour: COLOURS.camera },
     appearance_category: { colour: COLOURS.appearance },
     event_category:      { colour: COLOURS.event },
     control_category:    { colour: COLOURS.control },

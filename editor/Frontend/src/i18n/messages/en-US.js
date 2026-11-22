@@ -309,7 +309,6 @@ export default {
   blocklyToolbox: {
     appearance: 'Looks',
     audio: 'Sound',
-    camera: 'Camera',
     control: 'Control',
     condition: 'Conditions',
     conditionLogic: 'Logic',

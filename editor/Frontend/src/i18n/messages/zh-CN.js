@@ -309,7 +309,6 @@ export default {
   blocklyToolbox: {
     appearance: '外观',
     audio: '音效',
-    camera: '摄像机',
     control: '控制',
     condition: '条件',
     conditionLogic: '逻辑',

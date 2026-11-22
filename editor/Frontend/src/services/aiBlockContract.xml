@@ -117,7 +117,6 @@
     <Capability name="object-removal" keywords="destroy remove delete recycle despawn">Remove, recycle, or deactivate a real scene actor.</Capability>
     <Capability name="visibility" keywords="show hide visible invisible visibility">Show or hide a real scene actor.</Capability>
     <Capability name="rotation" keywords="rotate rotation spin angle yaw pitch roll">Rotate one actor or a tag-addressed actor group.</Capability>
-    <Capability name="camera-follow" keywords="camera follow orbit first person third person track">Bind a camera behavior to an exact real scene actor.</Capability>
     <Capability name="timer" keywords="timer wait delay cooldown duration countdown">Time-based waiting, cooldown, or duration logic.</Capability>
     <Capability name="state" keywords="variable state value initialize store update">Variables and persistent project node-graph state.</Capability>
     <Capability name="multi-object" keywords="multiple objects actors group tag all every">Operate on multiple real scene actors, normally through a real shared tag.</Capability>
@@ -127,8 +126,7 @@
     <Rule index="1">For follow, attraction, pursuit, or other dynamic actor-to-actor movement, each requested movement axis must depend on the live coordinate of the specified source actor.</Rule>
     <Rule index="2">Fixed world coordinates or unrelated numeric constants do not satisfy a dynamic actor relation.</Rule>
     <Rule index="3">A distance condition must contain both requested actors in the same Boolean condition and must use live coordinates for the compared position.</Rule>
-    <Rule index="4">A camera follow, orbit, or first-person block must bind NAME to the exact real actor requested by the user, independently from attraction or movement source roles.</Rule>
-    <Rule index="5">A tag-wide operation may cover multiple targets only when RuntimeContext proves that every requested target shares that exact tag.</Rule>
+    <Rule index="4">A tag-wide operation may cover multiple targets only when RuntimeContext proves that every requested target shares that exact tag.</Rule>
   </DynamicActorRelationRules>
   <MacroEdgeSerializationRules machineReadable="true">
     <EdgeShape requiredFields="id name source target conditionWorkspace" sourceFields="nodeId side index" targetFields="nodeId side index">{"id":"...","name":"...","source":{"nodeId":"...","side":"right","index":0},"target":{"nodeId":"...","side":"left","index":0},"conditionWorkspace":{}}</EdgeShape>
@@ -153,7 +151,7 @@
   </BlockSelectionPriority>
   <SafeCompositionPatterns>
     <Pattern name="SingleObjectWasdAndJump">In one reachable node_while_active DO chain, use object_third_person_move followed by object_arcade_jump. Bind both NAME fields to the same exact RuntimeContext object. Do not add camera, score, lives, combat, or win/lose logic unless requested.</Pattern>
-    <Pattern name="FirstPersonControl">In node_when_enter configure camera_first_person_follow for the controlled object, then in node_while_active use object_first_person_move and optional object_arcade_jump with the same object name. Use only a real obstacle tag; if no obstacle tag exists, do not invent one.</Pattern>
+    <Pattern name="FirstPersonControl">In node_while_active use object_first_person_move and optional object_arcade_jump with the same object name. Use only a real obstacle tag; if no obstacle tag exists, do not invent one.</Pattern>
     <Pattern name="RateLimitedShooting">Gate mouse or key input with control_cooldown_ready or an equivalent edge trigger, perform the raycast and hit action, then consume or start the cooldown. Never fire, damage, spawn, or play audio every active update without a rate limit.</Pattern>
     <Pattern name="RateLimitedSpawning">Any spawn or object-generation action reachable from node_while_active must be guarded by control_wait, control_cooldown_ready, control_start_cooldown, a one-shot input edge, or a state transition.</Pattern>
     <Pattern name="ProgressVariable">Initialize score, lives, floor, wave, checkpoint, or objective data on a reachable enter path, update the same variable on a reachable gameplay path, and compare that same variable in win or lose transitions.</Pattern>
@@ -166,7 +164,6 @@
     <Pattern name="ObjectAddressing">Use object-name blocks for unique objects and tag-based blocks for groups. Names and tags must match RuntimeContext.</Pattern>
     <Pattern name="RandomMovement">Combine math_random_int or math_random_float with object_set_tag_velocity_axis, object_set_random_position, object_scatter_tag, or timed state changes.</Pattern>
     <Pattern name="EnemyBehavior">Use combat_enemy_chase_tag for pursuit, combat_enemy_contact_damage for contact attacks, and combat_melee_attack or raycast blocks for player attacks.</Pattern>
-    <Pattern name="CameraAndControl">Choose first-person, third-person, orbit, or follow camera blocks and pair them with the corresponding movement template and input checks.</Pattern>
     <Pattern name="PhysicsAndDetection">Combine velocity, gravity, impulse, collision, ground, raycast, region, and distance blocks. Use Boolean detection blocks on transition edges.</Pattern>
     <Pattern name="ProgressAndRules">Use score, lives, countdown, cooldown, checkpoints, object counts, and variables to make explicit win, lose, wave, or objective conditions.</Pattern>
   </ThreeDDemoCompositionPatterns>
@@ -219,7 +216,7 @@
     "globalVariablesWorkspace": {}
   }
 }</ExampleResult>
-  <Catalog generatedFrom="editor/Frontend/src/blockly/configs/toolboxConfig.js and registered Blockly definitions" blockCount="259" locked="true">
+  <Catalog generatedFrom="editor/Frontend/src/blockly/configs/toolboxConfig.js and registered Blockly definitions" blockCount="249" locked="true">
     <CatalogRules>
       <Rule>AI must preserve this Catalog and may use only listed Block type, Field name, Input name, check type, and dropdown value combinations.</Rule>
       <Rule>projectUsage=project-safe means suitable for the unbound project graph. projectUsage=actor-context means the block expects a current actor context and should normally be avoided here.</Rule>
@@ -231,7 +228,6 @@
       <Group category="控制" types="control_wait control_if control_else control_cooldown_ready control_start_cooldown" />
       <Group category="条件" types="logic_boolean logic_compare logic_operation logic_negate math_number math_arithmetic variable_get variable_exists detect_object_exists detect_object_not_exists detect_keyboard1 detect_keyboard0 detect_mouse1 detect_mouse0 detect_mouse_x_ratio detect_inside_axis detect_inside_box detect_position_near detect_raycast detect_raycast_hit_tag ui_countdown_finished ui_score ui_lives" />
       <Group category="运动" types="object_set_position object_move_direction object_get_x object_get_y object_get_z object_move_tag" />
-      <Group category="摄像机" types="camera_follow_object camera_third_person_orbit camera_first_person_follow camera_raycast" />
       <Group category="侦测" types="detect_crossed_x_once detect_crossed_z_once detect_mouse_pick_object detect_mouse_pick_hit_tag" />
       <Group category="界面" types="ui_set_score ui_add_score ui_set_lives ui_game_win ui_game_over" />
       <Group category="音效" types="audio_play" />
@@ -655,35 +651,6 @@
         <Input name="NAME" kind="value" check="String" />
         <Field name="NAME_TEXT" kind="string" defaultJson="&quot;&quot;" inputOwner="NAME" />
       </Block>
-      <Block type="camera_lock_mouse" category="摄像机" shape="statement" projectUsage="project-safe" recommended="false" outputCheck="" dynamic="false" label="锁定鼠标" capabilities="camera-follow" />
-      <Block type="camera_unlock_mouse" category="摄像机" shape="statement" projectUsage="project-safe" recommended="false" outputCheck="" dynamic="false" label="解锁鼠标" capabilities="camera-follow" />
-      <Block type="camera_mouse_dx" category="摄像机" shape="output" projectUsage="project-safe" recommended="false" outputCheck="Number" dynamic="false" label="鼠标移动 X" />
-      <Block type="camera_mouse_dy" category="摄像机" shape="output" projectUsage="project-safe" recommended="false" outputCheck="Number" dynamic="false" label="鼠标移动 Y" />
-      <Block type="camera_set_fov" category="摄像机" shape="statement" projectUsage="project-safe" recommended="false" outputCheck="" dynamic="false" label="视野设为 75 度">
-        <Field name="FOV" kind="number" defaultJson="75" inputOwner="" />
-      </Block>
-      <Block type="camera_follow_object" category="摄像机" shape="statement" projectUsage="project-safe" recommended="true" outputCheck="" dynamic="false" label="摄像机跟随对象  偏移 X 0 Y 5 Z -10" capabilities="camera-follow" aiUse="NAME must be the exact real actor that the user requested the camera to follow.">
-        <Field name="NAME" kind="string" defaultJson="&quot;&quot;" inputOwner="" />
-        <Field name="OX" kind="number" defaultJson="0" inputOwner="" />
-        <Field name="OY" kind="number" defaultJson="5" inputOwner="" />
-        <Field name="OZ" kind="number" defaultJson="-10" inputOwner="" />
-      </Block>
-      <Block type="camera_third_person_orbit" category="摄像机" shape="statement" projectUsage="project-safe" recommended="true" outputCheck="" dynamic="false" label="第三人称摄像机跟随 CoinHero 距离 7 高度 2.4 鼠标灵敏度 0.18" capabilities="camera-follow" aiUse="NAME must be the exact real actor used as the third-person orbit target.">
-        <Field name="NAME" kind="string" defaultJson="&quot;CoinHero&quot;" inputOwner="" />
-        <Field name="DISTANCE" kind="number" defaultJson="7" inputOwner="" />
-        <Field name="HEIGHT" kind="number" defaultJson="2.4" inputOwner="" />
-        <Field name="SENSITIVITY" kind="number" defaultJson="0.18" inputOwner="" />
-      </Block>
-      <Block type="camera_first_person_follow" category="摄像机" shape="statement" projectUsage="project-safe" recommended="true" outputCheck="" dynamic="false" label="第一人称摄像机跟随 FighterPlayer 高度 1.55 灵敏度 0.16 武器 Sword" capabilities="camera-follow" aiUse="NAME must be the exact real actor used as the first-person follow target.">
-        <Field name="NAME" kind="string" defaultJson="&quot;FighterPlayer&quot;" inputOwner="" />
-        <Field name="HEIGHT" kind="number" defaultJson="1.55" inputOwner="" />
-        <Field name="SENSITIVITY" kind="number" defaultJson="0.16" inputOwner="" />
-        <Field name="WEAPON" kind="string" defaultJson="&quot;Sword&quot;" inputOwner="" />
-      </Block>
-      <Block type="camera_raycast" category="摄像机" shape="output" projectUsage="project-safe" recommended="true" outputCheck="Boolean" dynamic="false" label="从摄像机发射射线 距离 100 命中？">
-        <Field name="MAX_DIST" kind="number" defaultJson="100" inputOwner="" />
-      </Block>
-      <Block type="camera_raycast_object" category="摄像机" shape="output" projectUsage="project-safe" recommended="false" outputCheck="" dynamic="false" label="摄像机射线命中的对象" />
       <Block type="appearance_cartoonSet" category="外观" shape="statement" projectUsage="actor-context" recommended="false" outputCheck="" dynamic="false" label="换成 0 动画">
         <Field name="INDEX" kind="number" defaultJson="0" inputOwner="" />
       </Block>

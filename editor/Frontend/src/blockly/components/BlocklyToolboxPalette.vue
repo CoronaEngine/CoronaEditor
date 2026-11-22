@@ -103,8 +103,6 @@ const CONDITION_GROUPS = [
       'detect_mouse_left_half',
       'detect_mouse_right_half',
       'detect_mouse_x_ratio',
-      'camera_mouse_dx',
-      'camera_mouse_dy',
       'detect_ask_answer',
     ],
   },
@@ -125,7 +123,6 @@ const CONDITION_GROUPS = [
       'detect_raycast_object',
       'detect_raycast_point',
       'detect_raycast_hit_tag',
-      'camera_raycast_object',
       'detect_last_collision_axis',
       'detect_last_collision_normal_x',
       'detect_last_collision_normal_y',
@@ -285,7 +282,6 @@ async function registerBlocks() {
   if (blocksRegistered) return;
   const [
     { defineAudioBlocks },
-    { defineCameraBlocks },
     { defineEngineBlocks },
     { defineAppearanceBlocks },
     { defineEventBlocks },
@@ -298,7 +294,6 @@ async function registerBlocks() {
     { defineUiBlocks },
   ] = await Promise.all([
     import('@/blockly/blocks/audio.js'),
-    import('@/blockly/blocks/camera.js'),
     import('@/blockly/blocks/engine.js'),
     import('@/blockly/blocks/appearance.js'),
     import('@/blockly/blocks/event.js'),
@@ -313,7 +308,6 @@ async function registerBlocks() {
 
   await import('blockly/blocks');
   defineAudioBlocks();
-  defineCameraBlocks();
   defineEngineBlocks();
   defineAppearanceBlocks();
   defineEventBlocks(ref([]), () => {});

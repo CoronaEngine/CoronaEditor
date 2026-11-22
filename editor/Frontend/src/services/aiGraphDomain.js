@@ -719,18 +719,6 @@ export function validateSemantics(result, request) {
       });
       if (!satisfied) throw new Error('距离条件必须包含双方对象的实时坐标');
     }
-  if (
-    requirement.cameraTargets.length &&
-    !nodeBlocks.some(
-      (b) =>
-        [
-          'camera_follow_object',
-          'camera_third_person_orbit',
-          'camera_first_person_follow',
-        ].includes(b.type) && actorRefs(b).includes(requirement.cameraTargets[0])
-    )
-  )
-    throw new Error('镜头未跟随指定对象');
   if (requirement.narrowObjectControl) {
     const count = (blocks) =>
       blocks.reduce((d, b) => {

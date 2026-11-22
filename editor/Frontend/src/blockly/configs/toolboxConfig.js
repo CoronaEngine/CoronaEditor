@@ -146,23 +146,6 @@ export const TOOLBOX_CONFIG = {
     },
     {
       kind: 'category',
-      name: "\u6444\u50cf\u673a",
-      categorystyle: 'camera_category',
-      contents: [
-        block('camera_lock_mouse'),
-        block('camera_unlock_mouse'),
-        block('camera_mouse_dx'),
-        block('camera_mouse_dy'),
-        block('camera_set_fov'),
-        block('camera_follow_object'),
-        block('camera_third_person_orbit'),
-        block('camera_first_person_follow'),
-        block('camera_raycast'),
-        block('camera_raycast_object'),
-      ],
-    },
-    {
-      kind: 'category',
       name: "\u5916\u89c2",
       categorystyle: 'appearance_category',
       contents: [
@@ -429,7 +412,6 @@ const CATEGORY_KEYS = {
   "\u6761\u4ef6": 'blocklyToolbox.condition',
   "\u8fd0\u52a8": 'blocklyToolbox.motion',
   "\u7269\u7406": 'blocklyToolbox.physics',
-  "\u6444\u50cf\u673a": 'blocklyToolbox.camera',
   "\u5916\u89c2": 'blocklyToolbox.appearance',
   "\u5bf9\u8c61": 'blocklyToolbox.object',
   "\u4fa6\u6d4b": 'blocklyToolbox.detect',

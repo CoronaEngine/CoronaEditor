@@ -139,7 +139,6 @@ async function registerBlocks() {
   if (blocksRegistered) return;
   const [
     { defineAudioBlocks },
-    { defineCameraBlocks },
     { defineEngineBlocks },
     { defineAppearanceBlocks },
     { defineEventBlocks },
@@ -152,7 +151,6 @@ async function registerBlocks() {
     { defineUiBlocks },
   ] = await Promise.all([
     import('@/blockly/blocks/audio.js'),
-    import('@/blockly/blocks/camera.js'),
     import('@/blockly/blocks/engine.js'),
     import('@/blockly/blocks/appearance.js'),
     import('@/blockly/blocks/event.js'),
@@ -167,7 +165,6 @@ async function registerBlocks() {
 
   await import('blockly/blocks');
   defineAudioBlocks();
-  defineCameraBlocks();
   defineEngineBlocks();
   defineAppearanceBlocks();
   defineEventBlocks(ref([]), () => {});
