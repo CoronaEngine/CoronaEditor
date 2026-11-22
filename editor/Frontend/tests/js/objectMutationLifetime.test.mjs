@@ -159,8 +159,7 @@ for (const retire of ['unmount', 'actor', 'archive']) {
       ['scene.ini', { archive_session: 'archive', actors_only: true }]);
   });
 
-  for (const [method, args] of [['updateMechanic', ['SetMass', 3]], ['updateLocks', ['SetAngularLock', [false, true, false]]],
-    ['updateCameraLock', []], ['updateCameraLockOffset', []]]) {
+  for (const [method, args] of [['updateMechanic', ['SetMass', 3]], ['updateLocks', ['SetAngularLock', [false, true, false]]]]) {
     test(`Object ${method} late native failure is ignored after ${retire}`, async t => {
       const pending = deferred();
       const page = mount(t, { update_actor: () => pending.promise });
@@ -253,7 +252,7 @@ test('live Object transform event reports its submitted value instead of a later
   assert.equal(page.events[0][0].details.value, 2);
 });
 
-for (const method of ['setRenderSpace', 'setBodyType', 'updateCameraLock', 'updateCameraLockOffset', 'saveActor']) {
+for (const method of ['setRenderSpace', 'setBodyType', 'saveActor']) {
   test(`Object ${method} entry cannot initiate native work after unmount`, async t => {
     const page = mount(t); page.dispose();
     await page.state[method](method === 'setBodyType' ? 'static' : true);

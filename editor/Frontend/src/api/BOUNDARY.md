@@ -40,10 +40,9 @@ setActorTransform 只接受 archive_session 与 position/rotation/scale 三元�
 至少更新一个字段；归档身份在 owner 执行时校验。返回实际变换、Actor 标识及递增版本，
 没有 transport data 包装；无 persist、数字 operation 或 Fast 旁路，旧 CEF manifest 路由拒绝。
 
-setActorProperties 是状态、物理、摄像机锁定的唯一 Web 属性 patch。必须显式传入
-archive_session；顶层字段为 visible、follow_camera、mechanics、camera_lock、animation_sources。
-mechanics 使用具名 mass/restitution/damping/body_type 和三个布尔值的 linear_lock/angular_lock；
-camera_lock 必须包含 enabled，可附 position_offset/rotation_offset 三元有限数值数组。
+setActorProperties 是状态、物理的唯一 Web 属性 patch。必须显式传入
+archive_session；顶层字段为 visible、follow_camera、mechanics、animation_sources。
+mechanics 使用具名 mass/restitution/damping/body_type 和三个布尔值的 linear_lock/angular_lock。
 所有字段校验通过后才修改，成功一次 patch 只增加一次 Actor/tree revision；返回原生属性快照。
 动画源仍异步加载，requested_animation_sources 只表示接受的源请求，不表示加载完成。
 不保留 setActorState/setActorPhysics/setActorCameraLock Web alias；其原非 Web 契约共享 typed 写操作。

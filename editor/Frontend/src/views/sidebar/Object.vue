@@ -89,20 +89,6 @@
         </div>
       </section>
 
-      <section class="property-section" data-assistant-title="摄像机跟随" data-assistant-description="启用后模型会按照偏移值跟随编辑器或游戏摄像机。">
-        <div class="section-title section-title-row">
-          <span>摄像机跟随</span>
-          <label class="switch-label"><input v-model="actor.cameraLock.enabled" type="checkbox" @change="updateCameraLock" />启用</label>
-        </div>
-        <div v-if="actor.cameraLock.enabled" class="vector-group">
-          <span>位置偏移</span>
-          <label v-for="axis in axes" :key="axis" :class="`axis-${axis}`">
-            <b>{{ axis.toUpperCase() }}</b>
-            <input v-model.number="actor.cameraLock.position[axis]" type="number" step="0.1" @change="updateCameraLockOffset" />
-          </label>
-        </div>
-      </section>
-
       <!-- IK 配置与运行状态从当前对象读取。 -->
       <section
         v-if="actor.loadStatus === 'loaded'"
@@ -398,10 +384,6 @@ const actor = reactive({
     linearLock: [false, false, false],
     angularLock: [false, false, false],
   },
-  cameraLock: {
-    enabled: false,
-    position: { x: 0, y: 0, z: 2 },
-  },
 });
 
 const aliasDirty = computed(() => aliasDraft.value.trim() !== actor.name);
@@ -489,9 +471,6 @@ async function loadActor(sceneName, actorName, session, actorGuid) {
     actor.mechanics.damping = Number(mechanics.damping ?? 0.99);
     actor.mechanics.linearLock = axes.map((_, index) => Boolean(mechanics.linear_lock?.[index]));
     actor.mechanics.angularLock = axes.map((_, index) => Boolean(mechanics.angular_lock?.[index]));
-    const cameraLock = data.camera_lock || {};
-    actor.cameraLock.enabled = Boolean(cameraLock.enabled ?? cameraLock.lock_to_camera);
-    assignVector(actor.cameraLock.position, cameraLock.position_offset, { x: 0, y: 0, z: 2 });
     aliasDraft.value = actor.name;
     aliasError.value = '';
     syncViewportTransformBaseline();
@@ -792,49 +771,6 @@ async function updateLocks(operation, values) {
   }
 }
 
-async function updateCameraLock() {
-  if (!viewLifetime.current() || !selectedActorName.value) return;
-  const context = actorOperation();
-  try {
-    await editorApi.scene.update_actor(
-      selectedSceneName.value,
-      selectedActorName.value,
-      { archive_session: archiveSession.value, camera_lock: { enabled: actor.cameraLock.enabled } },
-    );
-  } catch (error) {
-    if (context.current()) logError('更新摄像机跟随失败', error);
-  }
-}
-
-async function updateCameraLockOffset() {
-  if (!viewLifetime.current() || !selectedActorName.value) return;
-  const context = actorOperation();
-  const value = actor.cameraLock.position;
-  const toFinite = (input, fallback) => {
-    const number = Number(input);
-    return Number.isFinite(number) ? number : fallback;
-  };
-  try {
-    await editorApi.scene.update_actor(
-      selectedSceneName.value,
-      selectedActorName.value,
-      {
-        archive_session: archiveSession.value,
-        camera_lock: {
-          enabled: true,
-          position_offset: [
-            toFinite(value.x, 0),
-            toFinite(value.y, 0),
-            toFinite(value.z, 2),
-          ],
-        },
-      },
-    );
-  } catch (error) {
-    if (context.current()) logError('更新摄像机偏移失败', error);
-  }
-}
-
 async function saveActor() {
   if (!viewLifetime.current() || !selectedActorName.value || saving.value) return;
   const context = actorOperation();
@@ -991,7 +927,6 @@ onUnmounted(() => {
 .save-button:disabled,.inline-button:disabled { opacity:.45; cursor:not-allowed; }
 .property-section { margin-bottom:8px; padding:10px; border:1px solid rgba(179, 153, 93,.24); border-radius:7px; background:#101711; }
 .section-title { margin-bottom:8px; color:#e8ede3; font-size:12px; font-weight:700; }
-.section-title-row { display:flex; align-items:center; justify-content:space-between; }
 .property-section-collapsible { padding:0; overflow:hidden; }
 .section-toggle { width:100%; min-height:38px; display:flex; align-items:center; justify-content:space-between; padding:9px 10px; border:0; background:#191711; color:#e8ede3; font-size:12px; font-weight:700; text-align:left; cursor:pointer; transition:background .15s ease,color .15s ease; }
 .section-toggle:hover { background:#242016; color:#e6d5a7; }
@@ -1018,7 +953,6 @@ input:focus,select:focus { border-color:#b3995d; box-shadow:0 0 0 1px rgba(179, 
 .vector-group label { display:grid; grid-template-columns:12px minmax(0,1fr); align-items:center; gap:3px; }
 .vector-group b { font-size:9px; }
 .axis-x b { color:#f28b82; }.axis-y b { color:#8ab4f8; }.axis-z b { color:#81c995; }
-.switch-label { display:flex; align-items:center; gap:5px; color:#d2c6a7; font-size:10px; }
 .physics-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:6px; }
 .physics-grid label { color:#8d9e85; font-size:10px; }
 .physics-grid input { margin-top:3px; }
