@@ -61,20 +61,19 @@ export function generationRequirements(instruction, project = {}, operation = 'c
     const a = byName.get(name) || {};
     return cameraPattern.test([a.name, a.type, a.semanticRole, ...(a.tags || [])].join(' '));
   };
-  let follow = null,
-    cameraTarget = null;
+  let follow = null;
   for (const m of text.matchAll(
     /\bfollow(?:s|ing)?\b|\btrack(?:s|ing)?\b|\bchase(?:s|ing)?\b|跟随|追随|追踪/gi
   )) {
     const nearCamera =
       cameraPattern.test(text.slice(Math.max(0, m.index - 80), m.index)) ||
       cameraPattern.test(text.slice(m.index + m[0].length, m.index + m[0].length + 40));
+    // Camera-follow wording derives nothing: the camera block family is gone, so a
+    // camera match must not create an actor relation.
+    if (nearCamera) continue;
     const before = matches.filter((a) => a.position < m.index).map((a) => a.name),
       after = matches.filter((a) => a.position > m.index + m[0].length).map((a) => a.name);
-    if (nearCamera)
-      cameraTarget =
-        after.find((n) => !isCamera(n)) || before.filter((n) => !isCamera(n)).at(-1) || null;
-    else if (!follow && before.length && after.length && !before.every(isCamera))
+    if (!follow && before.length && after.length && !before.every(isCamera))
       follow = { source: after[0], targets: unique(before.filter((n) => n !== after[0])) };
   }
   if (follow && !capabilities.includes('camera-follow') && !capabilities.includes('movement'))
@@ -87,12 +86,7 @@ export function generationRequirements(instruction, project = {}, operation = 'c
   let source = [];
   if (follow) source = [follow.source];
   else if (capabilities.some((c) => ['attraction', 'rotation', 'camera-follow'].includes(c))) {
-    source =
-      !capabilities.some((c) => ['attraction', 'rotation'].includes(c)) &&
-      capabilities.includes('camera-follow') &&
-      cameraTarget
-        ? [cameraTarget]
-        : mentioned.filter((n) => roleSources.includes(n));
+    source = mentioned.filter((n) => roleSources.includes(n));
     if (!source.length)
       source = genericSource && roleSources.length === 1 ? roleSources : mentioned;
     source = source.slice(0, 1);
@@ -217,10 +211,5 @@ export function generationRequirements(instruction, project = {}, operation = 'c
       : null,
     dynamicActorRelations,
     distanceActorRelations,
-    cameraTargets: capabilities.includes('camera-follow')
-      ? cameraTarget
-        ? [cameraTarget]
-        : source.slice(0, 1)
-      : [],
   };
 }

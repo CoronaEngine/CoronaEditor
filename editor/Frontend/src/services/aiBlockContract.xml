@@ -71,26 +71,26 @@
     <EdgeConditionRule index="3">Conditional flow uses logic_compare, logic_operation, logic_negate, input detection, collision, raycast, region, distance, variable, score, lives, or countdown Boolean combinations.</EdgeConditionRule>
     <EdgeConditionRule index="4">Number, text, coordinate, distance, score, and lives blocks are not valid outer conditions; connect them to a comparison block.</EdgeConditionRule>
     <ObjectTargetRule index="1">Project-global object actions must identify a real scene object or tag. Prefer the Catalog object_reference output connected to OBJECT value inputs when available.</ObjectTargetRule>
-    <ObjectTargetRule index="2">Do not leave movement, rotation, physics, collision, camera-follow, damage, spawn ownership, or deletion actions without a concrete target.</ObjectTargetRule>
+    <ObjectTargetRule index="2">Do not leave movement, rotation, physics, collision, damage, spawn ownership, or deletion actions without a concrete target.</ObjectTargetRule>
     <ObjectTargetRule index="3">Do not serialize placeholder actor names such as object, actor, target, TODO, unknown, empty string, or arbitrary names absent from RuntimeContext.</ObjectTargetRule>
     <ObjectTargetRule index="4">Every statically resolvable object_reference must resolve to an exact RuntimeContext actor name. If the referenced object does not exist, the result is invalid and must be corrected before return.</ObjectTargetRule>
     <GameplaySafetyRule index="1">Repeated shooting, spawning, damage, audio, or expensive raycast logic inside active loops requires a cooldown, wait, edge-trigger, or equivalent rate limit.</GameplaySafetyRule>
     <GameplaySafetyRule index="2">Variables used by win, loss, lives, score, layer, checkpoint, wave, or objective conditions must be initialized and updated on reachable paths.</GameplaySafetyRule>
-    <GameplaySafetyRule index="3">Movement and camera logic must target real RuntimeContext objects and use compatible first-person, third-person, orbit, follow, or free-camera behavior.</GameplaySafetyRule>
+    <GameplaySafetyRule index="3">Movement logic must target real RuntimeContext objects and use compatible first-person or third-person movement behavior.</GameplaySafetyRule>
     <GameplaySafetyRule index="4">Use collision, raycast, region, distance, ground, and tag detection blocks for 3D interactions rather than inventing unsupported physics behavior.</GameplaySafetyRule>
   </GenerationRules>
   <ProjectObjectBindingRules fixedTargetActorBinding="none">
     <Rule index="1">The project-global graph has no implicit current actor. Every newly generated single-object action must bind a concrete RuntimeContext object through its exact NAME field or an OBJECT value input.</Rule>
     <Rule index="2">When a block exposes an OBJECT value input, connect object_reference. Set object_reference.OBJECT to an exact current-scene object option; use OBJECT=__manual__ with MANUAL only for a runtime-created object name that is explicitly established by reachable logic.</Rule>
-    <Rule index="3">When a project-safe block exposes a direct NAME, PLAYER, BALL, PADDLE, CAMERA, TARGET, or similar object field instead of OBJECT, copy an exact object name from RuntimeContext or a valid runtime-created name from ExistingGraph.</Rule>
+    <Rule index="3">When a project-safe block exposes a direct NAME, PLAYER, BALL, PADDLE, TARGET, or similar object field instead of OBJECT, copy an exact object name from RuntimeContext or a valid runtime-created name from ExistingGraph.</Rule>
     <Rule index="4">Never emit empty object names, __none__, default sample names, translated object names, or placeholders such as Actor, Object, Player, Target, TODO, and unknown unless that exact name exists in RuntimeContext.</Rule>
-    <Rule index="5">Blocks that cooperate on one controlled object, such as movement, jump, camera follow, health, collision response, and checkpoint restore, must use the same exact object binding unless the user explicitly requests different objects.</Rule>
+    <Rule index="5">Blocks that cooperate on one controlled object, such as movement, jump, health, collision response, and checkpoint restore, must use the same exact object binding unless the user explicitly requests different objects.</Rule>
     <Rule index="6">Use tags only for groups whose real tag is present in RuntimeContext or ExistingGraph. Do not replace a unique object request with a tag-wide action.</Rule>
     <Rule index="7">Do not introduce projectUsage=actor-context blocks into this fixed project-global graph. They require an implicit actor that this target does not provide; choose a project-safe explicit-object or tag-based alternative instead.</Rule>
   </ProjectObjectBindingRules>
   <NodeLifecycleRootRules>
     <Rule index="1">For newly generated state-node logic, top-level execution roots must be node_when_enter, node_while_active, or node_when_exit. Put executable statements under the root's DO input; never leave a statement block as an orphan top-level root.</Rule>
-    <Rule index="2">Use node_when_enter for one-time initialization, camera setup, initial placement, variable initialization, initial spawning, and audio start.</Rule>
+    <Rule index="2">Use node_when_enter for one-time initialization, initial placement, variable initialization, initial spawning, and audio start.</Rule>
     <Rule index="3">Use node_while_active for repeated input polling, movement, physics stepping, enemy updates, collision or raycast checks, cooldown checks, and other per-update gameplay.</Rule>
     <Rule index="4">Use node_when_exit only for cleanup, stopping temporary effects or audio, and state hand-off work that must happen once.</Rule>
     <Rule index="5">Generate at most one root of each lifecycle type per node. Combine actions through next.block under the same DO chain rather than creating duplicate lifecycle roots.</Rule>
@@ -143,7 +143,7 @@
   </ContractRepairRules>
   <BlockSelectionPriority>
     <Priority rank="1">Use recommended=true and projectUsage=project-safe blocks that express the user's requested behavior directly.</Priority>
-    <Priority rank="2">For single-object WASD, jump, first-person, third-person, camera follow, or common gameplay behavior, prefer the dedicated project-safe template whose fields explicitly name the object.</Priority>
+    <Priority rank="2">For single-object WASD, jump, first-person, third-person, or common gameplay behavior, prefer the dedicated project-safe template whose fields explicitly name the object.</Priority>
     <Priority rank="3">For generic transforms and movement blocks with an OBJECT input, connect object_reference rather than relying on an implicit actor.</Priority>
     <Priority rank="4">Use tag-based blocks only when the user requests a group or RuntimeContext confirms a real tag shared by multiple objects.</Priority>
     <Avoid>Do not choose projectUsage=actor-context, recommended=false legacy blocks when an equivalent project-safe explicit-object block exists.</Avoid>
@@ -159,7 +159,7 @@
   </SafeCompositionPatterns>
   <ThreeDDemoCompositionPatterns>
     <Pattern name="StateMachine">Use start for initialization, one or more custom nodes for active gameplay, and end nodes for win and lose. Give every transition a visible Boolean condition.</Pattern>
-    <Pattern name="Initialization">In node_when_enter, initialize score/lives/global data, configure camera, spawn or place objects, set physics, and start audio.</Pattern>
+    <Pattern name="Initialization">In node_when_enter, initialize score/lives/global data, spawn or place objects, set physics, and start audio.</Pattern>
     <Pattern name="GameplayLoop">In node_while_active, run player movement, enemy behavior, collision/raycast actions, cooldown checks, scoring, life changes, recycling, and area logic.</Pattern>
     <Pattern name="ObjectAddressing">Use object-name blocks for unique objects and tag-based blocks for groups. Names and tags must match RuntimeContext.</Pattern>
     <Pattern name="RandomMovement">Combine math_random_int or math_random_float with object_set_tag_velocity_axis, object_set_random_position, object_scatter_tag, or timed state changes.</Pattern>
@@ -272,7 +272,7 @@
       <Block type="node_when_enter" category="事件" shape="definition" projectUsage="project-safe" recommended="true" outputCheck="" dynamic="false" label="当进入当前节点时 执行 …" aiUse="Lifecycle root for one-time initialization when a macro node becomes active.">
         <Input name="DO" kind="statement" check="" />
       </Block>
-      <Block type="node_while_active" category="事件" shape="definition" projectUsage="project-safe" recommended="true" outputCheck="" dynamic="false" label="当前节点持续时 执行 …" aiUse="Lifecycle root for continuous per-update logic; place dynamic movement, attraction, rotation, and camera updates under DO.">
+      <Block type="node_while_active" category="事件" shape="definition" projectUsage="project-safe" recommended="true" outputCheck="" dynamic="false" label="当前节点持续时 执行 …" aiUse="Lifecycle root for continuous per-update logic; place dynamic movement, attraction, and rotation under DO.">
         <Input name="DO" kind="statement" check="" />
       </Block>
       <Block type="node_when_exit" category="事件" shape="definition" projectUsage="project-safe" recommended="true" outputCheck="" dynamic="false" label="当离开当前节点时 执行 …" aiUse="Lifecycle root for cleanup performed when a macro node stops being active.">

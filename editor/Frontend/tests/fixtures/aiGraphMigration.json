@@ -2225,10 +2225,7 @@
         "firstPersonRequested": false,
         "replacementDirective": null,
         "dynamicActorRelations": [],
-        "distanceActorRelations": [],
-        "cameraTargets": [
-          "Player"
-        ]
+        "distanceActorRelations": []
       }
     },
     {
@@ -2312,8 +2309,7 @@
             ]
           }
         ],
-        "distanceActorRelations": [],
-        "cameraTargets": []
+        "distanceActorRelations": []
       }
     },
     {
@@ -2360,8 +2356,7 @@
         "firstPersonRequested": false,
         "replacementDirective": null,
         "dynamicActorRelations": [],
-        "distanceActorRelations": [],
-        "cameraTargets": []
+        "distanceActorRelations": []
       }
     },
     {
@@ -2421,10 +2416,7 @@
         "firstPersonRequested": false,
         "replacementDirective": null,
         "dynamicActorRelations": [],
-        "distanceActorRelations": [],
-        "cameraTargets": [
-          "FollowerActor"
-        ]
+        "distanceActorRelations": []
       }
     },
     {
@@ -2499,10 +2491,7 @@
             ]
           }
         ],
-        "distanceActorRelations": [],
-        "cameraTargets": [
-          "FollowerActor"
-        ]
+        "distanceActorRelations": []
       }
     },
     {
@@ -2561,8 +2550,7 @@
         "firstPersonRequested": false,
         "replacementDirective": null,
         "dynamicActorRelations": [],
-        "distanceActorRelations": [],
-        "cameraTargets": []
+        "distanceActorRelations": []
       }
     },
     {
@@ -2617,10 +2605,7 @@
         "firstPersonRequested": false,
         "replacementDirective": null,
         "dynamicActorRelations": [],
-        "distanceActorRelations": [],
-        "cameraTargets": [
-          "Player"
-        ]
+        "distanceActorRelations": []
       }
     },
     {
@@ -2675,8 +2660,7 @@
         "firstPersonRequested": false,
         "replacementDirective": null,
         "dynamicActorRelations": [],
-        "distanceActorRelations": [],
-        "cameraTargets": []
+        "distanceActorRelations": []
       }
     },
     {
@@ -2741,8 +2725,7 @@
         "firstPersonRequested": false,
         "replacementDirective": null,
         "dynamicActorRelations": [],
-        "distanceActorRelations": [],
-        "cameraTargets": []
+        "distanceActorRelations": []
       }
     },
     {
@@ -2797,8 +2780,7 @@
         "firstPersonRequested": false,
         "replacementDirective": null,
         "dynamicActorRelations": [],
-        "distanceActorRelations": [],
-        "cameraTargets": []
+        "distanceActorRelations": []
       }
     },
     {
@@ -2855,8 +2837,7 @@
         "firstPersonRequested": false,
         "replacementDirective": null,
         "dynamicActorRelations": [],
-        "distanceActorRelations": [],
-        "cameraTargets": []
+        "distanceActorRelations": []
       }
     },
     {
@@ -2903,8 +2884,7 @@
         "firstPersonRequested": false,
         "replacementDirective": null,
         "dynamicActorRelations": [],
-        "distanceActorRelations": [],
-        "cameraTargets": []
+        "distanceActorRelations": []
       }
     },
     {
@@ -2959,8 +2939,7 @@
         "firstPersonRequested": false,
         "replacementDirective": null,
         "dynamicActorRelations": [],
-        "distanceActorRelations": [],
-        "cameraTargets": []
+        "distanceActorRelations": []
       }
     },
     {
@@ -3064,8 +3043,7 @@
               "Z"
             ]
           }
-        ],
-        "cameraTargets": []
+        ]
       }
     },
     {
@@ -3136,8 +3114,7 @@
           "target": "bunny2"
         },
         "dynamicActorRelations": [],
-        "distanceActorRelations": [],
-        "cameraTargets": []
+        "distanceActorRelations": []
       }
     },
     {
@@ -3199,8 +3176,7 @@
           "target": "bunny2"
         },
         "dynamicActorRelations": [],
-        "distanceActorRelations": [],
-        "cameraTargets": []
+        "distanceActorRelations": []
       }
     },
     {
@@ -3274,8 +3250,7 @@
             ]
           }
         ],
-        "distanceActorRelations": [],
-        "cameraTargets": []
+        "distanceActorRelations": []
       }
     },
     {
@@ -3321,8 +3296,7 @@
         "firstPersonRequested": false,
         "replacementDirective": null,
         "dynamicActorRelations": [],
-        "distanceActorRelations": [],
-        "cameraTargets": []
+        "distanceActorRelations": []
       }
     },
     {
@@ -3370,8 +3344,7 @@
         "firstPersonRequested": false,
         "replacementDirective": null,
         "dynamicActorRelations": [],
-        "distanceActorRelations": [],
-        "cameraTargets": []
+        "distanceActorRelations": []
       }
     },
     {
@@ -3429,8 +3402,7 @@
         "firstPersonRequested": false,
         "replacementDirective": null,
         "dynamicActorRelations": [],
-        "distanceActorRelations": [],
-        "cameraTargets": []
+        "distanceActorRelations": []
       }
     },
     {
@@ -3524,8 +3496,7 @@
             ]
           }
         ],
-        "distanceActorRelations": [],
-        "cameraTargets": []
+        "distanceActorRelations": []
       }
     },
     {
@@ -3577,8 +3548,7 @@
         "firstPersonRequested": false,
         "replacementDirective": null,
         "dynamicActorRelations": [],
-        "distanceActorRelations": [],
-        "cameraTargets": []
+        "distanceActorRelations": []
       }
     },
     {
@@ -3631,8 +3601,7 @@
         "firstPersonRequested": false,
         "replacementDirective": null,
         "dynamicActorRelations": [],
-        "distanceActorRelations": [],
-        "cameraTargets": []
+        "distanceActorRelations": []
       }
     },
     {
@@ -3687,8 +3656,7 @@
         "firstPersonRequested": false,
         "replacementDirective": null,
         "dynamicActorRelations": [],
-        "distanceActorRelations": [],
-        "cameraTargets": []
+        "distanceActorRelations": []
       }
     },
     {
@@ -3738,8 +3706,7 @@
           "target": "bunny2"
         },
         "dynamicActorRelations": [],
-        "distanceActorRelations": [],
-        "cameraTargets": []
+        "distanceActorRelations": []
       }
     },
     {
@@ -3863,9 +3830,6 @@
               "Z"
             ]
           }
-        ],
-        "cameraTargets": [
-          "建筑B"
         ]
       }
     },
@@ -3921,8 +3885,7 @@
         "firstPersonRequested": false,
         "replacementDirective": null,
         "dynamicActorRelations": [],
-        "distanceActorRelations": [],
-        "cameraTargets": []
+        "distanceActorRelations": []
       }
     },
     {
@@ -3979,8 +3942,7 @@
         "firstPersonRequested": false,
         "replacementDirective": null,
         "dynamicActorRelations": [],
-        "distanceActorRelations": [],
-        "cameraTargets": []
+        "distanceActorRelations": []
       }
     },
     {
@@ -4073,8 +4035,7 @@
             ]
           }
         ],
-        "distanceActorRelations": [],
-        "cameraTargets": []
+        "distanceActorRelations": []
       }
     }
   ],
@@ -4141,96 +4102,6 @@
               "tags": [
                 "player"
               ],
-              "aliases": []
-            }
-          ]
-        }
-      },
-      "accepted": true
-    },
-    {
-      "result": {
-        "workspace": {
-          "version": 1,
-          "nodes": [
-            {
-              "id": "start",
-              "macroType": "state",
-              "nodeType": "start",
-              "name": "Start",
-              "customName": "Initialize",
-              "x": 80,
-              "y": 120,
-              "workspace": {
-                "blocks": {
-                  "languageVersion": 0,
-                  "blocks": [
-                    {
-                      "type": "node_while_active",
-                      "id": "camera-active",
-                      "x": 24,
-                      "y": 24,
-                      "inputs": {
-                        "DO": {
-                          "block": {
-                            "type": "camera_follow_object",
-                            "id": "camera-follow",
-                            "fields": {
-                              "NAME": "FollowerActor"
-                            }
-                          }
-                        }
-                      }
-                    }
-                  ]
-                }
-              }
-            }
-          ],
-          "edges": [],
-          "globalVariablesWorkspace": {}
-        }
-      },
-      "request": {
-        "schemaVersion": 1,
-        "requestId": "request-1",
-        "targetId": "node_graph:project:global",
-        "projectScopeId": "world-scope-1",
-        "baseGraphRevision": "revision-1",
-        "operation": "create",
-        "instruction": "make the camera continuously follow FollowerActor",
-        "responseLanguage": "en-US",
-        "workspace": {
-          "version": 1,
-          "nodes": [
-            {
-              "id": "start",
-              "macroType": "state",
-              "nodeType": "start",
-              "name": "Start",
-              "customName": "Initialize",
-              "x": 80,
-              "y": 120,
-              "workspace": {}
-            }
-          ],
-          "edges": [],
-          "globalVariablesWorkspace": {}
-        },
-        "projectContext": {
-          "actorContextAvailable": true,
-          "actors": [
-            {
-              "name": "LeaderActor",
-              "type": "model",
-              "tags": [],
-              "aliases": [],
-              "semanticRole": "source"
-            },
-            {
-              "name": "FollowerActor",
-              "type": "model",
-              "tags": [],
               "aliases": []
             }
           ]
