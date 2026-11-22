@@ -437,11 +437,9 @@ function renderPaletteBlocks() {
       resizeBlockly();
       workspace.resizeContents?.();
       workspace.scrollbar?.resize?.();
-      isRenderingPalette = false;
     });
-  } catch (error) {
+  } finally {
     isRenderingPalette = false;
-    throw error;
   }
 }
 
