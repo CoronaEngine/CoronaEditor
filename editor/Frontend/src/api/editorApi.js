@@ -69,11 +69,6 @@ const editorApiStatic = {
     // Active-project metadata is a project write, not a file-manager operation.
     save_active_project_info: settings => window.corona.project.save_active_project_info(settings),
   },
-  audio: {
-    // The identity decides what plays: a resource id, or an actor of a scene.
-    play: (identity, options = {}) => window.corona.audio.play({ ...identity, ...options }),
-    stop: identity => window.corona.audio.stop({ ...identity }),
-  },
   input: {
     // The camera is the target; the scene it belongs to is an argument.
     dispatch: (sceneName, cameraId, event) => window.corona.input.dispatch(sceneName, cameraId, event),
@@ -117,6 +112,9 @@ const editorApiStatic = {
       window.corona.scene.delete_camera(sceneName, cameraId, scope),
     read_environment: (sceneName, scope) => window.corona.scene.read_environment(sceneName, scope),
     set_environment: (sceneName, patch) => window.corona.scene.set_environment(sceneName, patch),
+    // The identity decides what plays: a resource id, or an actor of a scene.
+    play_audio: (identity, options = {}) => window.corona.scene.play_audio({ ...identity, ...options }),
+    stop_audio: identity => window.corona.scene.stop_audio({ ...identity }),
   },
   window: {
     // One verb for "close a window"; the identity decides which. No argument = this one.

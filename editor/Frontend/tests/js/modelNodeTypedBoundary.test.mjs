@@ -10,8 +10,8 @@ const table = read('src/systems/ui/cef/editor_operation_table.h');
 const component = fs.readFileSync(new URL('../../src/components/ui/ModelNodeHierarchy.vue', import.meta.url), 'utf8');
 
 test('model node operations use the typed scene surface with archive and actor identity', () => {
-  assert.match(table, /\{"scene", "read_model_nodes", SceneMethod::ReadModelNodes,/);
-  assert.match(table, /\{"scene", "set_model_node_state", SceneMethod::SetModelNodeState,/);
+  assert.match(table, /\{"scene", "read_model_nodes", SceneMethod::ReadModelNodes\}/);
+  assert.match(table, /\{"scene", "set_model_node_state", SceneMethod::SetModelNodeState\}/);
   assert.match(component, /editorApi\.scene\.read_model_nodes/);
   assert.match(component, /editorApi\.scene\.set_model_node_state/);
   assert.match(component, /archive_session:\s*archiveSession/);

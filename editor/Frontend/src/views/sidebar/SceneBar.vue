@@ -719,10 +719,10 @@ const handlePlayToggle = async (scene) => {
     if (isAudioActor) {
       const actor = scene.actor_guid || scene.name;
       const scope = { archive_session: archive };
-      if (playing) await editorApi.audio.stop({ scene: sceneId, actor, ...scope });
-      else await editorApi.audio.play({ scene: sceneId, actor, ...scope }, { loop: false });
-    } else if (playing) await editorApi.audio.stop({ resource: rid });
-    else await editorApi.audio.play({ resource: rid }, { loop: false });
+      if (playing) await editorApi.scene.stop_audio({ scene: sceneId, actor, ...scope });
+      else await editorApi.scene.play_audio({ scene: sceneId, actor, ...scope }, { loop: false });
+    } else if (playing) await editorApi.scene.stop_audio({ resource: rid });
+    else await editorApi.scene.play_audio({ resource: rid }, { loop: false });
     if (!current()) return;
     playingStates[key] = !playing;
     if (scene._playing !== undefined) scene._playing = !playing;
