@@ -351,6 +351,7 @@ export default {
     overallProgress: '基础引导 {current}/{total}',
     reminder: '提醒',
     retiredSignalRemoved: '该任务依赖已移除的完成信号 {signal}，已停用。',
+    retiredTask: '已停用',
     showcase: '展示',
     stepCompletedAt: '完成时间',
     suggestion: '建议',

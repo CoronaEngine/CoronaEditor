@@ -1955,9 +1955,13 @@ onMounted(async () => {
   stopViewportUiCalibrationMessages = viewportCalibration.subscribe(() => {
     if (viewportUiMode.value === 'stereo3d') applyViewportUiCalibration();
   });
+  // Explicit "this page finished mounting" signal for integration probes. Borrowing an
+  // incidental listener as a readiness probe broke a smoke when that feature was deleted.
+  window.__coronaMainPageReady = true;
 });
 
 onUnmounted(() => {
+  window.__coronaMainPageReady = false;
   sendScriptInput.dispose();
   viewLifetime.dispose();
   ++cabbageWorldLoadGeneration;

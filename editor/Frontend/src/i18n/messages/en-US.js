@@ -351,6 +351,7 @@ export default {
     overallProgress: 'Basics {current}/{total}',
     reminder: 'Reminder',
     retiredSignalRemoved: 'This task relied on the removed completion signal {signal} and was retired.',
+    retiredTask: 'Retired',
     showcase: 'Show',
     stepCompletedAt: 'Completed at',
     suggestion: 'Suggestion',

@@ -56,9 +56,7 @@
                   <span class="chapter-step-content">
                     <strong>{{ localizedTaskField(task, 'title') }}</strong>
                     <small>
-                      {{ taskCompletionTimestamp(task)
-                        ? `${t('cabbageReview.stepCompletedAt')} ${formatTimestamp(taskCompletionTimestamp(task))}`
-                        : t('cabbageReview.notCompleted') }}
+                      {{ taskProgressText(task) }}
                     </small>
                   </span>
                   <span class="chapter-step-check">
@@ -314,7 +312,14 @@ function chapterTotal(chapterKey) {
   const catalogCount = basicTaskCatalog.value.filter((task) => task.chapterKey === chapterKey).length;
   return Math.max(Number(CHAPTER_TOTALS[chapterKey]) || 0, catalogCount);
 }
+function isCancelledTask(task) {
+  return ['cancelled', 'canceled', 'retired'].includes(String(task?.status || '').toLowerCase());
+}
 function taskCompletionTimestamp(task) {
+  // A cancelled task was retired, not completed. `resolvedAt` records when and why it
+  // left the board; treating it as a completion time made a cancelled task render a
+  // check mark and "Completed at" and count toward its group's completion.
+  if (isCancelledTask(task)) return 0;
   return Math.max(
     Number(task?.completedAt) || 0,
     Number(task?.resolvedAt) || 0,
@@ -322,6 +327,12 @@ function taskCompletionTimestamp(task) {
       ? Number(task?.updatedAt) || 0
       : 0
   );
+}
+function taskProgressText(task) {
+  const completedAt = taskCompletionTimestamp(task);
+  if (completedAt) return `${t('cabbageReview.stepCompletedAt')} ${formatTimestamp(completedAt)}`;
+  if (isCancelledTask(task)) return retiredReasonText(task) || t('cabbageReview.retiredTask');
+  return t('cabbageReview.notCompleted');
 }
 function latestCompletion(tasks) { return tasks.reduce((value, task) => Math.max(value, taskCompletionTimestamp(task)), 0); }
 function sortHistoryRecords(left, right) { return taskCompletionTimestamp(right) - taskCompletionTimestamp(left); }
