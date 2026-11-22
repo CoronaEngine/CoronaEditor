@@ -23,7 +23,7 @@ test('project document facades call the Python bridge and parse its records', as
 test('target archives pass identity values and workspace objects with JSON disabled', async t => {
   const calls = [];
   const workspace = { graph: { nodes: [{ id: '中文', state: [null, true, 0] }] } };
-  const record = { status: 'saved', revision: 'revision', code_path: 'Scripts/files/run.py', document_path: 'Scripts/files/document.json' };
+  const record = { status: 'saved', revision: 'revision', document_path: 'Scripts/files/document.json' };
   t.mock.method(editorApi.projectFiles, 'save', async request => {
     calls.push(['save', request]);
     return { ...record, document: request.document };
@@ -33,7 +33,7 @@ test('target archives pass identity values and workspace objects with JSON disab
     return { ...record, status: 'loaded', document: { workspace } };
   });
   const payload = { archive_session: 'first', project_path: '/world', script_kind: 'node_graph',
-    target_type: 'model', scene_name: 'scene.ini', actor_name: '角色:"A"', code: '# 代码', workspace };
+    target_type: 'model', scene_name: 'scene.ini', actor_name: '角色:"A"', workspace };
   const stringify = JSON.stringify;
   const parse = JSON.parse;
   let saved, loaded;
@@ -45,13 +45,18 @@ test('target archives pass identity values and workspace objects with JSON disab
   assert.equal(saved.workspace, workspace);
   assert.equal(loaded.workspace, workspace);
   assert.equal(saved.target.revision, 'revision');
+  assert.equal(saved.target.workspace_path, 'Scripts/files/document.json');
+  assert.equal('code_path' in saved.target, false);
+  assert.equal('code_path' in loaded.target, false);
   for (const [, request] of calls) {
     assert.deepEqual(request.identity, ['node_graph', 'actor', 'scene.ini', '角色:"A"']);
     assert.equal('key' in request, false);
+    assert.equal('code' in request, false);
     assert.equal(request.archive_session, 'first');
     assert.equal(request.project_path, '/world');
   }
   assert.equal(calls[0][1].document.workspace, workspace);
   assert.equal(calls[0][1].document.target.target_type, 'actor');
-  assert.equal(calls[0][1].code, '# 代码');
+  assert.deepEqual(Object.keys(calls[0][1].document.target).sort(),
+    ['actor_name', 'id', 'scene_name', 'script_kind', 'target_type']);
 });

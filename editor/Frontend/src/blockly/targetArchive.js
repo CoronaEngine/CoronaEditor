@@ -1,7 +1,7 @@
 import { editorApi } from '../api/editorApi.js';
 
 async function accessTarget(payload, save) {
-  const { archive_session, project_path, code, workspace } = payload;
+  const { archive_session, project_path, workspace } = payload;
   const target_type = payload.target_type === 'model' ? 'actor' : payload.target_type || 'actor';
   const scene_name = target_type === 'project' ? '' : payload.scene_name;
   const actor_name = target_type === 'project' ? '' : payload.actor_name;
@@ -12,16 +12,14 @@ async function accessTarget(payload, save) {
   const identity = [script_kind, target_type, scene_name, actor_name];
   const prefix = script_kind === 'node_graph' ? 'node_graph:' : '';
   const id = prefix + (target_type === 'project' ? 'project:global' : `actor:${scene_name}:${actor_name}`);
-  const target = { id, script_kind, target_type, scene_name, actor_name,
-    enabled: payload.enabled ?? true, runnable: payload.runnable ?? true,
-    validation_errors: payload.validation_errors || [] };
+  const target = { id, script_kind, target_type, scene_name, actor_name };
   const scope = { identity, project_path, archive_session };
   const result = save
-    ? await editorApi.projectFiles.save({ ...scope, code, document: { target, workspace } })
+    ? await editorApi.projectFiles.save({ ...scope, document: { target, workspace } })
     : await editorApi.projectFiles.load(scope);
   // A refusal rejects (the bridge raises it with error.code); success shapes are records.
   return { status: result.status, workspace: result.document?.workspace || {},
-    target: { ...(result.document?.target || target), code_path: result.code_path,
+    target: { ...(result.document?.target || target),
       workspace_path: result.document_path, revision: result.revision }, project_path };
 }
 

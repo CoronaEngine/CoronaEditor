@@ -10,22 +10,10 @@
         <span class="ng-badge">节点</span>
       </div>
       <div class="ng-modes">
-        <select aria-label="运行目标" :value="actorName" :disabled="runBusy || codeRunning"
-                @change="selectRunTarget">
+        <select aria-label="运行目标" :value="actorName" @change="selectRunTarget">
           <option value="">项目</option>
           <option v-for="actor in sceneActorContext.actors" :key="actor.name" :value="actor.name">{{ actor.name }}</option>
         </select>
-        <button
-          type="button"
-          class="ng-run"
-          data-guidance="node-run"
-          :class="{ running: codeRunning }"
-          :disabled="runBusy"
-          @click.stop="handleRunButtonClick"
-        >
-          {{ codeRunning ? '停止' : '运行' }}
-        </button>
-        <span v-if="runStatus" class="ng-run-status" :title="runDetail || runStatus" @click="toggleRunDetail">{{ runStatus }}</span>
         <button class="ng-mode" data-guidance="node-select-mode" :class="{ active: mode === 'select' }" @click="setMode('select')">
           选择
         </button>
@@ -157,7 +145,6 @@
             `type-${node.nodeType}`,
             {
               selected: selectedKind === 'node' && selectedId === node.id,
-              running: currentRunNodeId === node.id,
               delete: mode === 'delete',
             },
           ]"
@@ -290,13 +277,6 @@
         </section>
       </aside>
     </div>
-    <div v-if="runDetailVisible && runDetail" class="ng-run-detail">
-      <div class="ng-run-detail-head">
-        <strong>运行诊断</strong>
-        <button type="button" @click="copyRunDetail">复制</button>
-      </div>
-      <pre>{{ runDetail }}</pre>
-    </div>
   </div>
   <Teleport to="body">
     <div
@@ -313,7 +293,7 @@
 import { saveBlocklyTarget, loadBlocklyTarget } from '@/blockly/targetArchive.js';
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
 import MiniBlocklyWorkspace from '@/blockly/components/MiniBlocklyWorkspace.vue';
-import { readScriptProject, startScriptFile } from '@/services/scriptFileService.js';
+import { readScriptProject } from '@/services/scriptFileService.js';
 import BlocklyToolboxPalette from '@/blockly/components/BlocklyToolboxPalette.vue';
 import { useErrorHandler } from '@/composables/useErrorHandler.js';
 import { editorApi } from '@/api/editorApi.js';
@@ -323,7 +303,6 @@ import { getNodeGraphSaves } from '@/services/nodeGraphSaves.js';
 import { coronaEventBus } from '@/utils/eventBus.js';
 import { createViewLifetime } from '@/utils/viewLifetime.js';
 import { cloneWebDto } from '@/utils/cloneWebDto.js';
-import { nodeGraphToCode } from '@/blockly/generators/index.js';
 import { validateNodeGraph } from '@/blockly/graph/validate.js';
 import { generatedNodeGraphRevision, registerGeneratedNodeGraphConsumer } from '@/blockly/node-editor/aiNodeGraphService.js';
 import { actorContextNameKey, actorContextRevision, actorRecordsFromSceneTree, normalizeActorContextName } from '@/blockly/utils/actorContext.js';
@@ -377,25 +356,6 @@ const viewport = reactive({ scale: 1, offsetX: 0, offsetY: 0 });
 const isCanvasPanning = ref(false);
 const connectionPointer = reactive({ active: false, x: 0, y: 0 });
 const graph = reactive({ version: 1, nodes: [], edges: [], globalVariablesWorkspace: {} });
-const codeRunning = ref(false);
-const runBusy = ref(false);
-const runStatus = ref('');
-const runDetail = ref('');
-const runDetailVisible = ref(false);
-const currentRunNodeId = ref('');
-const runWarnings = ref([]);
-const NODE_GRAPH_INPUT_LOCK = 'node_graph';
-function setEditorInputLock(reason, locked) {
-  const locks = window.__coronaEditorInputLocks instanceof Set
-    ? window.__coronaEditorInputLocks
-    : new Set();
-  window.__coronaEditorInputLocks = locks;
-  if (locked) locks.add(reason);
-  else locks.delete(reason);
-}
-function setNodeGraphInputLocked(locked) {
-  setEditorInputLock(NODE_GRAPH_INPUT_LOCK, Boolean(locked));
-}
 const macroDropActive = ref(false);
 const externalDrag = reactive({
   active: false,
@@ -451,12 +411,7 @@ let isLoading = false,
   suppressCanvasClick = false,
   macroPointerDrag = null,
   layoutResizeState = null,
-  runPollTimer = null,
-  startedRunForTarget = false,
-  fileRunId = '',
-  pendingFileRequest = '',
   panelClosing = false,
-  panelCloseStopPromise = null,
   unregisterAiNodeGraphConsumer = null,
   stopNodeGraphReview = null,
   actorOptionsRefreshTimer = null,
@@ -473,8 +428,6 @@ let isLoading = false,
   saveInFlight = null,
   saveQueued = false;
 const viewLifetime = createViewLifetime(() => componentMounted);
-const targetEnabledByKey = new Map();
-const nodeRunLifecycle = { active: false, terminalReported: false };
 const sceneActorContext = reactive({
   sceneName: '',
   available: false,
@@ -518,50 +471,6 @@ function optimizationHintsEnabled() {
   const tutorialCompleted = String(context?.tutorialSession?.status || '') === 'completed';
   const hasAdaptiveScore = Number(context?.profile?.updatedAt || 0) > 0;
   return tutorialCompleted && hasAdaptiveScore;
-}
-function beginNodeRunAttempt() {
-  nodeRunLifecycle.active = false;
-  nodeRunLifecycle.terminalReported = false;
-}
-function reportNodeRunClicked() {
-  void cabbageContextService.recordEvent({
-    type: 'run_clicked',
-    category: 'tutorial',
-    success: true,
-    details: { source: 'user' },
-  }, { onSceneSave: !isProjectTarget.value });
-}
-function reportNodeRunStarted() {
-  if (nodeRunLifecycle.active) return;
-  nodeRunLifecycle.active = true;
-  void cabbageContextService.recordEvent({
-    type: 'run_started',
-    category: 'runtime',
-    success: true,
-    details: { source: 'node_graph' },
-  }, { onSceneSave: !isProjectTarget.value });
-}
-function reportNodeRunTerminal(success, error = '') {
-  if (nodeRunLifecycle.terminalReported) return;
-  nodeRunLifecycle.terminalReported = true;
-  nodeRunLifecycle.active = false;
-  const type = success ? 'run_succeeded' : 'run_failed';
-  void cabbageContextService.recordEvent({
-    type,
-    category: 'runtime',
-    success,
-    details: { source: 'node_graph', error: String(error || '').slice(0, 500) },
-  }, { onSceneSave: !isProjectTarget.value });
-  if (!success && isProjectTarget.value) {
-    requestNodeGraphReview(0);
-    window.dispatchEvent(new CustomEvent('cabbage-run-failed', {
-      detail: { source: 'node_graph', error: String(error || ''), contextRecorded: true },
-    }));
-  }
-}
-function resetNodeRunLifecycle() {
-  nodeRunLifecycle.active = false;
-  nodeRunLifecycle.terminalReported = false;
 }
 function readActiveProjectPath() {
   return String(worldModeState.activeProjectPath || '').trim();
@@ -1026,13 +935,6 @@ function stopLayoutResize() {
   window.removeEventListener('pointermove', handleLayoutResize);
   persistLayout();
   resizeEmbeddedWorkspaces();
-}
-function toggleRunDetail() {
-  if (runDetail.value) runDetailVisible.value = !runDetailVisible.value;
-}
-async function copyRunDetail() {
-  if (!runDetail.value) return;
-  try { await navigator.clipboard?.writeText(runDetail.value); } catch (_) {}
 }
 function resetZoom() {
   viewport.scale = 1;
@@ -2290,7 +2192,7 @@ async function selectRunTarget(event) {
     }
     emit('select-target', { actorName, sceneName: route || '' });
   } catch (error) {
-    if (current()) runStatus.value = error.message;
+    if (current()) logError('切换节点图目标失败', error);
   }
 }
 async function saveNow(targetOverride = null, { force = false } = {}) {
@@ -2320,15 +2222,10 @@ async function saveNow(targetOverride = null, { force = false } = {}) {
   }
   const snapshot = graphSnapshot();
   const snapshotFingerprint = JSON.stringify(snapshot);
-  let runnable = true;
-  let code = '';
-  const validationErrors = [];
   try {
     validateNodeGraph(snapshot);
-    code = nodeGraphToCode(snapshot);
   } catch (error) {
-    runnable = false;
-    validationErrors.push(String(error?.message || error));
+    logError('节点图结构校验未通过', error);
   }
   try {
     window.localStorage?.setItem(storageKeyForTarget(target), JSON.stringify({
@@ -2347,16 +2244,10 @@ async function saveNow(targetOverride = null, { force = false } = {}) {
         script_kind: 'node_graph',
         project_path: target.projectPath, archive_session: target.archiveSession,
         workspace: snapshot,
-        code,
-        enabled: targetEnabledByKey.get(storageKeyForTarget(target)) ?? true,
-        runnable,
-        validation_errors: validationErrors,
       });
       if (target.archiveSession !== loadedArchiveSession) return false;
       graphDirty = JSON.stringify(graphSnapshot()) !== snapshotFingerprint;
-      saveLabel.value = runnable
-        ? `已实时保存到当前世界 ${new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}`
-        : `已实时保存（不可运行：${validationErrors[0]}）`;
+      saveLabel.value = `已实时保存到当前世界 ${new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}`;
       return response;
     } catch (error) {
       if (target.archiveSession !== loadedArchiveSession) return false;
@@ -2419,11 +2310,9 @@ async function loadGraphForCurrentTarget() {
     loadedArchiveSession = scope.archive_session;
     loadedProjectPath = activeProjectPath.value = scope.project_path;
     if (response?.status === 'loaded') {
-      targetEnabledByKey.set(storageKeyForTarget(target), response.target?.enabled !== false);
       shouldMigrateLocal = applyGraph(normalizeGraph(response.workspace || {}));
       saveLabel.value = '\u9879\u76ee\u8282\u70b9\u56fe\u5df2\u52a0\u8f7d';
     } else {
-      targetEnabledByKey.set(storageKeyForTarget(target), true);
       let draft = JSON.parse(window.localStorage?.getItem(storageKeyForTarget(target)) || 'null');
       // Older editors stored the workspace directly. New drafts belong to one opening.
       if (draft?.archive_session) draft = draft.archive_session === scope.archive_session ? draft.workspace : null;
@@ -2455,18 +2344,6 @@ async function loadGraphForCurrentTarget() {
     graphDirty = true;
     await saveNow();
   }
-}
-
-function normalizeNodeGraphScriptStatus(response = {}) {
-  const status = response || {};
-  return {
-    ...status,
-    status: String(status.status || status.state || '').trim().toLowerCase(),
-    currentNodeId: String(status.marker?.id || ''),
-    currentNodeName: String(status.marker?.name || ''),
-    waitingEdgeId: String(status.waiting?.id || ''),
-    waitingEdgeName: String(status.waiting?.name || ''),
-  };
 }
 
 async function loadEmbeddedWorkspaceStates({ strict = false, verifyActive = false } = {}) {
@@ -2548,8 +2425,7 @@ async function handleGeneratedNodeGraph(result) {
     // The service validates the raw envelope first. Normalize only after that so
     // missing IDs, invalid positions, and dangling edges cannot be silently repaired.
     const candidate = normalizeGraph(result.workspace);
-    const analysis = validateNodeGraph(candidate);
-    nodeGraphToCode(candidate); // Deserializes every visible block and validates conditions/generators.
+    validateNodeGraph(candidate);
     const focus = findGeneratedGraphFocus(previous, candidate, previousSelection);
 
     isLoading = true;
@@ -2573,7 +2449,7 @@ async function handleGeneratedNodeGraph(result) {
     return {
       success: true,
       errors: [],
-      warnings: Array.isArray(analysis?.warnings) ? analysis.warnings : [],
+      warnings: [],
       summary: {
         nodeCount: candidate.nodes.length,
         edgeCount: candidate.edges.length,
@@ -2641,239 +2517,11 @@ function syncGeneratedNodeGraphConsumer() {
   }
 }
 
-
-
-function clearRunPoll() {
-  if (runPollTimer) window.clearInterval(runPollTimer);
-  runPollTimer = null;
-}
-const STATUS_STARTING = "\u542f\u52a8\u4e2d...";
-const STATUS_WAITING = "\u7b49\u5f85\u8fde\u7ebf\u6761\u4ef6\uff1a";
-const STATUS_RUNNING = "\u8fd0\u884c\u4e2d\uff1a";
-const STATUS_RUNNING_BASE = "\u8fd0\u884c\u4e2d";
-const STATUS_COMPLETED = "\u5df2\u5b8c\u6210";
-const STATUS_STOPPED = "\u5df2\u505c\u6b62";
-const STATUS_FAILED = "\u6267\u884c\u5931\u8d25\uff1a";
-const STATUS_UNKNOWN_ERROR = "\u672a\u77e5\u9519\u8bef";
-const STATUS_QUERY_FAILED = "\u72b6\u6001\u67e5\u8be2\u5931\u8d25";
-const LOG_QUERY_FAILED = "\u67e5\u8be2\u8282\u70b9\u56fe\u8fd0\u884c\u72b6\u6001\u5931\u8d25";
-function formatRunState(status) {
-  const state = status?.status || 'idle';
-  if (state === 'starting') return STATUS_STARTING;
-  if (state === 'running') {
-    if (status?.waitingEdgeName) return `${STATUS_WAITING}${status.waitingEdgeName}`;
-    if (status?.currentNodeName) return `${STATUS_RUNNING}${status.currentNodeName}`;
-    return STATUS_RUNNING_BASE;
-  }
-  if (state === 'completed') return STATUS_COMPLETED;
-  if (state === 'stopped') return STATUS_STOPPED;
-  if (state === 'error') return `${STATUS_FAILED}${status?.error || STATUS_UNKNOWN_ERROR}`;
-  return '';
-}
-function formatRunDetail(status) {
-  if (!status || typeof status !== 'object') return '';
-  const lines = [];
-  if (status.error) lines.push(`错误：${status.error}`);
-  if (isProjectTarget.value) {
-    const sceneName = status.resolvedSceneName
-      || status.nativeScene
-      || sceneActorContext.sceneName
-      || props.sceneName
-      || '当前场景';
-    const actorNames = sceneActorContext.actors
-      .map((actor) => String(actor?.name || '').trim())
-      .filter(Boolean);
-    lines.push('运行作用域：当前场景（项目节点图）');
-    lines.push(`运行场景：${sceneName}`);
-    lines.push('对象来源：场景管理中已导入的物体，由各积木的对象参数指定');
-    if (actorNames.length) lines.push(`可用物体：${actorNames.join(', ')}`);
-    else if (!sceneActorContext.available) lines.push('可用物体：暂时无法读取场景对象列表');
-  } else {
-    if (status.requestedScene || status.requestedActor) lines.push(`请求目标：${status.requestedScene || '(空场景)'} / ${status.requestedActor || '(空物体)'}`);
-    if (status.resolvedSceneName || status.resolvedActorName) lines.push(`绑定目标：${status.resolvedSceneName || '(空场景)'} / ${status.resolvedActorName || '(空物体)'}`);
-    if (status.bindingMode) lines.push(`绑定模式：${status.bindingMode === 'native_editor' ? 'Native Editor' : 'Python Scene'}`);
-    if (status.nativeScene) lines.push(`原生场景：${status.nativeScene}`);
-    if (Array.isArray(status.actorCandidates) && status.actorCandidates.length) lines.push(`物体候选：${status.actorCandidates.join(', ')}`);
-  }
-  return lines.join('\n');
-}
-function startRunPoll() {
-  clearRunPoll();
-  runPollTimer = window.setInterval(async () => {
-    if (!codeRunning.value) return;
-    try {
-      const status = normalizeNodeGraphScriptStatus({ status: 'idle' });
-      if (fileRunId && status.runId !== fileRunId) {
-        fileRunId = '';
-        clearRunPoll();
-        codeRunning.value = false;
-        startedRunForTarget = false;
-        setNodeGraphInputLocked(false);
-        return;
-      }
-      currentRunNodeId.value = status?.currentNodeId || '';
-      setNodeGraphInputLocked(Boolean(status?.inputLocked));
-      runStatus.value = formatRunState(status);
-      runDetail.value = formatRunDetail(status);
-      if (!['starting', 'running'].includes(status?.status)) {
-        if (status?.status === 'completed') reportNodeRunTerminal(true);
-        else if (status?.status === 'error') reportNodeRunTerminal(false, status?.error || runStatus.value);
-        else resetNodeRunLifecycle();
-        clearRunPoll();
-        codeRunning.value = Boolean(fileRunId && status.snapshotCaptured);
-        runBusy.value = false;
-        startedRunForTarget = false;
-        setNodeGraphInputLocked(false);
-      }
-    } catch (error) {
-      reportNodeRunTerminal(false, error?.message || error);
-      clearRunPoll();
-      codeRunning.value = false;
-      startedRunForTarget = false;
-      currentRunNodeId.value = '';
-      setNodeGraphInputLocked(false);
-      runStatus.value = STATUS_QUERY_FAILED;
-      logError(LOG_QUERY_FAILED, error);
-    }
-  }, 300);
-}
-async function stopNodeGraphRun(statusText = '已停止', restoreState = false) {
-  clearRunPoll();
-  try {
-    if (fileRunId || pendingFileRequest) {
-      const response = { status: 'idle' };
-      if (response.status === 'error' || response.restoreError) throw new Error(response.message || response.restoreError);
-      fileRunId = '';
-      pendingFileRequest = '';
-      if (restoreState) {
-        if (response?.restored) {
-          runStatus.value = '已停止并恢复运行前状态';
-          runDetail.value = '';
-        } else if (response?.restoreError) {
-          runStatus.value = `已停止，但场景恢复失败：${response.restoreError}`;
-          runDetail.value = response.restoreError;
-        } else {
-          runStatus.value = statusText;
-        }
-      } else {
-        runStatus.value = statusText;
-      }
-    }
-  } catch (error) {
-    runStatus.value = `停止节点图失败：${error?.message || error}`;
-    logError('停止节点图失败', error);
-  } finally {
-    startedRunForTarget = false;
-    codeRunning.value = Boolean(fileRunId || pendingFileRequest);
-    runBusy.value = false;
-    currentRunNodeId.value = '';
-    setNodeGraphInputLocked(false);
-    resetNodeRunLifecycle();
-  }
-}
-async function stopForPanelClose() {
+function stopForPanelClose() {
   panelClosing = true;
-  if (!panelCloseStopPromise) {
-    // Closing can be reported by the title bar, pagehide, beforeunload and both
-    // parent/child unmount hooks. Keep one promise for the rest of this component
-    // lifetime so the backend stop and input unlock are never issued repeatedly.
-    panelCloseStopPromise = stopNodeGraphRun('\u8282\u70b9\u7a97\u53e3\u5df2\u5173\u95ed\uff0c\u8fd0\u884c\u5df2\u505c\u6b62', false);
-  }
-  return panelCloseStopPromise;
 }
 
 defineExpose({ stopForPanelClose });
-
-function handleRunButtonClick() {
-  if (!codeRunning.value) reportNodeRunClicked();
-  return handleToggleRun();
-}
-
-async function handleToggleRun() {
-  if (panelClosing || runBusy.value) return;
-  runBusy.value = true;
-  try {
-    if (codeRunning.value) {
-      await stopNodeGraphRun('已停止', true);
-      return;
-    }
-    beginNodeRunAttempt();
-    if (!targetReady.value) {
-      runStatus.value = '请先选择运行目标';
-      reportNodeRunTerminal(false, runStatus.value);
-      return;
-    }
-    // A terminal error is a diagnostic, not a latch. Keep it visible until the
-    // next click, then rebuild from the current workspaces and start a fresh run.
-    clearRunPoll();
-    codeRunning.value = false;
-    startedRunForTarget = false;
-    currentRunNodeId.value = '';
-    runWarnings.value = [];
-    runDetail.value = '';
-    runDetailVisible.value = false;
-    setNodeGraphInputLocked(false);
-    refreshEmbeddedWorkspaceStates();
-    const runTarget = currentTarget();
-    try {
-      const snapshot = graphSnapshot();
-      validateNodeGraph(snapshot);
-      runWarnings.value = [];
-    } catch (error) {
-      runStatus.value = `生成失败：${error?.message || error}`;
-      reportNodeRunTerminal(false, error?.message || error);
-      logError('生成节点图代码失败', error);
-      return;
-    }
-    const saved = await saveNow(runTarget, { force: true });
-    if (panelClosing || !componentMounted || loadedArchiveSession !== runTarget.archiveSession || storageKeyForTarget(currentTarget()) !== storageKeyForTarget(runTarget)) return;
-    if (!saved?.target?.runnable || !saved.target.revision) {
-      throw new Error(saved?.target?.validation_errors?.[0] || '未能保存可运行的脚本');
-    }
-    runStatus.value = '启动中...';
-    const requestId = crypto.randomUUID();
-    pendingFileRequest = requestId;
-    const response = await startScriptFile({
-        requestId,
-        archive_session: runTarget.archiveSession, project_path: saved.project_path, path: saved.target.code_path, revision: saved.target.revision,
-        target_type: saved.target.target_type, scene_name: saved.target.scene_name, actor_name: saved.target.actor_name,
-      });
-    pendingFileRequest = '';
-    if (panelClosing || !componentMounted || loadedArchiveSession !== runTarget.archiveSession || storageKeyForTarget(currentTarget()) !== storageKeyForTarget(runTarget)) {
-      /* script runtime removed */
-      setNodeGraphInputLocked(false);
-      return;
-    }
-    if ((response?.status === 'error' && !response.runId) || response?.success === false) {
-      throw new Error(response?.message || '后端拒绝执行节点图');
-    }
-    if (!response.runId) throw new Error('脚本运行实例未创建');
-    if (['stopped', 'finished', 'completed'].includes(response.status) && !response.snapshotCaptured) {
-      runStatus.value = '本次运行已结束';
-      return;
-    }
-    fileRunId = response.runId;
-    startedRunForTarget = true;
-    codeRunning.value = true;
-    reportNodeRunStarted();
-    setNodeGraphInputLocked(true);
-    runStatus.value = runWarnings.value.length ? `\u8fd0\u884c\u4e2d\uff08${runWarnings.value[0]}\uff09` : '\u8fd0\u884c\u4e2d';
-    startRunPoll();
-  } catch (error) {
-    startedRunForTarget = false;
-    // After a lost acknowledgement the Stop button can still cancel by requestId.
-    if (!error.scriptRunUnconfirmed) pendingFileRequest = '';
-    codeRunning.value = Boolean(pendingFileRequest);
-    clearRunPoll();
-    currentRunNodeId.value = '';
-    setNodeGraphInputLocked(false);
-    runStatus.value = pendingFileRequest ? '启动回执未确认，可点击停止并恢复' : `执行失败：${error?.message || error}`;
-    reportNodeRunTerminal(false, error?.message || error);
-    logError('执行节点图失败', error);
-  } finally {
-    runBusy.value = false;
-  }
-}
 
 watch(
   () => [activeNodeTutorialTaskKey.value, canonicalJson(tutorialNodeBindings.value)],
@@ -3043,11 +2691,7 @@ async function onActiveProjectChanged(event) {
   cabbageAssistant.clearPreWarning();
   activeProjectPath.value = nextProjectPath;
   loadedProjectPath = '';
-  targetEnabledByKey.clear();
   applyGraph(normalizeGraph({}));
-  runStatus.value = '';
-  currentRunNodeId.value = '';
-  runWarnings.value = [];
   if (!componentMounted) return;
   await loadGraphForCurrentTarget();
   await refreshSceneActorOptions();
@@ -3085,15 +2729,11 @@ watch(
       sceneName: old?.[0] || '',
       actorName: old?.[1] || '',
     };
-    if (startedRunForTarget || codeRunning.value) await stopNodeGraphRun('\u5df2\u505c\u6b62');
     if (!componentMounted) return;
     clearExternalDrag();
     cancelMacroPointerDrag();
     if ((oldTarget.targetType === 'project' || oldTarget.actorName) && !isLoading) await saveNow(oldTarget);
     if (!componentMounted) return;
-    runStatus.value = '';
-    currentRunNodeId.value = '';
-    runWarnings.value = [];
     syncGeneratedNodeGraphConsumer();
     await refreshSceneActorOptions();
     if (componentMounted) await loadGraphForCurrentTarget();
@@ -3218,12 +2858,10 @@ onBeforeUnmount(() => {
   resizeObserver?.disconnect?.();
   if (resizeFrame) window.cancelAnimationFrame(resizeFrame);
   resizeFrame = 0;
-  clearRunPoll();
   clearExternalDrag();
   cancelMacroPointerDrag();
   endCanvasPan();
-  stopForPanelClose().catch(() => {});
-  setNodeGraphInputLocked(false);
+  stopForPanelClose();
   window.removeEventListener('mousemove', onDragMove);
   window.removeEventListener('mouseup', stopNodeDrag);
 });
@@ -3279,36 +2917,6 @@ onBeforeUnmount(() => {
   justify-content: flex-end;
   gap: 6px;
   margin-left: auto;
-}
-.ng-run {
-  height: 28px;
-  min-width: 58px;
-  padding: 0 13px;
-  border: 1px solid #b3995d;
-  border-radius: 8px;
-  background: #4d4024;
-  color: #e6d5a7;
-  font-weight: 800;
-  cursor: pointer;
-}
-.ng-run:hover:not(:disabled) {
-  background: #4d4024;
-}
-.ng-run.running {
-  border-color: #fb7185;
-  background: #9f1239;
-}
-.ng-run:disabled {
-  opacity: 0.55;
-  cursor: wait;
-}
-.ng-run-status {
-  max-width: 240px;
-  overflow: hidden;
-  color: #e8ede3;
-  font-size: 12px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 .ng-mode {
   height: 28px;
@@ -3666,13 +3274,6 @@ onBeforeUnmount(() => {
   background: #b3995d;
 }
 
-.ng-node.running {
-  border-color: #facc15;
-  box-shadow:
-    0 0 0 3px rgba(250, 204, 21, 0.2),
-    0 0 22px rgba(250, 204, 21, 0.32),
-    0 14px 24px rgba(0, 0, 0, 0.36);
-}
 .ng-node-type-badge {
   flex: 0 0 auto;
   padding: 3px 7px;
@@ -3900,45 +3501,5 @@ onBeforeUnmount(() => {
 }
 .ng-splitter.horizontal {
   cursor: row-resize;
-}
-.ng-run-status {
-  cursor: pointer;
-}
-.ng-run-detail {
-  position: absolute;
-  top: 48px;
-  right: 12px;
-  z-index: 80;
-  width: min(620px, calc(100% - 24px));
-  max-height: 45%;
-  padding: 10px;
-  border: 1px solid #746137;
-  border-radius: 10px;
-  background: rgba(8, 8, 6, 0.98);
-  box-shadow: 0 16px 35px rgba(0, 0, 0, 0.45);
-  color: #e8ede3;
-}
-.ng-run-detail-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 7px;
-}
-.ng-run-detail-head button {
-  border: 1px solid #746137;
-  border-radius: 6px;
-  padding: 3px 9px;
-  background: #242016;
-  color: #fff3c8;
-  cursor: pointer;
-}
-.ng-run-detail pre {
-  max-height: 280px;
-  overflow: auto;
-  margin: 0;
-  color: #fecaca;
-  font: 12px/1.55 Consolas, monospace;
-  white-space: pre-wrap;
-  word-break: break-word;
 }
 </style>

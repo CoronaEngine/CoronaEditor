@@ -1,7 +1,6 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
-import Blockly from 'blockly/core';
 import { babelParse, parse } from 'vue/compiler-sfc';
 import { reactive, ref } from 'vue';
 import { cloneWebDto } from '../../src/utils/cloneWebDto.js';
@@ -16,7 +15,6 @@ function declarations(path, names) {
 
 const miniSource = declarations('blockly/components/MiniBlocklyWorkspace.vue', ['cloneState']);
 const graphSource = declarations('blockly/components/NodeGraphWorkspace.vue', ['refreshEmbeddedWorkspaceStates', 'graphSnapshot']);
-const loaderSource = declarations('blockly/generators/index.js', ['loadSerializedWorkspace']);
 
 function withoutJsonCopy(operation) {
   const stringify = JSON.stringify;
@@ -63,15 +61,4 @@ test('graph snapshot uses the fallback when a workspace cannot be cloned', () =>
     'variablesBlocklyRef', 'cloneWebDto', `${graphSource}; return graphSnapshot;`)(
     graph, ref(null), ref(null), ref(null), ref(null), cloneWebDto);
   assert.deepEqual(snapshot(), { version: 1, nodes: [], edges: [], globalVariablesWorkspace: {} });
-});
-
-test('generator loads an independent reactive state into a real Blockly workspace without JSON', () => {
-  const load = new Function('Blockly', 'cloneWebDto', `${loaderSource}; return loadSerializedWorkspace;`)(Blockly, cloneWebDto);
-  const state = reactive({ variables: [{ name: 'counter', id: 'counter-id', type: '' }] });
-  const workspace = withoutJsonCopy(() => load(state));
-  try {
-    assert.equal(workspace.getVariableMap().getVariableById('counter-id').name, 'counter');
-    workspace.getVariableMap().renameVariable(workspace.getVariableMap().getVariableById('counter-id'), 'changed');
-    assert.equal(state.variables[0].name, 'counter');
-  } finally { workspace.dispose(); }
 });

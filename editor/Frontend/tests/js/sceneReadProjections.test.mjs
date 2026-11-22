@@ -131,7 +131,7 @@ function targetDeps(read) {
   return { props: { sceneName: 'scene.ini', actorName: 'Before' }, initialLoadComplete: true,
     loadedArchiveSession: 'archive', graphLoadSequence: 1, panelClosing: false,
     viewLifetime: { current: () => true }, saveNow: async () => true,
-    runStatus: { value: '' }, emit: () => {},
+    logError: () => {}, emit: () => {},
     editorApi: { scene: { ...sceneQueryFixture({ index: read }),   } },
   };
 }
@@ -146,7 +146,6 @@ test('node graph run target uses only the observed scene actor index after savin
   deps.emit = (...args) => calls.push(args);
   const select = handler('blockly/components/NodeGraphWorkspace', 'selectRunTarget', deps);
   await select({ target: { value: 'Probe' } });
-  assert.equal(deps.runStatus.value, '');
   assert.deepEqual(calls, ['save', ['read', 'scene.ini', { archive_session: 'archive' }],
     ['select-target', { actorName: 'Probe', sceneName: 'scene.ini' }]]);
 });
@@ -174,10 +173,11 @@ test('project graph never applies its old run target to a new active archive', a
 });
 
 test('an Actor removed since the dropdown was populated is rejected as a run target', async () => {
-  const emitted = [], deps = targetDeps(async () => ({ scene: 'scene.ini', archive_session: 'archive', actors: [] }));
+  const emitted = [], errors = [], deps = targetDeps(async () => ({ scene: 'scene.ini', archive_session: 'archive', actors: [] }));
   deps.emit = (...args) => emitted.push(args);
+  deps.logError = (...args) => errors.push(args);
   await handler('blockly/components/NodeGraphWorkspace', 'selectRunTarget', deps)({ target: { value: 'Removed' } });
-  assert.match(deps.runStatus.value, /运行目标已不在当前场景/);
+  assert.match(String(errors[0]?.[1]), /运行目标已不在当前场景/);
   assert.deepEqual(emitted, []);
 });
 
