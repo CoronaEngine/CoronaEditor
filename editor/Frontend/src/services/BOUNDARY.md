@@ -112,7 +112,7 @@ state/physics/camera-lock Web facade；Vue 调用方必须传递其已观察的 
 2026-11-07 Scripts迁移：editorApi.scripts的runFile/getRun/stop/getStatus仅调用corona.scripts同名具名V8函数，直接返回显式snapshot，不经manifest、JSON字符串或data envelope。scriptFileService只保留超时回执恢复编排（原requestId查询/重试，未知回执才重试）；Python FileScripts仍是去重、取消、执行状态和场景恢复唯一owner。旧Scripts manifest只保留Native权限。
 
 
-2026-11-07 ProjectFiles迁移：save/load仅使用corona.projectFiles具名V8；scope与四段identity数组、document/workspace均为owned结构化值，targetArchive不编码JSON key、不解包data envelope。Python存储owner保留原key目录/落盘JSON/原子发布，独立Python opaque key契约保留，旧CEF manifest/handler已删。NodeGraph最终bridgeResult已删。真实packaged UI运行/保存/关闭恢复/重开通过。
+2026-11-07 ProjectFiles迁移：save/load仅使用corona.projectFiles具名V8；scope与四段identity数组、document/workspace均为owned结构化值，targetArchive不编码JSON key、不解包data envelope。Python存储owner保留原key目录/落盘JSON/原子发布，独立Python opaque key契约保留，旧CEF manifest/handler已删。NodeGraph最终bridgeResult已删。真实packaged UI保存/关闭恢复/重开通过；其中的运行结论写于运行面删除之前，已随本轮（2026-11-22）的运行面删除失效。
 
 
 2026-11-07 ProjectSettings：readProjectDocument/commitProjectDocument/getActiveProjectInfo/saveActiveProjectInfo直接调用corona.projectSettings具名V8；metadata为显式字段，document content为owned结构化值。Web版本凭据仅SHA256 revision，JSON序列化仅在Python文件owner落盘；独立非Web version原契约保留。旧CEF manifest入口关闭，Python原权限保持；Web调用不再解包data或接受多层metadata envelope。设置面板复用createViewLifetime并带项目revision/请求序号保护，保存携带加载时project_path与archive_session。最终Node717/Python133+56subtests通过；Conan完整构建、真实CEF JSON禁用及packaged五套/11面板通过，项目设置真实Vue保存/重置通过（run-ai8guyqu）。CEF剩82个旧入口；完整优化计划仍未完成。

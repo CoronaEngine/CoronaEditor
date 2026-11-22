@@ -61,7 +61,6 @@ const EXPLICIT_DOM_TEXT_TRANSLATIONS = {
   创建场景: 'Create Scene',
   上次编辑: 'Last Edited',
   更多: 'More',
-  'Python 代码': 'Python Code',
   一键清除所有内容: 'Clear all content',
   与同一网络下的伙伴一起创造: 'Create with people on the same network',
   下一步: 'Next',
@@ -78,7 +77,6 @@ const EXPLICIT_DOM_TEXT_TRANSLATIONS = {
   二维码: 'QR Code',
   云海浮空城: 'Floating city above clouds',
   亮度: 'Brightness',
-  代码区: 'Code Area',
   位置: 'Position',
   你想创造一个怎样的: 'What kind of',
   '例如：一座漂浮在云海之上的赛博朋克城市，永远是雨夜，霓虹倒映在湿漉漉的街道……':
@@ -175,7 +173,6 @@ const EXPLICIT_DOM_TEXT_TRANSLATIONS = {
   旋转锁定: 'Rotation Lock',
   无: 'None',
   无相机: 'No camera',
-  暂无代码: 'No code yet',
   暂无文件或未打开项目: 'No files or project is open',
   暂无最近记录: 'No recent records',
   '更新偏移...': 'Updating offset...',

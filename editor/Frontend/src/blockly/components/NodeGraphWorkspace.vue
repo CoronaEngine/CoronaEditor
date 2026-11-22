@@ -14,6 +14,7 @@
           <option value="">项目</option>
           <option v-for="actor in sceneActorContext.actors" :key="actor.name" :value="actor.name">{{ actor.name }}</option>
         </select>
+        <span v-if="saveLabel" class="ng-save-status" role="status" :title="saveLabel">{{ saveLabel }}</span>
         <button class="ng-mode" data-guidance="node-select-mode" :class="{ active: mode === 'select' }" @click="setMode('select')">
           选择
         </button>
@@ -2941,6 +2942,14 @@ onBeforeUnmount(() => {
 .ng-mode.delete.active {
   background: #b91c1c;
   border-color: #f87171;
+}
+.ng-save-status {
+  max-width: 260px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #8d9e85;
+  font-size: 12px;
 }
 .ng-empty {
   height: 100%;
