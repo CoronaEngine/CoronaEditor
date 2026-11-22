@@ -314,7 +314,6 @@ const EXPLICIT_DOM_TEXT_TRANSLATIONS = {
   别名: 'Alias',
   '屏幕 UI': 'Screen UI',
   未选择模型: 'No model selected',
-  相机锁定: 'Camera Lock',
   锁定偏移: 'Lock Offset',
   碰撞: 'Collision',
   包围盒: 'Bounding Box',

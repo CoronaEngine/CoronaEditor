@@ -202,7 +202,6 @@ export default {
     alias: 'Alias',
     animation: 'Animation',
     boundingBox: 'Bounding Box',
-    cameraLock: 'Camera Lock',
     clear: 'Clear',
     clearAllTitle: 'Clear all content',
     collision: 'Collision',

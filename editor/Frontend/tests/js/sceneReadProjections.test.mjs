@@ -32,7 +32,7 @@ function objectDeps(read) {
   return { loadSequence: 0, loading: { value: false }, archiveSession: { value: '' },
     selectedSceneName: { value: '' }, selectedActorName: { value: '' },
     viewLifetime: { current: () => true }, ikController: { clear() {}, select() {} },
-    actor: { transform: { position: {}, rotation: {}, scale: {} }, mechanics: {}, cameraLock: { position: {} } },
+    actor: { transform: { position: {}, rotation: {}, scale: {} }, mechanics: {} },
     aliasDraft: { value: '' }, aliasError: { value: '' }, aliasSaving: { value: false },
     placeholderRebinding: { value: false }, saving: { value: false }, axes: ['x', 'y', 'z'],
     assignVector: (target, values, fallback) => Object.assign(target, values || fallback),
@@ -48,8 +48,7 @@ test('Object loads a scoped property projection and preserves opaque native iden
     return { archive_session: 'archive', scene: 'scene.ini', name: 'Probe', actor_guid: 'guid',
       handle: '18446744073709551615', actor_type: 'audio', load_status: 'error',
       load_error: { code: 'MISSING', message: 'missing resource' }, model: 'probe.wav',
-      body_type: 'static', follow_camera: true, geometry: { position: [1, 2, 3] },
-      camera_lock: { enabled: true, position_offset: [0, 0, 2] } };
+      body_type: 'static', follow_camera: true, geometry: { position: [1, 2, 3] } };
   });
   await handler('views/sidebar/Object', 'loadActor', deps)('scene.ini', 'Probe', 'archive', 'guid');
   assert.deepEqual(calls, [['scene.ini', 'guid', { archive_session: 'archive' }]]);

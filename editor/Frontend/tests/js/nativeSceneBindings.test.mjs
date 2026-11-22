@@ -104,7 +104,7 @@ test('Actor properties merge state, physics and camera lock into one raw V8 patc
   JSON.stringify = JSON.parse = () => { throw new Error('JSON properties are forbidden'); };
   const patch = { archive_session: 'archive', visible: false, follow_camera: true,
     mechanics: { mass: 4, body_type: 'kinematic', linear_lock: [true, false, false] },
-    camera_lock: { enabled: true, position_offset: [1, 2, 3] }, animation_sources: [] };
+    animation_sources: [] };
   assert.equal(await editorApi.scene.update_actor('scene.ini', 'actor-id', patch), result);
   assert.deepEqual(calls, [['scene.ini', 'actor-id', patch]]);
   for (const retired of ['setActorState', 'setActorPhysics', 'setActorCameraLock']) {

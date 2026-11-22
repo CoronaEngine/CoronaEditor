@@ -202,7 +202,6 @@ export default {
     alias: '别名',
     animation: '动画',
     boundingBox: '包围盒',
-    cameraLock: '相机锁定',
     clear: '清除',
     clearAllTitle: '一键清除所有内容',
     collision: '碰撞',
