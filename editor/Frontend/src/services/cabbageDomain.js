@@ -142,6 +142,7 @@ export function normalizeContext(raw, projectPath, now = Date.now()) {
   }
   context.profileHistory = context.profileHistory.slice(-50);
   context.recentOperationEvents = context.recentOperationEvents.slice(-200);
+  retireUnsupportedGoalTasks(context, now);
   fillSlots(context, now);
   return context;
 }
@@ -225,6 +226,23 @@ function completeTask(context, key, now, status = 'completed') {
     ...(status === 'completed' ? { completedAt: now } : { resolvedAt: now }),
   });
   return true;
+}
+
+// A world-goal task saved before a completion signal was removed can never
+// complete. Retire it into history with an auditable reason instead of
+// dropping it or auto-completing it.
+function retireUnsupportedGoalTasks(context, now) {
+  const liveSignals = new Set(policy.goalSignals);
+  for (const task of [...context.activeTasks]) {
+    if (task.type !== 'goal') continue;
+    const taskKey = String(task.taskKey || '').trim();
+    if (!taskKey) continue;
+    const signal = String(task.completionSignal || '');
+    if (liveSignals.has(signal)) continue;
+    task.retiredReason = 'completion_signal_removed';
+    task.retiredSignal = signal;
+    completeTask(context, taskKey, now, 'cancelled');
+  }
 }
 
 function tutorialProgress(context, event) {

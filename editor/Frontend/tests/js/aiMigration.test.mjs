@@ -377,6 +377,40 @@ async function finished(job) {
   assert.fail('Web workflow did not complete');
 }
 
+test('saved goal tasks with a removed completion signal are retired at load', () => {
+  const context = normalizeContext(
+    {
+      worldGoal: { source: 'ai', status: 'ready' },
+      activeTasks: [
+        {
+          taskKey: 'goal.run',
+          type: 'goal',
+          status: 'active',
+          title: 'Run the logic',
+          completionSignal: 'run_succeeded',
+        },
+        {
+          taskKey: 'goal.node',
+          type: 'goal',
+          status: 'active',
+          title: 'Create a node',
+          completionSignal: 'node_created',
+        },
+      ],
+    },
+    'E:/World/FixtureWorld',
+    1000
+  );
+  assert.equal(context.activeTasks.some((task) => task.taskKey === 'goal.run'), false);
+  assert.equal(context.activeTasks.some((task) => task.taskKey === 'goal.node'), true);
+  const retired = context.taskHistory.find((task) => task.taskKey === 'goal.run');
+  assert.equal(retired.status, 'cancelled');
+  assert.equal(retired.retiredReason, 'completion_signal_removed');
+  assert.equal(retired.retiredSignal, 'run_succeeded');
+  assert.equal(retired.resolvedAt, 1000);
+  assert.equal(retired.title, 'Run the logic');
+});
+
 test('world goals normalize legacy modes to the single editable world type', async () => {
   const saved = documentFixture(normalizeContext(null, 'E:/World/FixtureWorld'));
   for (const mode of [undefined, 'story', 'creative']) {

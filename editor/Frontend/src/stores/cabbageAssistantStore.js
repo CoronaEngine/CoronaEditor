@@ -337,6 +337,8 @@ function normalizeTask(raw, graphRevision = '', now = Date.now()) {
     completionSignal: String(raw.completionSignal || '')
       .trim()
       .slice(0, 80),
+    retiredReason: String(raw.retiredReason || '').slice(0, 80),
+    retiredSignal: String(raw.retiredSignal || '').slice(0, 80),
     requiredCount: Math.max(1, Number(raw.requiredCount) || 1),
     phase: String(raw.phase || '')
       .trim()

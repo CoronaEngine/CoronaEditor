@@ -75,6 +75,9 @@
                   class="chapter-step-detail"
                 >
                   <p class="history-task-description">{{ taskDescription(task) }}</p>
+                  <p v-if="task.retiredReason" class="history-task-description">
+                    {{ retiredReasonText(task) }}
+                  </p>
                   <div class="task-suggestion">
                     <strong>{{ t('cabbageReview.howToComplete') }}</strong>
                     <p>{{ completionText(task) }}</p>
@@ -351,6 +354,10 @@ function historyStatusLabel(status) {
     not_started: 'cabbageReview.notStarted', archived: 'cabbageReview.archived',
   };
   return t(labels[status] || labels.archived);
+}
+function retiredReasonText(task) {
+  if (String(task?.retiredReason || '') !== 'completion_signal_removed') return '';
+  return t('cabbageReview.retiredSignalRemoved', { signal: String(task?.retiredSignal || '') });
 }
 function formatTimestamp(timestamp) {
   const value = Number(timestamp) || 0;

@@ -464,7 +464,6 @@ const RUNTIME_DOM_TEXT_TRANSLATIONS = {
   保存本地节点图失败: 'Failed to Save the Local Node Graph',
   保存节点图失败: 'Failed to Save the Node Graph',
   '已实时保存到当前世界 {time}': 'Saved to the Current World at {time}',
-  '已实时保存（不可运行：{error}）': 'Saved (Cannot Run: {error})',
   保存项目节点图失败: 'Failed to Save the Project Node Graph',
   '项目保存失败（本地副本已保留）': 'Project Save Failed (Local Copy Retained)',
   等待当前世界加载: 'Waiting for the Current World to Load',
@@ -502,7 +501,6 @@ const RUNTIME_DOM_TEXT_TRANSLATIONS = {
   脚本已完成: 'Scripts Completed',
   已停止并恢复: 'Stopped and Restored',
   '场景恢复失败：{error}': 'Failed to Restore Scene: {error}',
-  没有可运行脚本: 'No Runnable Scripts',
   查询预览状态失败: 'Failed to Query Preview Status',
   '准备当前场景脚本...': 'Preparing Current Scene Scripts...',
   '准备项目预览...': 'Preparing Project Preview...',
@@ -566,8 +564,6 @@ const RUNTIME_DOM_TEXT_TRANSLATIONS = {
   系统: 'System',
   'GM 提案': 'GM Proposal',
 
-  当前积木脚本正在由全局运行执行: 'The Current Block Script Is Running Globally',
-  当前积木脚本正在由项目预览执行: 'The Current Block Script Is Running in Project Preview',
   'Blockly 模块加载失败': 'Failed to Load the Blockly Module',
   保存工作区状态失败: 'Failed to Save Workspace State',
   加载目标积木失败: 'Failed to Load the Target Blocks',
@@ -679,8 +675,6 @@ const RUNTIME_DOM_TEXT_TRANSLATIONS = {
   '确定要删除 "{name}" 吗？': 'Delete "{name}"?',
   '{nickname}（我）': '{nickname} (Me)',
 
-  当前节点图正在由全局运行执行: 'The Current Node Graph Is Running Globally',
-  当前节点图正在由项目预览执行: 'The Current Node Graph Is Running in Project Preview',
   '读取当前项目路径失败，将使用已有项目上下文:':
     'Failed to Read the Current Project Path; Using the Existing Project Context:',
   未选择: 'Not Selected',
@@ -706,32 +700,6 @@ const RUNTIME_DOM_TEXT_TRANSLATIONS = {
   '内部 AI 应用失败：{error}': 'Failed to Apply the Internal AI Result: {error}',
   '启动中...': 'Starting...',
   '等待连线条件：': 'Waiting for Connection Condition:',
-  '运行中：': 'Running:',
-  运行中: 'Running',
-  已停止: 'Stopped',
-  '执行失败：': 'Execution Failed:',
-  状态查询失败: 'Failed to Query Status',
-  查询节点图运行状态失败: 'Failed to Query Node Graph Run Status',
-  '错误：{error}': 'Error: {error}',
-  '运行作用域：当前场景（项目节点图）': 'Run Scope: Current Scene (Project Node Graph)',
-  '运行场景：{scene}': 'Run Scene: {scene}',
-  '对象来源：场景管理中已导入的物体，由各积木的对象参数指定':
-    'Object Source: Objects Imported in Scene Manager, Selected by Each Block Object Parameter',
-  已停止并恢复运行前状态: 'Stopped and Restored the Pre-run State',
-  '已停止，但场景恢复失败：{error}': 'Stopped, but Failed to Restore the Scene: {error}',
-  '停止节点图失败：{error}': 'Failed to Stop the Node Graph: {error}',
-  '节点窗口已关闭，运行已停止': 'The Node Window Was Closed and Execution Stopped',
-  后端拒绝执行节点图: 'The Backend Rejected Node Graph Execution',
-  '运行中（{status}）': 'Running ({status})',
-  '执行失败：{error}': 'Execution Failed: {error}',
-  '运行成功，正在恢复运行前状态...': 'Run Succeeded. Restoring the Pre-run State...',
-  '运行前状态恢复失败': 'Failed to Restore the Pre-run State',
-  '运行已成功，但任务进度没有同步，请再点击一次“运行”':
-    'The Run Succeeded, but Task Progress Was Not Synchronized. Click Run Again.',
-  '运行成功，已恢复运行前状态': 'Run Succeeded. The Pre-run State Has Been Restored.',
-  '运行验证失败：{error}': 'Run Validation Failed: {error}',
-  '教程节点图运行验证失败': 'Tutorial Node Graph Run Validation Failed',
-  '节点图保存失败，已取消全局运行': 'Node Graph Save Failed; Global Run Was Cancelled',
 
   'AI 正在读取积木文档并生成当前节点逻辑…':
     'AI Is Reading the Block Documentation and Generating the Current Node Logic...',
@@ -766,11 +734,6 @@ const RUNTIME_DOM_TEXT_TRANSLATIONS = {
     'Received a Remote Scene Snapshot; the SceneTools Native Apply API Is Not Connected Yet',
   'Actor 身份注册失败: {actor}': 'Failed to Register Actor Identity: {actor}',
 
-  '[Blockly] 停止脚本失败:': '[Blockly] Failed to Stop Script:',
-  '[Blockly] 查询全局运行状态失败，将继续尝试单物体运行:':
-    '[Blockly] Failed to Query Global Run Status; Trying Single-object Run:',
-  '[Blockly] 脚本执行超时，强制停止': '[Blockly] Script Timed Out and Was Force-stopped',
-  '[Blockly] 脚本状态查询失败:': '[Blockly] Failed to Query Script Status:',
   '[Blockly] 保存项目积木镜像失败:': '[Blockly] Failed to Save the Project Block Snapshot:',
   'Blockly.inject 失败': 'Blockly.inject Failed',
 
