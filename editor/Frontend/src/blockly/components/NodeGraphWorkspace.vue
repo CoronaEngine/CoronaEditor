@@ -2222,6 +2222,14 @@ async function saveNow(targetOverride = null, { force = false } = {}) {
   }
   const snapshot = graphSnapshot();
   const snapshotFingerprint = JSON.stringify(snapshot);
+  // Structural feedback belongs to the save the user is watching: an unfinished graph
+  // must never block the save, but the label must say why it is not a usable graph.
+  let structuralError = '';
+  try {
+    validateNodeGraph(snapshot);
+  } catch (error) {
+    structuralError = String(error?.message || error);
+  }
   try {
     window.localStorage?.setItem(storageKeyForTarget(target), JSON.stringify({
       archive_session: target.archiveSession, workspace: snapshot,
@@ -2242,7 +2250,9 @@ async function saveNow(targetOverride = null, { force = false } = {}) {
       });
       if (target.archiveSession !== loadedArchiveSession) return false;
       graphDirty = JSON.stringify(graphSnapshot()) !== snapshotFingerprint;
-      saveLabel.value = `已实时保存到当前世界 ${new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}`;
+      saveLabel.value = structuralError
+        ? `已实时保存，但结构校验未通过：${structuralError}`
+        : `已实时保存到当前世界 ${new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}`;
       return response;
     } catch (error) {
       if (target.archiveSession !== loadedArchiveSession) return false;

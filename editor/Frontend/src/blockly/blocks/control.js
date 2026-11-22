@@ -9,7 +9,7 @@ export const defineControlBlocks = () => {
       this.setPreviousStatement(true, null);
       this.setNextStatement(true, null);
       this.setStyle('control_blocks');
-      this.setTooltip('此积木已退役。请在节点图中替换此积木后再运行。');
+      this.setTooltip('此积木已退役，不再执行任何操作。');
       this.setHelpUrl('');
     },
   };

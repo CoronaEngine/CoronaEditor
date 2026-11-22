@@ -78,7 +78,7 @@ export const CUSTOM_BLOCK_TRANSLATIONS = {
 
   // Control
   "运行项目脚本": 'Run project script',
-  '运行当前项目目录中的 Python 脚本，并调用脚本内的 run() 入口': "Run a Python script in the current project and call its run() entry point",
+  '此积木已退役，不再执行任何操作。': 'This block is retired and performs no action',
   "等待": 'Wait',
   "秒": 'seconds',
   "暂停执行指定秒数": 'Pause for the specified number of seconds',

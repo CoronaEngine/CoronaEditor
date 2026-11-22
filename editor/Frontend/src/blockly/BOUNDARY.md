@@ -30,10 +30,10 @@ Actor 选择继续由现有场景选择契约和各视图自身状态处理；�
 
 ## 验证与删除策略
 
-边界由 `editor/Frontend/tests/python/test_frontend_blockly_boundary.py` 以及现有
-Frontend Node 单元测试验证。删除或移动目录前必须覆盖 Blockly workspace 序列化、
+边界由 Frontend 的 Node 单元测试（如 `tests/js/nodeGraphValidation.test.mjs`、
+`tests/js/nativeProjectFiles.test.mjs`）验证。删除或移动目录前必须覆盖 Blockly workspace 序列化、
 节点图保存、detached Dock 和旧项目兼容回归；仅凭仓内 import 搜索
 不到调用方不能直接删除。
 
 
-2026-11-07 ProjectFiles迁移：save/load仅使用corona.projectFiles具名V8；scope与四段identity数组、document/workspace均为owned结构化值，targetArchive不编码JSON key、不解包data envelope。Python存储owner保留原key目录/落盘JSON/原子发布，独立Python opaque key契约保留，旧CEF manifest/handler已删。NodeGraph最终bridgeResult已删。真实packaged UI运行/保存/关闭恢复/重开通过。
+2026-11-07 ProjectFiles迁移：save/load仅使用corona.projectFiles具名V8；scope与四段identity数组、document/workspace均为owned结构化值，targetArchive不编码JSON key、不解包data envelope。Python存储owner保留原key目录/落盘JSON/原子发布，独立Python opaque key契约保留，旧CEF manifest/handler已删。NodeGraph最终bridgeResult已删。真实packaged UI保存/关闭恢复/重开通过；其中的运行结论写于运行面删除之前，已随本轮（2026-11-22）的运行面删除失效。

@@ -368,7 +368,8 @@ function historyStatusLabel(status) {
 }
 function retiredReasonText(task) {
   if (String(task?.retiredReason || '') !== 'completion_signal_removed') return '';
-  return t('cabbageReview.retiredSignalRemoved', { signal: String(task?.retiredSignal || '') });
+  // The stored signal is an internal token (for example `run_succeeded`); never show it raw.
+  return t('cabbageReview.retiredSignalRemoved');
 }
 function formatTimestamp(timestamp) {
   const value = Number(timestamp) || 0;

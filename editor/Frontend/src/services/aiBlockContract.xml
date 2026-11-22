@@ -170,7 +170,7 @@
   <HostValidationPipeline>
     <Step index="1">Validate schemaVersion, request identity, fixed targetId, projectScopeId, baseGraphRevision, operation, workspace shape, IDs, finite positions, node types, and edge endpoints.</Step>
     <Step index="2">Validate every serialized block against Catalog type, fields, inputs, dropdown options, connection shape, and output type.</Step>
-    <Step index="3">Validate exactly one start node, graph reachability, global workspace roots, and one Boolean condition block per edge.</Step>
+    <Step index="3">Structural checks cover exactly one start node and valid node/edge IDs, endpoints, and ports (the rules validateNodeGraph enforces). Graph reachability, global workspace roots, and per-edge Boolean condition blocks are not validated.</Step>
     <Step index="4">Validate the complete candidate node graph with validateNodeGraph before changing the visible graph.</Step>
     <Step index="5">Reject stale or cross-world responses, then apply atomically to the mounted project-global editor and save only after successful validation; otherwise restore the previous graph.</Step>
   </HostValidationPipeline>
