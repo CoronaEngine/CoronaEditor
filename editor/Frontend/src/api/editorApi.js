@@ -27,8 +27,6 @@ const fileOp = async (op, request, fields) => bridgeCall('project_archive', 'fil
 const editorApiStatic = {
   app: {
     close_process: () => window.corona.app.close_process(),
-    // Engine capability, not scene state: the panel asks before rendering a vision tab.
-    is_vision_available: () => window.corona.app.is_vision_available(),
   },
   files: {
     getFileTree: async request => ({

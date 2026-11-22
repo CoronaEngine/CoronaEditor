@@ -59,19 +59,6 @@ test('scene facade preserves native failures and does not retry an old route', a
   await assert.rejects(editorApi.scene.select_actor('scene.ini', 'model', 'Probe'), error => error === failure);
 });
 
-test('vision availability uses the typed app binding without JSON or the legacy facade', async t => {
-  const { app } = nativeScene(t);
-  const result = { available: true };
-  const calls = [];
-  app.is_vision_available = async (...args) => { calls.push(args); return result; };
-  const stringify = JSON.stringify, parse = JSON.parse;
-  t.after(() => { JSON.stringify = stringify; JSON.parse = parse; });
-  JSON.stringify = JSON.parse = () => { throw new Error('vision availability JSON transport forbidden'); };
-  assert.equal(await editorApi.app.is_vision_available(), result);
-  assert.deepEqual(calls, [[]]);
-  assert.equal('is_vision_available' in (editorApi.sceneTools || {}), false);
-});
-
 test('Actor transform has one native patch entry with raw values and no JSON transport', async t => {
   const { native } = nativeScene(t);
   const calls = [];

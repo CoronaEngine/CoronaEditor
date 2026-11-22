@@ -507,7 +507,6 @@ const cameraControls = createViewportCameraController({
 const isRealtimeCameraInputActive = cameraControls.isInputActive;
 const scheduleCameraUpdate = cameraControls.scheduleUpdate;
 
-const visionAvailable = ref(false);
 const creativeRenderDefaultsBusy = ref(true);
 const creativeRenderDefaultsError = ref('');
 const mainRenderBackend = ref('vision');
@@ -1756,13 +1755,11 @@ const getEditorControlsState = () => ({
   available: true,
   sceneId: currentSceneId.value || DEFAULT_SCENE_NAME,
   cameraId: cameraBindingState.value.cameraId,
-  visionAvailable: visionAvailable.value,
   renderMode: currentMainRenderMode(),
   renderLabel: mainRenderModeLabel.value,
   renderModes: mainRenderModeOptions.map((mode) => ({
     ...mode,
     active: currentMainRenderMode() === mode.value,
-    disabled: mode.backend === 'vision' && !visionAvailable.value,
   })),
   viewportUiMode: viewportUiMode.value,
   viewportUiModes: viewportUiModeItems.map((item) => ({
@@ -1787,8 +1784,7 @@ const registerEditorControls = () => {
     isCurrent: viewCurrent,
     actions: {
       selectRenderMode: payload => {
-        if (!mainRenderModeOptions.some(mode => mode.value === payload.mode &&
-            (mode.backend !== 'vision' || visionAvailable.value))) return false;
+        if (!mainRenderModeOptions.some(mode => mode.value === payload.mode)) return false;
         return selectMainRenderMode(payload.mode);
       },
       setViewportUiMode: payload => setViewportUiModeFromPanel(payload.mode),
@@ -1872,15 +1868,7 @@ onMounted(async () => {
   if (!await initializeCreativeRenderMode() || !viewCurrent()) return;
   await pollProjectResourceLoadStatus();
   if (!viewCurrent()) return;
-  try {
-    const visionResult = await editorApi.app.is_vision_available();
-    if (!viewCurrent()) return;
-    visionAvailable.value = !!visionResult?.available;
-  } catch (error) {
-    visionAvailable.value = false;
-  }
 
-  if (!viewCurrent()) return;
   // 等待 Vue 渲染 dock 面板（SceneBar/Object 等），确保 eventBus 监听就绪
   await nextTick();
   if (!viewCurrent()) return;
@@ -2020,7 +2008,7 @@ provideCreativePanelState(() => ({
   cameraHandle: cameraBindingState.value.cameraHandle,
   available: !creativeRenderDefaultsBusy.value && Boolean(cameraBindingState.value.cameraHandle),
   mainRenderBackend: mainRenderBackend.value, mainRenderModeLabel: mainRenderModeLabel.value,
-  mainRenderModeOptions, visionAvailable: visionAvailable.value,
+  mainRenderModeOptions,
   mainVisionRenderMode: mainVisionRenderMode.value, mainVisionDenoiser: mainVisionDenoiser.value,
   mainVisionAccumulation: mainVisionAccumulation.value, mainVisionDenoise: mainVisionDenoise.value,
   mainVisionStablePlanes: mainVisionStablePlanes.value,

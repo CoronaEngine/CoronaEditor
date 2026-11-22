@@ -57,7 +57,6 @@
                 type="button"
                 role="menuitemradio"
                 :aria-checked="mode.value === (state.mainRenderBackend === 'vision' ? state.mainVisionRenderMode : 'native')"
-                :disabled="mode.backend === 'vision' && !state.visionAvailable"
                 @click="select('selectMainRenderMode', mode.value)"
               >
                 {{ mode.label }}

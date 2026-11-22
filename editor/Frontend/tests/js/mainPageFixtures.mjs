@@ -70,7 +70,6 @@ export function mountMainPage(t, visionMode = 'path_tracing') {
   const api = {
     viewport: { configure: async (...args) => { calls.push(['viewport', ...args]); return {}; } },
     sceneTools: {},
-    app: { is_vision_available: async () => ({ available: true }) },
     scene: { ...sceneQueryFixture({ index: async () => ({ archive_session: 'main-archive', scene: 'scene_v3.xml', actors: [] }), cameras: async (scene, scope) => {
       calls.push(['cameras', scene, scope]);
       assert.equal(scene, 'scene_v3.xml');

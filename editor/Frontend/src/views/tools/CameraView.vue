@@ -19,7 +19,7 @@
         </button>
         <div v-if="backendMenuOpen" class="dropdown-menu">
           <button @click="selectBackend('native')">Native</button>
-          <button :disabled="!visionAvailable" @click="selectBackend('vision')">Vision</button>
+          <button @click="selectBackend('vision')">Vision</button>
         </div>
       </div>
       <div v-if="backend === 'vision'" class="dropdown no-drag">
@@ -220,7 +220,6 @@ const moveSpeed = ref(1);
 const renderWidth = ref(960);
 const renderHeight = ref(540);
 const viewportUiMode = ref('flat2d');
-const visionAvailable = ref(false);
 const errorText = ref('');
 const nodeGraphInputLocked = ref(false);
 const inputLayerRef = ref(null);
@@ -258,17 +257,13 @@ const viewportUiModeItems = [
 
 const loadCamera = async () => {
   if (!cameraArchiveSession || !viewLifetime.current()) return false;
-  const [listResult, visionResult] = await Promise.all([
-    editorApi.scene.read_scene({ archive_session: cameraArchiveSession, scene: sceneId, cameras: true }),
-    editorApi.app.is_vision_available(),
-  ]);
+  const listResult = await editorApi.scene.read_scene({ archive_session: cameraArchiveSession, scene: sceneId, cameras: true });
   if (!viewLifetime.current() || listResult.archive_session !== cameraArchiveSession || listResult.scene !== sceneId) return false;
   const payload = listResult;
   camera.value = payload?.cameras?.find(
     (item) => String(item.camera_id || item.id) === cameraId,
   );
   if (!camera.value) throw new Error(`Camera ${cameraId} was not found`);
-  visionAvailable.value = !!visionResult?.available;
   cameraName.value = camera.value.name;
   backend.value = camera.value.render_backend || 'native';
   visionAccumulation.value = visionAccumulationFromCamera(camera.value);

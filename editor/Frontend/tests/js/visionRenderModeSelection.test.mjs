@@ -167,8 +167,7 @@ function detachedHost({ fields = {}, fail = false, pending = false, accumulation
   const source = declarations('../../src/views/tools/CameraView.vue', [
     'camera', 'cameraName', 'backend', 'visionRenderMode', 'visionDenoise', 'visionDenoiseBusy',
     'outputMode', 'shadowCascadeDebug', 'ssaoEnabled', 'moveSpeed', 'renderWidth', 'renderHeight',
-    'visionAvailable', 'errorText', 'visionModeMenuOpen', 'loadCamera', 'selectVisionRenderMode',
-    'toggleVisionDenoise',
+    'errorText', 'visionModeMenuOpen', 'loadCamera', 'selectVisionRenderMode', 'toggleVisionDenoise',
     'visionDenoiser', 'visionDenoiserBusy', 'pendingDenoiserSelection', 'selectVisionDenoiser', 'denoiserMenuOpen',
     'visionAccumulation', 'visionAccumulationBusy', 'toggleVisionAccumulation',
     'visionStablePlanes', 'visionStablePlanesBusy', 'pendingStablePlanesSelection', 'toggleVisionStablePlanes',
@@ -210,7 +209,7 @@ function detachedHost({ fields = {}, fail = false, pending = false, accumulation
       if (typeof vision.denoise === 'boolean') return { vision: { denoise: pending ? !vision.denoise : vision.denoise }, pending };
       if (typeof vision.accumulation === 'boolean') return { vision: { accumulation: pending ? !vision.accumulation : vision.accumulation }, pending };
       return { render_backend: patch.render_backend || 'native' };
-    } }, app: { is_vision_available: async () => ({ available: true }) } });
+    } } });
   return { ...host, calls, patches };
 }
 

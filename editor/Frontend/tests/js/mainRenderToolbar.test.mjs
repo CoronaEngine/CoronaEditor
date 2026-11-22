@@ -30,7 +30,7 @@ async function renderMain(settings = {}) {
       handleViewportPointerDown: noop, handleViewportPointerCancel: noop, handleViewportPointerLeave: noop,
       handleViewportClick: noop, handleWheel: noop, updateSceneLight: noop,
       cameraSpeed: 0.2, setCameraSpeedFromPanel: noop,
-      mainRenderBackend: 'vision', mainVisionRenderMode: 'restir', visionAvailable: true,
+      mainRenderBackend: 'vision', mainVisionRenderMode: 'restir',
       mainRenderModeLabel: 'Vision ReSTIR', activeMenu: null, toggleMenu: noop,
       currentMainSceneId: () => 'scene.ini', currentMainCameraId: () => 'camera-1', mainVisionAccumulation: true, mainVisionDenoise: false,
       mainVisionAccumulationBusy: false, mainVisionDenoiseBusy: false,

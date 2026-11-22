@@ -112,9 +112,8 @@
               />
             </svg>
           </button>
-          <!-- Vision / Native 渲染后端切换（仅 Vision 可用时显示） -->
+          <!-- Vision / Native 渲染后端切换 -->
           <button
-            v-if="visionAvailable"
             class="p-1.5 hover:bg-[#3a4a3c] rounded flex items-center gap-0.5"
             :class="activeRenderBackend === 'vision' ? 'text-[#b3995d]' : 'text-[#e8ede3]'"
             :title="
@@ -843,7 +842,6 @@ const TakeScreenshot = async () => {
 };
 
 // Vision / Native 渲染后端切换状态
-const visionAvailable = ref(false);
 const activeRenderBackend = ref('native');
 
 const RefreshRenderBackendState = async () => {
@@ -855,15 +853,8 @@ const RefreshRenderBackendState = async () => {
     const archive = archiveSession.value;
     const current = () => viewLifetime.current() && scene === currentSceneName.value && archive === archiveSession.value;
     if (!scene || !archive) return;
-    const [cameraResult, availResult] = await Promise.all([
-      editorApi.scene.read_scene({ archive_session: archive, scene: scene, cameras: true }),
-      editorApi.app.is_vision_available(),
-    ]);
+    const cameraResult = await editorApi.scene.read_scene({ archive_session: archive, scene: scene, cameras: true });
     if (!current() || sequence !== renderBackendSequence || cameraResult.archive_session !== archive || cameraResult.scene !== scene) return;
-    visionAvailable.value = !!availResult?.available;
-    if (!visionAvailable.value) {
-      return;
-    }
     const target = getTargetCamera();
     const camera = cameraResult.cameras?.find(item => item.camera_id === target?.camera_id);
     if (camera?.render_backend) activeRenderBackend.value = camera.render_backend;

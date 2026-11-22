@@ -23,7 +23,6 @@ function mount(t, overrides = {}) {
     if (method === 'read_scene') return Promise.resolve({ archive_session: args[0].archive_session,
       scene: args[0].scene, actors: [{ name: 'Probe', actor_guid: 'actor', type: 'model' }], cameras: [] });
     if (method === 'create_camera') return Promise.resolve({ camera: { name: 'New', camera_id: 'new-camera' } });
-    if (method === 'is_vision_available') return Promise.resolve({ available: true });
     return Promise.resolve(namespace === 'window' ? {} : { ok: true });
   } });
   const bindings = { ref, reactive, onMounted() {}, onUnmounted: fn => { unmounted = fn; }, createViewLifetime,

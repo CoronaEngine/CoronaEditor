@@ -77,10 +77,9 @@ function cameraDeps(read) {
     pendingDenoiserSelection: null, pendingStablePlanesSelection: null,
     normalizeVisionRenderMode, visionAccumulationFromCamera, visionDenoiseFromCamera,
     visionDenoiserFromCamera, visionStablePlanesFromCamera,
-    editorApi: { scene: { ...sceneQueryFixture({ cameras: read }) },
-      app: { is_vision_available: async () => ({ available: true }) } },
+    editorApi: { scene: { ...sceneQueryFixture({ cameras: read }) } },
   };
-  for (const key of ['camera', 'cameraName', 'backend', 'visionAvailable', 'visionAccumulation', 'visionDenoise',
+  for (const key of ['camera', 'cameraName', 'backend', 'visionAccumulation', 'visionDenoise',
     'visionDenoiser', 'visionStablePlanes', 'visionRenderMode', 'outputMode', 'moveSpeed', 'renderWidth', 'renderHeight'])
     deps[key] = { value: null };
   return deps;
