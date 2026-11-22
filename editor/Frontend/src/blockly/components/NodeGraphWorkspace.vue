@@ -323,7 +323,8 @@ import { getNodeGraphSaves } from '@/services/nodeGraphSaves.js';
 import { coronaEventBus } from '@/utils/eventBus.js';
 import { createViewLifetime } from '@/utils/viewLifetime.js';
 import { cloneWebDto } from '@/utils/cloneWebDto.js';
-import { nodeGraphToCode, validateNodeGraph } from '@/blockly/generators/index.js';
+import { nodeGraphToCode } from '@/blockly/generators/index.js';
+import { validateNodeGraph } from '@/blockly/graph/validate.js';
 import { generatedNodeGraphRevision, registerGeneratedNodeGraphConsumer } from '@/blockly/node-editor/aiNodeGraphService.js';
 import { actorContextNameKey, actorContextRevision, actorRecordsFromSceneTree, normalizeActorContextName } from '@/blockly/utils/actorContext.js';
 import { nextSaveAction } from '@/blockly/utils/saveRetryPolicy.js';
@@ -2816,8 +2817,8 @@ async function handleToggleRun() {
     const runTarget = currentTarget();
     try {
       const snapshot = graphSnapshot();
-      const analysis = validateNodeGraph(snapshot);
-      runWarnings.value = analysis.warnings || [];
+      validateNodeGraph(snapshot);
+      runWarnings.value = [];
     } catch (error) {
       runStatus.value = `生成失败：${error?.message || error}`;
       reportNodeRunTerminal(false, error?.message || error);
