@@ -50,7 +50,7 @@
             @change="setRenderMode"
           >
             <option v-for="mode in viewportControlState.renderModes" :key="mode.value"
-                    :value="mode.value" :disabled="mode.disabled">
+                    :value="mode.value">
               {{ mode.label }}
             </option>
           </select>
