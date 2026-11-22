@@ -213,7 +213,6 @@ export default {
     frame: 'Frame',
     grid: 'Grid',
     light: 'Light',
-    lockOffset: 'Lock Offset',
     mass: 'Mass',
     mesh: 'Mesh',
     model: 'Model',

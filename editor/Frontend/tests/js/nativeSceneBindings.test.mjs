@@ -94,7 +94,7 @@ test('Actor transform failures never fall back to Fast or manifest writes', asyn
   }), error => error === failure);
 });
 
-test('Actor properties merge state, physics and camera lock into one raw V8 patch', async t => {
+test('Actor properties merge state, physics and animation sources into one raw V8 patch', async t => {
   const { native } = nativeScene(t);
   const calls = [];
   const result = { status: 'success', actor: { actor_guid: 'actor-id', actor_version: 8 } };

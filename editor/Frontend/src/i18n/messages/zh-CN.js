@@ -213,7 +213,6 @@ export default {
     frame: '帧',
     grid: '网格',
     light: '光照',
-    lockOffset: '锁定偏移',
     mass: '质量',
     mesh: '网格',
     model: '模型',
