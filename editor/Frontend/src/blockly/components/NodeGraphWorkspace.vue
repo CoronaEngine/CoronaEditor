@@ -2223,11 +2223,6 @@ async function saveNow(targetOverride = null, { force = false } = {}) {
   const snapshot = graphSnapshot();
   const snapshotFingerprint = JSON.stringify(snapshot);
   try {
-    validateNodeGraph(snapshot);
-  } catch (error) {
-    logError('节点图结构校验未通过', error);
-  }
-  try {
     window.localStorage?.setItem(storageKeyForTarget(target), JSON.stringify({
       archive_session: target.archiveSession, workspace: snapshot,
     }));

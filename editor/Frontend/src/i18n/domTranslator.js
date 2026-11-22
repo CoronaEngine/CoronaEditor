@@ -568,6 +568,7 @@ const RUNTIME_DOM_TEXT_TRANSLATIONS = {
   保存工作区状态失败: 'Failed to Save Workspace State',
   加载目标积木失败: 'Failed to Load the Target Blocks',
   切换工作区失败: 'Failed to Switch Workspace',
+  切换节点图目标失败: 'Failed to Switch the Node Graph Target',
   '注册积木/生成器失败': 'Failed to Register Blocks or Generators',
   '刷新 Blockly 语言失败': 'Failed to Refresh the Blockly Language',
   'Blockly 容器未找到': 'Blockly Container Not Found',
