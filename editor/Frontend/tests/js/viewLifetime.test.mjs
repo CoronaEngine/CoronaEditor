@@ -110,7 +110,7 @@ function mountNodeGraphLifecycle(t) {
     onNodeGraphActorChanged: () => delivered.push('selection'),
     onNodeGraphSceneTreeChanged: () => delivered.push('tree'),
     refreshSceneActorOptions: () => actors.promise,
-    stopForPanelClose: async () => {},
+    markPanelClosing: async () => {},
     ResizeObserver: class { observe() {} disconnect() {} },
     workspaceRootRef: { value: null },
   };

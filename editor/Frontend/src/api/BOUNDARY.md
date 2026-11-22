@@ -90,7 +90,7 @@ appService.createCameraView 再请求原生表面，打开/关闭只走 corona.w
 readActorIndex(scene,{archive_session}) 是具名直接 V8 读取，仅允许非空场景和已观察的 archive_session，未知 scope 字段拒绝。
 回复为 archive_session、scene、tree_revision、actors[{actor_guid,name,type}]，没有数字句柄、相机或几何体。
 无文件扩展名时 type 保留原 actor_type。读请求不懒创建世界，不改变选择/树 revision，不读取完整场景的渲染设置字符串。
-CameraView、MainPage 的索引刷新及 NodeGraphWorkspace 运行目标校验复用此投影；迟到结果按归档/视图/图加载及关闭状态丢弃。
+CameraView、MainPage 的索引刷新及 NodeGraphWorkspace 编辑目标校验复用此投影；迟到结果按归档/视图/图加载及关闭状态丢弃。
 MainPage 初始化复用相机/环境/Actor索引投影；SceneBar 的丰富场景树及助手上下文仍属于未完成迁移，不存在新接口失败回退旧完整树的路径。
 
 readActorProperties(scene,actor,{archive_session}) 是 Object 属性面板及主视口变换基线的唯一 Actor 属性读取。

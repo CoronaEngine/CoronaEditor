@@ -1,13 +1,13 @@
 <?xml version='1.0' encoding='utf-8'?>
 <CoronaBlocksDocument schemaVersion="1" documentPurpose="internal-ai-node-graph-contract" contractVersion="5" updatedAt="2026-07-31">
-  <InternalAiContract catalogLocked="true" visualGraphIsSourceOfTruth="true" pythonProducedByEngine="true">
+  <InternalAiContract catalogLocked="true" visualGraphIsSourceOfTruth="true">
     <Purpose lang="zh-CN">这是 CoronaEngine 包菜答疑使用的项目级节点积木能力与生成合同。宿主会提供用户指令、当前世界上下文、完整现有节点图和本文档；AI 只能返回完整、可见、可校验的 JSON 节点图。</Purpose>
     <Purpose lang="en-US">Project-global node graph capability and generation contract used by Cabbage Q&amp;A. The host sends the user instruction, current world context, complete current graph, and this file; the model may return only a complete visible JSON node graph.</Purpose>
     <FixedTarget targetId="node_graph:project:global" targetType="project" scriptKind="node_graph" actorBinding="none" />
     <SupportedOperations values="create extend edit delete" queryRoute="node_graph.review.chat.start" />
     <SourceOfTruth>Nodes, edges, Blockly workspaces, Boolean edge conditions, global data blocks, and node x/y layout are the complete visible logic source. The model must not hide gameplay in text or code.</SourceOfTruth>
-    <NoPythonFromModel>The model must not produce Python. After validation and atomic application, CoronaEngine calls nodeGraphToCode on the visible workspace and saves the compiled Python itself.</NoPythonFromModel>
-    <HostApplicationApi function="applyGeneratedNodeGraph" accepts="JSON object" atomic="true" staleResponseRejected="true">The host validates and compiles the complete result before changing the editor. Invalid, stale, cancelled, or cross-world results leave the current project graph unchanged.</HostApplicationApi>
+    <NoPythonFromModel>The model must not produce Python. After validation and atomic application, CoronaEngine saves the visible node graph itself.</NoPythonFromModel>
+    <HostApplicationApi function="applyGeneratedNodeGraph" accepts="JSON object" atomic="true" staleResponseRejected="true">The host validates and applies the complete result before changing the editor. Invalid, stale, cancelled, or cross-world results leave the current project graph unchanged.</HostApplicationApi>
   </InternalAiContract>
   <HostInputContract>
     <RequestIdentity required="true" fields="requestId targetId projectScopeId baseGraphRevision operation" />
@@ -171,8 +171,8 @@
     <Step index="1">Validate schemaVersion, request identity, fixed targetId, projectScopeId, baseGraphRevision, operation, workspace shape, IDs, finite positions, node types, and edge endpoints.</Step>
     <Step index="2">Validate every serialized block against Catalog type, fields, inputs, dropdown options, connection shape, and output type.</Step>
     <Step index="3">Validate exactly one start node, graph reachability, global workspace roots, and one Boolean condition block per edge.</Step>
-    <Step index="4">Deserialize candidate Blockly workspaces and run validateNodeGraph and nodeGraphToCode before changing the visible graph.</Step>
-    <Step index="5">Reject stale or cross-world responses, then apply atomically to the mounted project-global editor and save only after successful compilation; otherwise restore the previous graph.</Step>
+    <Step index="4">Deserialize candidate Blockly workspaces and run validateNodeGraph before changing the visible graph.</Step>
+    <Step index="5">Reject stale or cross-world responses, then apply atomically to the mounted project-global editor and save only after successful validation; otherwise restore the previous graph.</Step>
   </HostValidationPipeline>
   <GenerationScopingRules>
     <Rule index="1">Implement only the capabilities explicitly requested by UserInstruction. A request to add object controls is not permission to add score, lives, combat, enemies, win, lose, or unrelated states.</Rule>

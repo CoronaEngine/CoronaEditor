@@ -208,7 +208,7 @@ async function sendEvent(event) {
   if (context) publishBackendContext(context);
   if (response?.success === true && (
     Array.isArray(response.completedTaskKeys) && response.completedTaskKeys.length
-    || ['run_started', 'run_succeeded', 'run_failed', 'node_issue_found', 'node_issue_fixed'].includes(event?.type)
+    || ['node_issue_found', 'node_issue_fixed'].includes(event?.type)
   )) {
     void requestProfileScoreUpdate().catch(() => {});
   }

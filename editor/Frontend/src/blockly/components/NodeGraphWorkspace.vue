@@ -10,7 +10,7 @@
         <span class="ng-badge">节点</span>
       </div>
       <div class="ng-modes">
-        <select aria-label="运行目标" :value="actorName" @change="selectRunTarget">
+        <select aria-label="编辑目标" :value="actorName" @change="selectTarget">
           <option value="">项目</option>
           <option v-for="actor in sceneActorContext.actors" :key="actor.name" :value="actor.name">{{ actor.name }}</option>
         </select>
@@ -2170,7 +2170,7 @@ function currentTarget(projectPathOverride = '') {
     projectPath: projectPathOverride || loadedProjectPath || activeProjectPath.value || readActiveProjectPath(),
   };
 }
-async function selectRunTarget(event) {
+async function selectTarget(event) {
   const actorName = event.target.value;
   event.target.value = props.actorName;
   const archive = loadedArchiveSession, loadSequence = graphLoadSequence;
@@ -2188,7 +2188,7 @@ async function selectRunTarget(event) {
     if (!current() || scene.archive_session !== archive) return;
     const route = scene.scene;
     if (actorName && (!route || !scene.actors?.some(actor => actor.name === actorName))) {
-      throw new Error('运行目标已不在当前场景');
+      throw new Error('编辑目标已不在当前场景');
     }
     emit('select-target', { actorName, sceneName: route || '' });
   } catch (error) {
@@ -2517,11 +2517,11 @@ function syncGeneratedNodeGraphConsumer() {
   }
 }
 
-function stopForPanelClose() {
+function markPanelClosing() {
   panelClosing = true;
 }
 
-defineExpose({ stopForPanelClose });
+defineExpose({ markPanelClosing });
 
 watch(
   () => [activeNodeTutorialTaskKey.value, canonicalJson(tutorialNodeBindings.value)],
@@ -2861,7 +2861,7 @@ onBeforeUnmount(() => {
   clearExternalDrag();
   cancelMacroPointerDrag();
   endCanvasPan();
-  stopForPanelClose();
+  markPanelClosing();
   window.removeEventListener('mousemove', onDragMove);
   window.removeEventListener('mouseup', stopNodeDrag);
 });

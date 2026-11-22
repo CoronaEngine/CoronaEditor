@@ -407,7 +407,7 @@
       "steps": [
         "先确认当前要完成的目标和出现问题的位置",
         "检查对应对象、节点、积木或连线是否已经选中并正确连接",
-        "完成修改后重新运行或等待下一次节点审查确认结果"
+        "完成修改后保存并等待下一次节点审查确认结果"
       ]
     }
   },
@@ -1032,68 +1032,6 @@
     }
   },
   {
-    "id": "zh-CN-run_node_graph",
-    "input": {
-      "content": "Show me",
-      "locale": "zh-CN",
-      "requestId": "zh-CN-run_node_graph",
-      "selectedTaskKey": "tutorial.run_node_graph",
-      "tasks": [
-        {
-          "taskKey": "tutorial.run_node_graph",
-          "type": "tutorial",
-          "title": "任务",
-          "titleEn": "Task"
-        }
-      ],
-      "assistant": {
-        "worldId": "test-world",
-        "projectScopeId": "scope",
-        "graphRevision": "rev",
-        "assistanceProfile": {
-          "score": 50,
-          "updatedAt": 1
-        },
-        "graphExcerpt": {},
-        "projectContext": {
-          "sceneName": "场景 🌱",
-          "actorContextAvailable": false,
-          "actors": []
-        },
-        "messages": [
-          {
-            "role": "user",
-            "id": "last",
-            "content": "Show me"
-          }
-        ]
-      }
-    },
-    "messages": [
-      {
-        "role": "system",
-        "content": "你是 CoronaEngine 的包菜答疑助手。请围绕当前世界、待处理任务和节点图回答。对基础引导任务和世界制作任务，说明如何在引擎内完成；对节点问题，说明原因、修改位置和验证方法。不得编造不存在的节点、积木、对象或 API。信息不足时应使用条件式建议。node_graph:project:global 是当前 Native Editor 场景的项目级节点图，默认已经作用于当前场景。项目节点图的 actorName 为空表示它不固定绑定单个物体，不表示场景没有绑定。不得要求用户选择原生场景、绑定模式、确认绑定或点击应用。projectContext.actors 是场景管理中已经导入的可用物体；涉及移动、跳跃、旋转、碰撞等对象操作时，必须优先使用其中的精确对象名，并说明在对应积木的对象参数中选择该物体。如果 actorContextAvailable 为 false，只能说明暂时无法读取对象列表，不能编造场景绑定面板。不要向用户显示内部评分，不要给用户贴美术、程序、入门、熟悉或熟练标签。不要输出 JSON，不要为用户生成或覆盖 Python 脚本。请使用干净的中文纯文本回答，不要使用 Markdown 标题、星号加粗、反引号、代码围栏或横线分隔符。需要分步骤时只使用‘1. 2. 3.’编号，每一步保持一到两句，不要堆叠装饰符号。请保持适中详细度，先给关键修改方向，再补充必要的操作步骤，仅解释与当前问题直接相关的术语。用户明确表示不理解或连续追问。请把解决方法整理成清楚的编号步骤，说明操作位置、连接顺序和完成后的验证方法。不要声称已经替用户修改。"
-      },
-      {
-        "role": "system",
-        "content": "当前结构化上下文：{\"worldId\": \"test-world\", \"projectScopeId\": \"scope\", \"graphRevision\": \"rev\", \"selectedTask\": {\"taskKey\": \"tutorial.run_node_graph\", \"issueKey\": \"tutorial.run_node_graph\", \"type\": \"tutorial\", \"title\": \"任务\", \"titleEn\": \"Task\", \"message\": \"\", \"messageEn\": \"\", \"suggestion\": \"\", \"suggestionEn\": \"\", \"completionCriteria\": \"\", \"completionCriteriaEn\": \"\", \"completionSignal\": \"\", \"guidanceIntent\": \"\", \"nodeId\": \"\", \"blockId\": \"\", \"edgeId\": \"\", \"code\": \"\"}, \"activeTasks\": [{\"taskKey\": \"tutorial.run_node_graph\", \"issueKey\": \"tutorial.run_node_graph\", \"type\": \"tutorial\", \"title\": \"任务\", \"titleEn\": \"Task\", \"message\": \"\", \"messageEn\": \"\", \"suggestion\": \"\", \"suggestionEn\": \"\", \"completionCriteria\": \"\", \"completionCriteriaEn\": \"\", \"completionSignal\": \"\", \"guidanceIntent\": \"\", \"nodeId\": \"\", \"blockId\": \"\", \"edgeId\": \"\", \"code\": \"\"}], \"graphExcerpt\": \"{}\", \"projectContext\": {\"sceneName\": \"场景 🌱\", \"actorContextAvailable\": false, \"actors\": []}}"
-      },
-      {
-        "role": "user",
-        "content": "Show me"
-      }
-    ],
-    "guidance": {
-      "needsShowcase": true,
-      "guidanceIntent": "run_node_graph",
-      "steps": [
-        "确认开始节点已经连接到后续节点",
-        "找到节点 Dock 顶部的运行按钮",
-        "点击运行并观察逻辑是否正常执行"
-      ]
-    }
-  },
-  {
     "id": "zh-CN-missing_actor_target",
     "input": {
       "content": "Show me",
@@ -1153,7 +1091,7 @@
         "打开节点 Dock 并选中包含操作积木的节点",
         "找到操作积木的对象输入口",
         "连接“对象[]”积木并选择场景中的目标物体",
-        "运行节点逻辑确认目标物体能够响应"
+        "保存后检查对象引用，确认积木使用的是场景中真实存在的物体"
       ]
     }
   },
@@ -2006,7 +1944,7 @@
       "steps": [
         "First confirm the current goal and where the problem appears",
         "Check that the relevant object, node, block, or connection is selected and connected correctly",
-        "After editing, run again or wait for the next node review to confirm the result"
+        "After editing, save and wait for the next node review to confirm the result"
       ]
     }
   },
@@ -2631,68 +2569,6 @@
     }
   },
   {
-    "id": "en-US-run_node_graph",
-    "input": {
-      "content": "Show me",
-      "locale": "en-US",
-      "requestId": "en-US-run_node_graph",
-      "selectedTaskKey": "tutorial.run_node_graph",
-      "tasks": [
-        {
-          "taskKey": "tutorial.run_node_graph",
-          "type": "tutorial",
-          "title": "任务",
-          "titleEn": "Task"
-        }
-      ],
-      "assistant": {
-        "worldId": "test-world",
-        "projectScopeId": "scope",
-        "graphRevision": "rev",
-        "assistanceProfile": {
-          "score": 50,
-          "updatedAt": 1
-        },
-        "graphExcerpt": {},
-        "projectContext": {
-          "sceneName": "场景 🌱",
-          "actorContextAvailable": false,
-          "actors": []
-        },
-        "messages": [
-          {
-            "role": "user",
-            "id": "last",
-            "content": "Show me"
-          }
-        ]
-      }
-    },
-    "messages": [
-      {
-        "role": "system",
-        "content": "You are Cabbage Help, the CoronaEngine assistant. Answer about the current world, active tasks, and node graph. For tutorials and world-building tasks, explain how to complete them in the engine. For node issues, explain the cause, where to edit, and how to verify the result. Never invent nodes, blocks, objects, or APIs; use conditional advice when context is incomplete. node_graph:project:global is the project-level node graph for the current Native Editor scene and already applies to that scene by default. An empty actorName means the graph is not fixed to one object; it does not mean the scene is unbound. Do not ask the user to select a native scene, binding mode, confirm binding, or click Apply. projectContext.actors lists objects already imported in Scene Manager. For movement, jumping, rotation, collision, and other object operations, prefer an exact object name from that list and tell the user to select it in the block's object parameter. If actorContextAvailable is false, only say that the object list is temporarily unavailable; do not invent a scene-binding panel. Do not expose internal scores or label the user as an artist, programmer, beginner, familiar, or advanced. Do not output JSON or generate or overwrite Python scripts. Reply in clean English plain text. Do not use Markdown headings, bold markers, backticks, code fences, or horizontal rules. When steps are needed, use only 1. 2. 3. numbering. Keep each step to one or two sentences and avoid decorative symbols. Use moderate detail. Give the key correction first, then the necessary operation steps, and explain only terms directly related to the current issue.The user explicitly said they do not understand or has asked repeatedly. Organize the solution into clear numbered steps, including where to operate, the connection order, and how to verify completion. Do not claim you already changed the project."
-      },
-      {
-        "role": "system",
-        "content": "Current structured context:{\"worldId\": \"test-world\", \"projectScopeId\": \"scope\", \"graphRevision\": \"rev\", \"selectedTask\": {\"taskKey\": \"tutorial.run_node_graph\", \"issueKey\": \"tutorial.run_node_graph\", \"type\": \"tutorial\", \"title\": \"任务\", \"titleEn\": \"Task\", \"message\": \"\", \"messageEn\": \"\", \"suggestion\": \"\", \"suggestionEn\": \"\", \"completionCriteria\": \"\", \"completionCriteriaEn\": \"\", \"completionSignal\": \"\", \"guidanceIntent\": \"\", \"nodeId\": \"\", \"blockId\": \"\", \"edgeId\": \"\", \"code\": \"\"}, \"activeTasks\": [{\"taskKey\": \"tutorial.run_node_graph\", \"issueKey\": \"tutorial.run_node_graph\", \"type\": \"tutorial\", \"title\": \"任务\", \"titleEn\": \"Task\", \"message\": \"\", \"messageEn\": \"\", \"suggestion\": \"\", \"suggestionEn\": \"\", \"completionCriteria\": \"\", \"completionCriteriaEn\": \"\", \"completionSignal\": \"\", \"guidanceIntent\": \"\", \"nodeId\": \"\", \"blockId\": \"\", \"edgeId\": \"\", \"code\": \"\"}], \"graphExcerpt\": \"{}\", \"projectContext\": {\"sceneName\": \"场景 🌱\", \"actorContextAvailable\": false, \"actors\": []}}"
-      },
-      {
-        "role": "user",
-        "content": "Show me"
-      }
-    ],
-    "guidance": {
-      "needsShowcase": true,
-      "guidanceIntent": "run_node_graph",
-      "steps": [
-        "Confirm that the Start node is connected to the following node",
-        "Find Run at the top of the Nodes dock",
-        "Click Run and observe whether the logic executes correctly"
-      ]
-    }
-  },
-  {
     "id": "en-US-missing_actor_target",
     "input": {
       "content": "Show me",
@@ -2752,7 +2628,7 @@
         "Open the Nodes dock and select the node containing the operation block",
         "Find the object input on the operation block",
         "Connect an Object [] block and select the target object from the scene",
-        "Run the node logic and confirm that the target object responds"
+        "After saving, check the object reference and confirm the block uses an object that exists in the scene"
       ]
     }
   },
@@ -3922,7 +3798,7 @@
       "steps": [
         "先确认当前要完成的目标和出现问题的位置",
         "检查对应对象、节点、积木或连线是否已经选中并正确连接",
-        "完成修改后重新运行或等待下一次节点审查确认结果"
+        "完成修改后保存并等待下一次节点审查确认结果"
       ]
     }
   },
@@ -4534,7 +4410,7 @@
       "steps": [
         "先确认当前要完成的目标和出现问题的位置",
         "检查对应对象、节点、积木或连线是否已经选中并正确连接",
-        "完成修改后重新运行或等待下一次节点审查确认结果"
+        "完成修改后保存并等待下一次节点审查确认结果"
       ]
     }
   },

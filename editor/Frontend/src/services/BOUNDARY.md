@@ -61,7 +61,7 @@ MainPage、CameraView 和标定 Dock 使用公共 Web request/event 的值同步
 
 `nodeGraphGenerationService.js`、`nodeGraphReviewService.js` 负责节点生成与审查业务任务。
 页面请求匹配、发现、超时/取消归 webMessages；业务模型任务轮询与状态不等同于通信重试。
-没有生产调用方的 nodeGraphRuntimeService 已删除；NodeGraphWorkspace 本地运行/保存仍保留。
+没有生产调用方的 nodeGraphRuntimeService 已删除；NodeGraphWorkspace 本地保存仍保留。
 `nodeGraphSaves.js` 拥有按 archive session 选择 workspace、共享在途保存和失败卸载图的显式重试。
 每个文档只注册一个 `nodeGraph.flush` handler；发现、定向请求、超时和取消归公共 webMessages.requestAll，领域层不维护请求 ID 或响应表。
 `editorWindowSession.beforeRetire` 通过 appService 调用 active archive flush，保存完成前不进入原生退休；禁用 UI 保留原消息 generation，再次启用才换代。

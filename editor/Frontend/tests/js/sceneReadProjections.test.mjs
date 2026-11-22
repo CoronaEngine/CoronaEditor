@@ -136,7 +136,7 @@ function targetDeps(read) {
   };
 }
 
-test('node graph run target uses only the observed scene actor index after saving', async () => {
+test('node graph edit target uses only the observed scene actor index after saving', async () => {
   const calls = [];
   const deps = targetDeps(async (...args) => {
     calls.push(['read', ...args]);
@@ -144,13 +144,13 @@ test('node graph run target uses only the observed scene actor index after savin
   });
   deps.saveNow = async () => { calls.push('save'); return true; };
   deps.emit = (...args) => calls.push(args);
-  const select = handler('blockly/components/NodeGraphWorkspace', 'selectRunTarget', deps);
+  const select = handler('blockly/components/NodeGraphWorkspace', 'selectTarget', deps);
   await select({ target: { value: 'Probe' } });
   assert.deepEqual(calls, ['save', ['read', 'scene.ini', { archive_session: 'archive' }],
     ['select-target', { actorName: 'Probe', sceneName: 'scene.ini' }]]);
 });
 
-test('project graph resolves its observed scene before checking a run target', async () => {
+test('project graph resolves its observed scene before checking an edit target', async () => {
   const calls = [], deps = targetDeps(async (...args) => {
     calls.push(args);
     return { scene: 'scene.ini', archive_session: 'archive', actors: [{ name: 'Probe' }] };
@@ -158,35 +158,35 @@ test('project graph resolves its observed scene before checking a run target', a
   deps.props.sceneName = '';
   deps.editorApi.scene.read_active = async () => ({ scene: 'scene.ini', archive_session: 'archive' });
   deps.emit = (...args) => calls.push(args);
-  await handler('blockly/components/NodeGraphWorkspace', 'selectRunTarget', deps)({ target: { value: 'Probe' } });
+  await handler('blockly/components/NodeGraphWorkspace', 'selectTarget', deps)({ target: { value: 'Probe' } });
   assert.deepEqual(calls, [['scene.ini', { archive_session: 'archive' }],
     ['select-target', { actorName: 'Probe', sceneName: 'scene.ini' }]]);
 });
 
-test('project graph never applies its old run target to a new active archive', async () => {
+test('project graph never applies its old edit target to a new active archive', async () => {
   const calls = [], deps = targetDeps(async (...args) => calls.push(args));
   deps.props.sceneName = '';
   deps.editorApi.scene.read_active = async () => ({ scene: 'scene.ini', archive_session: 'next' });
   deps.emit = (...args) => calls.push(args);
-  await handler('blockly/components/NodeGraphWorkspace', 'selectRunTarget', deps)({ target: { value: 'Probe' } });
+  await handler('blockly/components/NodeGraphWorkspace', 'selectTarget', deps)({ target: { value: 'Probe' } });
   assert.deepEqual(calls, []);
 });
 
-test('an Actor removed since the dropdown was populated is rejected as a run target', async () => {
+test('an Actor removed since the dropdown was populated is rejected as an edit target', async () => {
   const emitted = [], errors = [], deps = targetDeps(async () => ({ scene: 'scene.ini', archive_session: 'archive', actors: [] }));
   deps.emit = (...args) => emitted.push(args);
   deps.logError = (...args) => errors.push(args);
-  await handler('blockly/components/NodeGraphWorkspace', 'selectRunTarget', deps)({ target: { value: 'Removed' } });
-  assert.match(String(errors[0]?.[1]), /运行目标已不在当前场景/);
+  await handler('blockly/components/NodeGraphWorkspace', 'selectTarget', deps)({ target: { value: 'Removed' } });
+  assert.match(String(errors[0]?.[1]), /编辑目标已不在当前场景/);
   assert.deepEqual(emitted, []);
 });
 
 for (const change of ['archive', 'reload', 'unmount', 'closing']) {
-  test(`node graph does not emit a run target after ${change}`, async () => {
+  test(`node graph does not emit an edit target after ${change}`, async () => {
     const pending = deferred(), emitted = [];
     const deps = targetDeps(() => pending.promise);
     deps.emit = (...args) => emitted.push(args);
-    const select = handler('blockly/components/NodeGraphWorkspace', 'selectRunTarget', deps);
+    const select = handler('blockly/components/NodeGraphWorkspace', 'selectTarget', deps);
     const work = select({ target: { value: 'Probe' } });
     await Promise.resolve();
     if (change === 'archive') deps.loadedArchiveSession = 'next';

@@ -614,7 +614,7 @@ export const useCabbageAssistantStore = defineStore('cabbageAssistant', {
       return this.projectContext;
     },
 
-    applyReview(result = {}, { runtimeFailed = false } = {}) {
+    applyReview(result = {}) {
       const scope = String(result.projectScopeId || '');
       if (this.projectScopeId && scope && scope !== this.projectScopeId) return [];
       if (scope) this.projectScopeId = scope;
@@ -669,7 +669,7 @@ export const useCabbageAssistantStore = defineStore('cabbageAssistant', {
           const repeated =
             (!previous && Number(memory.occurrences || 0) >= 1) ||
             Number(memory.chatDiscussionCount || 0) >= 1;
-          const shouldShow = runtimeFailed || repeated || previous?.status === 'active';
+          const shouldShow = repeated || previous?.status === 'active';
           const summary = String(result.summary || '').trim();
           const task = normalizeTask(
             {
@@ -755,13 +755,12 @@ export const useCabbageAssistantStore = defineStore('cabbageAssistant', {
       return actions;
     },
 
-    promoteDueCandidates({ runtimeFailed = false, now = Date.now() } = {}) {
+    promoteDueCandidates({ now = Date.now() } = {}) {
       const delay = assistanceDelay(this.profile);
       const promoted = [];
       for (const task of this.activeTasks) {
         if (task.type !== 'node-issue' || task.status !== 'candidate') continue;
-        if (!runtimeFailed && now - Number(task.firstDetectedAt || task.createdAt || now) < delay)
-          continue;
+        if (now - Number(task.firstDetectedAt || task.createdAt || now) < delay) continue;
         task.status = 'active';
         task.updatedAt = now;
         promoted.push(clone(task));

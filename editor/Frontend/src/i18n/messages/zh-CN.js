@@ -96,7 +96,6 @@ export default {
     otherPreviewRunning: '其他预览正在运行',
     runGlobalTitle: '运行当前项目的全局节点逻辑',
     status: {
-      noRunnableBlocks: '没有可运行积木',
       previewError: '预览出错',
       previewFailed: '预览启动失败',
       previewRestored: '已恢复预览前参数',

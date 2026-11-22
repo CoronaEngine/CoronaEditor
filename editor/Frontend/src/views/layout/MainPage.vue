@@ -781,25 +781,11 @@ async function handleNodeGraphReview(result) {
   await persistCabbageTaskActions(actions);
 }
 
-function promoteDueCabbageTasks(options = {}) {
-  const promoted = cabbageAssistant.promoteDueCandidates(options);
+function promoteDueCabbageTasks() {
+  const promoted = cabbageAssistant.promoteDueCandidates();
   if (!promoted.length) return;
   publishCabbageAssistantContext(cabbageAssistant);
   void persistCabbageTaskActions(promoted.map((task) => ({ action: 'upsert', task })));
-}
-
-function onCabbageRunFailed(event) {
-  promoteDueCabbageTasks({ runtimeFailed: true });
-  if (event?.detail?.contextRecorded) return;
-  void cabbageContextService.recordEvent({
-    type: 'run_failed',
-    category: 'runtime',
-    success: false,
-    details: {
-      source: String(event?.detail?.source || 'editor'),
-      error: String(event?.detail?.error || '').slice(0, 500),
-    },
-  });
 }
 
 // Assistant state has been initialized above.
@@ -1965,7 +1951,6 @@ onMounted(async () => {
   await loadCabbageWorldContext({ reset: true });
   if (!viewCurrent()) return;
   cabbageCandidateTimer = window.setInterval(() => promoteDueCabbageTasks(), 1000);
-  window.addEventListener('cabbage-run-failed', onCabbageRunFailed);
   stopProjectChanged = subscribeProjectChanged(onActiveProjectChanged);
   stopViewportUiCalibrationMessages = viewportCalibration.subscribe(() => {
     if (viewportUiMode.value === 'stereo3d') applyViewportUiCalibration();
@@ -1992,7 +1977,6 @@ onUnmounted(() => {
   unsubscribeCabbagePreWarnings = null;
   if (cabbageCandidateTimer) window.clearInterval(cabbageCandidateTimer);
   cabbageCandidateTimer = null;
-  window.removeEventListener('cabbage-run-failed', onCabbageRunFailed);
   void cabbageContextService.flush();
   stopProjectChanged?.();
   stopProjectChanged = null;

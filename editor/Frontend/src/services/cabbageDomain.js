@@ -490,9 +490,6 @@ function tutorialProgress(context, event) {
           d.modelName === b.modelActorName &&
           String(d.direction).toUpperCase() === 'RIGHT';
       break;
-    case 'run_graph':
-      matched = type === 'run_clicked' && user;
-      break;
     case 'focus_ai_composer':
       matched = type === 'ai_composer_focused' && user;
       break;
@@ -559,8 +556,6 @@ function goalSignals(event) {
     signals.push('block_added');
     if (event.details.workspaceRole === 'condition') signals.push('transition_condition_set');
   }
-  if (['run_started', 'run_succeeded'].includes(event.type)) signals.push('node_graph_run');
-  if (event.type === 'run_succeeded') signals.push('run_succeeded');
   return signals;
 }
 
@@ -722,7 +717,6 @@ export function appendMessage(context, message) {
     'drag_block',
     'edit_block_parameter',
     'set_transition_condition',
-    'run_node_graph',
   ];
   if (!intents.includes(entry.guidanceIntent)) {
     entry.guidanceIntent = '';

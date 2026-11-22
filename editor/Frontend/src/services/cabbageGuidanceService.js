@@ -26,7 +26,6 @@ const SELECTOR_KEYS = Object.freeze({
   'object-physics': '[data-guidance="object-physics"]',
   'object-physics-enabled': '[data-guidance="object-physics-enabled"]',
   'object-physics-mass': '[data-guidance="object-physics-mass"]',
-  'node-run': '[data-guidance="node-run"]',
   'node-select-mode': '[data-guidance="node-select-mode"]',
   'node-delete-mode': '[data-guidance="node-delete-mode"]',
   'node-toolbox': '[data-guidance="node-toolbox"]',
@@ -286,10 +285,6 @@ const LEGACY_TUTORIAL_GUIDANCE = Object.freeze({
   'tutorial.set_transition_condition': {
     panelId: 'NodeGraphPanel',
     steps: [stepFor('node-transition-condition', 'connect', '选中一条连线，在条件编辑区接入一个返回 Boolean 的条件积木。')],
-  },
-  'tutorial.run_node_graph': {
-    panelId: 'NodeGraphPanel',
-    steps: [stepFor('node-run', 'click', '点击节点 Dock 顶部的“运行”按钮。展示不会真的启动逻辑。')],
   },
 });
 
@@ -569,13 +564,6 @@ const BASICS_TUTORIAL_GUIDANCE = Object.freeze({
     '\u5728\u9ec4\u8272\u9ad8\u4eae\u79ef\u6728\u4e2d\uff0c\u628a\u201c\u901f\u5ea6\u201d\u540e\u9762\u7684\u6570\u5b57\u6539\u4e3a 2\u3002\u6a21\u578b\u540d\u79f0\u8981\u6b63\u786e\uff0c\u65b9\u5411\u8981\u4fdd\u6301\u201c\u5411\u53f3\u201d\u3002',
     { fallbackEn: 'Set Speed to 2 in the yellow-highlighted block. Keep the correct model name and Direction set to Right.', preferFallbackText: true }
   )] }),
-  run_node_graph: basicGuidance(
-    'NodeGraphPanel',
-    { kind: 'selector', selectorKey: 'node-run' },
-    'click',
-    '\u70b9\u51fb\u8282\u70b9\u7a97\u53e3\u4e0a\u65b9\u7684\u201c\u8fd0\u884c\u201d\u6309\u94ae\u4e00\u6b21\u3002\u70b9\u51fb\u540e\uff0c\u6a21\u578b\u4f1a\u5148\u8df3\u5230 X=-3\uff0c\u7136\u540e\u4ee5\u6bcf\u79d2 2 \u4e2a\u5355\u4f4d\u7684\u901f\u5ea6\u6301\u7eed\u5411\u53f3\u79fb\u52a8\u3002\u4efb\u52a1\u5728\u4f60\u70b9\u51fb\u65f6\u7acb\u5373\u5b8c\u6210\u3002',
-    { fallbackEn: 'Click Run once. The model will jump to X=-3 and then keep moving right at two units per second. The task completes immediately when you click.' },
-  ),
   focus_ai_composer: basicGuidance(
     'MainPage',
     { kind: 'selector', selectorKey: 'cabbage-chat-input' },
@@ -656,7 +644,6 @@ const CHAT_GUIDANCE = Object.freeze({
   drag_block: LEGACY_TUTORIAL_GUIDANCE['tutorial.drag_block'].steps[0],
   edit_block_parameter: LEGACY_TUTORIAL_GUIDANCE['tutorial.edit_block_parameter'].steps[0],
   set_transition_condition: LEGACY_TUTORIAL_GUIDANCE['tutorial.set_transition_condition'].steps[0],
-  run_node_graph: LEGACY_TUTORIAL_GUIDANCE['tutorial.run_node_graph'].steps[0],
   import_model: LEGACY_TUTORIAL_GUIDANCE['tutorial.import_model'].steps[0],
   transform_model: LEGACY_TUTORIAL_GUIDANCE['tutorial.transform_model'].steps[0],
   adjust_lighting: LEGACY_TUTORIAL_GUIDANCE['tutorial.adjust_lighting'].steps[0],

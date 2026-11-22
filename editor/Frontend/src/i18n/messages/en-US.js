@@ -96,7 +96,6 @@ export default {
     otherPreviewRunning: 'Another preview is running',
     runGlobalTitle: 'Run the project-wide node logic',
     status: {
-      noRunnableBlocks: 'No runnable blocks',
       previewError: 'Preview error',
       previewFailed: 'Preview failed to start',
       previewRestored: 'Preview settings restored',

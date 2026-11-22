@@ -227,7 +227,7 @@ test('view unmount keeps world scoring alive but does not detach its retirement 
   assert.equal(f.timers.size, 0, 'world retirement still cancels its timer after view unmount');
 });
 
-for (const trigger of ['run_succeeded', 'completedTaskKeys']) {
+for (const trigger of ['node_issue_found', 'completedTaskKeys']) {
   for (const change of ['revision', 'path', 'readiness']) {
     test(`late ${trigger} event cannot start scoring after world ${change} changes`, async t => {
       const f = await fixture(t);
@@ -249,7 +249,7 @@ for (const trigger of ['run_succeeded', 'completedTaskKeys']) {
 
 test('current events still publish their context and start one score update', async t => {
   const f = await fixture(t);
-  const request = f.service.recordEvent({ type: 'run_succeeded' });
+  const request = f.service.recordEvent({ type: 'node_issue_found' });
   await flush();
   f.records[0].resolve({ success: true, context: { worldId: 'First', profile: { score: 30 } } });
   await request;
@@ -261,7 +261,7 @@ test('an event queued behind a native reply is retired before reaching the repla
   const f = await fixture(t);
   const first = f.service.recordEvent({ type: 'panel_opened' });
   await flush();
-  const queued = f.service.recordEvent({ type: 'run_succeeded' });
+  const queued = f.service.recordEvent({ type: 'node_issue_found' });
   f.switchWorld();
   f.records[0].resolve({ success: true });
   await first;

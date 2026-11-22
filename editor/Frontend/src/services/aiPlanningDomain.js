@@ -9,8 +9,6 @@ const signalsByPhase = {
     'block_added',
     'block_parameter_changed',
     'transition_condition_set',
-    'node_graph_run',
-    'run_succeeded',
   ],
   'scene-polish': ['model_imported', 'object_transformed', 'lighting_adjusted', 'physics_adjusted'],
 };
@@ -25,8 +23,6 @@ const guidanceBySignal = {
   block_added: 'drag_block',
   block_parameter_changed: 'edit_block_parameter',
   transition_condition_set: 'set_transition_condition',
-  node_graph_run: 'run_node_graph',
-  run_succeeded: 'run_node_graph',
 };
 const string = (value, limit) =>
   String(value || '')
@@ -125,12 +121,8 @@ export function normalizeGoalPlan(result, context, now = Date.now()) {
     tasks.push(task);
   }
   const nodeTasks = tasks.filter((t) => t.phase === 'node-logic');
-  if (
-    tasks.length < 6 ||
-    nodeTasks.length < 5 ||
-    nodeTasks.at(-1)?.completionSignal !== 'run_succeeded'
-  )
-    throw new Error('至少需要五个节点任务，最后一步必须验证成功运行');
+  if (tasks.length < 6 || nodeTasks.length < 5)
+    throw new Error('至少需要五个节点任务');
   tasks.slice(0, 2).forEach((t) => {
     t.status = 'active';
   });
@@ -143,13 +135,12 @@ export function scoreEligibility(context, force, now = Date.now()) {
     p = context.profile,
     count = Number(m.importantEventCount) || 0,
     last = Number(p.updatedAt) || 0;
-  const high = ['nodeEdits', 'nodeIssueFixes', 'runSuccesses', 'runFailures'].some((k) => m[k] > 0);
+  const high = ['nodeEdits', 'nodeIssueFixes'].some((k) => m[k] > 0);
   const categories = [
     m.modelImports || m.transformEdits,
     m.lightingEdits,
     m.physicsEdits,
     m.nodeEdits || m.nodeErrors || m.nodeIssueFixes,
-    m.runSuccesses || m.runFailures,
   ].filter(Boolean).length;
   if (count < 6 && !high) return 'insufficient_evidence';
   if (categories < 2 && !high) return 'insufficient_categories';
@@ -165,8 +156,6 @@ export function scoreEligibility(context, force, now = Date.now()) {
         'block_added',
         'block_parameter_changed',
         'node_issue_fixed',
-        'run_succeeded',
-        'run_failed',
       ].includes(e.type)
   );
   if (last && count - p.lastScoredEventCount < 5 && !recentHigh) return 'no_material_change';
@@ -192,19 +181,16 @@ export function scoreEvidence(context) {
       : null;
   const ratio = (a, b) => (b ? Math.round((a / b) * 1000) / 1000 : null);
   const events = context.recentOperationEvents.slice(-60),
-    runs = events.filter((e) => ['run_succeeded', 'run_failed'].includes(e.type)),
     m = context.metrics;
   return {
     completedTutorials: completed,
     medianTutorialSeconds: median(durations),
     medianIssueFixSeconds: median(fixes),
-    runSuccessRate: ratio(m.runSuccesses, m.runSuccesses + m.runFailures),
     nodeIssueResolutionRate: ratio(m.nodeIssueFixes, m.nodeErrors),
     recentOperationSuccessRate: ratio(
       events.filter((e) => e.success !== false).length,
       Math.max(1, events.length)
     ),
-    recentRunSuccessRate: ratio(runs.filter((e) => e.type === 'run_succeeded').length, runs.length),
     recentFailedOperations: events.filter((e) => e.success === false).length,
     repeatedIssueKinds: Object.values(context.issueMemory).filter((v) => v.occurrences >= 2).length,
     operationCategoryCount: [
@@ -212,7 +198,6 @@ export function scoreEvidence(context) {
       m.lightingEdits,
       m.physicsEdits,
       m.nodeEdits || m.nodeErrors || m.nodeIssueFixes,
-      m.runSuccesses || m.runFailures,
     ].filter(Boolean).length,
   };
 }

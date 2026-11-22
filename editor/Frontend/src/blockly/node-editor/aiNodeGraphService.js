@@ -113,7 +113,7 @@ export function validateGeneratedNodeGraphResult(result) {
     throw new Error(`targetId 必须为 ${PROJECT_NODE_GRAPH_TARGET_ID}`);
   }
   if (Object.prototype.hasOwnProperty.call(result, 'generatedCode') || Object.prototype.hasOwnProperty.call(result, 'GeneratedCode')) {
-    throw new Error('内部 AI 不得提供 Python；代码必须由 nodeGraphToCode 从可见积木生成');
+    throw new Error('内部 AI 不得提供 Python；逻辑必须由可见积木承载');
   }
 
   const cloned = cloneJson(result);
@@ -225,7 +225,7 @@ export async function getGeneratedNodeGraphSnapshot({ timeoutMs = 2500 } = {}) {
 
 /**
  * Apply an internal AI result to the mounted project graph. The mounted editor performs
- * compilation, persistence, and rollback. Detached Dock windows are reached through the
+ * validation, persistence, and rollback. Detached Dock windows are reached through the
  * shared Web message module; no C++ interface or file import route is involved.
  */
 export async function applyGeneratedNodeGraph(result, { timeoutMs = 12000 } = {}) {

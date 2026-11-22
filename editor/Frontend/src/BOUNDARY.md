@@ -14,7 +14,7 @@
 |---|---|---|---|
 | `api/` | active contract adapter | 引用原生 typed V8 方法、提供公共聚合接口；未迁移方法仍保留 manifest adapter；见 [`api/BOUNDARY.md`](api/BOUNDARY.md) | 不删除公共契约；单个方法迁移需有 caller 和回归证据 |
 | `assets/` | static assets | 前端静态图片、样式和运行时资源 | 所有引用迁移且构建产物回归通过 |
-| `blockly/` | active editor/compiler | Blockly/Scratch、节点图 UI、受限 Script Runtime 代码生成 | 见 [`blockly/BOUNDARY.md`](blockly/BOUNDARY.md) |
+| `blockly/` | active editor | Blockly/Scratch、节点图 UI | 见 [`blockly/BOUNDARY.md`](blockly/BOUNDARY.md) |
 | `components/` | active UI | 可复用 Dock、面板和通用 UI 组件；不反向依赖路由级页面 | 调用方迁移到新 UI 且完成视觉/交互回归 |
 | `composables/` | active UI state | 跨组件可复用的 Vue composition 行为 | 对应状态/行为由明确 owner 吸收后删除 |
 | `config/` | active configuration | 插件面板元数据、应用和静态前端配置；不得静态导入 Vue 组件 | 配置 owner 合并且构建/启动回归通过 |

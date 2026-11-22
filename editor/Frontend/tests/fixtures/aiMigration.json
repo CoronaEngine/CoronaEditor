@@ -580,20 +580,6 @@
       ]
     },
     {
-      "task": "tutorial.basics.run_graph",
-      "event": {
-        "type": "run_clicked",
-        "details": {
-          "source": "user"
-        },
-        "success": true,
-        "timestamp": 134000
-      },
-      "completed": [
-        "tutorial.basics.run_graph"
-      ]
-    },
-    {
       "task": "tutorial.basics.focus_ai_composer",
       "event": {
         "type": "ai_composer_focused",
@@ -716,7 +702,6 @@
     "tutorial.basics.set_move_model",
     "tutorial.basics.set_move_direction",
     "tutorial.basics.set_move_speed",
-    "tutorial.basics.run_graph",
     "tutorial.basics.focus_ai_composer",
     "tutorial.basics.ask_ai",
     "tutorial.basics.modify_with_ai",

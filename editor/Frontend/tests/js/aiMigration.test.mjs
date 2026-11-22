@@ -52,7 +52,7 @@ function mockTransport(handler) {
 const { aiWorkflows } = await import('../../src/services/aiWorkflows.js');
 const { worldModeState } = await import('../../src/services/worldModeService.js');
 
-test('all 39 tutorial steps complete in the legacy order with identical bindings', () => {
+test('all 38 tutorial steps complete in the legacy order with identical bindings', () => {
   const f = fixture('aiMigration.json'),
     context = normalizeContext(null, 'E:/World/FixtureWorld', 100000);
   for (const step of f.tutorialSteps) {
@@ -75,7 +75,7 @@ test('all 39 tutorial steps complete in the legacy order with identical bindings
     0
   );
 });
-test('59 recorded ordinary-chat inputs retain identical final messages and guidance', () => {
+test('57 recorded ordinary-chat inputs retain identical final messages and guidance', () => {
   for (const record of fixture('aiChatMigration.json')) {
     const request = buildCabbageChatRequest(record.input);
     assert.deepEqual(request.modelMessages, record.messages, record.id);
@@ -251,7 +251,7 @@ const samplePlan = () => ({
     'block_added',
     'block_parameter_changed',
     'nodes_connected',
-    'run_succeeded',
+    'transition_condition_set',
     'model_imported',
   ].map((signal, i) => ({
     phase: i < 5 ? 'node-logic' : 'scene-polish',

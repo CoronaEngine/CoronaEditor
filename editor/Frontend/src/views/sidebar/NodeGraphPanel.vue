@@ -26,7 +26,7 @@ function selectTarget(target) {
   actorName.value = target.actorName;
 }
 const workspaceRef = ref(null);
-let closeStopPromise = null;
+let closePromise = null;
 let unsubscribeViewportControls = null;
 const viewportRequests = new globalThis.AbortController();
 
@@ -42,14 +42,14 @@ function requestViewportState() {
     .then(applyViewportState).catch(() => {});
 }
 
-function stopNodeRunForClose() {
-  if (!closeStopPromise) {
-    closeStopPromise = Promise.resolve(workspaceRef.value?.stopForPanelClose?.());
+function markWorkspaceClosing() {
+  if (!closePromise) {
+    closePromise = Promise.resolve(workspaceRef.value?.markPanelClosing?.());
   }
-  return closeStopPromise;
+  return closePromise;
 }
 function handleWindowClosing() {
-  stopNodeRunForClose().catch(() => {});
+  markWorkspaceClosing().catch(() => {});
 }
 
 onMounted(() => {
@@ -66,7 +66,7 @@ onBeforeUnmount(() => {
   viewportRequests.abort();
   window.removeEventListener('pagehide', handleWindowClosing);
   window.removeEventListener('beforeunload', handleWindowClosing);
-  stopNodeRunForClose().catch(() => {});
+  markWorkspaceClosing().catch(() => {});
 });
 
 </script>

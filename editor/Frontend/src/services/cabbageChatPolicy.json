@@ -13,7 +13,7 @@
       "fallbackSteps": [
         "先确认当前要完成的目标和出现问题的位置",
         "检查对应对象、节点、积木或连线是否已经选中并正确连接",
-        "完成修改后重新运行或等待下一次节点审查确认结果"
+        "完成修改后保存并等待下一次节点审查确认结果"
       ]
     },
     "en-US": {
@@ -29,7 +29,7 @@
       "fallbackSteps": [
         "First confirm the current goal and where the problem appears",
         "Check that the relevant object, node, block, or connection is selected and connected correctly",
-        "After editing, run again or wait for the next node review to confirm the result"
+        "After editing, save and wait for the next node review to confirm the result"
       ]
     }
   },
@@ -182,19 +182,6 @@
         "Place a Boolean-returning block in the condition editor",
         "Keep exactly one complete return expression in the condition area"
       ]
-    },
-    "tutorial.run_node_graph": {
-      "intent": "run_node_graph",
-      "zh-CN": [
-        "确认开始节点已经连接到后续节点",
-        "找到节点 Dock 顶部的运行按钮",
-        "点击运行并观察逻辑是否正常执行"
-      ],
-      "en-US": [
-        "Confirm that the Start node is connected to the following node",
-        "Find Run at the top of the Nodes dock",
-        "Click Run and observe whether the logic executes correctly"
-      ]
     }
   },
   "issueGuides": {
@@ -204,13 +191,13 @@
         "打开节点 Dock 并选中包含操作积木的节点",
         "找到操作积木的对象输入口",
         "连接“对象[]”积木并选择场景中的目标物体",
-        "运行节点逻辑确认目标物体能够响应"
+        "保存后检查对象引用，确认积木使用的是场景中真实存在的物体"
       ],
       "en-US": [
         "Open the Nodes dock and select the node containing the operation block",
         "Find the object input on the operation block",
         "Connect an Object [] block and select the target object from the scene",
-        "Run the node logic and confirm that the target object responds"
+        "After saving, check the object reference and confirm the block uses an object that exists in the scene"
       ]
     },
     "actor_target_not_found": {
@@ -397,14 +384,6 @@
       ],
       "also": [],
       "guide": "tutorial.edit_block_parameter"
-    },
-    {
-      "any": [
-        "运行节点",
-        "节点运行"
-      ],
-      "also": [],
-      "guide": "tutorial.run_node_graph"
     },
     {
       "any": [

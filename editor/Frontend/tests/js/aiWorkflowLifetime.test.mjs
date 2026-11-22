@@ -214,7 +214,7 @@ test('reopening a cancelled goal regenerates it instead of polling its cancelled
       flow: ['Enter', 'Move', 'Verify'], nodeEffects: ['enter', 'move'].map(effectId => ({
         effectId, title: effectId, description: 'Apply effect', verification: 'Visible result', recommendedBlockTypes: ['node_when_enter'],
       })) },
-    tasks: ['node_created', 'block_added', 'block_parameter_changed', 'nodes_connected', 'run_succeeded', 'model_imported']
+    tasks: ['node_created', 'block_added', 'block_parameter_changed', 'nodes_connected', 'transition_condition_set', 'model_imported']
       .map((completionSignal, index) => ({ phase: index < 5 ? 'node-logic' : 'scene-polish',
         effectId: index < 5 ? (index % 2 ? 'enter' : 'move') : '', title: 'Task ' + index,
         message: 'Do it', suggestion: 'Apply', completionCriteria: 'Verify', completionSignal,
