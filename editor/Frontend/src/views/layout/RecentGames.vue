@@ -190,6 +190,12 @@ const handleOpenProject = async (path, project = null) => {
       if (!lifetime.current() || isProjectOpenSuperseded(result)) return;
       opened = result;
     }
+    if (opened?.status === 'scene_commit_failed') {
+      // 存档解析成功、但引擎没创建出实体（tick 边界未结算）：这不是"存档坏了"，
+      // 提示要指向引擎侧原因，并且不进入场景（半装载的场景比打不开更糟）。
+      window.alert(`场景装载失败：引擎未能创建实体，场景未打开。\n${archiveDiagnostics(opened)}`);
+      return;
+    }
     if (opened?.status === 'invalid_archive') {
       window.alert(`无法打开存档：\n${archiveDiagnostics(opened)}`);
       return;

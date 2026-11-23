@@ -128,3 +128,25 @@ test('declining direct open diagnostics leaves the project unopened', async t =>
   assert.equal(opens, 1);
   assert.deepEqual(page.routes, []);
 });
+
+test('a structural commit failure shows its own message and does not open the scene', async t => {
+  const alerts = [];
+  const page = mount(t, { open_project: async path => ({
+    ok: false,
+    status: 'scene_commit_failed',
+    path,
+    diagnostics: [{
+      stage: 'structural_commit',
+      code: 'ENTITY_CREATE_FAILED',
+      message: "engine entity create failed while materializing actor 'Chair' (route 'chair.ply'): actor did not settle",
+      path: 'world',
+    }],
+  }) });
+  window.alert = message => { alerts.push(message); };
+  await page.ready;
+  await page.state.handleOpenProject('world');
+  assert.equal(alerts.length, 1, 'the user is told the scene did not open');
+  assert.ok(alerts[0].includes('场景装载失败'), alerts[0]);
+  assert.ok(alerts[0].includes('did not settle'), alerts[0]);
+  assert.deepEqual(page.routes, [], 'a structural commit failure never enters the scene');
+});
