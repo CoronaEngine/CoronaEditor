@@ -74,47 +74,81 @@ const editorApiStatic = {
     dispatch: (sceneName, cameraId, event) => window.corona.input.dispatch(sceneName, cameraId, event),
   },
   scene: {
-    read_scene: request => window.corona.scene.read_scene(request),
-    read_actor_rig: (sceneName, actor, scope) => window.corona.scene.read_actor_rig(sceneName, actor, scope),
-    select_actor: (sceneName, actorType, actorName, context = null) =>
-      context ? window.corona.scene.select_actor(sceneName, actorType, actorName, context)
-        : window.corona.scene.select_actor(sceneName, actorType, actorName),
-    create_camera: (sceneName, options) => window.corona.scene.create_camera(sceneName, options),
-    read_active: () => window.corona.scene.read_active(),
-    select_model_file: (sceneName, fileType = 'model', scope) =>
-      window.corona.scene.select_model_file(sceneName, { ...(scope || {}), file_type: fileType }),
-    create_actor: (sceneName, path, options) => window.corona.scene.create_actor(sceneName, path, options),
-    import_resource_file: (sceneName, fileType = 'model', scope) =>
-      window.corona.scene.import_resource_file(sceneName, { ...(scope || {}), file_type: fileType }),
-    read_actor_properties: (sceneName, actor, scope) => window.corona.scene.read_actor_properties(sceneName, actor, scope),
-    read_model_nodes: (sceneName, options) => window.corona.scene.read_model_nodes(sceneName, options),
-    set_model_node_state: (identity, patch) => window.corona.scene.set_model_node_state(identity, patch),
-    set_actor_ik_chains: (sceneName, actor, chains, expectedRevision, scope) => expectedRevision === undefined
-      ? window.corona.scene.set_actor_ik_chains(sceneName, actor, chains, scope)
-      : window.corona.scene.set_actor_ik_chains(sceneName, actor, chains, expectedRevision, scope),
-    read_transforms: (session, actors) => window.corona.scene.read_transforms({ archive_session: session, actors }),
-    set_actor_transform: (sceneName, actorName, transform) =>
-      window.corona.scene.set_actor_transform(sceneName, actorName, transform),
-    update_actor: (sceneName, actorName, patch) =>
-      window.corona.scene.update_actor(sceneName, actorName, patch),
-    delete_actor: (sceneName, actor, scope) =>
-      window.corona.scene.delete_actor(sceneName, actor, scope),
+    // Bridge for the nine call sites that still ask for a projection (`actors: 'index' | 'tree' |
+    // 'context'`, `cameras: true`). It composes the four read_* operations and merges their
+    // answers, so no native method is reached by a retired name; the call sites migrate next.
+    read_scene: async request => {
+      const { actors: projection, cameras, ...scope } = request || {};
+      const reader = projection === 'tree' ? 'read_scene_tree'
+        : projection === 'context' ? 'read_scene_context'
+          : projection === 'index' ? 'read_scene_index' : null;
+      const [actors, cameraList] = await Promise.all([
+        reader ? window.corona.scene[reader](scope) : Promise.resolve(null),
+        cameras ? window.corona.scene.read_cameras(scope) : Promise.resolve(null),
+      ]);
+      const base = actors || cameraList || {};
+      return {
+        ...base,
+        ...(actors ? { actors: actors.actors } : {}),
+        ...(cameraList ? { cameras: cameraList.cameras, active_camera_id: cameraList.active_camera_id } : {}),
+      };
+    },    // One object per call: the keys are the C++ request fields, so a wrapper never invents a
+    // positional protocol the native side does not have. `scope` is `{ archive_session }`.
+    read_active: () => window.corona.scene.read_active({}),
+    read_scene_tree: (sceneName, scope) => window.corona.scene.read_scene_tree({ ...(scope || {}), scene: sceneName }),
+    read_scene_index: (sceneName, scope) => window.corona.scene.read_scene_index({ ...(scope || {}), scene: sceneName }),
+    read_scene_context: (sceneName, scope) => window.corona.scene.read_scene_context({ ...(scope || {}), scene: sceneName }),
+    read_cameras: (sceneName, scope) => window.corona.scene.read_cameras({ ...(scope || {}), scene: sceneName }),
+    read_environment: (sceneName, scope) => window.corona.scene.read_environment({ ...(scope || {}), scene: sceneName }),
+    set_environment: (sceneName, patch) => window.corona.scene.set_environment({ scene: sceneName, ...(patch || {}) }),
+    read_model_nodes: (sceneName, options) => window.corona.scene.read_model_nodes({ scene: sceneName, ...(options || {}) }),
+    set_model_node_state: (identity, patch) => window.corona.scene.set_model_node_state({ ...(identity || {}), ...(patch || {}) }),
+    create_actor: (sceneName, path, options) => window.corona.scene.create_actor({ scene: sceneName, path, ...(options || {}) }),
     rebind_actor_resource: (sceneName, actorGuid, path, scope) =>
-      window.corona.scene.rebind_actor_resource(sceneName, actorGuid, path, scope),
-    save: (sceneName, scope) => window.corona.scene.save(sceneName, scope),
-    focus_actor: (sceneName, actorName, cameraId, scope) => window.corona.scene.focus_actor(sceneName, actorName, cameraId, scope),
-    update_camera: (sceneName, cameraId, patch) => window.corona.scene.update_camera(sceneName, cameraId, patch),
-    set_camera_render_settings: (sceneName, cameraId, patch) =>
-      window.corona.scene.set_camera_render_settings(sceneName, cameraId, patch),
-    read_camera_render_settings: (sceneName, cameraId, scope) =>
-      window.corona.scene.read_camera_render_settings(sceneName, cameraId, scope),
+      window.corona.scene.rebind_actor_resource({ ...(scope || {}), scene: sceneName, actor_guid: actorGuid, path }),
+    update_actor: (sceneName, actorName, patch) =>
+      window.corona.scene.update_actor({ scene: sceneName, actor: actorName, ...(patch || {}) }),
+    read_actor_properties: (sceneName, actor, scope) =>
+      window.corona.scene.read_actor_properties({ ...(scope || {}), scene: sceneName, actor }),
+    select_actor: (sceneName, actorType, actorName, context = null) =>
+      window.corona.scene.select_actor({ ...(context || {}), scene: sceneName, actor_type: actorType, actor: actorName }),
+    delete_actor: (sceneName, actor, scope) =>
+      window.corona.scene.delete_actor({ ...(scope || {}), scene: sceneName, actor }),
+    read_actor_rig: (sceneName, actor, scope) =>
+      window.corona.scene.read_actor_rig({ ...(scope || {}), scene: sceneName, actor }),
+    set_actor_ik_chains: (sceneName, actor, chains, expectedRevision, scope) =>
+      window.corona.scene.set_actor_ik_chains({
+        ...(scope || {}),
+        scene: sceneName,
+        actor,
+        chains,
+        ...(expectedRevision === undefined ? {} : { expected_revision: expectedRevision }),
+      }),
+    set_actor_transform: (sceneName, actorName, transform) =>
+      window.corona.scene.set_actor_transform({ scene: sceneName, actor: actorName, ...(transform || {}) }),
+    read_transforms: (session, actors) => window.corona.scene.read_transforms({ archive_session: session, actors }),
+    create_camera: (sceneName, options) => window.corona.scene.create_camera({ scene: sceneName, ...(options || {}) }),
+    update_camera: (sceneName, cameraId, patch) =>
+      window.corona.scene.update_camera({ scene: sceneName, camera_id: cameraId, ...(patch || {}) }),
     delete_camera: (sceneName, cameraId, scope) =>
-      window.corona.scene.delete_camera(sceneName, cameraId, scope),
-    read_environment: (sceneName, scope) => window.corona.scene.read_environment(sceneName, scope),
-    set_environment: (sceneName, patch) => window.corona.scene.set_environment(sceneName, patch),
-    // The identity decides what plays: a resource id, or an actor of a scene.
+      window.corona.scene.delete_camera({ ...(scope || {}), scene: sceneName, camera_id: cameraId }),
+    read_camera_render_settings: (sceneName, cameraId, scope) =>
+      window.corona.scene.read_camera_render_settings({ ...(scope || {}), scene: sceneName, camera_id: cameraId }),
+    set_camera_render_settings: (sceneName, cameraId, patch) =>
+      window.corona.scene.set_camera_render_settings({ scene: sceneName, camera_id: cameraId, ...(patch || {}) }),
+    focus_actor: (sceneName, actorName, cameraId, scope) =>
+      window.corona.scene.focus_actor({ ...(scope || {}), scene: sceneName, actor: actorName, camera_id: cameraId }),
     play_audio: (identity, options = {}) => window.corona.scene.play_audio({ ...identity, ...options }),
     stop_audio: identity => window.corona.scene.stop_audio({ ...identity }),
+    play_actor_audio: (sceneName, actor, scope) =>
+      window.corona.scene.play_actor_audio({ ...(scope || {}), scene: sceneName, actor }),
+    stop_actor_audio: (sceneName, actor, scope) =>
+      window.corona.scene.stop_actor_audio({ ...(scope || {}), scene: sceneName, actor }),
+    save: (sceneName, scope) => window.corona.scene.save({ ...(scope || {}), scene: sceneName }),
+    select_model_file: (sceneName, fileType = 'model', scope) =>
+      window.corona.scene.select_model_file({ ...(scope || {}), scene: sceneName, file_type: fileType }),
+    import_resource_file: (sceneName, fileType = 'model', scope) =>
+      window.corona.scene.import_resource_file({ ...(scope || {}), scene: sceneName, file_type: fileType }),
   },
   window: {
     // One verb for "close a window"; the identity decides which. No argument = this one.
@@ -134,7 +168,7 @@ const editorApiStatic = {
     configure: (sceneName, cameraId, patch) => window.corona.viewport.configure(sceneName, cameraId, patch),
     // A capture is a viewport operation, not scene state.
     capture_screenshot: (sceneName, cameraId, options) =>
-      window.corona.viewport.capture_screenshot(sceneName, cameraId, options),
+      window.corona.viewport.capture_screenshot({ scene: sceneName, camera_id: cameraId, ...(options || {}) }),
   },
   projectFiles: {
     save: request => bridgeCall('project_files', 'save', [request]),
@@ -148,7 +182,7 @@ const editorApiStatic = {
       [{ ...request, revision_only: true }]),
     // The projection is composed here from the scene primitive plus archive metadata.
     getActiveProjectInfo: async () => {
-      const active = await window.corona.scene.read_active();
+      const active = await window.corona.scene.read_active({});
       if (active.read_only) {
         return { name: active.name, mode: 'creative', project_path: active.project_path,
           read_only: true, source_path: active.project_path, archive_session: active.archive_session };
