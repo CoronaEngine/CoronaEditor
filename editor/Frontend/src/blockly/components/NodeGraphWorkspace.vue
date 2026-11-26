@@ -2185,8 +2185,8 @@ async function selectTarget(event) {
       if (!current() || active.archive_session !== archive) return;
       sceneName = active.scene;
     }
-    const scene = await editorApi.scene.read_scene({ archive_session: archive, scene: sceneName, actors: 'index' });
-    if (!current() || scene.archive_session !== archive) return;
+    const scene = await editorApi.scene.read_scene_index({ archive_session: archive, scene: sceneName });
+    if (!current() || scene.archive_session !== archive || scene.scene !== sceneName) return;
     const route = scene.scene;
     if (actorName && (!route || !scene.actors?.some(actor => actor.name === actorName))) {
       throw new Error('编辑目标已不在当前场景');
@@ -2574,11 +2574,8 @@ async function refreshSceneActorOptions({ rescan = false } = {}) {
       if (!current() || active.archive_session !== archive) return false;
       requestedSceneName = String(active.scene || '').trim();
     }
-    const response = await editorApi.scene.read_scene({ archive_session: archive, scene: requestedSceneName, actors: 'context' });
+    const response = await editorApi.scene.read_scene_context({ archive_session: archive, scene: requestedSceneName });
     if (!current() || response?.archive_session !== archive || response?.scene !== requestedSceneName) return false;
-    if (response?.success === false || response?.status === 'error') {
-      throw new Error(response?.message || 'Actor tree query failed');
-    }
     if (!Array.isArray(response.actors)) throw new Error('Actor tree response has no actor list');
     const actorsByName = new Map();
     actorRecordsFromSceneTree(response.actors).forEach((actor) => {

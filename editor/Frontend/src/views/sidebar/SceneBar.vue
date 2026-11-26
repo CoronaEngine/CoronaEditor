@@ -853,7 +853,7 @@ const RefreshRenderBackendState = async () => {
     const archive = archiveSession.value;
     const current = () => viewLifetime.current() && scene === currentSceneName.value && archive === archiveSession.value;
     if (!scene || !archive) return;
-    const cameraResult = await editorApi.scene.read_scene({ archive_session: archive, scene: scene, cameras: true });
+    const cameraResult = await editorApi.scene.read_cameras({ archive_session: archive, scene: scene });
     if (!current() || sequence !== renderBackendSequence || cameraResult.archive_session !== archive || cameraResult.scene !== scene) return;
     const target = getTargetCamera();
     const camera = cameraResult.cameras?.find(item => item.camera_id === target?.camera_id);
@@ -1025,7 +1025,11 @@ const OnInitObjTree = async () => {
   const current = () => viewLifetime.current() && requestSeq === sceneTreeRequestSeq
     && sceneName === currentSceneName.value && archive === archiveSession.value;
   try {
-    const data = await editorApi.scene.read_scene({ archive_session: archive, scene: sceneName, actors: 'tree', cameras: true });
+    const [tree, cameraList] = await Promise.all([
+        editorApi.scene.read_scene_tree({ archive_session: archive, scene: sceneName }),
+        editorApi.scene.read_cameras({ archive_session: archive, scene: sceneName }),
+      ]);
+      const data = { ...tree, cameras: cameraList?.cameras ?? [], active_camera_id: cameraList?.active_camera_id ?? '' };
     if (!current() || data.archive_session !== archive || data.scene !== sceneName) return;
     const nextActors = Array.isArray(data.actors)
       ? data.actors.map((item) => ({
@@ -1034,13 +1038,20 @@ const OnInitObjTree = async () => {
           actor_version: Number(item.actor_version || 1),
           archive_session: archive,
           model_node_count: Number(item.model_node_count || 0),
-          path: item.path,
-          type: item.type || 'obj',
+          path: item.route,
+          type: item.actor_type || 'obj',
           visible: item.visible !== false,
-          handle: normalizeHandle(item.opaque_handle),
+          handle: normalizeHandle(item.handle),
           audioResourceId: item.audio_resource_id || '',
           load_status: item.load_status || 'loaded',
-          load_error: item.load_error || null,
+          load_error: item.load_error_code
+          ? {
+            code: item.load_error_code,
+            message: item.load_error_message || '',
+            resource_path: item.load_error_resource_path || '',
+            path: item.load_error_path || '',
+          }
+          : null,
         }))
       : [];
     // Commit the full snapshot atomically.  A failed or stale refresh keeps
@@ -1171,7 +1182,7 @@ const RefreshCameraListOnly = async () => {
   }
   cameraListRefreshInFlight = true;
   try {
-    const data = await editorApi.scene.read_scene({ archive_session: archive, scene: scene, cameras: true });
+    const data = await editorApi.scene.read_cameras({ archive_session: archive, scene: scene });
     if (!current() || data.archive_session !== archive || data.scene !== scene) return;
     if (Array.isArray(data?.cameras)) {
       applyCameraList(data.cameras);

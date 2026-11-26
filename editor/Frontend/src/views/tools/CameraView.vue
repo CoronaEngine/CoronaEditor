@@ -257,11 +257,11 @@ const viewportUiModeItems = [
 
 const loadCamera = async () => {
   if (!cameraArchiveSession || !viewLifetime.current()) return false;
-  const listResult = await editorApi.scene.read_scene({ archive_session: cameraArchiveSession, scene: sceneId, cameras: true });
+  const listResult = await editorApi.scene.read_cameras({ archive_session: cameraArchiveSession, scene: sceneId });
   if (!viewLifetime.current() || listResult.archive_session !== cameraArchiveSession || listResult.scene !== sceneId) return false;
   const payload = listResult;
   camera.value = payload?.cameras?.find(
-    (item) => String(item.camera_id || item.id) === cameraId,
+    (item) => String(item.camera_id) === cameraId,
   );
   if (!camera.value) throw new Error(`Camera ${cameraId} was not found`);
   cameraName.value = camera.value.name;

@@ -20,8 +20,10 @@ function mount(t, overrides = {}) {
   const api = namespace => new Proxy({}, { get: (_, method) => (...args) => {
     calls.push({ method, args });
     if (overrides[method]) return overrides[method](...args);
-    if (method === 'read_scene') return Promise.resolve({ archive_session: args[0].archive_session,
-      scene: args[0].scene, actors: [{ name: 'Probe', actor_guid: 'actor', type: 'model' }], cameras: [] });
+    if (method === 'read_cameras') return Promise.resolve({ archive_session: args[0].archive_session,
+      scene: args[0].scene, active_camera_id: 'camera', cameras: [] });
+      if (method === 'read_scene_tree') return Promise.resolve({ archive_session: args[0].archive_session,
+        scene: args[0].scene, tree_revision: 1, actors: [{ name: 'Probe', actor_guid: 'actor', actor_type: 'model' }] });
     if (method === 'create_camera') return Promise.resolve({ camera: { name: 'New', camera_id: 'new-camera' } });
     return Promise.resolve(namespace === 'window' ? {} : { ok: true });
   } });
@@ -111,7 +113,7 @@ for (const retirement of ['unmount', 'archive', 'scene']) {
     const deleting = page.state.DeleteActor(page.actor);
     retire(page); pending.resolve({ actor_guid: 'actor' }); await deleting;
     assert.equal(page.state.selectedItem.value, 'Probe');
-    assert.equal(page.calls.filter(call => call.method === 'read_scene').length, 0);
+    assert.equal(page.calls.filter(call => call.method.startsWith('read_')).length, 0);
   });
 
   for (const [method, pendingMethod, argumentsFor] of [
@@ -120,7 +122,7 @@ for (const retirement of ['unmount', 'archive', 'scene']) {
     ['RebindActorResource', 'select_model_file', page => [page.actor]],
     ['TakeScreenshot', 'capture_screenshot', () => []],
     ['focusActorFromList', 'focus_actor', page => [page.actor]],
-    ['RefreshRenderBackendState', 'read_scene', () => []],
+    ['RefreshRenderBackendState', 'read_cameras', () => []],
   ]) {
     test(`SceneBar ${method} late failure is ignored after ${retirement}`, async t => {
       const pending = deferred(), page = mount(t, { [pendingMethod]: () => pending.promise });
@@ -135,7 +137,7 @@ for (const retirement of ['unmount', 'archive', 'scene']) {
     const creating = page.state.ImportCamera();
     await setImmediate(); retire(page); pending.resolve({}); await creating;
     assert.equal(page.state.selectedCameraName.value, 'Camera');
-    assert.equal(page.calls.filter(call => call.method === 'read_scene').length, 0);
+    assert.equal(page.calls.filter(call => call.method.startsWith('read_')).length, 0);
   });
 
   test(`SceneBar rebind reply cannot alert or refresh after ${retirement}`, async t => {
@@ -144,7 +146,7 @@ for (const retirement of ['unmount', 'archive', 'scene']) {
     const rebinding = page.state.RebindActorResource(page.actor);
     await setImmediate(); retire(page); pending.resolve({ ok: false }); await rebinding;
     assert.deepEqual(page.errors, []);
-    assert.equal(page.calls.filter(call => call.method === 'read_scene').length, 0);
+    assert.equal(page.calls.filter(call => call.method.startsWith('read_')).length, 0);
   });
 }
 
@@ -187,14 +189,14 @@ test('SceneBar live camera deletion keeps close, retirement wait, delete and ref
   const page = mount(t);
   const deleting = page.state.DeleteCamera(page.camera);
   await setImmediate(); await page.tick(); await deleting;
-  assert.deepEqual(page.calls.map(call => call.method), ['closeCameraView', 'delete_camera', 'read_scene']);
+  assert.deepEqual(page.calls.map(call => call.method), ['closeCameraView', 'delete_camera', 'read_scene_tree', 'read_cameras']);
   assert.deepEqual(page.calls[1].args, ['scene.ini', 'camera', { archive_session: 'archive' }]);
 });
 
 test('SceneBar live camera creation still opens exactly one surface', async t => {
   const page = mount(t);
   await page.state.ImportCamera();
-  assert.deepEqual(page.calls.map(call => call.method), ['create_camera', 'createCameraView', 'read_scene']);
+  assert.deepEqual(page.calls.map(call => call.method), ['create_camera', 'createCameraView', 'read_scene_tree', 'read_cameras']);
 });
 
 
@@ -217,7 +219,7 @@ test('SceneBar canceled resource chooser leaves the actor untouched', async t =>
 test('SceneBar live rebind preserves actor GUID and archive through refresh', async t => {
   const page = mount(t, { select_model_file: async () => 'replacement.ply' });
   await page.state.RebindActorResource(page.actor);
-  assert.deepEqual(page.calls.map(call => call.method), ['select_model_file', 'rebind_actor_resource', 'read_scene']);
+  assert.deepEqual(page.calls.map(call => call.method), ['select_model_file', 'rebind_actor_resource', 'read_scene_tree', 'read_cameras']);
   assert.deepEqual(page.calls[1].args, ['scene.ini', 'actor', 'replacement.ply', { archive_session: 'archive' }]);
   assert.deepEqual(page.errors, []);
 });
@@ -242,6 +244,6 @@ test('SceneBar current actor deletion clears its selection and refreshes', async
   page.state.selectedItem.value = 'Probe';
   await page.state.DeleteActor(page.actor);
   assert.equal(page.state.selectedItem.value, null);
-  assert.deepEqual(page.calls.map(call => call.method), ['delete_actor', 'read_scene']);
+  assert.deepEqual(page.calls.map(call => call.method), ['delete_actor', 'read_scene_tree', 'read_cameras']);
   assert.deepEqual(page.errors, []);
 });

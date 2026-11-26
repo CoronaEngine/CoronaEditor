@@ -74,31 +74,12 @@ const editorApiStatic = {
     dispatch: (sceneName, cameraId, event) => window.corona.input.dispatch(sceneName, cameraId, event),
   },
   scene: {
-    // Bridge for the nine call sites that still ask for a projection (`actors: 'index' | 'tree' |
-    // 'context'`, `cameras: true`). It composes the four read_* operations and merges their
-    // answers, so no native method is reached by a retired name; the call sites migrate next.
-    read_scene: async request => {
-      const { actors: projection, cameras, ...scope } = request || {};
-      const reader = projection === 'tree' ? 'read_scene_tree'
-        : projection === 'context' ? 'read_scene_context'
-          : projection === 'index' ? 'read_scene_index' : null;
-      const [actors, cameraList] = await Promise.all([
-        reader ? window.corona.scene[reader](scope) : Promise.resolve(null),
-        cameras ? window.corona.scene.read_cameras(scope) : Promise.resolve(null),
-      ]);
-      const base = actors || cameraList || {};
-      return {
-        ...base,
-        ...(actors ? { actors: actors.actors } : {}),
-        ...(cameraList ? { cameras: cameraList.cameras, active_camera_id: cameraList.active_camera_id } : {}),
-      };
-    },    // One object per call: the keys are the C++ request fields, so a wrapper never invents a
     // positional protocol the native side does not have. `scope` is `{ archive_session }`.
     read_active: () => window.corona.scene.read_active({}),
-    read_scene_tree: (sceneName, scope) => window.corona.scene.read_scene_tree({ ...(scope || {}), scene: sceneName }),
-    read_scene_index: (sceneName, scope) => window.corona.scene.read_scene_index({ ...(scope || {}), scene: sceneName }),
-    read_scene_context: (sceneName, scope) => window.corona.scene.read_scene_context({ ...(scope || {}), scene: sceneName }),
-    read_cameras: (sceneName, scope) => window.corona.scene.read_cameras({ ...(scope || {}), scene: sceneName }),
+    read_scene_tree: request => window.corona.scene.read_scene_tree(request),
+    read_scene_index: request => window.corona.scene.read_scene_index(request),
+    read_scene_context: request => window.corona.scene.read_scene_context(request),
+    read_cameras: request => window.corona.scene.read_cameras(request),
     read_environment: (sceneName, scope) => window.corona.scene.read_environment({ ...(scope || {}), scene: sceneName }),
     set_environment: (sceneName, patch) => window.corona.scene.set_environment({ scene: sceneName, ...(patch || {}) }),
     read_model_nodes: (sceneName, options) => window.corona.scene.read_model_nodes({ scene: sceneName, ...(options || {}) }),

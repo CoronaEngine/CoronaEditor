@@ -37,7 +37,7 @@ test('a current selection still opens Object when the transform read fails', asy
 for (const scope of ['unmount', 'scene', 'archive']) test(`selection entry rejects ${scope} before publishing or reading`, async t => {
   const h = await mount(t);
   let reads = 0, events = 0;
-  h.api.scene.read_scene.projections.index = h.api.scene.read_actor_properties = async () => { reads++; return snapshot([]); };
+  h.api.scene.projections.index = h.api.scene.read_actor_properties = async () => { reads++; return snapshot([]); };
   h.bus.on('model-node-selection', () => events++);
   if (scope === 'unmount') h.unmount();
   const payload = { ...selection('A'), actor_name: 'A', node_index: 1 };
