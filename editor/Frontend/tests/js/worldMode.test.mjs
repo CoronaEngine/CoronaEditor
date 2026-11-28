@@ -5,6 +5,7 @@ import { setImmediate } from 'node:timers';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createWorldModeController, createWorldModeRouteGuard, normalizeWorldMode, normalizeProjectPath, requireProjectInfo, worldModeService } from '../../src/services/worldModeService.js';
+import { trackWorldSessionWork, drainWorldSession } from '../../src/services/worldSessionLifecycle.js';
 import { editorApi } from '../../src/api/editorApi.js';
 
 test.beforeEach(t => t.mock.method(editorApi.network, 'stop_session', async () => ({ ok: true })));
@@ -13,6 +14,18 @@ import { projectLauncherService, resolveOpenedProjectScene, stopWorldRuntimeBefo
 
 const deferred = () => { let resolve, reject; const promise = new Promise((yes, no) => { resolve = yes; reject = no; }); return { promise, resolve, reject }; };
 const info = (path, mode) => ({ project_path: path, mode });
+
+test('world replacement waits for outstanding work in the previous world', async () => {
+  const pending = deferred();
+  trackWorldSessionWork(pending.promise);
+  let drained = false;
+  const draining = drainWorldSession().then(() => { drained = true; });
+  await Promise.resolve();
+  assert.equal(drained, false);
+  pending.resolve();
+  await draining;
+  assert.equal(drained, true);
+});
 
 test('opens the single materialized scene', () => {
   assert.equal(resolveOpenedProjectScene({ scene: { path: 'scene.ini' } }), 'scene.ini');

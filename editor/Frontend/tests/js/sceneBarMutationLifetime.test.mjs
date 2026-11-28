@@ -1,4 +1,3 @@
-import { sceneQueryFixture } from './sceneQueryFixtures.mjs';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import test from 'node:test';
@@ -83,13 +82,6 @@ for (const retirement of ['unmount', 'archive', 'scene']) {
     assert.deepEqual(page.calls.map(call => call.method), ['select_model_file']);
   });
 
-  test(`SceneBar render backend reply cannot overwrite retired state after ${retirement}`, async t => {
-    const pending = deferred(), page = mount(t, { set_camera_render_settings: () => pending.promise });
-    const switching = page.state.ToggleRenderBackend();
-    retire(page); pending.resolve({ render_backend: 'vision' }); await switching;
-    assert.equal(page.state.activeRenderBackend.value, 'native');
-  });
-
   test(`SceneBar save reply does not notify a changed scope after ${retirement}`, async t => {
     const pending = deferred(), page = mount(t, { save: () => pending.promise });
     const saving = page.state.SaveScene();
@@ -120,7 +112,6 @@ for (const retirement of ['unmount', 'archive', 'scene']) {
     ['RebindActorResource', 'select_model_file', page => [page.actor]],
     ['TakeScreenshot', 'capture_screenshot', () => []],
     ['focusActorFromList', 'focus_actor', page => [page.actor]],
-    ['RefreshRenderBackendState', 'read_scene', () => []],
   ]) {
     test(`SceneBar ${method} late failure is ignored after ${retirement}`, async t => {
       const pending = deferred(), page = mount(t, { [pendingMethod]: () => pending.promise });
@@ -147,24 +138,6 @@ for (const retirement of ['unmount', 'archive', 'scene']) {
     assert.equal(page.calls.filter(call => call.method === 'read_scene').length, 0);
   });
 }
-
-test('SceneBar cannot apply a backend reply to a different selected camera', async t => {
-  const pending = deferred(), page = mount(t, { set_camera_render_settings: () => pending.promise });
-  const switching = page.state.ToggleRenderBackend();
-  page.state.selectedCameraName.value = 'Main';
-  pending.resolve({ render_backend: 'vision' }); await switching;
-  assert.equal(page.state.activeRenderBackend.value, 'native');
-});
-
-test('SceneBar newer backend change wins over an older read', async t => {
-  const pending = deferred(), page = mount(t, { ...sceneQueryFixture({ cameras: () => pending.promise }),
-    set_camera_render_settings: async () => ({ render_backend: 'vision' }) });
-  const reading = page.state.RefreshRenderBackendState();
-  await page.state.ToggleRenderBackend();
-  pending.resolve({ archive_session: 'archive', scene: 'scene.ini', cameras: [{ camera_id: 'camera', render_backend: 'native' }] });
-  await reading;
-  assert.equal(page.state.activeRenderBackend.value, 'vision');
-});
 
 test('SceneBar old visibility failure cannot undo a newer same-value edit', async t => {
   const pending = deferred(); let calls = 0;
@@ -227,13 +200,6 @@ test('SceneBar current visibility failure rolls back and reports the failed edit
   await page.state.ToggleVisible(page.actor);
   assert.equal(page.actor.visible, true);
   assert.deepEqual(page.calls[0].args, ['scene.ini', 'actor', { archive_session: 'archive', visible: false }]);
-  assert.equal(page.errors.length, 1);
-});
-
-test('SceneBar current render backend failure preserves the previous value and reports it', async t => {
-  const page = mount(t, { set_camera_render_settings: async () => { throw Error('native rejected'); } });
-  await page.state.ToggleRenderBackend();
-  assert.equal(page.state.activeRenderBackend.value, 'native');
   assert.equal(page.errors.length, 1);
 });
 

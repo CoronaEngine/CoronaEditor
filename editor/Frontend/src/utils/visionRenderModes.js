@@ -1,8 +1,8 @@
 // Shared by the main viewport and detached camera windows.
 export const visionRenderModes = [
-  { value: 'path_tracing', backend: 'vision', label: 'Vision PT' },
-  { value: 'restir', backend: 'vision', label: 'Vision ReSTIR' },
-  { value: 'ssat', backend: 'vision', label: 'Vision SSAT' },
+  { value: 'path_tracing', label: 'Vision PT' },
+  { value: 'restir', label: 'Vision ReSTIR' },
+  { value: 'ssat', label: 'Vision SSAT' },
 ];
 
 export const visionDenoisers = [

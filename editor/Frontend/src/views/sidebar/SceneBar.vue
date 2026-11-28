@@ -112,27 +112,6 @@
               />
             </svg>
           </button>
-          <!-- Vision / Native 渲染后端切换 -->
-          <button
-            class="p-1.5 hover:bg-[#3a4a3c] rounded flex items-center gap-0.5"
-            :class="activeRenderBackend === 'vision' ? 'text-[#b3995d]' : 'text-[#e8ede3]'"
-            :title="
-              activeRenderBackend === 'vision'
-                ? '当前: Vision (路径追踪)，点击切换到 Native'
-                : '当前: Native (光栅化)，点击切换到 Vision'
-            "
-            @click.stop="ToggleRenderBackend"
-          >
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M3 12a9 9 0 1018 0 9 9 0 00-18 0zm9-9v18m-9-9h18"
-              />
-            </svg>
-          </button>
-          <!-- GBuffer 输出模式切换 -->
         </div>
 
         <!-- 场景树 -->
@@ -446,7 +425,6 @@ const sceneOperation = () => {
     && scene === currentSceneName.value && archive === archiveSession.value };
 };
 const visibilityRevisions = new WeakMap();
-let renderBackendSequence = 0;
 let sceneTreeRequestSeq = 0;
 let sceneTreeSettleTimer = null;
 let sceneTreeSettleTimerScene = '';
@@ -605,7 +583,6 @@ const SelectCamera = (cam) => {
   publishModelNodeSelection(null);
   selectedItem.value = 'cam:' + cam.name;
   selectedCameraName.value = cam.name;
-  RefreshRenderBackendState();
 };
 
 const OpenCameraView = async (cam) => {
@@ -841,47 +818,6 @@ const TakeScreenshot = async () => {
   }
 };
 
-// Vision / Native 渲染后端切换状态
-const activeRenderBackend = ref('native');
-
-const RefreshRenderBackendState = async () => {
-  const context = sceneOperation();
-  if (!context.current()) return;
-  const sequence = ++renderBackendSequence;
-  try {
-    const scene = currentSceneName.value;
-    const archive = archiveSession.value;
-    const current = () => viewLifetime.current() && scene === currentSceneName.value && archive === archiveSession.value;
-    if (!scene || !archive) return;
-    const cameraResult = await editorApi.scene.read_scene({ archive_session: archive, scene: scene, cameras: true });
-    if (!current() || sequence !== renderBackendSequence || cameraResult.archive_session !== archive || cameraResult.scene !== scene) return;
-    const target = getTargetCamera();
-    const camera = cameraResult.cameras?.find(item => item.camera_id === target?.camera_id);
-    if (camera?.render_backend) activeRenderBackend.value = camera.render_backend;
-  } catch (e) {
-    if (context.current() && sequence === renderBackendSequence) logError('Failed to query render backend state', e);
-  }
-};
-
-const ToggleRenderBackend = async () => {
-  const context = sceneOperation();
-  if (!context.current()) return;
-  const sequence = ++renderBackendSequence;
-  const next = activeRenderBackend.value === 'vision' ? 'native' : 'vision';
-  try {
-    const target = getTargetCamera();
-    if (!target?.camera_id || !archiveSession.value) throw new Error('没有可用的活动相机');
-    const payload = await editorApi.scene.set_camera_render_settings(context.scene, target.camera_id, {
-      archive_session: context.archive,
-      render_backend: next,
-    });
-    if (!context.current() || sequence !== renderBackendSequence || target.camera_id !== getTargetCamera()?.camera_id) return;
-    activeRenderBackend.value = payload.render_backend;
-  } catch (e) {
-    if (context.current() && sequence === renderBackendSequence) logError('Failed to switch render backend', e);
-  }
-};
-
 const ShowModelDropdown = ref(false);
 const ToggleModelDropdown = () => {
   ShowModelDropdown.value = !ShowModelDropdown.value;
@@ -1095,7 +1031,6 @@ onMounted(async () => {
 
   await OnInitObjTree();
   if (!viewLifetime.current()) return;
-  await RefreshRenderBackendState();
   if (!viewLifetime.current()) return;
   // 后端对象变化：项目打开/物体变化时重新加载场景树
   await viewLifetime.subscribe(callback => getObserverRuntime().observe('selection', callback), onActorChangeEvent, token => getObserverRuntime().off(token));
@@ -1133,7 +1068,6 @@ const onProjectOpenedEvent = (payload = {}) => {
   archiveSession.value = payload.archive_session;
   currentSceneName.value = sceneRoute;
   void OnInitObjTree();
-  void RefreshRenderBackendState();
 };
 
 const normalizeCameraPayload = (cam) => ({
@@ -1145,7 +1079,6 @@ const normalizeCameraPayload = (cam) => ({
   height: cam.height || 0,
   fov: cam.fov ?? null,
   handle: normalizeHandle(cam.opaque_handle ?? cam.handle ?? cam.camera_handle),
-  render_backend: cam.render_backend || 'native',
   output_mode: cam.output_mode || 'final_color',
   deletable: cam.deletable !== false,
   move_speed: cam.move_speed || 1,

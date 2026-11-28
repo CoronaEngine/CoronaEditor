@@ -186,7 +186,7 @@ const aiKeyMessageType = ref('');
 const defaultViewportControls = {
   available: false,
   sceneId: '',
-  renderMode: 'native',
+  renderMode: 'path_tracing',
   renderModes: [],
   viewportUiMode: 'flat2d',
   viewportUiModes: [
@@ -215,7 +215,7 @@ function normalizeViewportControls(state = {}) {
     sceneId: String(state.sceneId || ''),
     cameraId: state.cameraId,
     cameraHandle: state.cameraHandle,
-    renderMode: String(state.renderMode || 'native'),
+    renderMode: String(state.renderMode || 'path_tracing'),
     renderModes: Array.isArray(state.renderModes) ? state.renderModes : [],
     viewportUiMode: String(state.viewportUiMode || defaultViewportControls.viewportUiMode),
     viewportUiModes: modes.map((item) => ({

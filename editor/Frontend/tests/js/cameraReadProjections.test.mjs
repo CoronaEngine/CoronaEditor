@@ -79,8 +79,8 @@ function cameraDeps(read) {
     visionDenoiserFromCamera, visionStablePlanesFromCamera,
     editorApi: { scene: { ...sceneQueryFixture({ cameras: read }) } },
   };
-  for (const key of ['camera', 'cameraName', 'backend', 'visionAccumulation', 'visionDenoise',
-    'visionDenoiser', 'visionStablePlanes', 'visionRenderMode', 'outputMode', 'moveSpeed', 'renderWidth', 'renderHeight'])
+  for (const key of ['camera', 'cameraName', 'visionAccumulation', 'visionDenoise',
+    'visionDenoiser', 'visionStablePlanes', 'visionRenderMode', 'moveSpeed', 'renderWidth', 'renderHeight'])
     deps[key] = { value: null };
   return deps;
 }
@@ -88,12 +88,12 @@ function cameraDeps(read) {
 test('CameraView reads rendering and pose under its original window archive', async () => {
   const calls = [], deps = cameraDeps(async (...args) => { calls.push(args); return {
     scene: 'scene.ini', archive_session: 'archive', cameras: [{ archive_session: 'archive', camera_id: 'camera',
-      name: 'Camera', opaque_handle: '18446744073709551615', render_backend: 'vision', vision_render_mode: 'restir',
+      name: 'Camera', opaque_handle: '18446744073709551615', vision_render_mode: 'restir',
       vision_denoise: false, vision_denoiser: 'relax', vision_accumulation: true, vision_stable_planes: false }] }; });
   await handler('views/tools/CameraView', 'loadCamera', deps)();
   assert.deepEqual(calls, [['scene.ini', { archive_session: 'archive' }]]);
   assert.equal(deps.camera.value.opaque_handle, '18446744073709551615');
-  assert.equal(deps.backend.value, 'vision'); assert.equal(deps.visionRenderMode.value, 'restir');
+  assert.equal(deps.visionRenderMode.value, 'restir');
   assert.equal(deps.visionDenoiser.value, 'relax'); assert.equal(deps.visionDenoise.value, false);
   assert.equal(deps.visionStablePlanes.value, false); assert.equal(deps.visionAccumulation.value, true);
 });
@@ -138,18 +138,29 @@ test('main viewport cannot start scoped projections without an observed archive'
   assert.deepEqual(calls, []);
 });
 
-test('camera restoration never opens a camera after its archive has retired during render initialization', async () => {
+test('camera restoration never opens a camera after its archive has retired during the camera list read', async () => {
   const pending = deferred(), opened = [];
   const deps = { viewCurrent: () => true, environmentArchiveSession: { value: 'archive' },
     currentSceneId: { value: 'scene.ini' }, mainEnvironmentRevision: 0, mainEnvironmentWrites: new Map(),
-    editorApi: { scene: { ...sceneQueryFixture({ cameras: async () => ({ archive_session: 'archive', scene: 'scene.ini',
-      cameras: [{ archive_session: 'archive', camera_id: 'camera', view_open: true }] }) }),   } },
-    initializeWorldRenderBackend: () => pending.promise,
+    editorApi: { scene: sceneQueryFixture({ cameras: () => pending.promise }) },
     appService: { createCameraView: value => opened.push(value) }, logError() {},
   };
   const work = handler('views/layout/MainPage', 'restoreCameraViews', deps)('scene.ini');
-  await Promise.resolve(); deps.environmentArchiveSession.value = 'next'; pending.resolve(true);
+  await Promise.resolve(); deps.environmentArchiveSession.value = 'next';
+  pending.resolve({ archive_session: 'archive', scene: 'scene.ini', cameras: [{ camera_id: 'camera', view_open: true }] });
   await work; assert.deepEqual(opened, []);
+});
+
+test('restoring camera windows keeps their saved Vision settings', async () => {
+  const cameras = [{ camera_id: 'saved', view_open: true, vision_render_mode: 'restir' },
+    { camera_id: 'closed', view_open: false }];
+  const opened = [];
+  const deps = { viewCurrent: () => true, environmentArchiveSession: { value: 'archive' },
+    editorApi: { scene: sceneQueryFixture({ cameras: async () => ({ archive_session: 'archive', scene: 'scene.ini', cameras }) }) },
+    appService: { createCameraView: camera => opened.push(camera) }, logError(error) { throw error; },
+  };
+  await handler('views/layout/MainPage', 'restoreCameraViews', deps)('scene.ini');
+  assert.deepEqual(opened, [{ ...cameras[0], scene_id: 'scene.ini' }]);
 });
 
 test('SceneBar camera-only hover reads do not build a rich Actor tree', async () => {

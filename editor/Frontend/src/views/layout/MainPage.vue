@@ -112,7 +112,6 @@ import { createViewLifetime } from '@/utils/viewLifetime.js';
 import { appService, isCurrentWindowEvent } from '@/services/appService.js';
 import { viewportControlsService } from '@/services/viewportControlsService.js';
 import { worldModeState } from '@/services/worldModeService.js';
-import { initializeWorldRenderBackend } from '@/services/worldRenderPolicy.js';
 import { useErrorHandler } from '@/composables/useErrorHandler.js';
 import { useDockStore } from '@/stores/dockStore.js';
 import { PLUGIN_MANIFEST } from '@/config/pluginManifest.js';
@@ -507,9 +506,6 @@ const cameraControls = createViewportCameraController({
 const isRealtimeCameraInputActive = cameraControls.isInputActive;
 const scheduleCameraUpdate = cameraControls.scheduleUpdate;
 
-const creativeRenderDefaultsBusy = ref(true);
-const creativeRenderDefaultsError = ref('');
-const mainRenderBackend = ref('vision');
 const mainVisionRenderMode = ref('path_tracing');
 const mainVisionAccumulation = ref(false);
 const mainVisionAccumulationBusy = ref(false);
@@ -539,17 +535,9 @@ const physicsParams = ref({
   fixedDt: 1.0 / 60.0,
 });
 
-const mainRenderModeOptions = [
-  { value: 'native', backend: 'native', label: 'Native' },
-  ...visionRenderModes,
-];
-const mainRenderModeLabel = computed(() => {
-  if (mainRenderBackend.value !== 'vision') {
-    return 'Native';
-  }
-  return mainRenderModeOptions.find((mode) => mode.value === mainVisionRenderMode.value)?.label
-    || 'Vision PT';
-});
+const mainRenderModeLabel = computed(() =>
+  visionRenderModes.find((mode) => mode.value === mainVisionRenderMode.value)?.label
+    || 'Vision PT');
 let pendingMainRenderSelection = null;
 let pendingMainAccumulationSelection = null;
 let pendingMainDenoiseSelection = null;
@@ -574,8 +562,6 @@ const mainCameraOperation = (kind) => {
 };
 const retireMainRenderOperations = () => {
   mainRenderOperations.clear();
-  creativeRenderDefaultsBusy.value = false;
-  creativeRenderDefaultsError.value = '';
   pendingMainRenderSelection = null;
   pendingMainAccumulationSelection = null;
   pendingMainDenoiseSelection = null;
@@ -789,91 +775,34 @@ function promoteDueCabbageTasks() {
 
 // Assistant state has been initialized above.
 
-// Apply Vision both before first binding and after restoring camera windows,
-// which can recreate the camera from an archive that still remembers Native.
-const initializeCreativeRenderMode = async () => {
-  const context = mainCameraOperation('mode');
-  const { sceneId, cameraId, archive } = context;
-  if (!context.current() || !cameraBindingState.value.cameraHandle) return false;
-  const current = () => context.current() && worldModeState.status === 'ready';
-  creativeRenderDefaultsBusy.value = true;
-  creativeRenderDefaultsError.value = '';
-  try {
-    if (!await initializeWorldRenderBackend({ api: editorApi, sceneId, cameraId,
-      archiveSession: archive, isCurrent: current })) return false;
-    pendingMainRenderSelection = { sceneId, cameraId, backend: 'vision',
-      visionMode: mainVisionRenderMode.value, expiresAt: Date.now() + 3000 };
-    mainRenderBackend.value = 'vision';
-    await syncSceneCameraBinding(sceneId, { preservePose: true });
-    return current();
-  } catch (error) {
-    if (current()) {
-      creativeRenderDefaultsError.value = `初始化创造模式渲染设置失败：${error.message}`;
-      logError('Failed to initialize creative viewport rendering', error);
-    }
-    return false;
-  } finally {
-    if (current()) creativeRenderDefaultsBusy.value = false;
-  }
-};
-
 const selectMainRenderMode = async (mode) => {
+  if (!visionRenderModes.some(item => item.value === mode)) return false;
   const context = mainCameraOperation('mode');
   if (!context.current()) return false;
   const { sceneId, cameraId } = context;
-  creativeRenderDefaultsBusy.value = false;
-  const previousBackend = mainRenderBackend.value;
   const previousMode = mainVisionRenderMode.value;
 
   try {
-    if (mode === 'native') {
-      pendingMainRenderSelection = {
-        sceneId,
-        cameraId,
-        backend: 'native',
-        visionMode: mainVisionRenderMode.value,
-        expiresAt: Date.now() + 3000,
-      };
-      mainRenderBackend.value = 'native';
-      const result = await editorApi.scene.set_camera_render_settings(sceneId, cameraId, {
-        archive_session: context.archive,
-        render_backend: 'native',
-      });
-      if (!context.current()) return false;
-      mainRenderBackend.value = result?.render_backend || 'native';
-      await syncSceneCameraBinding(sceneId);
-      return context.current();
-    }
-
     pendingMainRenderSelection = {
       sceneId,
       cameraId,
-      backend: 'vision',
       visionMode: mode,
       expiresAt: Date.now() + 3000,
     };
-    mainRenderBackend.value = 'vision';
     mainVisionRenderMode.value = mode;
 
     const result = await editorApi.scene.set_camera_render_settings(sceneId, cameraId, {
       archive_session: context.archive,
-      render_backend: 'vision',
       output_mode: 'final_color',
       vision: { render_mode: mode },
     });
     if (!context.current()) return false;
     mainVisionRenderMode.value = result?.pending ? mode : result?.vision?.render_mode || mode;
-    mainRenderBackend.value = result?.render_backend || 'native';
-    if (mainRenderBackend.value !== 'vision') {
-      pendingMainRenderSelection = null;
-      return false;
-    }
     await syncSceneCameraBinding(sceneId);
     return context.current();
   } catch (error) {
     if (!context.current()) return false;
     pendingMainRenderSelection = null;
-    mainRenderBackend.value = previousBackend;
     mainVisionRenderMode.value = previousMode;
     logError('Failed to set main viewport render mode', error);
     return false;
@@ -883,7 +812,7 @@ const selectMainRenderMode = async (mode) => {
 const toggleMainVisionAccumulation = async () => {
   const sceneId = currentMainSceneId();
   const cameraId = currentMainCameraId();
-  if (mainRenderBackend.value !== 'vision' || mainVisionRenderMode.value === 'ssat'
+  if (mainVisionRenderMode.value === 'ssat'
     || mainVisionAccumulationBusy.value || !cameraId) return false;
   const context = mainCameraOperation('Accumulation');
   if (!context.current()) return false;
@@ -922,7 +851,7 @@ const toggleMainVisionAccumulation = async () => {
 const toggleMainVisionDenoise = async () => {
   const sceneId = currentMainSceneId();
   const cameraId = currentMainCameraId();
-  if (mainRenderBackend.value !== 'vision' || mainVisionRenderMode.value === 'ssat'
+  if (mainVisionRenderMode.value === 'ssat'
     || mainVisionDenoiseBusy.value || !cameraId) return false;
   const context = mainCameraOperation('Denoise');
   if (!context.current()) return false;
@@ -962,7 +891,7 @@ const selectMainVisionDenoiser = async (type) => {
 
   const sceneId = currentMainSceneId();
   const cameraId = currentMainCameraId();
-  if (mainRenderBackend.value !== 'vision' || mainVisionRenderMode.value === 'ssat'
+  if (mainVisionRenderMode.value === 'ssat'
     || mainVisionDenoiserBusy.value || !cameraId) return false;
   const context = mainCameraOperation('Denoiser');
   if (!context.current()) return false;
@@ -1000,7 +929,7 @@ const selectMainVisionDenoiser = async (type) => {
 const toggleMainVisionStablePlanes = async () => {
   const sceneId = currentMainSceneId();
   const cameraId = currentMainCameraId();
-  if (mainRenderBackend.value !== 'vision' || mainVisionRenderMode.value !== 'restir'
+  if (mainVisionRenderMode.value !== 'restir'
     || mainVisionStablePlanesBusy.value || !cameraId) return false;
   const context = mainCameraOperation('StablePlanes');
   if (!context.current()) return false;
@@ -1124,11 +1053,9 @@ const applySceneSnapshot = (sceneId, payload, { preservePose = false, preserveEn
     pendingMainRenderSelection.cameraId === currentMainCameraId() &&
     Date.now() < pendingMainRenderSelection.expiresAt
   ) {
-    mainRenderBackend.value = pendingMainRenderSelection.backend;
     mainVisionRenderMode.value = pendingMainRenderSelection.visionMode;
   } else {
     pendingMainRenderSelection = null;
-    mainRenderBackend.value = activeCamera?.render_backend || 'native';
     mainVisionRenderMode.value = normalizeVisionRenderMode(activeCamera?.vision_render_mode);
   }
   const snapshotAccumulation = visionAccumulationFromCamera(activeCamera);
@@ -1292,8 +1219,6 @@ const restoreCameraViews = async (sceneId) => {
       : [];
     for (const camera of openCameras) {
       if (!current()) return;
-      if (!await initializeWorldRenderBackend({ api: editorApi, sceneId,
-        cameraId: camera.camera_id, archiveSession: payload.archive_session, isCurrent: current }) || !current()) return;
       await appService.createCameraView({ ...camera, scene_id: sceneId });
     }
   } catch (e) {
@@ -1748,18 +1673,15 @@ const applyPhysicsFromSettings = async (nextParams = {}) => {
   return getEditorControlsState();
 };
 
-const currentMainRenderMode = () =>
-  mainRenderBackend.value === 'vision' ? mainVisionRenderMode.value : 'native';
-
 const getEditorControlsState = () => ({
   available: true,
   sceneId: currentSceneId.value || DEFAULT_SCENE_NAME,
   cameraId: cameraBindingState.value.cameraId,
-  renderMode: currentMainRenderMode(),
+  renderMode: mainVisionRenderMode.value,
   renderLabel: mainRenderModeLabel.value,
-  renderModes: mainRenderModeOptions.map((mode) => ({
+  renderModes: visionRenderModes.map((mode) => ({
     ...mode,
-    active: currentMainRenderMode() === mode.value,
+    active: mainVisionRenderMode.value === mode.value,
   })),
   viewportUiMode: viewportUiMode.value,
   viewportUiModes: viewportUiModeItems.map((item) => ({
@@ -1784,7 +1706,6 @@ const registerEditorControls = () => {
     isCurrent: viewCurrent,
     actions: {
       selectRenderMode: payload => {
-        if (!mainRenderModeOptions.some(mode => mode.value === payload.mode)) return false;
         return selectMainRenderMode(payload.mode);
       },
       setViewportUiMode: payload => setViewportUiModeFromPanel(payload.mode),
@@ -1865,7 +1786,6 @@ onMounted(async () => {
   // Render settings require the observed archive and exact camera identity.
   // A retired or failed binding must not leave a partially mounted viewport.
   if (!await syncSceneCameraBinding(openedSceneId) || !viewCurrent()) return;
-  if (!await initializeCreativeRenderMode() || !viewCurrent()) return;
   await pollProjectResourceLoadStatus();
   if (!viewCurrent()) return;
 
@@ -1888,7 +1808,6 @@ onMounted(async () => {
   // current camera handle rather than the camera object that was just destroyed.
   await syncSceneCameraBinding(initialSceneId);
   if (!viewCurrent()) return;
-  if (!await initializeCreativeRenderMode() || !viewCurrent()) return;
   // The CEF window can survive project creation/switching, so discard stale
   // frontend lock reasons using the backend's self-healed runtime truth.
   await reconcileEditorCameraInputLocks();
@@ -2006,9 +1925,9 @@ onUnmounted(() => {
 provideCreativePanelState(() => ({
   sceneId: currentMainSceneId(), cameraId: currentMainCameraId(),
   cameraHandle: cameraBindingState.value.cameraHandle,
-  available: !creativeRenderDefaultsBusy.value && Boolean(cameraBindingState.value.cameraHandle),
-  mainRenderBackend: mainRenderBackend.value, mainRenderModeLabel: mainRenderModeLabel.value,
-  mainRenderModeOptions,
+  available: Boolean(cameraBindingState.value.cameraHandle),
+  mainRenderModeLabel: mainRenderModeLabel.value,
+  mainRenderModeOptions: visionRenderModes,
   mainVisionRenderMode: mainVisionRenderMode.value, mainVisionDenoiser: mainVisionDenoiser.value,
   mainVisionAccumulation: mainVisionAccumulation.value, mainVisionDenoise: mainVisionDenoise.value,
   mainVisionStablePlanes: mainVisionStablePlanes.value,
@@ -2016,7 +1935,6 @@ provideCreativePanelState(() => ({
   mainVisionDenoiserBusy: mainVisionDenoiserBusy.value, mainVisionStablePlanesBusy: mainVisionStablePlanesBusy.value,
   mainVisionAccumulationError: mainVisionAccumulationError.value, mainVisionDenoiseError: mainVisionDenoiseError.value,
   mainVisionDenoiserError: mainVisionDenoiserError.value, mainVisionStablePlanesError: mainVisionStablePlanesError.value,
-  creativeRenderDefaultsBusy: creativeRenderDefaultsBusy.value, creativeRenderDefaultsError: creativeRenderDefaultsError.value,
   cameraSpeed: cameraSpeed.value, sceneGridEnabled: sceneGridEnabled.value, viewportUiMode: viewportUiMode.value,
   sceneLightSettings: { enabled: sceneLightSettings.enabled, direction: { ...sceneLightSettings.direction } },
   sceneLightBusy: sceneLightBusy.value,

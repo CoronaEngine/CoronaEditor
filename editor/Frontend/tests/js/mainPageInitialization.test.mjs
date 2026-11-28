@@ -12,7 +12,7 @@ test('world entry retains the initialized scene controls and scene manager', asy
 });
 
 for (const retiredBy of ['archive', 'unmount']) {
-  test(`world entry does not select a backend after ${retiredBy} retires the initial camera read`, async t => {
+  test(`world entry stops setup when ${retiredBy} retires the initial camera read`, async t => {
     const h = mountMainPage(t);
     const read = h.api.scene.read_scene.projections.cameras;
     h.api.scene.read_scene.projections.cameras = async (...args) => {
@@ -23,23 +23,10 @@ for (const retiredBy of ['archive', 'unmount']) {
     };
     await h.mount();
     assert.ok(h.calls.some(call => call[0] === 'cameras'), 'the initial scoped camera read must run');
-    assert.deepEqual(h.calls.filter(call => call[0] === 'backend'), []);
+    assert.deepEqual(h.calls.filter(call => call[0] === 'renderSettings'), []);
     assert.deepEqual(h.observed, []);
   });
 }
-
-test('backend completion from a replaced archive cannot continue viewport initialization', async t => {
-  const h = mountMainPage(t);
-  await h.mount();
-  h.calls.length = 0;
-  h.api.scene.set_camera_render_settings = async () => {
-    h.page.environmentArchiveSession.value = 'replacement';
-    return { render_backend: 'vision' };
-  };
-  assert.equal(await h.page.initializeCreativeRenderMode(), false);
-  assert.deepEqual(h.calls, []);
-  assert.equal(h.page.creativeRenderDefaultsError.value, '');
-});
 
 test('applied focus synchronizes only the matching native camera without resubmitting a pose', async t => {
   const h = mountMainPage(t);
@@ -129,7 +116,7 @@ test('right dragging from the viewport still rotates the camera', async t => {
   assert.notDeepEqual(h.page.cameraState.value.forward, forward);
 });
 
-for (const visionMode of ['path_tracing', 'restir']) {
+for (const visionMode of ['path_tracing', 'restir', 'ssat']) {
 test(`external scene entry defaults to Vision and preserves saved ${visionMode}`, async t => {
   const h = mountMainPage(t, visionMode);
   assert.equal(h.page.currentMainSceneId(), 'scene.ini', 'the unopened page starts at the default scene');
@@ -137,14 +124,10 @@ test(`external scene entry defaults to Vision and preserves saved ${visionMode}`
   await h.mount();
 
   const cameraRead = h.calls.findIndex(call => call[0] === 'cameras');
-  const backendWrite = h.calls.findIndex(call => call[0] === 'backend');
-  assert.ok(cameraRead >= 0 && backendWrite > cameraRead, 'bind the archive and exact camera before selecting its backend');
-  assert.deepEqual(h.calls[backendWrite], ['backend', 'vision', 'scene_v3.xml', 'camera-1', {
-    archive_session: 'main-archive', render_backend: 'vision',
-  }]);
+  assert.ok(cameraRead >= 0);
+  assert.deepEqual(h.calls.filter(call => call[0] === 'renderSettings'), []);
   assert.equal(h.page.cameraBindingState.value.sceneId, 'scene_v3.xml');
   assert.equal(h.page.cameraBindingState.value.cameraHandle, '42');
-  assert.equal(h.page.mainRenderBackend.value, 'vision');
   assert.equal(h.page.mainVisionRenderMode.value, visionMode);
   assert.deepEqual(h.observed, [h.surface]);
   h.flushFrames();

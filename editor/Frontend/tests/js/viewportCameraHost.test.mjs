@@ -13,7 +13,7 @@ const declarations = babelParse(descriptor.scriptSetup.content, { sourceType: 'm
 // Execute the real creative camera host declarations with unrelated services stubbed.
 // No duplicate handlers or movement algorithms live in this test.
 const names = new Set([
-  'mainRenderOperations', 'retireMainRenderOperations', 'creativeRenderDefaultsBusy', 'creativeRenderDefaultsError',
+  'mainRenderOperations', 'retireMainRenderOperations',
   'mainVisionAccumulationBusy', 'mainVisionDenoiseBusy', 'mainVisionDenoiserBusy', 'mainVisionStablePlanesBusy',
   'cameraState', 'cameraBindingState', 'cameraSpeed', 'mouseSensitivity', 'viewportSurfaceRef',
   'cameraMovementGestures', 'movementAxisGroups', 'mouseRotateStartForward', 'mouseRotateMoved',
@@ -42,7 +42,7 @@ const makeHost = new Function('deps', `
   const currentSceneId = ref(DEFAULT_SCENE_NAME);
   const getViewportRenderRect = () => ({ left: 0, top: 0, width: 800, height: 600 });
   const sceneGridEnabled = ref(true), sceneLightSettings = reactive({ direction: {} });
-  const mainRenderBackend = ref('native'), mainVisionRenderMode = ref('path_tracing');
+  const mainVisionRenderMode = ref('path_tracing');
   let actorPickIndex, lastCameraViewportSignature = '', pendingMainRenderSelection = null;
   const scheduleCameraViewportSync = () => {}, syncViewportUiMode = () => {};
   ${hostSource}

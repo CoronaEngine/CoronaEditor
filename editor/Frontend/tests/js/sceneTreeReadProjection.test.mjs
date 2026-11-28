@@ -86,7 +86,7 @@ test('a missing archive cannot be filled by an implicit current-world tree read'
 test('same-route project reopening changes tree scope before issuing the new read', () => {
   const calls = [], deps = { currentSceneName: { value: 'scene.ini' }, archiveSession: { value: 'old' },
     resolveOpenedProjectScene: () => 'scene.ini', publishModelNodeSelection() {},
-    OnInitObjTree: () => calls.push(['tree', deps.archiveSession.value]), RefreshRenderBackendState() {},
+    OnInitObjTree: () => calls.push(['tree', deps.archiveSession.value]),
   };
   handler('onProjectOpenedEvent', deps)({ archive_session: 'next' });
   assert.equal(deps.archiveSession.value, 'next'); assert.deepEqual(calls, [['tree', 'next']]);

@@ -27,8 +27,7 @@
           <button>{{ translate('editorSettings.applyPhysics') }}</button>
         </form>
       </details>
-      <section class="scene-quick-render" aria-label="渲染设置" data-guidance="render-settings"
-        :inert="state.creativeRenderDefaultsBusy" :aria-busy="state.creativeRenderDefaultsBusy">
+      <section class="scene-quick-render" aria-label="渲染设置" data-guidance="render-settings">
         <div class="scene-quick-render-mode">
           <span>渲染模式</span>
           <!-- CEF's offscreen renderer paints PET_VIEW only, so keep the menu in the page. -->
@@ -56,7 +55,7 @@
                 :key="mode.value"
                 type="button"
                 role="menuitemradio"
-                :aria-checked="mode.value === (state.mainRenderBackend === 'vision' ? state.mainVisionRenderMode : 'native')"
+                :aria-checked="mode.value === state.mainVisionRenderMode"
                 @click="select('selectMainRenderMode', mode.value)"
               >
                 {{ mode.label }}
@@ -77,7 +76,7 @@
               aria-label="降噪类型"
               aria-haspopup="menu"
               :aria-expanded="activeMenu === 'denoiser'"
-              :disabled="state.mainRenderBackend !== 'vision' || state.mainVisionRenderMode === 'ssat' || state.mainVisionDenoiserBusy || !state.cameraId"
+              :disabled="state.mainVisionRenderMode === 'ssat' || state.mainVisionDenoiserBusy || !state.cameraId"
               @click="toggleMenu('denoiser')"
               @keydown.down.prevent="activeMenu = 'denoiser'"
             >
@@ -99,20 +98,20 @@
           </div>
         </div>
         <PtSettings :scene-id="state.sceneId" :camera-id="state.cameraId || ''"
-          :enabled="state.mainRenderBackend === 'vision' && state.mainVisionRenderMode === 'path_tracing'" />
+          :enabled="state.mainVisionRenderMode === 'path_tracing'" />
         <RestirSettings :scene-id="state.sceneId" :camera-id="state.cameraId || ''"
-          :enabled="state.mainRenderBackend === 'vision' && state.mainVisionRenderMode === 'restir'" />
+          :enabled="state.mainVisionRenderMode === 'restir'" />
         <ReblurSettings :scene-id="state.sceneId" :camera-id="state.cameraId || ''"
-          :enabled="state.mainRenderBackend === 'vision' && state.mainVisionRenderMode !== 'ssat' && state.mainVisionDenoiser === 'reblur' && !state.mainVisionDenoiserBusy" />
+          :enabled="state.mainVisionRenderMode !== 'ssat' && state.mainVisionDenoiser === 'reblur' && !state.mainVisionDenoiserBusy" />
         <RelaxSettings :scene-id="state.sceneId" :camera-id="state.cameraId || ''"
-          :enabled="state.mainRenderBackend === 'vision' && state.mainVisionRenderMode !== 'ssat' && state.mainVisionDenoiser === 'relax' && !state.mainVisionDenoiserBusy" />
+          :enabled="state.mainVisionRenderMode !== 'ssat' && state.mainVisionDenoiser === 'relax' && !state.mainVisionDenoiserBusy" />
         <div class="scene-quick-render-options">
           <label title="累积 PT / ReSTIR 样本">
             <input
               type="checkbox"
               aria-label="累积样本"
               :checked="state.mainVisionAccumulation"
-              :disabled="state.mainRenderBackend !== 'vision' || state.mainVisionRenderMode === 'ssat' || state.mainVisionAccumulationBusy || !state.cameraId"
+              :disabled="state.mainVisionRenderMode === 'ssat' || state.mainVisionAccumulationBusy || !state.cameraId"
               @change="act('toggleMainVisionAccumulation')"
             />
             <span>累积样本</span>
@@ -122,7 +121,7 @@
               type="checkbox"
               aria-label="降噪"
               :checked="state.mainVisionDenoise"
-              :disabled="state.mainRenderBackend !== 'vision' || state.mainVisionRenderMode === 'ssat' || state.mainVisionDenoiseBusy || !state.cameraId"
+              :disabled="state.mainVisionRenderMode === 'ssat' || state.mainVisionDenoiseBusy || !state.cameraId"
               @change="act('toggleMainVisionDenoise')"
             />
             <span>降噪</span>
@@ -132,14 +131,14 @@
               type="checkbox"
               aria-label="Stable Plane"
               :checked="state.mainVisionStablePlanes"
-              :disabled="state.mainRenderBackend !== 'vision' || state.mainVisionRenderMode !== 'restir' || state.mainVisionStablePlanesBusy || !state.cameraId"
+              :disabled="state.mainVisionRenderMode !== 'restir' || state.mainVisionStablePlanesBusy || !state.cameraId"
               @change="act('toggleMainVisionStablePlanes')"
             />
             <span>Stable Plane</span>
           </label>
         </div>
-        <p v-if="state.creativeRenderDefaultsError || state.mainVisionAccumulationError || state.mainVisionDenoiseError || state.mainVisionDenoiserError || state.mainVisionStablePlanesError" role="alert" class="text-red-300 text-xs">
-          {{ state.creativeRenderDefaultsError || state.mainVisionAccumulationError || state.mainVisionDenoiseError || state.mainVisionDenoiserError || state.mainVisionStablePlanesError }}
+        <p v-if="state.mainVisionAccumulationError || state.mainVisionDenoiseError || state.mainVisionDenoiserError || state.mainVisionStablePlanesError" role="alert" class="text-red-300 text-xs">
+          {{ state.mainVisionAccumulationError || state.mainVisionDenoiseError || state.mainVisionDenoiserError || state.mainVisionStablePlanesError }}
         </p>
       </section>
       <label class="scene-quick-camera-speed" data-guidance="camera-speed">

@@ -17,7 +17,7 @@ test('migrated native consumers do not accept retired data envelopes', () => {
     'views/sidebar/SceneBar.vue', 'views/sidebar/EditorSettings.vue',
     'components/ui/ModelNodeHierarchy.vue', 'blockly/components/NodeGraphWorkspace.vue',
     'utils/ptSettings.js', 'utils/restirSettings.js', 'utils/reblurSettings.js', 'utils/relaxSettings.js',
-    'services/editorWindowSession.js', 'services/nativePanelHosts.js', 'services/worldRenderPolicy.js',
+    'services/editorWindowSession.js', 'services/nativePanelHosts.js',
   ]) {
     assert.doesNotMatch(fs.readFileSync(path.join(sourceRoot, file), 'utf8'),
       /\?\.data\s*\?\?|\?\.data\?\.tab_id/, file);

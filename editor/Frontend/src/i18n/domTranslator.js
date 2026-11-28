@@ -621,10 +621,6 @@ const RUNTIME_DOM_TEXT_TRANSLATIONS = {
   'Vision PT · 实时': 'Vision PT · Realtime',
   'Vision PT · 渐进收敛': 'Vision PT · Progressive',
   'Vision ReSTIR · 实时': 'Vision ReSTIR · Realtime',
-  '当前: Vision (路径追踪)，点击切换到 Native':
-    'Current: Vision (Path Tracing). Click to Switch to Native',
-  '当前: Native (光栅化)，点击切换到 Vision':
-    'Current: Native (Rasterization). Click to Switch to Vision',
   网络错误: 'Network Error',
   '图片过大 ({size}MB),请使用 ≤ 2MB 的图片':
     'Image Too Large ({size} MB); Use an Image of 2 MB or Less',

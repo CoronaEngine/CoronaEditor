@@ -30,7 +30,7 @@ async function renderMain(settings = {}) {
       handleViewportPointerDown: noop, handleViewportPointerCancel: noop, handleViewportPointerLeave: noop,
       handleViewportClick: noop, handleWheel: noop, updateSceneLight: noop,
       cameraSpeed: 0.2, setCameraSpeedFromPanel: noop,
-      mainRenderBackend: 'vision', mainVisionRenderMode: 'restir',
+      mainVisionRenderMode: 'restir',
       mainRenderModeLabel: 'Vision ReSTIR', activeMenu: null, toggleMenu: noop,
       currentMainSceneId: () => 'scene.ini', currentMainCameraId: () => 'camera-1', mainVisionAccumulation: true, mainVisionDenoise: false,
       mainVisionAccumulationBusy: false, mainVisionDenoiseBusy: false,
@@ -40,7 +40,7 @@ async function renderMain(settings = {}) {
       visionDenoisers,
       selectMainVisionDenoiser: noop,
       toggleMainVisionStablePlanes: noop,
-      mainRenderModeOptions: [{ value: 'native', backend: 'native', label: 'Native' }, ...visionRenderModes],
+      mainRenderModeOptions: visionRenderModes,
       selectMainRenderMode: noop, toggleMainVisionAccumulation: noop, toggleMainVisionDenoise: noop,
       ...settings,
       },
@@ -67,15 +67,13 @@ test('denoiser selector exposes REBLUR independently of the denoise switch', asy
   assert.match(html, /<button[^>]*role="menuitemradio"[^>]*aria-checked="true"[^>]*>\s*REBLUR/);
   assert.match(html, /<button[^>]*role="menuitemradio"[^>]*aria-checked="false"[^>]*>\s*SVGF/);
   assert.doesNotMatch(html, /<input[^>]*aria-label="降噪"[^>]*checked/);
-  for (const settings of [{ mainRenderBackend: 'native' }, { mainVisionRenderMode: 'ssat' }]) {
-    assert.match(await renderMain(settings), /<button[^>]*aria-label="降噪类型"[^>]*disabled/);
-  }
+  assert.match(await renderMain({ mainVisionRenderMode: 'ssat' }), /<button[^>]*aria-label="降噪类型"[^>]*disabled/);
 });
 
-test('mode selector stays visible on Native while both checkbox preferences are disabled and retained', async () => {
-  const html = await renderMain({ mainRenderBackend: 'native', mainRenderModeLabel: 'Native', mainVisionDenoise: true });
+test('mode selector stays visible on SSAT while both checkbox preferences are disabled and retained', async () => {
+  const html = await renderMain({ mainVisionRenderMode: 'ssat', mainRenderModeLabel: 'Vision SSAT', mainVisionDenoise: true });
   assert.match(html, /<button[^>]*aria-label="渲染模式"/);
-  assert.match(html, /Native/);
+  assert.match(html, /Vision SSAT/);
   assert.match(html, /<input[^>]*aria-label="累积样本"[^>]*checked[^>]*disabled/);
   assert.match(html, /<input[^>]*aria-label="降噪"[^>]*checked[^>]*disabled/);
 });
@@ -84,6 +82,7 @@ test('expanded render options are painted in the page without a native CEF popup
   const html = await renderMain({ activeMenu: 'render' });
   assert.match(html, /<button[^>]*aria-label="渲染模式"[^>]*aria-expanded="true"/);
   assert.match(html, /role="menu"/);
+  assert.doesNotMatch(html, />\s*Native\s*</);
   assert.match(html, /<button[^>]*role="menuitemradio"[^>]*aria-checked="true"[^>]*>\s*Vision ReSTIR/);
   assert.match(html, /<button[^>]*role="menuitemradio"[^>]*aria-checked="false"[^>]*>\s*Vision PT/);
 });
@@ -93,7 +92,7 @@ test('Stable Plane is visible and checked, and only enabled for an available ReS
   assert.match(enabled, /<input[^>]*aria-label="Stable Plane"[^>]*checked/);
   assert.doesNotMatch(enabled, /<input[^>]*aria-label="Stable Plane"[^>]*disabled/);
   for (const settings of [
-    { mainRenderBackend: 'native' }, { mainVisionRenderMode: 'path_tracing' },
+    { mainVisionRenderMode: 'path_tracing' },
     { mainVisionRenderMode: 'ssat' }, { currentMainCameraId: () => null },
     { mainVisionStablePlanesBusy: true },
   ]) {

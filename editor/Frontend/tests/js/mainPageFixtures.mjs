@@ -15,12 +15,11 @@ import * as viewportCalibration from '../../src/services/viewportCalibrationServ
 import * as serviceInitialization from '../../src/utils/serviceInitialization.js';
 import * as viewLifetime from '../../src/utils/viewLifetime.js';
 import * as pluginManifest from '../../src/config/pluginManifest.js';
-import * as worldRenderPolicy from '../../src/services/worldRenderPolicy.js';
 import { createWebMessages } from '../../src/api/webMessages.js';
 import { createViewportControlsService } from '../../src/services/viewportControlsService.js';
 
 // Execute the complete production setup and mounted hook. Only host/service
-// boundaries are injected; scene selection, backend policy and binding stay real.
+// boundaries are injected; scene selection and binding stay real.
 const { descriptor } = parse(fs.readFileSync(new URL('../../src/views/layout/MainPage.vue', import.meta.url), 'utf8'));
 const compiled = compileScript(descriptor, { id: 'main-page-initialization', genDefaultAs: 'MainPage' });
 const imports = babelParse(compiled.content, { sourceType: 'module' }).program.body
@@ -77,17 +76,17 @@ export function mountMainPage(t, visionMode = 'path_tracing') {
       return { archive_session: 'main-archive', scene, active_camera_id: 'camera-1', cameras: [{
         name: 'KitchenCamera', camera_id: 'camera-1', archive_session: 'main-archive', opaque_handle: '42',
         position: [0, 1, -5], forward: [0, 0, 1], world_up: [0, 1, 0], fov: 45,
-        render_backend: 'native', vision_render_mode: visionMode,
+        vision_render_mode: visionMode,
         vision_accumulation: false, vision_denoise: true, vision_denoiser: 'reblur',
         vision_stable_planes: true, view_open: false,
       }] };
     } }),  observe: async () => -1,
       set_camera_render_settings: async (scene, camera, patch) => {
-        calls.push(['backend', patch.render_backend, scene, camera, patch]);
+        calls.push(['renderSettings', scene, camera, patch]);
         assert.equal(scene, 'scene_v3.xml');
         assert.equal(camera, 'camera-1');
         assert.equal(patch.archive_session, 'main-archive');
-        return { archive_session: 'main-archive', scene, camera_id: camera, render_backend: patch.render_backend };
+        return { archive_session: 'main-archive', scene, camera_id: camera, vision: patch.vision };
       },
       update_camera: async (...args) => { calls.push(['cameraWrite', ...args]); return {}; },
       read_active: async () => ({ archive_session: 'main-archive', scene: 'scene_v3.xml' }),
@@ -135,7 +134,6 @@ export function mountMainPage(t, visionMode = 'path_tracing') {
     '@/api/webDocument.js': { getWebDocumentIdentity: () => ({ owner: 'main-owner' }) },
     '@/services/viewportCalibrationService.js': viewportCalibration,
     '@/services/worldModeService.js': { worldModeState: { status: 'ready', mode: 'creative', revision: 1 } },
-    '@/services/worldRenderPolicy.js': worldRenderPolicy,
     '@/services/projectMessages.js': { subscribeProjectChanged: () => noop },
     '@/services/appService.js': { appService: { crossTabBroadcast: asyncNoop } },
     '@/services/viewportControlsService.js': { viewportControlsService: createViewportControlsService(messages) },

@@ -15,7 +15,7 @@ function handler(name, deps) {
 
 test('CameraView settings share scoped properties and preserve camera metadata omitted by a partial reply', async () => {
   const calls = [], camera = ref({ archive_session: 'archive', camera_id: 'camera-id', handle: 42,
-    position: [1, 2, 3], render_backend: 'vision', vision_denoise: true });
+    position: [1, 2, 3], vision_denoise: true });
   const save = handler('saveSettings', {
     viewLifetime: createViewLifetime(),
     camera, sceneId: 'scene.ini', cameraId: 'camera-id', renderWidth: ref(640), renderHeight: ref(480), moveSpeed: ref(0.5),
@@ -30,7 +30,6 @@ test('CameraView settings share scoped properties and preserve camera metadata o
   assert.deepEqual(calls, [['scene.ini', 'camera-id', { archive_session: 'archive',
     move_speed: 0.5 }], ['resize', 640, 480, 'scene.ini', 'camera-id']]);
   assert.equal(camera.value.handle, 42);
-  assert.equal(camera.value.render_backend, 'vision');
   assert.equal(camera.value.vision_denoise, true);
   assert.deepEqual(camera.value.position, [1, 2, 3]);
 });
