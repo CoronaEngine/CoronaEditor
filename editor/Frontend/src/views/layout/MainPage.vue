@@ -246,7 +246,6 @@ const syncViewportUiCalibrationPanel = (mode) => {
 
 // 摄像头移动速度（可调节）
 const cameraSpeed = ref(0.2);
-const sceneGridEnabled = ref(true);
 const sceneLightSettings = reactive({
   enabled: true,
   direction: { x: 1, y: 1, z: 1 },
@@ -793,7 +792,6 @@ const selectMainRenderMode = async (mode) => {
 
     const result = await editorApi.scene.set_camera_render_settings(sceneId, cameraId, {
       archive_session: context.archive,
-      output_mode: 'final_color',
       vision: { render_mode: mode },
     });
     if (!context.current()) return false;
@@ -972,12 +970,6 @@ let sceneCameraBindingRefreshPromise = null;
 let sceneCameraBindingLastRefreshAt = 0;
 const SCENE_CAMERA_BINDING_REFRESH_INTERVAL_MS = 1000;
 
-const sceneGridEnabledFromSnapshot = (snapshot = {}) => {
-  if (typeof snapshot?.grid?.enabled === 'boolean') return snapshot.grid.enabled;
-  if (typeof snapshot?.floor_grid_enabled === 'boolean') return snapshot.floor_grid_enabled;
-  return null;
-};
-
 const applySceneSnapshot = (sceneId, payload, { preservePose = false, preserveEnvironment = false } = {}) => {
   const snapshot = payload;
   if (!snapshot || typeof snapshot !== 'object' || Array.isArray(snapshot)) {
@@ -1005,8 +997,6 @@ const applySceneSnapshot = (sceneId, payload, { preservePose = false, preserveEn
   const normalizedSceneId =
     snapshot.scene_id ?? snapshot.sceneId ?? snapshot.id ?? sceneId ?? DEFAULT_SCENE_NAME;
   if (!preserveEnvironment) {
-    const gridEnabled = sceneGridEnabledFromSnapshot(snapshot);
-    if (gridEnabled !== null) sceneGridEnabled.value = gridEnabled;
     const sun = snapshot.sun && typeof snapshot.sun === 'object' ? snapshot.sun : {};
     const lightDirection = Array.isArray(sun.direction) ? sun.direction : [1, 1, 1];
     sceneLightSettings.enabled = sun.enabled !== false;
@@ -1145,7 +1135,7 @@ const syncSceneCameraBinding = async (sceneId, { preservePose = false } = {}) =>
     ]);
     if (!current() || [snapshot, environment].some(value => value.archive_session !== archive || value.scene !== sceneId)) return false;
     applySceneSnapshot(sceneId, { ...snapshot, scene_id: snapshot.scene,
-      sun: environment.sun, grid: environment.grid }, { preservePose,
+      sun: environment.sun }, { preservePose,
       ...(environmentRevision !== mainEnvironmentRevision || mainEnvironmentWrites.size
         ? { preserveEnvironment: true } : {}) });
     broadcastViewportControlsState();
@@ -1627,36 +1617,6 @@ const setViewportUiModeFromPanel = (mode) => {
   return getEditorControlsState();
 };
 
-const setSceneGridEnabledFromPanel = async (enabled, requestedSceneId = '') => {
-  const context = beginEnvironmentWrite('grid');
-  if (!context.current()) return false;
-  const { sceneId } = context;
-  const requested = String(requestedSceneId || '').trim();
-  const nextEnabled = Boolean(enabled);
-  const scope = { archive_session: context.archive };
-  try {
-    if (requested && requested !== sceneId) {
-      context.finish();
-      await syncSceneCameraBinding(sceneId, { preservePose: true });
-      if (!context.current()) return false;
-      broadcastViewportControlsState();
-      return getEditorControlsState();
-    }
-
-    await editorApi.scene.set_environment(sceneId, { ...scope, grid: { enabled: nextEnabled } });
-    if (!context.current()) return false;
-    sceneGridEnabled.value = nextEnabled;
-    broadcastViewportControlsState();
-    return getEditorControlsState();
-  } catch (error) {
-    if (!context.current()) return false;
-    logError('更新场景编辑网格失败', error);
-    return false;
-  } finally {
-    context.finish();
-  }
-};
-
 const applyPhysicsFromSettings = async (nextParams = {}) => {
   if (!viewCurrent() || !environmentArchiveSession.value) return false;
   const current = getPhysicsSnapshot();
@@ -1689,7 +1649,6 @@ const getEditorControlsState = () => ({
     active: item.mode === viewportUiMode.value,
   })),
   cameraSpeed: Number(cameraSpeed.value),
-  gridEnabled: Boolean(sceneGridEnabled.value),
   physics: getPhysicsSnapshot(),
 });
 
@@ -1710,7 +1669,6 @@ const registerEditorControls = () => {
       },
       setViewportUiMode: payload => setViewportUiModeFromPanel(payload.mode),
       setCameraSpeed: payload => setCameraSpeedFromPanel(payload.value),
-      setGridEnabled: payload => setSceneGridEnabledFromPanel(payload.enabled, payload.sceneId),
     },
   });
 };
@@ -1935,7 +1893,7 @@ provideCreativePanelState(() => ({
   mainVisionDenoiserBusy: mainVisionDenoiserBusy.value, mainVisionStablePlanesBusy: mainVisionStablePlanesBusy.value,
   mainVisionAccumulationError: mainVisionAccumulationError.value, mainVisionDenoiseError: mainVisionDenoiseError.value,
   mainVisionDenoiserError: mainVisionDenoiserError.value, mainVisionStablePlanesError: mainVisionStablePlanesError.value,
-  cameraSpeed: cameraSpeed.value, sceneGridEnabled: sceneGridEnabled.value, viewportUiMode: viewportUiMode.value,
+  cameraSpeed: cameraSpeed.value, viewportUiMode: viewportUiMode.value,
   sceneLightSettings: { enabled: sceneLightSettings.enabled, direction: { ...sceneLightSettings.direction } },
   sceneLightBusy: sceneLightBusy.value,
   physics: getPhysicsSnapshot(),

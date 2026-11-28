@@ -10,7 +10,7 @@ const source = parse(fs.readFileSync(new URL('../../src/views/layout/MainPage.vu
 const names = ['mainRenderModeLabel', 'mainVisionRenderMode',
   'currentMainSceneId', 'currentMainCameraId', 'currentMainCamera', 'pendingMainRenderSelection',
   'mainRenderOperations', 'mainCameraOperation', 'retireMainRenderOperations',
-  'selectMainRenderMode', 'isVector3', 'sceneGridEnabledFromSnapshot', 'applySceneSnapshot'];
+  'selectMainRenderMode', 'isVector3', 'applySceneSnapshot'];
 const options = [
   ['Accumulation', 'toggleMainVisionAccumulation', [], 'accumulation'],
   ['Denoise', 'toggleMainVisionDenoise', [], 'denoise'],
@@ -35,7 +35,7 @@ function mount(write) {
     const viewCurrent=()=>live, currentSceneId=ref('scene.ini'), environmentArchiveSession=ref('archive');
     const cameraBindingState=ref({sceneId:'scene.ini',cameraId:'camera',cameraHandle:12,archiveSession:'archive'});
     const cameraState=ref({position:[0,0,0],forward:[0,0,1],up:[0,1,0],fov:60});
-    const sceneGridEnabled=ref(true), sceneLightSettings={direction:{}};
+    const sceneLightSettings={direction:{}};
     ${declarations}
     mainVisionRenderMode.value='restir';
     currentMainCamera.value={camera_id:'camera',handle:12,archive_session:'archive'};

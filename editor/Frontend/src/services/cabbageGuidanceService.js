@@ -18,7 +18,6 @@ const SELECTOR_KEYS = Object.freeze({
   'settings-viewport': '[data-guidance="settings-viewport"]',
   'settings-viewport-ui': '[data-guidance="settings-viewport-ui"]',
   'settings-camera-speed': '[data-guidance="settings-camera-speed"]',
-  'settings-grid': '[data-guidance="settings-grid"]',
   'object-transform': '[data-guidance="object-transform"]',
   'object-position-x': '[data-guidance="object-position-x"]',
   'object-rotation-y': '[data-guidance="object-rotation-y"]',

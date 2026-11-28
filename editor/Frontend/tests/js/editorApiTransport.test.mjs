@@ -81,7 +81,6 @@ test('camera render settings use one scoped V8 patch and expose no legacy Web se
   const { editorApi, host } = await loadEditorApi();
   const patch = {
     archive_session: 'archive-7',
-    output_mode: 'final_color',
     vision: { render_mode: 'restir', accumulation: true },
   };
 

@@ -48,7 +48,7 @@ mechanics 使用具名 mass/restitution/damping/body_type 和三个布尔值的 
 不保留 setActorState/setActorPhysics Web alias；其原非 Web 契约共享 typed 写操作。
 
 getEnvironment(scene,{archive_session}) / setEnvironment(scene,patch) 是唯一 Web 环境读写。
-patch 顶层只接受 archive_session、sun、grid、physics；sun 使用 enabled/direction，grid 使用 enabled，
+patch 顶层只接受 archive_session、sun、physics。sun 使用 enabled/direction，
 physics 使用 gravity/floor_y/floor_restitution/fixed_dt。至少包含一个非空更新组，方向/重力为三元有限数值数组，
 标量须为有限 float 范围数值；未知字段和无效混合 patch 在写入前拒绝，省略字段保持、false 有效。
 原生 owner 执行前复核 scene/archive，返回实际环境领域快照，不含 transport data 包装；
@@ -67,7 +67,7 @@ captureScreenshot(scene,cameraId,{archive_session,path?}) 是唯一 Web 截图�
 scene/cameraId/archive_session 必须为非空字符串；cameraId 精确匹配 ID，不接受显示名或句柄。
 path 省略时打开原生 PNG 保存对话框；指定时为非空、不含 NUL 的路径字符串，未知字段/空值拒绝。
 返回 status、archive_session、scene、camera_id、path；取消为 canceled/path 空，不执行保存；原生失败为带 code 的拒绝。
-执行前与模态选择后复核归档/相机身份；保存只使用当前相机，不修改姿态、输出模式或离屏状态。
+执行前与模态选择后复核归档/相机身份；保存只使用当前相机，不修改姿态或离屏状态。
 删除 sceneTools.selectScreenshotPath/saveScreenshot 和无生产调用方的 viewport.capture；不新增别名或回退。
 三个旧 CEF 路由关闭，Python 原权限保留；离屏相机配置属于非 Web 语义，和现有相机保存共享同一原生保存函数。
 

@@ -54,20 +54,18 @@ test('applied focus synchronizes only the matching native camera without resubmi
   assert.equal(h.bus.listenerCount('camera-pose-applied'), 1);
 });
 
-test('main controls use the same scoped environment patch for light, grid and physics', async t => {
+test('main controls use the same scoped environment patch for light and physics', async t => {
   const h = mountMainPage(t);
   await h.mount();
   h.calls.length = 0;
-  assert.deepEqual(await h.page.setSceneGridEnabledFromPanel(false), h.page.getEditorControlsState());
-  assert.equal(h.page.sceneGridEnabled.value, false);
+  assert.equal(Object.hasOwn(h.page.getEditorControlsState(), 'gridEnabled'), false);
   assert.equal(await h.page.updateSceneLight(), true);
   assert.equal(await h.page.handleApplyPhysics(), true);
   const writes = h.calls.filter(call => call[0] === 'environmentWrite');
-  assert.equal(writes.length, 3);
-  assert.deepEqual(writes[0], ['environmentWrite', 'scene_v3.xml', { archive_session: 'main-archive', grid: { enabled: false } }]);
-  assert.deepEqual(writes[1][2], { archive_session: 'main-archive', sun: { enabled: true, direction: [1, 1, 1] } });
-  assert.equal(writes[2][2].archive_session, 'main-archive');
-  assert.ok(Array.isArray(writes[2][2].physics.gravity));
+  assert.equal(writes.length, 2);
+  assert.deepEqual(writes[0][2], { archive_session: 'main-archive', sun: { enabled: true, direction: [1, 1, 1] } });
+  assert.equal(writes[1][2].archive_session, 'main-archive');
+  assert.ok(Array.isArray(writes[1][2].physics.gravity));
   assert.equal(await h.page.loadPhysicsParams(), true);
   assert.equal(h.page.physicsParams.value.gravityY, -8);
   assert.equal(h.page.physicsParams.value.floorY, 4);

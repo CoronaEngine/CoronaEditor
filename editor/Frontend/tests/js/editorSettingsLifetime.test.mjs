@@ -13,7 +13,7 @@ const compiled = compileScript(descriptor, { id: 'editor-settings-lifetime' }).c
 function mount(t, overrides = {}) {
   const requests = [], timers = new Map(), warnings = [], keys = [];
   let mounted, unmounted, receive, sequence = 0, unsubscribed = 0;
-  const viewport = { available: true, sceneId: 'scene', cameraId: 'camera', cameraSpeed: 0.3, gridEnabled: true };
+  const viewport = { available: true, sceneId: 'scene', cameraId: 'camera', cameraSpeed: 0.3 };
   const component = new Function('ref', 'computed', 'onMounted', 'onBeforeUnmount', 'useI18n', 'setLocale',
     'appService', 'editorApi', 'aiSettings', 'viewportControlsService', 'createViewLifetime', 'window', 'console', compiled)(
     ref, computed, fn => { mounted = fn; }, fn => { unmounted = fn; },
@@ -92,19 +92,6 @@ test('EditorSettings clears speed debounce and ignores its queued callback after
   callback();
   await Promise.resolve();
   assert.equal(page.requests.length, 0);
-});
-
-test('EditorSettings retired grid failure cannot refresh or clear busy state', async t => {
-  const pending = deferred();
-  const page = mount(t, { request: () => pending.promise });
-  page.state.syncViewportControls(page.viewport);
-  const applying = page.state.setGridEnabled();
-  page.dispose();
-  pending.reject(new Error('aborted grid'));
-  await applying;
-  assert.equal(page.requests.length, 1);
-  assert.equal(page.state.gridApplying.value, true);
-  assert.deepEqual(page.warnings, []);
 });
 
 test('EditorSettings ignores a queued subscription update and cannot restart retired actions', async t => {

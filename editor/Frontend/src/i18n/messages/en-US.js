@@ -127,8 +127,6 @@ export default {
     viewport: 'Viewport',
     viewportUiMode: 'Viewport UI',
     cameraSpeed: 'Camera Move Speed',
-    editGrid: 'Editor Grid',
-    editGridDescription: 'Show the ground reference grid for the current scene',
     viewport2dDescription: 'Use standard flat-screen 2D UI',
     viewport3dDescription: 'Use light-field stereoscopic 3D UI',
     run: 'Run',

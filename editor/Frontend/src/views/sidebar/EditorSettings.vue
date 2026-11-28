@@ -89,18 +89,6 @@
           />
           <strong>{{ cameraSpeedLabel }}</strong>
         </label>
-
-        <label class="viewport-setting-row grid-setting" data-guidance="settings-grid">
-          <span class="setting-label">{{ t('editorSettings.editGrid') }}</span>
-          <input
-            v-model="viewportControlState.gridEnabled"
-            type="checkbox"
-            :disabled="!viewportControlState.available || gridApplying"
-            :title="t('editorSettings.editGridDescription')"
-            @change="setGridEnabled"
-          />
-          <span class="setting-description">{{ t('editorSettings.editGridDescription') }}</span>
-        </label>
       </section>
 
       <section class="settings-section">
@@ -194,10 +182,8 @@ const defaultViewportControls = {
     { mode: 'stereo3d', label: '3D UI' },
   ],
   cameraSpeed: 0.2,
-  gridEnabled: true,
 };
 const viewportControlState = ref({ ...defaultViewportControls });
-const gridApplying = ref(false);
 const renderApplying = ref(false);
 const renderError = ref(false);
 const cameraSpeedLabel = computed(() => Number(viewportControlState.value.cameraSpeed || 0).toFixed(2));
@@ -226,9 +212,6 @@ function normalizeViewportControls(state = {}) {
     cameraSpeed: Number.isFinite(speed)
       ? Math.min(2, Math.max(0.01, speed))
       : defaultViewportControls.cameraSpeed,
-    gridEnabled: typeof state.gridEnabled === 'boolean'
-      ? state.gridEnabled
-      : defaultViewportControls.gridEnabled,
   };
 }
 
@@ -292,26 +275,6 @@ function handleCameraSpeedInput() {
     speedApplyTimer = null;
     void applyCameraSpeed(viewportControlState.value.cameraSpeed);
   }, 60);
-}
-
-async function setGridEnabled() {
-  if (!viewLifetime.current() || gridApplying.value || !viewportControlState.value.sceneId) return;
-  const enabled = Boolean(viewportControlState.value.gridEnabled);
-  const sceneId = viewportControlState.value.sceneId;
-  gridApplying.value = true;
-  try {
-    await updateViewportControls({
-      action: 'setGridEnabled',
-      enabled,
-      sceneId,
-    });
-  } catch (error) {
-    if (!viewLifetime.current()) return;
-    console.warn('[EditorSettings] failed to update scene grid', error);
-    requestViewportControlsState();
-  } finally {
-    if (viewLifetime.current()) gridApplying.value = false;
-  }
 }
 
 function viewportModeTitle(item = {}) {
@@ -636,16 +599,6 @@ function goHome() {
   font-size: 12px;
   font-variant-numeric: tabular-nums;
   text-align: right;
-}
-
-.grid-setting {
-  grid-template-columns: minmax(76px, auto) auto minmax(0, 1fr);
-}
-
-.grid-setting input[type='checkbox'] {
-  width: 16px;
-  height: 16px;
-  accent-color: var(--accent-strong);
 }
 
 .setting-description {

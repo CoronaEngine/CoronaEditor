@@ -31,7 +31,7 @@ function mainHost({ fail = false, pending = false, denoiseFail = false, denoiseR
     'pendingMainAccumulationSelection', 'toggleMainVisionAccumulation',
     'mainVisionStablePlanes', 'mainVisionStablePlanesBusy', 'mainVisionStablePlanesError',
     'pendingMainStablePlanesSelection', 'toggleMainVisionStablePlanes',
-    'isVector3', 'sceneGridEnabledFromSnapshot', 'applySceneSnapshot',
+    'isVector3', 'applySceneSnapshot',
   ]);
   const api = { set_camera_render_settings: async (scene, camera, patch) => {
     patches.push([scene, camera, structuredClone(patch)]);
@@ -83,7 +83,7 @@ function mainHost({ fail = false, pending = false, denoiseFail = false, denoiseR
     const resetRealtimeCameraInput = () => {}, scheduleCameraViewportSync = () => {};
     const syncViewportUiMode = () => {}, scheduleCameraUpdate = () => {};
     const isRealtimeCameraInputActive = () => false;
-    const sceneGridEnabled = ref(true), sceneLightSettings = { direction: {} };
+    const sceneLightSettings = { direction: {} };
     const cameraState = ref({ vision_denoise: false, position: [0, 0, 0], forward: [0, 0, 1], up: [0, 1, 0], fov: 60 });
     let actorPickIndex, lastCameraViewportSignature;
     ${source}
@@ -108,7 +108,7 @@ test('main menu selects ReSTIR on the current camera without a backend selector'
   assert.equal(await host.selectMainRenderMode(option.value), true);
   assert.deepEqual(host.calls, [['mode', 'scene.ini', 'camera-2', 'restir']]);
   assert.deepEqual(host.patches[0], ['scene.ini', 'camera-2', {
-    archive_session: 'archive', output_mode: 'final_color', vision: { render_mode: 'restir' },
+    archive_session: 'archive', vision: { render_mode: 'restir' },
   }]);
   assert.equal(host.mainVisionRenderMode.value, 'restir');
   assert.match(host.mainRenderModeLabel.value, /ReSTIR/);
@@ -147,7 +147,7 @@ test('detached camera selects ReSTIR and stores the returned camera mode', async
   } } });
   await host.selectVisionRenderMode('restir');
   assert.deepEqual(calls, [['scene.ini', 'camera-3', {
-    archive_session: 'archive', output_mode: 'final_color', vision: { render_mode: 'restir' },
+    archive_session: 'archive', vision: { render_mode: 'restir' },
   }]]);
   assert.equal(host.camera.value.vision_render_mode, 'restir');
   assert.equal(host.visionRenderMode.value, 'restir');

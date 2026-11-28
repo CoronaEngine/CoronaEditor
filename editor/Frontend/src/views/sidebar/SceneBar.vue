@@ -1079,7 +1079,6 @@ const normalizeCameraPayload = (cam) => ({
   height: cam.height || 0,
   fov: cam.fov ?? null,
   handle: normalizeHandle(cam.opaque_handle ?? cam.handle ?? cam.camera_handle),
-  output_mode: cam.output_mode || 'final_color',
   deletable: cam.deletable !== false,
   move_speed: cam.move_speed || 1,
   view_open: !!cam.view_open,

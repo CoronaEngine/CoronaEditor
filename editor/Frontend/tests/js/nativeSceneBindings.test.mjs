@@ -112,7 +112,7 @@ test('environment has one raw V8 read and patch for sun, grid and physics with J
   const { native } = nativeScene(t);
   const calls = [];
   const result = { archive_session: 'archive', scene: 'scene.ini', sun: { enabled: false },
-    grid: { enabled: true }, physics: { gravity: [0, -9, 0], fixed_dt: 0.01 } };
+    physics: { gravity: [0, -9, 0], fixed_dt: 0.01 } };
   for (const method of ['read_environment', 'set_environment']) {
     native[method] = async (...args) => { calls.push([method, ...args]); return result; };
   }
@@ -120,7 +120,7 @@ test('environment has one raw V8 read and patch for sun, grid and physics with J
   t.after(() => { JSON.stringify = stringify; JSON.parse = parse; });
   JSON.stringify = JSON.parse = () => { throw new Error('JSON environment is forbidden'); };
   const scope = { archive_session: 'archive' };
-  const patch = { ...scope, sun: { enabled: false }, grid: { enabled: true }, physics: { gravity: [0, -9, 0] } };
+  const patch = { ...scope, sun: { enabled: false }, physics: { gravity: [0, -9, 0] } };
   assert.equal(await editorApi.scene.read_environment('scene.ini', scope), result);
   assert.equal(await editorApi.scene.set_environment('scene.ini', patch), result);
   assert.deepEqual(calls, [['read_environment', 'scene.ini', scope], ['set_environment', 'scene.ini', patch]]);
@@ -134,7 +134,7 @@ test('environment preserves native scope failures without retrying granular mani
   const failure = Object.assign(new Error('old archive'), { code: 'PROJECT_CONTEXT_CHANGED' });
   native.read_environment = native.set_environment = () => Promise.reject(failure);
   await assert.rejects(editorApi.scene.read_environment('scene.ini', { archive_session: 'old' }), error => error === failure);
-  await assert.rejects(editorApi.scene.set_environment('scene.ini', { archive_session: 'old', grid: { enabled: false } }),
+  await assert.rejects(editorApi.scene.set_environment('scene.ini', { archive_session: 'old', sun: { enabled: false } }),
     error => error === failure);
 });
 

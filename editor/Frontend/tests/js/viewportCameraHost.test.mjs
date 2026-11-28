@@ -23,7 +23,7 @@ const names = new Set([
   'setEditorCameraInputLock',
   'handleMainViewportBlur', 'handleMainViewportVisibility',
   'onMouseDown', 'onMouseMove', 'onMouseUp', 'sendCameraUpdateFast', 'handleCameraMove',
-  'coerceNumber', 'setCameraSpeedFromPanel', 'isVector3', 'sceneGridEnabledFromSnapshot', 'applySceneSnapshot',
+  'coerceNumber', 'setCameraSpeedFromPanel', 'isVector3', 'applySceneSnapshot',
   'currentMainCamera', 'currentMainCameraId', 'mainVisionDenoise', 'mainVisionDenoiseError',
   'pendingMainDenoiseSelection',
   'mainVisionDenoiser', 'mainVisionDenoiserError', 'pendingMainDenoiserSelection',
@@ -41,7 +41,7 @@ const makeHost = new Function('deps', `
   const DEFAULT_SCENE_NAME = 'scene.ini';
   const currentSceneId = ref(DEFAULT_SCENE_NAME);
   const getViewportRenderRect = () => ({ left: 0, top: 0, width: 800, height: 600 });
-  const sceneGridEnabled = ref(true), sceneLightSettings = reactive({ direction: {} });
+  const sceneLightSettings = reactive({ direction: {} });
   const mainVisionRenderMode = ref('path_tracing');
   let actorPickIndex, lastCameraViewportSignature = '', pendingMainRenderSelection = null;
   const scheduleCameraViewportSync = () => {}, syncViewportUiMode = () => {};

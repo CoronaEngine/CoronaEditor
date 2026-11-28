@@ -127,8 +127,6 @@ export default {
     viewport: '视口',
     viewportUiMode: '视口 UI',
     cameraSpeed: '摄像机移动速度',
-    editGrid: '编辑网格',
-    editGridDescription: '显示当前场景的地面参考网格',
     viewport2dDescription: '使用普通屏幕 2D UI',
     viewport3dDescription: '使用光场屏立体 3D UI',
     run: '运行',

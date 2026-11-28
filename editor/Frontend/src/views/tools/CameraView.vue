@@ -267,7 +267,6 @@ const selectVisionRenderMode = async (mode) => {
   try {
     const result = await editorApi.scene.set_camera_render_settings(sceneId, cameraId, {
       archive_session: cameraArchiveSession,
-      output_mode: 'final_color',
       vision: { render_mode: mode },
     });
     visionRenderMode.value = result?.pending ? mode : result?.vision?.render_mode || mode;

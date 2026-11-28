@@ -12,7 +12,6 @@ function retire(h, kind) {
 for (const retirement of ['unmount', 'archive', 'scene']) {
   for (const [name, method, args, native] of [
     ['light', 'updateSceneLight', ['x'], 'set_environment'],
-    ['grid', 'setSceneGridEnabledFromPanel', [false], 'set_environment'],
     ['physics write', 'handleApplyPhysics', [], 'set_environment'],
     ['physics read', 'loadPhysicsParams', [], 'read_environment'],
     ['resource status', 'pollProjectResourceLoadStatus', [], 'get_project_load_status'],
@@ -23,7 +22,7 @@ for (const retirement of ['unmount', 'archive', 'scene']) {
       (name === 'resource status' ? h.api.project : h.api.scene)[native] = () => pending.promise;
       const action = h.page[method](...args);
       retire(h, retirement);
-      const before = { grid: h.page.sceneGridEnabled.value, physics: { ...h.page.physicsParams.value },
+      const before = { physics: { ...h.page.physicsParams.value },
         busy: h.page.sceneLightBusy.value, records: h.records.length, calls: h.calls.length,
         errors: h.errors.length, status: h.page.projectResourceLoadStatus.value, timers: h.timers.size };
       if (failure) pending.reject(Error('retired operation failed'));
@@ -31,7 +30,7 @@ for (const retirement of ['unmount', 'archive', 'scene']) {
         physics: { gravity: [99, 99, 99] }, active: true, loading: true });
       const result = await action;
       if (name !== 'resource status') assert.equal(result, false);
-      assert.deepEqual({ grid: h.page.sceneGridEnabled.value, physics: { ...h.page.physicsParams.value },
+      assert.deepEqual({ physics: { ...h.page.physicsParams.value },
         busy: h.page.sceneLightBusy.value, records: h.records.length, calls: h.calls.length,
         errors: h.errors.length, status: h.page.projectResourceLoadStatus.value, timers: h.timers.size }, before);
     });
@@ -57,14 +56,6 @@ test('light scope replacement permits a new edit and old finally cannot release 
   const current = h.page.updateSceneLight(); assert.equal(writes, 2);
   first.resolve({}); assert.equal(await old, false); assert.equal(h.page.sceneLightBusy.value, true);
   next.resolve({}); assert.equal(await current, true); assert.equal(h.page.sceneLightBusy.value, false);
-});
-
-test('an older grid reply cannot undo a newer grid choice', async t => {
-  const h = mountMainPage(t); await h.mount(); const pending = deferred(); let writes = 0;
-  h.api.scene.set_environment = () => ++writes === 1 ? pending.promise : Promise.resolve({});
-  const old = h.page.setSceneGridEnabledFromPanel(false);
-  await h.page.setSceneGridEnabledFromPanel(true);
-  pending.resolve({}); assert.equal(await old, false); assert.equal(h.page.sceneGridEnabled.value, true);
 });
 
 test('physics read started before a new write cannot replace the submitted values', async t => {
@@ -96,15 +87,14 @@ test('stopping resource polling also retires its in-flight sample', async t => {
   assert.equal(h.page.projectResourceLoadStatus.value, null); assert.equal(h.timers.size, 0);
 });
 
-test('camera projection read before environment edits cannot roll back light and grid', async t => {
+test('camera projection read before environment edits cannot roll back light', async t => {
   const h = mountMainPage(t); await h.mount(); const pending = deferred();
   h.api.scene.read_environment = () => pending.promise;
   const reading = h.page.syncSceneCameraBinding('scene_v3.xml');
   h.page.sceneLightSettings.direction.x = 7; await h.page.updateSceneLight('x');
-  await h.page.setSceneGridEnabledFromPanel(false);
-  pending.resolve({ archive_session: 'main-archive', scene: 'scene_v3.xml', sun: { direction: [1, 1, 1] }, grid: { enabled: true } });
+  pending.resolve({ archive_session: 'main-archive', scene: 'scene_v3.xml', sun: { direction: [1, 1, 1] } });
   await reading;
-  assert.equal(h.page.sceneLightSettings.direction.x, 7); assert.equal(h.page.sceneGridEnabled.value, false);
+  assert.equal(h.page.sceneLightSettings.direction.x, 7);
 });
 
 

@@ -64,7 +64,7 @@ function mainDeps() {
           vision_accumulation: true, vision_denoise: false, vision_denoiser: 'relax', vision_stable_planes: false }] }; }, index: async (...args) => { calls.push(['actors', ...args]); return { ...identity, actors: [{ actor_guid: 'actor', name: 'Probe' }] }; } }),
 
       read_environment: async (...args) => { calls.push(['environment', ...args]); return { ...identity,
-        sun: { enabled: false, direction: [3, 2, 1] }, grid: { enabled: false } }; },
+        sun: { enabled: false, direction: [3, 2, 1] } }; },
 
     } },
   };
@@ -114,7 +114,6 @@ test('main viewport composes complete camera, environment and pick projections u
   assert.equal(scene, 'scene.ini'); assert.equal(payload.active_camera_id, 'main');
   assert.equal(payload.cameras[0].vision_denoiser, 'relax');
   assert.deepEqual(payload.sun, { enabled: false, direction: [3, 2, 1] });
-  assert.deepEqual(payload.grid, { enabled: false });
   assert.equal(payload.actors[0].actor_guid, 'actor');
   assert.equal(options.preservePose, true);
 });
